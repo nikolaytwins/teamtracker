@@ -2,7 +2,11 @@ import Database from "better-sqlite3";
 import path from "path";
 import { DEFAULT_STATUS, type PmStatusKey } from "./statuses";
 
-const dbPath = path.join(process.cwd(), "data", "pm-board.db");
+function getPmBoardSqlitePath(): string {
+  const override = process.env.PM_BOARD_SQLITE_PATH?.trim();
+  if (override) return path.resolve(override);
+  return path.join(process.cwd(), "data", "pm-board.db");
+}
 
 let _db: Database.Database | null = null;
 
@@ -11,7 +15,7 @@ function ensureDb() {
   const fs = require("fs");
   const dir = path.join(process.cwd(), "data");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  _db = new Database(dbPath);
+  _db = new Database(getPmBoardSqlitePath());
   _db.exec(`
     CREATE TABLE IF NOT EXISTS pm_cards (
       id TEXT PRIMARY KEY,

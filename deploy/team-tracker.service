@@ -1,0 +1,18 @@
+[Unit]
+Description=Team Tracker (Next.js, tt.twinlabs.ru, корень /)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.openclaw/workspace/team-tracker
+Environment=NODE_ENV=production
+Environment=PORT=3005
+Environment=TEAM_TRACKER_ROOT_DOMAIN=1
+Environment=AGENCY_SQLITE_PATH=/root/.openclaw/workspace/twinworks/prisma/dev.db
+Environment=PM_BOARD_SQLITE_PATH=/root/.openclaw/workspace/agency-pm-board/data/pm-board.db
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
