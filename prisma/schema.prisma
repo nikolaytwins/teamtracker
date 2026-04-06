@@ -168,6 +168,7 @@ model AgencyLead {
   status          String    @default("new") // new, contact_established, commercial_proposal, thinking, paid, pause
   nextContactDate DateTime? // Дата следующего касания
   manualDateSet   Boolean   @default(false) // Флаг, что дата установлена вручную
+  isRecurring     Boolean   @default(false) // Постоянник / повторное обращение
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

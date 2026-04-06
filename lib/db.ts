@@ -129,3 +129,25 @@ export function getCard(id: string): PmCard | null {
   const row = db.prepare("SELECT * FROM pm_cards WHERE id = ?").get(id);
   return (row as PmCard) ?? null;
 }
+
+export function getCardBySourceProjectId(sourceProjectId: string): PmCard | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM pm_cards WHERE source_project_id = ? LIMIT 1").get(sourceProjectId);
+  return (row as PmCard) ?? null;
+}
+
+/** Создать карточку канбана для проекта агентства, если её ещё нет. */
+export function ensureCardForAgencyProject(project: {
+  id: string;
+  name: string;
+  deadline: string | null;
+}): PmCard {
+  const existing = getCardBySourceProjectId(project.id);
+  if (existing) return existing;
+  return createCard({
+    source_project_id: project.id,
+    name: project.name,
+    deadline: project.deadline,
+    status: DEFAULT_STATUS,
+  });
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Database from 'better-sqlite3'
 import { getAgencySqlitePath } from '@/lib/agency-sqlite'
+import { ensureCardForAgencyProject } from '@/lib/db'
 
 const dbPath = getAgencySqlitePath()
 
@@ -63,8 +64,22 @@ export async function POST(
       `).run(newExpId, newProjectId, exp.employeeName, exp.employeeRole, exp.amount, exp.notes)
     }
 
-    const newProject = db.prepare('SELECT * FROM AgencyProject WHERE id = ?').get(newProjectId)
+    const newProject = db.prepare('SELECT * FROM AgencyProject WHERE id = ?').get(newProjectId) as {
+      id: string
+      name: string
+      deadline: string | null
+    }
     db.close()
+
+    try {
+      ensureCardForAgencyProject({
+        id: newProject.id,
+        name: newProject.name,
+        deadline: newProject.deadline ?? null,
+      })
+    } catch (syncErr) {
+      console.error('ensureCardForAgencyProject after copy:', syncErr)
+    }
 
     return NextResponse.json({ success: true, project: newProject })
   } catch (error: any) {

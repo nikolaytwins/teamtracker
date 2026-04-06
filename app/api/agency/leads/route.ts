@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Database from 'better-sqlite3'
 import { getAgencySqlitePath } from '@/lib/agency-sqlite'
+import { ensureAgencyLeadsColumns } from '@/lib/agency-leads-schema'
 
 const dbPath = getAgencySqlitePath()
 
@@ -52,6 +53,8 @@ export async function GET() {
       db.close()
       return NextResponse.json([])
     }
+
+    ensureAgencyLeadsColumns(db)
     
     const leads = db.prepare(`
       SELECT * FROM agency_leads
@@ -78,13 +81,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { contact, source, taskDescription, status = 'new' } = body
+    const { contact, source, taskDescription, status = 'new', isRecurring } = body
     
     if (!contact || !source) {
       return NextResponse.json({ error: 'Contact and source are required' }, { status: 400 })
     }
     
     const db = getDb()
+    ensureAgencyLeadsColumns(db)
     
     // Вычисляем автоматическую дату, если статус требует этого
     const autoDate = calculateNextContactDate(status)
@@ -93,10 +97,11 @@ export async function POST(request: NextRequest) {
     
     const id = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
+    const recurring = Boolean(isRecurring) ? 1 : 0
     db.prepare(`
-      INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `).run(id, contact, source, taskDescription || null, status, nextContactDate, manualDateSet ? 1 : 0)
+      INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, isRecurring, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `).run(id, contact, source, taskDescription || null, status, nextContactDate, manualDateSet ? 1 : 0, recurring)
     
     // Сохраняем событие создания в историю
     const historyId = `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`

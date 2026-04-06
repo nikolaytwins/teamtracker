@@ -13,12 +13,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
   try {
     const { id } = await context.params;
     const db = getDb();
-    const row = getOutreachById(db, id, "profi");
+    const row = getOutreachById(db, id, "threads");
     db.close();
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(row);
   } catch (error) {
-    console.error("Error fetching profi response:", error);
+    console.error("Error fetching threads response:", error);
     return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
   }
 }
@@ -30,12 +30,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const { status, refundAmount, projectAmount, notes } = body;
 
     const db = getDb();
-    const row = patchOutreachResponse(db, id, "profi", { status, refundAmount, projectAmount, notes });
+    const row = patchOutreachResponse(db, id, "threads", { status, refundAmount, projectAmount, notes });
     db.close();
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ success: true, item: row });
   } catch (error) {
-    console.error("Error updating profi response:", error);
+    console.error("Error updating threads response:", error);
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 }
@@ -44,12 +44,12 @@ export async function DELETE(_request: NextRequest, context: { params: Promise<{
   try {
     const { id } = await context.params;
     const db = getDb();
-    const ok = deleteOutreachResponse(db, id, "profi");
+    const ok = deleteOutreachResponse(db, id, "threads");
     db.close();
     if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting profi response:", error);
+    console.error("Error deleting threads response:", error);
     return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
 }

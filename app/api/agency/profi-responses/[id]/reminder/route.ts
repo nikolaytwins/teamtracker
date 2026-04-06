@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Database from 'better-sqlite3'
 import { getAgencySqlitePath } from '@/lib/agency-sqlite'
+import { getOutreachById } from '@/lib/outreach-api'
 
 const dbPath = getAgencySqlitePath()
 
@@ -30,7 +31,7 @@ export async function POST(
     }
 
     const db = getDb()
-    const profi = db.prepare('SELECT * FROM profi_responses WHERE id = ?').get(id) as {
+    const profi = getOutreachById(db, id, 'profi') as {
       id: string
       createdAt: string
       cost: number

@@ -34,6 +34,12 @@ export default function Navigation() {
               >
                 Проекты и финансы
               </Link>
+              <Link
+                href="/sales/leads"
+                className={linkClass(pathname?.startsWith("/sales") ?? false)}
+              >
+                Продажи
+              </Link>
             </div>
           </div>
         </div>

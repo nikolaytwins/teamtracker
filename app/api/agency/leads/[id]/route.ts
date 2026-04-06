@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Database from 'better-sqlite3'
 import { getAgencySqlitePath } from '@/lib/agency-sqlite'
+import { ensureAgencyLeadsColumns } from '@/lib/agency-leads-schema'
 
 const dbPath = getAgencySqlitePath()
 
@@ -40,6 +41,7 @@ export async function GET(
   try {
     const { id } = await context.params
     const db = getDb()
+    ensureAgencyLeadsColumns(db)
     const lead = db.prepare('SELECT * FROM agency_leads WHERE id = ?').get(id)
     db.close()
     
@@ -61,9 +63,10 @@ export async function PUT(
   try {
     const { id } = await context.params
     const body = await request.json()
-    const { contact, source, taskDescription, status, nextContactDate } = body
+    const { contact, source, taskDescription, status, nextContactDate, isRecurring } = body
     
     const db = getDb()
+    ensureAgencyLeadsColumns(db)
     
     // Получаем текущий лид
     const currentLead = db.prepare('SELECT * FROM agency_leads WHERE id = ?').get(id) as any
@@ -90,7 +93,16 @@ export async function PUT(
       }
       // Если дата была установлена вручную, не трогаем её
     }
-    
+
+    const recurringVal =
+      isRecurring !== undefined
+        ? Boolean(isRecurring)
+          ? 1
+          : 0
+        : currentLead.isRecurring
+          ? 1
+          : 0
+
     db.prepare(`
       UPDATE agency_leads
       SET contact = COALESCE(?, contact),
@@ -99,6 +111,7 @@ export async function PUT(
           status = COALESCE(?, status),
           nextContactDate = ?,
           manualDateSet = ?,
+          isRecurring = ?,
           updatedAt = datetime('now')
       WHERE id = ?
     `).run(
@@ -108,6 +121,7 @@ export async function PUT(
       status || null,
       finalNextContactDate,
       finalManualDateSet,
+      recurringVal,
       id
     )
     
