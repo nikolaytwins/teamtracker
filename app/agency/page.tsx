@@ -108,12 +108,43 @@ export default function AgencyPage() {
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
   const [editingExpenseValue, setEditingExpenseValue] = useState('')
   
-  // Месяц для фильтрации
+  // Месяц для фильтрации (по дате создания проекта)
   const today = new Date()
   const [selectedYear, setSelectedYear] = useState(today.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1)
+  /** Пока false — не грузим таблицу, чтобы успеть выставить месяц последнего проекта (иначе «пусто» в текущем месяце без данных). */
+  const [monthFilterReady, setMonthFilterReady] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(apiUrl('/api/agency/projects'))
+        const data = (await res.json()) as unknown
+        if (cancelled || !Array.isArray(data) || data.length === 0) return
+        let best = 0
+        for (const p of data as Project[]) {
+          const t = new Date(p.createdAt).getTime()
+          if (!Number.isNaN(t) && t >= best) best = t
+        }
+        if (best > 0) {
+          const d = new Date(best)
+          setSelectedYear(d.getFullYear())
+          setSelectedMonth(d.getMonth() + 1)
+        }
+      } catch {
+        /* оставляем текущий календарный месяц */
+      } finally {
+        if (!cancelled) setMonthFilterReady(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const fetchProjects = useCallback(async () => {
+    if (!monthFilterReady) return
     try {
       const res = await fetch(apiUrl('/api/agency/projects'))
       const data = await res.json()
@@ -210,9 +241,10 @@ export default function AgencyPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedYear, selectedMonth])
+  }, [selectedYear, selectedMonth, monthFilterReady])
 
   const fetchGeneralExpenses = useCallback(async () => {
+    if (!monthFilterReady) return
     try {
       const res = await fetch(apiUrl('/api/agency/general-expenses'))
       const data = await res.json()
@@ -232,12 +264,13 @@ export default function AgencyPage() {
       console.error('Error fetching general expenses:', error)
       setGeneralExpenses([])
     }
-  }, [selectedYear, selectedMonth])
+  }, [selectedYear, selectedMonth, monthFilterReady])
 
   useEffect(() => {
+    if (!monthFilterReady) return
     void fetchProjects()
     void fetchGeneralExpenses()
-  }, [fetchProjects, fetchGeneralExpenses])
+  }, [fetchProjects, fetchGeneralExpenses, monthFilterReady])
 
   const handleAddExpense = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -539,6 +572,9 @@ export default function AgencyPage() {
                 <option key={index + 1} value={index + 1}>{name}</option>
               ))}
             </select>
+            <span className="text-xs text-gray-500 max-w-[11rem] leading-tight hidden md:inline">
+              Фильтр по месяцу создания проекта
+            </span>
             {selectedYear !== today.getFullYear() || selectedMonth !== today.getMonth() + 1 ? (
               <button
                 onClick={() => {

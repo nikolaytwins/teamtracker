@@ -1,6 +1,18 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  basePath: "/pm-board",
-  env: { NEXT_PUBLIC_BASE_PATH: "/pm-board" },
+import type { NextConfig } from "next";
+
+/**
+ * Поддомен (tt.twinlabs.ru): соберите и запустите с TEAM_TRACKER_ROOT_DOMAIN=1 — без basePath, приложение с корня /.
+ * Иначе префикс /pm-board (как за nginx location /pm-board).
+ */
+const root =
+  process.env.TEAM_TRACKER_ROOT_DOMAIN === "1" ||
+  process.env.TEAM_TRACKER_ROOT_DOMAIN === "true";
+
+const basePath = root ? "" : "/pm-board";
+
+const nextConfig: NextConfig = {
+  ...(basePath ? { basePath } : {}),
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
 };
+
 export default nextConfig;

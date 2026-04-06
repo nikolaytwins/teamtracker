@@ -1,0 +1,16 @@
+[Unit]
+Description=Team Tracker (Next.js, корень / для tt.twinlabs.ru)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.openclaw/workspace/team-tracker
+Environment=NODE_ENV=production
+Environment=PORT=3005
+Environment=TEAM_TRACKER_ROOT_DOMAIN=1
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
