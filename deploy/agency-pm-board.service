@@ -1,0 +1,16 @@
+[Unit]
+Description=Agency PM Board (Next.js kanban)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.openclaw/workspace/agency-pm-board
+Environment=NODE_ENV=production
+Environment=PORT=3003
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+# PM Board — только карточки проектов для проджекта (без сумм)
+node_modules
+.next
+*.db
+*.db.backup*
+.env*
