@@ -1,4 +1,5 @@
 # PM Board — только карточки проектов для проджекта (без сумм)
+.DS_Store
 node_modules
 .next
 *.db

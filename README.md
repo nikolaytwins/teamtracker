@@ -52,4 +52,6 @@
 
 ## Деплой
 
-- Старый пример под `/pm-board`: `deploy/agency-pm-board.service`.
+- **Полная инструкция (GitHub, SSH, systemd, nginx, типовые ошибки):** [deploy/VPS-SETUP.md](deploy/VPS-SETUP.md).
+- Пример unit под VPS с путём `/opt/team-tracker`: `deploy/team-tracker.vps.example.service`.
+- Старый пример под `/pm-board` (другие пути на сервере): `deploy/agency-pm-board.service`.

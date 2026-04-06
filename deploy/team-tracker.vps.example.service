@@ -1,0 +1,28 @@
+# Пример для VPS: один репозиторий team-tracker, SQLite в data/ рядом с приложением.
+# 1) Скопировать: sudo cp deploy/team-tracker.vps.example.service /etc/systemd/system/team-tracker.service
+# 2) Править WorkingDirectory и User под ваш сервер
+# 3) Корень домена: TEAM_TRACKER_ROOT_DOMAIN=1 и сборка: TEAM_TRACKER_ROOT_DOMAIN=1 npm run build
+# 4) Под /pm-board: убрать TEAM_TRACKER_ROOT_DOMAIN из unit и собрать без этой переменной
+
+[Unit]
+Description=Team Tracker (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/team-tracker
+Environment=NODE_ENV=production
+Environment=PORT=3005
+# Раскомментируйте для tt.example.com без префикса /pm-board:
+Environment=TEAM_TRACKER_ROOT_DOMAIN=1
+# По умолчанию приложение использует data/agency.db и data/pm-board.db в WorkingDirectory.
+# Раскомментируйте, если базы лежат в другом месте:
+# Environment=AGENCY_SQLITE_PATH=/opt/team-tracker/data/agency.db
+# Environment=PM_BOARD_SQLITE_PATH=/opt/team-tracker/data/pm-board.db
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
