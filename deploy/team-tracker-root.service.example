@@ -9,6 +9,7 @@ WorkingDirectory=/root/.openclaw/workspace/team-tracker
 Environment=NODE_ENV=production
 Environment=PORT=3005
 Environment=TEAM_TRACKER_ROOT_DOMAIN=1
+EnvironmentFile=-/etc/team-tracker.env
 ExecStart=/usr/bin/npm run start
 Restart=on-failure
 

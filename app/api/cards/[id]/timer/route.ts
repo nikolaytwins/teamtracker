@@ -18,8 +18,16 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     if (action === "start") {
       const phaseId = typeof body.phaseId === "string" ? body.phaseId : "";
+      const workerName = typeof body.workerName === "string" ? body.workerName : "";
+      const taskType =
+        body.taskType != null && String(body.taskType).trim() ? String(body.taskType).trim() : null;
+      const taskNote =
+        body.taskNote != null && String(body.taskNote).trim() ? String(body.taskNote).trim() : null;
       if (!phaseId) return NextResponse.json({ error: "phaseId required" }, { status: 400 });
-      const result = startTimer(id, phaseId);
+      if (!workerName.trim()) {
+        return NextResponse.json({ error: "workerName required (сотрудник)" }, { status: 400 });
+      }
+      const result = startTimer(id, phaseId, { workerName, taskType, taskNote });
       if (!result) return NextResponse.json({ error: "Invalid card or phase" }, { status: 400 });
       return NextResponse.json({
         success: true,

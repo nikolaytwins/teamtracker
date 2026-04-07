@@ -1,9 +1,29 @@
 "use client";
 
 import { apiUrl, appPath } from "@/lib/api-url";
+import { TIME_TASK_TYPE_OPTIONS, labelForTaskType } from "@/lib/time-task-types";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+
+const PM_BOARD_TEAM_KEY = "pm-board-team";
+
+type TeamMember = { id: string; name: string; avatar?: string };
+
+function loadTeamFromStorage(): TeamMember[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PM_BOARD_TEAM_KEY);
+    const parsed = JSON.parse(raw || "[]");
+    if (!Array.isArray(parsed)) return [];
+    if (parsed.length > 0 && typeof parsed[0] === "string") {
+      return (parsed as string[]).map((name, i) => ({ id: `t${i}`, name, avatar: undefined }));
+    }
+    return parsed as TeamMember[];
+  } catch {
+    return [];
+  }
+}
 
 type PmTimeEntry = {
   id: string;
@@ -12,6 +32,9 @@ type PmTimeEntry = {
   started_at: string;
   ended_at: string | null;
   duration_seconds: number | null;
+  worker_name: string;
+  task_type: string | null;
+  task_note: string | null;
 };
 
 type PhaseRow = {
@@ -24,7 +47,7 @@ type PhaseRow = {
 };
 
 type Payload = {
-  card: { id: string; name: string; deadline: string | null; status: string } | null;
+  card: { id: string; name: string; deadline: string | null; status: string; extra?: string | null } | null;
   phases: PhaseRow[];
   entries: PmTimeEntry[];
   activeEntry: PmTimeEntry | null;
@@ -51,6 +74,36 @@ export default function CardPhasesPage() {
   const [saving, setSaving] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState(() => Date.now());
   const [nowTs, setNowTs] = useState(() => Date.now());
+  const [teamList, setTeamList] = useState<TeamMember[]>([]);
+  const [workerSelect, setWorkerSelect] = useState("");
+  const [workerManual, setWorkerManual] = useState("");
+  const [taskType, setTaskType] = useState("");
+
+  useEffect(() => {
+    setTeamList(loadTeamFromStorage());
+  }, []);
+
+  useEffect(() => {
+    if (!payload?.card) return;
+    setWorkerManual("");
+    try {
+      const ex = payload.card.extra ? JSON.parse(payload.card.extra) : {};
+      const pt = ex.projectType;
+      if (typeof pt === "string" && TIME_TASK_TYPE_OPTIONS.some((o) => o.key === pt)) {
+        setTaskType(pt);
+      } else {
+        setTaskType("");
+      }
+      const rawAssignees = ex.assignees ?? (ex.assignee ? [ex.assignee] : []);
+      const names = Array.isArray(rawAssignees)
+        ? rawAssignees.filter((n: unknown): n is string => typeof n === "string" && n.trim().length > 0)
+        : [];
+      setWorkerSelect(names[0] ?? "");
+    } catch {
+      setTaskType("");
+      setWorkerSelect("");
+    }
+  }, [payload?.card?.id, payload?.card?.extra]);
   const applyPayload = useCallback((p: Payload) => {
     setPayload(p);
     setLastSyncAt(Date.now());
@@ -113,13 +166,24 @@ export default function CardPhasesPage() {
     }
   }
 
+  const effectiveWorker = workerManual.trim() || workerSelect.trim();
+
   async function startWork(phaseId: string) {
+    if (!effectiveWorker) {
+      setError("Укажите сотрудника перед стартом таймера.");
+      return;
+    }
     setSaving(true);
     try {
       const r = await fetch(apiUrl(`/api/cards/${cardId}/timer`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start", phaseId }),
+        body: JSON.stringify({
+          action: "start",
+          phaseId,
+          workerName: effectiveWorker,
+          taskType: taskType.trim() || null,
+        }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Ошибка");
@@ -173,12 +237,18 @@ export default function CardPhasesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/80 p-4 md:p-6 max-w-4xl mx-auto">
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         <Link
           href={appPath("/board")}
           className="text-sm text-slate-600 hover:text-slate-900 underline"
         >
           ← Канбан
+        </Link>
+        <Link
+          href={appPath("/board/time-analytics")}
+          className="text-sm font-medium text-emerald-700 hover:text-emerald-900 underline"
+        >
+          Аналитика времени
         </Link>
       </div>
       <h1 className="text-2xl font-bold text-slate-800 mb-1">{card.name}</h1>
@@ -208,10 +278,64 @@ export default function CardPhasesPage() {
         </div>
         {active && !active.ended_at && (
           <p className="text-sm text-emerald-700 mt-2">
-            Идёт учёт… {formatDuration(sessionElapsedSec)} с начала сессии (
-            {payload.phases.find((p) => p.id === active.phase_id)?.title ?? "этап"})
+            Идёт учёт… {formatDuration(sessionElapsedSec)} ·{" "}
+            {active.worker_name ? active.worker_name : "—"} ·{" "}
+            {labelForTaskType(active.task_type)} · этап:{" "}
+            {payload.phases.find((p) => p.id === active.phase_id)?.title ?? "—"}
           </p>
         )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6 space-y-3">
+        <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Перед «Приступил»</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Сотрудник</label>
+            <select
+              value={workerSelect}
+              onChange={(e) => setWorkerSelect(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+            >
+              <option value="">— из списка команды</option>
+              {teamList.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+              {workerSelect && !teamList.some((t) => t.name === workerSelect) ? (
+                <option value={workerSelect}>{workerSelect}</option>
+              ) : null}
+            </select>
+            <input
+              type="text"
+              value={workerManual}
+              onChange={(e) => setWorkerManual(e.target.value)}
+              placeholder="Или введите имя вручную"
+              className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            />
+            {!effectiveWorker ? (
+              <p className="text-xs text-amber-700 mt-1">Нужно выбрать или ввести сотрудника.</p>
+            ) : null}
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Тип задачи</label>
+            <select
+              value={taskType}
+              onChange={(e) => setTaskType(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+            >
+              <option value="">— не указан</option>
+              {TIME_TASK_TYPE_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-400 mt-2">
+              Список команды редактируется в канбане (ответственные в карточке).
+            </p>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={addPhase} className="flex flex-wrap gap-2 mb-6">
@@ -250,7 +374,9 @@ export default function CardPhasesPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={saving || Boolean(active && !active.ended_at)}
+                    disabled={
+                      saving || Boolean(active && !active.ended_at) || !effectiveWorker.trim()
+                    }
                     onClick={() => void startWork(p.id)}
                     className="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40"
                   >
@@ -280,13 +406,15 @@ export default function CardPhasesPage() {
                 <th className="py-2 px-4">Начало</th>
                 <th className="py-2 px-4">Конец</th>
                 <th className="py-2 px-4">Длительность</th>
+                <th className="py-2 px-4">Сотрудник</th>
+                <th className="py-2 px-4">Тип задачи</th>
                 <th className="py-2 px-4">Этап</th>
               </tr>
             </thead>
             <tbody>
               {payload.entries.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-6 text-center text-slate-500">
+                  <td colSpan={6} className="py-6 text-center text-slate-500">
                     Записей пока нет
                   </td>
                 </tr>
@@ -306,6 +434,10 @@ export default function CardPhasesPage() {
                         {e.ended_at ? new Date(e.ended_at).toLocaleString("ru-RU") : "…"}
                       </td>
                       <td className="py-2 px-4 tabular-nums">{formatDuration(dur)}</td>
+                      <td className="py-2 px-4 text-slate-700">
+                        {e.worker_name?.trim() ? e.worker_name : "—"}
+                      </td>
+                      <td className="py-2 px-4 text-slate-600">{labelForTaskType(e.task_type)}</td>
                       <td className="py-2 px-4 text-slate-700">{phaseTitle}</td>
                     </tr>
                   );

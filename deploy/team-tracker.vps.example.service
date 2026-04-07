@@ -16,6 +16,8 @@ Environment=NODE_ENV=production
 Environment=PORT=3005
 # Раскомментируйте для tt.example.com без префикса /pm-board:
 Environment=TEAM_TRACKER_ROOT_DOMAIN=1
+# Секреты (см. deploy/team-tracker.env.example): создайте /etc/team-tracker.env на сервере
+EnvironmentFile=-/etc/team-tracker.env
 # По умолчанию приложение использует data/agency.db и data/pm-board.db в WorkingDirectory.
 # Раскомментируйте, если базы лежат в другом месте:
 # Environment=AGENCY_SQLITE_PATH=/opt/team-tracker/data/agency.db

@@ -15,9 +15,15 @@ export interface PmTimeEntry {
   started_at: string;
   ended_at: string | null;
   duration_seconds: number | null;
+  worker_name: string;
+  task_type: string | null;
+  task_note: string | null;
 }
 
-function ensurePhasesSchema() {
+/** Одна фаза для учёта из профиля (не плодим этапы вручную). */
+export const QUICK_WORK_PHASE_TITLE = "Быстрый старт (профиль)";
+
+export function ensurePhasesSchema() {
   const db = getDb();
   try {
     db.pragma("foreign_keys = ON");
@@ -44,6 +50,21 @@ function ensurePhasesSchema() {
     CREATE INDEX IF NOT EXISTS idx_pm_time_card ON pm_time_entries(card_id);
     CREATE INDEX IF NOT EXISTS idx_pm_time_phase ON pm_time_entries(phase_id);
   `);
+  try {
+    db.exec(`ALTER TABLE pm_time_entries ADD COLUMN worker_name TEXT NOT NULL DEFAULT ''`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE pm_time_entries ADD COLUMN task_type TEXT`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE pm_time_entries ADD COLUMN task_note TEXT`);
+  } catch {
+    /* exists */
+  }
 }
 
 function secondsBetween(startIso: string, endIso: string): number {
@@ -65,6 +86,47 @@ function closeOpenEntriesForCard(cardId: string, endIso: string) {
       `UPDATE pm_time_entries SET ended_at = ?, duration_seconds = ? WHERE id = ?`
     ).run(endIso, dur, e.id);
   }
+}
+
+/** Закрыть все открытые сессии сотрудника по всем карточкам (один активный таймер на человека). */
+export function closeOpenEntriesForWorker(workerName: string, endIso: string) {
+  ensurePhasesSchema();
+  const name = workerName.trim();
+  if (!name) return;
+  const db = getDb();
+  const open = db
+    .prepare(
+      `SELECT * FROM pm_time_entries WHERE TRIM(worker_name) = ? AND ended_at IS NULL ORDER BY started_at ASC`
+    )
+    .all(name) as PmTimeEntry[];
+  for (const e of open) {
+    const dur = secondsBetween(e.started_at, endIso);
+    db.prepare(`UPDATE pm_time_entries SET ended_at = ?, duration_seconds = ? WHERE id = ?`).run(
+      endIso,
+      dur,
+      e.id
+    );
+  }
+}
+
+export function getOrCreatePhaseByTitle(cardId: string, title: string): PmProjectPhase | null {
+  const phases = listPhasesForCard(cardId);
+  const found = phases.find((p) => p.title === title);
+  if (found) return found;
+  return createPhase(cardId, title);
+}
+
+export function getActiveEntryForWorker(workerName: string): PmTimeEntry | null {
+  ensurePhasesSchema();
+  const name = workerName.trim();
+  if (!name) return null;
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT * FROM pm_time_entries WHERE TRIM(worker_name) = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1`
+    )
+    .get(name) as PmTimeEntry | undefined;
+  return row ?? null;
 }
 
 export function listPhasesForCard(cardId: string): PmProjectPhase[] {
@@ -130,7 +192,13 @@ export function getActiveEntry(cardId: string): PmTimeEntry | null {
   return row ?? null;
 }
 
-export function startTimer(cardId: string, phaseId: string): { entry: PmTimeEntry; closedPrevious: boolean } | null {
+export function startTimer(
+  cardId: string,
+  phaseId: string,
+  opts: { workerName: string; taskType?: string | null; taskNote?: string | null }
+): { entry: PmTimeEntry; closedPrevious: boolean } | null {
+  const worker = (opts.workerName || "").trim();
+  if (!worker) return null;
   if (!getCard(cardId)) return null;
   ensurePhasesSchema();
   const db = getDb();
@@ -139,14 +207,18 @@ export function startTimer(cardId: string, phaseId: string): { entry: PmTimeEntr
     .get(phaseId, cardId);
   if (!phase) return null;
   const now = new Date().toISOString();
-  const hadOpen = getActiveEntry(cardId);
+  const hadOpenBefore = Boolean(getActiveEntryForWorker(worker));
+  closeOpenEntriesForWorker(worker, now);
   closeOpenEntriesForCard(cardId, now);
+  const taskType = opts.taskType != null && String(opts.taskType).trim() ? String(opts.taskType).trim() : null;
+  const taskNote =
+    opts.taskNote != null && String(opts.taskNote).trim() ? String(opts.taskNote).trim() : null;
   const id = `tent_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   db.prepare(
-    `INSERT INTO pm_time_entries (id, card_id, phase_id, started_at, ended_at, duration_seconds) VALUES (?, ?, ?, ?, NULL, NULL)`
-  ).run(id, cardId, phaseId, now);
+    `INSERT INTO pm_time_entries (id, card_id, phase_id, started_at, ended_at, duration_seconds, worker_name, task_type, task_note) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?)`
+  ).run(id, cardId, phaseId, now, worker, taskType, taskNote);
   const entry = db.prepare(`SELECT * FROM pm_time_entries WHERE id = ?`).get(id) as PmTimeEntry;
-  return { entry, closedPrevious: Boolean(hadOpen) };
+  return { entry, closedPrevious: hadOpenBefore };
 }
 
 export function stopTimer(cardId: string): PmTimeEntry | null {

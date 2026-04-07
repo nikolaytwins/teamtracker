@@ -384,6 +384,13 @@ export default function BoardPage() {
                 Проект: {formatDate(projectDeadline)}
               </span>
             </div>
+            <Link
+              href={appPath(`/board/${card.id}`)}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-900"
+            >
+              Учёт времени и этапы
+            </Link>
             {assignees.length > 0 && (
               <div className="flex items-center gap-1 mt-2 flex-wrap">
                 {assignees.slice(0, 4).map((name, i) => {
@@ -452,6 +459,12 @@ export default function BoardPage() {
                 <span className="text-slate-400"> из {cards.length}</span>
               ) : null}
             </p>
+            <Link
+              href={appPath("/board/time-analytics")}
+              className="inline-flex mt-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900 underline-offset-2 hover:underline"
+            >
+              Отчёты по времени →
+            </Link>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Team Tracker — канбан и агентство",
-  description: "Канбан проектов и учёт агентства",
+  title: "Team Tracker — профиль, канбан и агентство",
+  description: "Профиль, таймтрекер, канбан проектов и учёт агентства",
 };
 
 export const dynamic = "force-dynamic";
