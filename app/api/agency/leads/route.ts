@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Database from 'better-sqlite3'
 import { getAgencySqlitePath } from '@/lib/agency-sqlite'
-import { ensureAgencyLeadsColumns } from '@/lib/agency-leads-schema'
+import { ensureAgencyLeadsColumns, ensureLeadHistoryTable } from '@/lib/agency-leads-schema'
 
 const dbPath = getAgencySqlitePath()
 
@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
     
     const db = getDb()
     ensureAgencyLeadsColumns(db)
+    ensureLeadHistoryTable(db)
     
     // Вычисляем автоматическую дату, если статус требует этого
     const autoDate = calculateNextContactDate(status)

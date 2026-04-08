@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/sales/leads", label: "Лиды" },
   { href: "/sales/profi", label: "Profi.ru" },
+  { href: "/sales/leads", label: "Лиды" },
   { href: "/sales/threads", label: "Threads" },
   { href: "/sales/analytics", label: "Аналитика" },
 ];

@@ -66,8 +66,16 @@ export default function Navigation() {
                 Проекты и финансы
               </Link>
               <Link
+                href={appPath("/sales/profi")}
+                className={linkClass(pathname === "/sales/profi")}
+              >
+                Profi.ru
+              </Link>
+              <Link
                 href={appPath("/sales/leads")}
-                className={linkClass(pathname?.startsWith("/sales") ?? false)}
+                className={linkClass(
+                  Boolean(pathname?.startsWith("/sales")) && pathname !== "/sales/profi"
+                )}
               >
                 Продажи
               </Link>

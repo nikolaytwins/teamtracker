@@ -22,8 +22,8 @@ const STATUS_OPTIONS = [
   { value: "pause", label: "Пауза" },
 ];
 
+/** Колонку «Новые» не показываем — такие лиды видны в первой колонке. */
 const STATUS_COLUMNS = [
-  "new",
   "contact_established",
   "commercial_proposal",
   "thinking",
@@ -154,7 +154,17 @@ export default function SalesLeadsPage() {
 
   const leadsByStatus = STATUS_COLUMNS.reduce(
     (acc, status) => {
-      acc[status] = leads.filter((l) => l.status === status);
+      if (status === "contact_established") {
+        acc[status] = leads
+          .filter((l) => l.status === "new" || l.status === "contact_established")
+          .sort((a, b) => {
+            if (a.status === "new" && b.status !== "new") return -1;
+            if (a.status !== "new" && b.status === "new") return 1;
+            return 0;
+          });
+      } else {
+        acc[status] = leads.filter((l) => l.status === status);
+      }
       return acc;
     },
     {} as Record<string, Lead[]>
@@ -288,6 +298,12 @@ export default function SalesLeadsPage() {
           {STATUS_COLUMNS.map((status) => {
             const statusLabel = STATUS_OPTIONS.find((o) => o.value === status)?.label || status;
             const columnLeads = leadsByStatus[status] || [];
+            const titleExtra =
+              status === "contact_established" ? (
+                <span className="block text-xs font-normal text-gray-500 mt-0.5">
+                  Включая лиды со статусом «Новые»
+                </span>
+              ) : null;
 
             return (
               <div
@@ -295,8 +311,11 @@ export default function SalesLeadsPage() {
                 className="flex-shrink-0 w-80 bg-gray-100/80 rounded-xl p-4 border border-gray-200"
               >
                 <h3 className="font-semibold text-gray-900 mb-3 text-sm">
-                  {statusLabel}{" "}
-                  <span className="text-gray-500 font-normal">({columnLeads.length})</span>
+                  <span className="block">
+                    {statusLabel}{" "}
+                    <span className="text-gray-500 font-normal">({columnLeads.length})</span>
+                  </span>
+                  {titleExtra}
                 </h3>
                 <div className="space-y-3 min-h-[120px]">
                   {columnLeads.map((lead) => (
@@ -304,8 +323,13 @@ export default function SalesLeadsPage() {
                       key={lead.id}
                       className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
                     >
-                      <div className="text-sm font-semibold text-gray-900 mb-2">
-                        {lead.taskDescription || "Без описания"}
+                      <div className="text-sm font-semibold text-gray-900 mb-2 flex flex-wrap items-center gap-2">
+                        <span>{lead.taskDescription || "Без описания"}</span>
+                        {lead.status === "new" ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                            Новый
+                          </span>
+                        ) : null}
                       </div>
                       <div className="text-xs text-gray-700 mb-1">
                         <span className="font-medium">Контакт:</span> {lead.contact}

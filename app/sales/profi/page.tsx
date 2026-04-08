@@ -43,11 +43,6 @@ interface ProfiStats {
   }
 }
 
-interface VisitInfo {
-  total: number
-  byMonth: Record<string, number>
-}
-
 // Порядок: отклик → просмотрено → переписка → КП → оплачено; выходы: возврат, слив
 const STATUS_OPTIONS = [
   { value: 'response', label: 'Отклик' },
@@ -63,7 +58,6 @@ export default function ProfiPage() {
   const [items, setItems] = useState<ProfiItem[]>([])
   const [stats, setStats] = useState<ProfiStats | null>(null)
   const [byMonth, setByMonth] = useState<Record<string, ProfiStats>>({})
-  const [visits, setVisits] = useState<VisitInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [quickCost, setQuickCost] = useState('')
   const [quickNotes, setQuickNotes] = useState('')
@@ -79,12 +73,10 @@ export default function ProfiPage() {
         setItems(data.items)
         setStats(data.stats ?? null)
         setByMonth(data.byMonth ?? {})
-        setVisits(data.visits ?? null)
       } else if (Array.isArray(data)) {
         setItems(data)
         setStats(null)
         setByMonth({})
-        setVisits(null)
       }
     } catch (e) {
       console.error(e)
@@ -96,21 +88,6 @@ export default function ProfiPage() {
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const key = 'pm_visit_debounce_profi'
-      const now = Date.now()
-      try {
-        const last = typeof sessionStorage !== 'undefined' ? Number(sessionStorage.getItem(key) || 0) : 0
-        if (typeof sessionStorage !== 'undefined' && now - last >= 30 * 60 * 1000) {
-          sessionStorage.setItem(key, String(now))
-          await fetch(apiUrl('/api/agency/platform-visits'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ platform: 'profi' }),
-          })
-        }
-      } catch {
-        /* ignore */
-      }
       if (!cancelled) await fetchData()
     })()
     return () => {
@@ -211,12 +188,6 @@ export default function ProfiPage() {
       <div className="mb-2">
         <h1 className="text-2xl font-bold text-gray-900">Profi.ru — экономика откликов</h1>
         <p className="text-sm text-gray-500 mt-1">Раздел «Продажи» — отклики и воронка без напоминаний.</p>
-        {visits != null && (
-          <p className="text-sm text-violet-700 mt-2">
-            Визитов на эту вкладку (учтено): <span className="font-semibold tabular-nums">{visits.total}</span>
-            <span className="text-gray-500 font-normal"> — не чаще 1 раза в 30 мин с браузера</span>
-          </p>
-        )}
       </div>
 
       {/* Экономика и конверсии (инфографика) */}
@@ -413,15 +384,17 @@ export default function ProfiPage() {
       {Object.keys(byMonth).length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 overflow-x-auto">
           <h2 className="text-lg font-semibold text-gray-800 mb-3">По месяцам (по дате отклика)</h2>
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[920px]">
             <thead>
               <tr className="text-left text-gray-500 border-b border-gray-200">
-                <th className="py-2 pr-4 font-medium">Месяц</th>
-                <th className="py-2 pr-4 font-medium">Откликов</th>
-                <th className="py-2 pr-4 font-medium">Переписка+</th>
-                <th className="py-2 pr-4 font-medium">Оплачено</th>
-                <th className="py-2 pr-4 font-medium">Чистые расходы ₽</th>
-                <th className="py-2 pr-4 font-medium">Визиты вкладки</th>
+                <th className="py-2 pr-3 font-medium">Месяц</th>
+                <th className="py-2 pr-3 font-medium">Отклики</th>
+                <th className="py-2 pr-3 font-medium">Просмотров откликов</th>
+                <th className="py-2 pr-3 font-medium">Переписок</th>
+                <th className="py-2 pr-3 font-medium">КП</th>
+                <th className="py-2 pr-3 font-medium">Оплачено</th>
+                <th className="py-2 pr-3 font-medium">Чистые расходы, ₽</th>
+                <th className="py-2 pr-3 font-medium">Доходы, ₽</th>
               </tr>
             </thead>
             <tbody>
@@ -429,12 +402,14 @@ export default function ProfiPage() {
                 .sort(([a], [b]) => b.localeCompare(a))
                 .map(([ym, m]) => (
                   <tr key={ym} className="border-b border-gray-100">
-                    <td className="py-2 pr-4 font-medium text-gray-800">{ym}</td>
-                    <td className="py-2 pr-4 tabular-nums">{m.totalResponses}</td>
-                    <td className="py-2 pr-4 tabular-nums">{m.funnel.toConversation}</td>
-                    <td className="py-2 pr-4 tabular-nums">{m.countPaid}</td>
-                    <td className="py-2 pr-4 tabular-nums">{Math.round(m.netSpent).toLocaleString('ru-RU')}</td>
-                    <td className="py-2 pr-4 tabular-nums text-gray-600">{visits?.byMonth?.[ym] ?? '—'}</td>
+                    <td className="py-2 pr-3 font-medium text-gray-800">{ym}</td>
+                    <td className="py-2 pr-3 tabular-nums">{m.funnel.responses}</td>
+                    <td className="py-2 pr-3 tabular-nums">{m.funnel.viewedResponses}</td>
+                    <td className="py-2 pr-3 tabular-nums">{m.funnel.toConversation}</td>
+                    <td className="py-2 pr-3 tabular-nums">{m.funnel.toProposal}</td>
+                    <td className="py-2 pr-3 tabular-nums">{m.countPaid}</td>
+                    <td className="py-2 pr-3 tabular-nums">{Math.round(m.netSpent).toLocaleString('ru-RU')}</td>
+                    <td className="py-2 pr-3 tabular-nums text-blue-700">{Math.round(m.totalProjectAmount).toLocaleString('ru-RU')}</td>
                   </tr>
                 ))}
             </tbody>

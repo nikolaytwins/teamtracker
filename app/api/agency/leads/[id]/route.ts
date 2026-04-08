@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Database from 'better-sqlite3'
 import { getAgencySqlitePath } from '@/lib/agency-sqlite'
-import { ensureAgencyLeadsColumns } from '@/lib/agency-leads-schema'
+import { ensureAgencyLeadsColumns, ensureLeadHistoryTable } from '@/lib/agency-leads-schema'
 
 const dbPath = getAgencySqlitePath()
 
@@ -67,6 +67,7 @@ export async function PUT(
     
     const db = getDb()
     ensureAgencyLeadsColumns(db)
+    ensureLeadHistoryTable(db)
     
     // Получаем текущий лид
     const currentLead = db.prepare('SELECT * FROM agency_leads WHERE id = ?').get(id) as any
