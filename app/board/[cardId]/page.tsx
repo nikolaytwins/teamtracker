@@ -72,8 +72,8 @@ export default function CardPhasesPage() {
   const [loading, setLoading] = useState(true);
   const [newTitle, setNewTitle] = useState("");
   const [saving, setSaving] = useState(false);
-  const [lastSyncAt, setLastSyncAt] = useState(() => Date.now());
-  const [nowTs, setNowTs] = useState(() => Date.now());
+  const [lastSyncAt, setLastSyncAt] = useState(0);
+  const [nowTs, setNowTs] = useState(0);
   const [teamList, setTeamList] = useState<TeamMember[]>([]);
   const [workerSelect, setWorkerSelect] = useState("");
   const [workerManual, setWorkerManual] = useState("");
@@ -106,7 +106,9 @@ export default function CardPhasesPage() {
   }, [payload?.card?.id, payload?.card?.extra]);
   const applyPayload = useCallback((p: Payload) => {
     setPayload(p);
-    setLastSyncAt(Date.now());
+    const t = Date.now();
+    setLastSyncAt(t);
+    setNowTs(t);
   }, []);
 
   const load = useCallback(async () => {
@@ -134,6 +136,7 @@ export default function CardPhasesPage() {
 
   useEffect(() => {
     if (!timerRunning) return;
+    setNowTs(Date.now());
     const t = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(t);
   }, [timerRunning]);

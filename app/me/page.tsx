@@ -49,7 +49,8 @@ export default function MePage() {
   const [taskChoice, setTaskChoice] = useState<string>("sales");
   const [customText, setCustomText] = useState("");
   const [active, setActive] = useState<ActiveInfo | null>(null);
-  const [nowTs, setNowTs] = useState(() => Date.now());
+  /** Avoid Date.now() in useState initializer — SSR and client differ → hydration errors and broken clicks. */
+  const [nowTs, setNowTs] = useState(0);
   const [monthYm, setMonthYm] = useState(currentMonthYm);
   const [stats, setStats] = useState<StatsPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +125,7 @@ export default function MePage() {
 
   useEffect(() => {
     if (!active) return;
+    setNowTs(Date.now());
     const t = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(t);
   }, [active]);
