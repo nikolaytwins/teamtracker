@@ -2,11 +2,15 @@
 
 import { apiUrl, appPath } from "@/lib/api-url";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+function safeRedirectPath(raw: string | null): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("://")) return null;
+  return raw;
+}
+
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
@@ -29,9 +33,10 @@ function LoginForm() {
         setError(data.error || "Ошибка входа");
         return;
       }
-      const redir = searchParams.get("redirect");
-      router.push(redir && redir.startsWith("/") ? appPath(redir) : appPath("/me"));
-      router.refresh();
+      const redir = safeRedirectPath(searchParams.get("redirect"));
+      const target = appPath(redir ?? "/me");
+      // Полная перезагрузка: cookie из ответа гарантированно попадёт в следующий запрос (надёжнее router.push).
+      window.location.assign(target);
     } catch {
       setError("Сеть недоступна");
     } finally {

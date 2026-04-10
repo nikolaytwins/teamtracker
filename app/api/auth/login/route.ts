@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sessionCookieSecure } from "@/lib/session-cookie";
 import { syncUsersFromEnv, getUserByLogin, verifyPassword } from "@/lib/tt-auth-db";
 import { signSession, getAuthSecret } from "@/lib/session-token";
 
@@ -49,12 +50,13 @@ export async function POST(request: NextRequest) {
         avatarUrl: user.avatar_url,
       },
     });
+    const secure = sessionCookieSecure(request);
     res.cookies.set(COOKIE, token, {
       httpOnly: true,
       path: "/",
       maxAge: MAX_AGE,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure,
     });
     return res;
   } catch (e) {
