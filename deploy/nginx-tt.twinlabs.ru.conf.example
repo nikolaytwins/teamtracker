@@ -1,11 +1,29 @@
 # Пример для поддомена tt.twinlabs.ru (приложение с корня, без /pm-board).
 # 1) Собрать: TEAM_TRACKER_ROOT_DOMAIN=1 npm run build
 # 2) systemd: Environment=TEAM_TRACKER_ROOT_DOMAIN=1 NODE_ENV=production PORT=3005
-# 3) certbot --nginx -d tt.twinlabs.ru
+# 3) Выпустить сертификат: certbot certonly --nginx -d tt.twinlabs.ru
+# 4) Включить конфиг ниже (HTTP → редирект на HTTPS, отдельный server на 443).
+#
+# Важно: без блока listen 443 для tt.twinlabs.ru запросы по HTTPS могут попасть на
+# другой виртуальный хост (чужой сертификат и чужое приложение).
 
 server {
     listen 80;
+    listen [::]:80;
     server_name tt.twinlabs.ru;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen [::]:443 ssl;
+    listen 443 ssl;
+    server_name tt.twinlabs.ru;
+
+    ssl_certificate /etc/letsencrypt/live/tt.twinlabs.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/tt.twinlabs.ru/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
     location / {
         proxy_pass http://127.0.0.1:3005;
         proxy_http_version 1.1;
