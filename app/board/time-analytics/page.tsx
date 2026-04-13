@@ -179,33 +179,33 @@ export default function TimeAnalyticsPage() {
   const matrixWorkers = useMemo(() => projectDetail?.workerList ?? [], [projectDetail]);
 
   return (
-    <div className="min-h-screen bg-slate-50/80 p-4 md:p-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl p-4 md:p-6">
       <div className="mb-6 flex flex-wrap items-center gap-4">
-        <Link href={appPath("/board")} className="text-sm text-slate-600 hover:text-slate-900 underline">
+        <Link href={appPath("/board")} className="text-sm text-[var(--muted-foreground)] hover:text-[var(--text)] underline">
           ← Канбан
         </Link>
       </div>
 
-      <h1 className="text-2xl font-bold text-slate-800 mb-1">Аналитика времени</h1>
-      <p className="text-sm text-slate-500 mb-8">
+      <h1 className="text-2xl font-bold text-[var(--text)] mb-1">Аналитика времени</h1>
+      <p className="text-sm text-[var(--muted-foreground)] mb-8">
         Сводка за месяц, разрез по сотрудникам и типам задач, детализация по проектам и этапам.
       </p>
 
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 mb-8">
+      <section className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 md:p-6 mb-8">
         <div className="flex flex-wrap items-end gap-4 mb-6">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Месяц</label>
+            <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Месяц</label>
             <input
               type="month"
               value={monthYm}
               onChange={(e) => setMonthYm(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              className="px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
             />
           </div>
           {loadingMonthly ? (
-            <span className="text-sm text-slate-500">Загрузка…</span>
+            <span className="text-sm text-[var(--muted-foreground)]">Загрузка…</span>
           ) : monthly ? (
-            <div className="text-lg font-semibold text-slate-800 tabular-nums">
+            <div className="text-lg font-semibold text-[var(--text)] tabular-nums">
               Всего: {monthly.totalHours} ч
             </div>
           ) : null}
@@ -215,11 +215,11 @@ export default function TimeAnalyticsPage() {
         {monthly && (
           <div className="grid gap-6 md:grid-cols-2">
             <div>
-              <h2 className="text-sm font-semibold text-slate-700 mb-2">По сотрудникам</h2>
-              <div className="overflow-x-auto rounded-lg border border-slate-100">
+              <h2 className="text-sm font-semibold text-[var(--text)] mb-2">По сотрудникам</h2>
+              <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-slate-500 border-b border-slate-100">
+                    <tr className="text-left text-[var(--muted-foreground)] border-b border-[var(--border)]">
                       <th className="py-2 px-3">Сотрудник</th>
                       <th className="py-2 px-3 text-right">Часы</th>
                     </tr>
@@ -227,13 +227,13 @@ export default function TimeAnalyticsPage() {
                   <tbody>
                     {monthly.byWorker.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="py-4 px-3 text-slate-500">
+                        <td colSpan={2} className="py-4 px-3 text-[var(--muted-foreground)]">
                           Нет закрытых сессий за этот месяц
                         </td>
                       </tr>
                     ) : (
                       monthly.byWorker.map((row) => (
-                        <tr key={row.name} className="border-b border-slate-50">
+                        <tr key={row.name} className="border-b border-[var(--border)]">
                           <td className="py-2 px-3">
                             <button
                               type="button"
@@ -252,11 +252,11 @@ export default function TimeAnalyticsPage() {
               </div>
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-700 mb-2">По типу задачи</h2>
-              <div className="overflow-x-auto rounded-lg border border-slate-100">
+              <h2 className="text-sm font-semibold text-[var(--text)] mb-2">По типу задачи</h2>
+              <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-slate-500 border-b border-slate-100">
+                    <tr className="text-left text-[var(--muted-foreground)] border-b border-[var(--border)]">
                       <th className="py-2 px-3">Тип</th>
                       <th className="py-2 px-3 text-right">Часы</th>
                     </tr>
@@ -264,13 +264,13 @@ export default function TimeAnalyticsPage() {
                   <tbody>
                     {monthly.byTaskType.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="py-4 px-3 text-slate-500">
+                        <td colSpan={2} className="py-4 px-3 text-[var(--muted-foreground)]">
                           Нет данных
                         </td>
                       </tr>
                     ) : (
                       monthly.byTaskType.map((row) => (
-                        <tr key={row.type || "__empty"} className="border-b border-slate-50">
+                        <tr key={row.type || "__empty"} className="border-b border-[var(--border)]">
                           <td className="py-2 px-3">{row.label}</td>
                           <td className="py-2 px-3 text-right tabular-nums">{row.hours} ч</td>
                         </tr>
@@ -284,9 +284,9 @@ export default function TimeAnalyticsPage() {
         )}
       </section>
 
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 mb-8">
-        <h2 className="text-lg font-semibold text-slate-800 mb-1">Проект</h2>
-        <p className="text-sm text-slate-500 mb-4">
+      <section className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 md:p-6 mb-8">
+        <h2 className="text-lg font-semibold text-[var(--text)] mb-1">Проект</h2>
+        <p className="text-sm text-[var(--muted-foreground)] mb-4">
           Поиск по названию карточки канбана — часы по этапам и сотрудникам (только завершённые сессии).
         </p>
         <input
@@ -294,13 +294,13 @@ export default function TimeAnalyticsPage() {
           value={projectQuery}
           onChange={(e) => setProjectQuery(e.target.value)}
           placeholder="Начните вводить название проекта…"
-          className="w-full max-w-md px-3 py-2 border border-slate-200 rounded-lg text-sm mb-3"
+          className="w-full max-w-md px-3 py-2 border border-[var(--border)] rounded-lg text-sm mb-3"
         />
         {loadingProjects && debouncedQ ? (
-          <p className="text-xs text-slate-500 mb-2">Поиск…</p>
+          <p className="text-xs text-[var(--muted-foreground)] mb-2">Поиск…</p>
         ) : null}
         {projects.length > 0 && (
-          <ul className="space-y-1 mb-6 max-h-48 overflow-y-auto border border-slate-100 rounded-lg p-2">
+          <ul className="space-y-1 mb-6 max-h-48 overflow-y-auto border border-[var(--border)] rounded-lg p-2">
             {projects.map((p) => (
               <li key={p.id}>
                 <button
@@ -312,11 +312,11 @@ export default function TimeAnalyticsPage() {
                   className={`w-full text-left px-2 py-1.5 rounded-md text-sm ${
                     selectedProjectId === p.id
                       ? "bg-emerald-100 text-emerald-900 font-medium"
-                      : "hover:bg-slate-50"
+                      : "hover:bg-[var(--surface-2)]"
                   }`}
                 >
                   <span className="font-medium">{p.name}</span>
-                  <span className="text-slate-500 tabular-nums"> · {p.totalHours} ч всего</span>
+                  <span className="text-[var(--muted-foreground)] tabular-nums"> · {p.totalHours} ч всего</span>
                 </button>
               </li>
             ))}
@@ -324,9 +324,9 @@ export default function TimeAnalyticsPage() {
         )}
 
         {selectedProjectId && (
-          <div className="border-t border-slate-100 pt-4">
+          <div className="border-t border-[var(--border)] pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-              <h3 className="text-base font-semibold text-slate-800">
+              <h3 className="text-base font-semibold text-[var(--text)]">
                 {projectDetail?.card.name ?? "Проект"}
               </h3>
               <Link
@@ -336,19 +336,19 @@ export default function TimeAnalyticsPage() {
                 Открыть учёт времени
               </Link>
             </div>
-            {loadingProject && <p className="text-sm text-slate-500">Загрузка…</p>}
+            {loadingProject && <p className="text-sm text-[var(--muted-foreground)]">Загрузка…</p>}
             {projectErr && <p className="text-sm text-red-600">{projectErr}</p>}
             {projectDetail && !loadingProject && (
               <>
-                <p className="text-lg font-semibold text-slate-900 tabular-nums mb-4">
+                <p className="text-lg font-semibold text-[var(--text)] tabular-nums mb-4">
                   Всего по проекту: {projectDetail.totalHours} ч
                 </p>
-                <h4 className="text-sm font-semibold text-slate-700 mb-2">По сотрудникам</h4>
+                <h4 className="text-sm font-semibold text-[var(--text)] mb-2">По сотрудникам</h4>
                 <ul className="flex flex-wrap gap-2 mb-6">
                   {matrixWorkers.map((w) => (
                     <li
                       key={w}
-                      className="px-3 py-1.5 rounded-lg bg-slate-100 text-sm text-slate-800 tabular-nums"
+                      className="px-3 py-1.5 rounded-lg bg-[var(--surface-2)] text-sm text-[var(--text)] tabular-nums"
                     >
                       <button
                         type="button"
@@ -361,23 +361,23 @@ export default function TimeAnalyticsPage() {
                     </li>
                   ))}
                 </ul>
-                <h4 className="text-sm font-semibold text-slate-700 mb-2">Этап × сотрудник (часы)</h4>
+                <h4 className="text-sm font-semibold text-[var(--text)] mb-2">Этап × сотрудник (часы)</h4>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs md:text-sm border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-xs md:text-sm border border-[var(--border)] rounded-lg overflow-hidden">
                     <thead>
-                      <tr className="bg-slate-50 text-left text-slate-600">
-                        <th className="py-2 px-2 border-b border-slate-200 sticky left-0 bg-slate-50 z-10 min-w-[8rem]">
+                      <tr className="bg-[var(--surface-2)] text-left text-[var(--muted-foreground)]">
+                        <th className="py-2 px-2 border-b border-[var(--border)] sticky left-0 bg-[var(--surface-2)] z-10 min-w-[8rem]">
                           Этап
                         </th>
                         {matrixWorkers.map((w) => (
                           <th
                             key={w}
-                            className="py-2 px-2 border-b border-slate-200 whitespace-nowrap text-right min-w-[4.5rem]"
+                            className="py-2 px-2 border-b border-[var(--border)] whitespace-nowrap text-right min-w-[4.5rem]"
                           >
                             {w}
                           </th>
                         ))}
-                        <th className="py-2 px-2 border-b border-slate-200 text-right font-semibold">Σ</th>
+                        <th className="py-2 px-2 border-b border-[var(--border)] text-right font-semibold">Σ</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -385,19 +385,19 @@ export default function TimeAnalyticsPage() {
                         <tr>
                           <td
                             colSpan={matrixWorkers.length + 2}
-                            className="py-4 px-2 text-slate-500 text-center"
+                            className="py-4 px-2 text-[var(--muted-foreground)] text-center"
                           >
                             Нет этапов или нет учтённого времени
                           </td>
                         </tr>
                       ) : (
                         projectDetail.matrix.map((row) => (
-                          <tr key={row.phaseTitle} className="border-b border-slate-100">
-                            <td className="py-2 px-2 font-medium text-slate-800 sticky left-0 bg-white z-10">
+                          <tr key={row.phaseTitle} className="border-b border-[var(--border)]">
+                            <td className="py-2 px-2 font-medium text-[var(--text)] sticky left-0 bg-[var(--surface)] z-10">
                               {row.phaseTitle}
                             </td>
                             {matrixWorkers.map((w) => (
-                              <td key={w} className="py-2 px-2 text-right tabular-nums text-slate-700">
+                              <td key={w} className="py-2 px-2 text-right tabular-nums text-[var(--text)]">
                                 {(row.byWorker[w]?.hours ?? 0) > 0 ? row.byWorker[w].hours : "—"}
                               </td>
                             ))}
@@ -416,14 +416,14 @@ export default function TimeAnalyticsPage() {
         )}
       </section>
 
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 mb-8">
+      <section className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 md:p-6 mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="text-lg font-semibold text-slate-800">Сотрудник за месяц</h2>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Сотрудник за месяц</h2>
           {workers.length > 0 && (
             <select
               value={selectedWorker ?? ""}
               onChange={(e) => setSelectedWorker(e.target.value || null)}
-              className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white max-w-[16rem]"
+              className="text-sm border border-[var(--border)] rounded-lg px-2 py-1.5 bg-[var(--surface)] max-w-[16rem]"
             >
               <option value="">— выберите из списка</option>
               {workers.map((w) => (
@@ -441,13 +441,13 @@ export default function TimeAnalyticsPage() {
           )}
         </div>
         {!selectedWorker ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-[var(--muted-foreground)]">
             Нажмите имя в таблице «По сотрудникам», в блоке проекта или выберите в списке.
           </p>
         ) : (
           <>
-            <p className="text-sm text-slate-600 mb-2">
-              <span className="font-semibold text-slate-800">{selectedWorker}</span>,{" "}
+            <p className="text-sm text-[var(--muted-foreground)] mb-2">
+              <span className="font-semibold text-[var(--text)]">{selectedWorker}</span>,{" "}
               {monthYm}:{" "}
               {loadingEmployee ? (
                 "…"
@@ -459,13 +459,13 @@ export default function TimeAnalyticsPage() {
             {employee && !loadingEmployee && (
               <div className="grid gap-6 md:grid-cols-2 mt-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-700 mb-2">По проектам</h3>
+                  <h3 className="text-sm font-semibold text-[var(--text)] mb-2">По проектам</h3>
                   <ul className="space-y-1 text-sm">
                     {employee.byProject.length === 0 ? (
-                      <li className="text-slate-500">Нет данных</li>
+                      <li className="text-[var(--muted-foreground)]">Нет данных</li>
                     ) : (
                       employee.byProject.map((p) => (
-                        <li key={p.cardId} className="flex justify-between gap-2 border-b border-slate-50 py-1">
+                        <li key={p.cardId} className="flex justify-between gap-2 border-b border-[var(--border)] py-1">
                           <button
                             type="button"
                             onClick={() => setSelectedProjectId(p.cardId)}
@@ -473,25 +473,25 @@ export default function TimeAnalyticsPage() {
                           >
                             {p.name}
                           </button>
-                          <span className="tabular-nums text-slate-600 shrink-0">{p.hours} ч</span>
+                          <span className="tabular-nums text-[var(--muted-foreground)] shrink-0">{p.hours} ч</span>
                         </li>
                       ))
                     )}
                   </ul>
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-700 mb-2">По типу задачи</h3>
+                  <h3 className="text-sm font-semibold text-[var(--text)] mb-2">По типу задачи</h3>
                   <ul className="space-y-1 text-sm">
                     {employee.byTaskType.length === 0 ? (
-                      <li className="text-slate-500">Нет данных</li>
+                      <li className="text-[var(--muted-foreground)]">Нет данных</li>
                     ) : (
                       employee.byTaskType.map((t) => (
                         <li
                           key={t.type || "__"}
-                          className="flex justify-between gap-2 border-b border-slate-50 py-1"
+                          className="flex justify-between gap-2 border-b border-[var(--border)] py-1"
                         >
                           <span>{t.label}</span>
-                          <span className="tabular-nums text-slate-600">{t.hours} ч</span>
+                          <span className="tabular-nums text-[var(--muted-foreground)]">{t.hours} ч</span>
                         </li>
                       ))
                     )}

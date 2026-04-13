@@ -75,15 +75,15 @@ export default function AdminUsersPage() {
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Пользователи и роли</h1>
-          <p className="text-sm text-slate-600 mt-1">
+          <h1 className="text-2xl font-bold text-[var(--text)]">Пользователи и роли</h1>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
             Быстрая смена роли: администратор, дизайнер или ПМ. Доступ к финансам и продажам только у
             администратора.
           </p>
         </div>
         <Link
           href={appPath("/me")}
-          className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+          className="text-sm font-medium text-[var(--primary)] hover:underline"
         >
           ← Назад в профиль
         </Link>
@@ -96,15 +96,15 @@ export default function AdminUsersPage() {
       )}
       {err && <p className="text-sm text-red-600">{err}</p>}
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] overflow-hidden">
         {loading ? (
-          <p className="p-6 text-slate-500">Загрузка…</p>
+          <p className="p-6 text-[var(--muted-foreground)]">Загрузка…</p>
         ) : users.length === 0 ? (
-          <p className="p-6 text-slate-500">Нет пользователей</p>
+          <p className="p-6 text-[var(--muted-foreground)]">Нет пользователей</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+              <thead className="bg-[var(--surface-2)] border-b border-[var(--border)] text-[var(--muted-foreground)]">
                 <tr>
                   <th className="px-4 py-3 font-medium">Имя</th>
                   <th className="px-4 py-3 font-medium">Логин</th>
@@ -114,16 +114,16 @@ export default function AdminUsersPage() {
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80">
-                    <td className="px-4 py-3 font-medium text-slate-900">{u.display_name}</td>
-                    <td className="px-4 py-3 text-slate-600 tabular-nums">{u.login}</td>
-                    <td className="px-4 py-3 text-slate-600">{u.job_title || "—"}</td>
+                  <tr key={u.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)]/80">
+                    <td className="px-4 py-3 font-medium text-[var(--text)]">{u.display_name}</td>
+                    <td className="px-4 py-3 text-[var(--muted-foreground)] tabular-nums">{u.login}</td>
+                    <td className="px-4 py-3 text-[var(--muted-foreground)]">{u.job_title || "—"}</td>
                     <td className="px-4 py-3">
                       <select
                         value={u.role}
                         disabled={savingId === u.id}
                         onChange={(e) => void onRoleChange(u.id, e.target.value as TtUserRole)}
-                        className="w-full max-w-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 disabled:opacity-50"
+                        className="w-full max-w-xs px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--text)] disabled:opacity-50"
                         aria-label={`Роль для ${u.display_name}`}
                       >
                         {TT_USER_ROLES.map((r) => (

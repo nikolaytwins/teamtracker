@@ -80,7 +80,7 @@ function ExpenseRow({
 
   return (
     <tr>
-      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text)]">
         {editingField === 'employeeName' ? (
           <input
             type="text"
@@ -92,18 +92,18 @@ function ExpenseRow({
               if (e.key === 'Escape') handleCancel()
             }}
             autoFocus
-            className="w-full px-2 py-1 border border-blue-500 rounded text-sm"
+            className="w-full px-2 py-1 border border-[var(--primary)] rounded text-sm"
           />
         ) : (
           <button
             onClick={() => handleStartEdit('employeeName', expense.employeeName)}
-            className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded text-left"
+            className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-left"
           >
             {expense.employeeName}
           </button>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--muted-foreground)]">
         {editingField === 'employeeRole' ? (
           <select
             value={tempValue}
@@ -113,7 +113,7 @@ function ExpenseRow({
             }}
             onBlur={() => setEditingField(null)}
             autoFocus
-            className="w-full px-2 py-1 border border-blue-500 rounded text-sm"
+            className="w-full px-2 py-1 border border-[var(--primary)] rounded text-sm"
           >
             {roleOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -122,13 +122,13 @@ function ExpenseRow({
         ) : (
           <button
             onClick={() => handleStartEdit('employeeRole', expense.employeeRole)}
-            className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+            className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded"
           >
             {roleLabels[expense.employeeRole] || expense.employeeRole}
           </button>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-[var(--text)]">
         {editingField === 'amount' ? (
           <input
             type="number"
@@ -141,18 +141,18 @@ function ExpenseRow({
               if (e.key === 'Escape') handleCancel()
             }}
             autoFocus
-            className="w-24 px-2 py-1 border border-blue-500 rounded text-sm text-right"
+            className="w-24 px-2 py-1 border border-[var(--primary)] rounded text-sm text-right"
           />
         ) : (
           <button
             onClick={() => handleStartEdit('amount', expense.amount)}
-            className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded text-right"
+            className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-right"
           >
             {expense.amount.toLocaleString('ru-RU')} ₽
           </button>
         )}
       </td>
-      <td className="px-6 py-4 text-sm text-gray-600">
+      <td className="px-6 py-4 text-sm text-[var(--muted-foreground)]">
         {editingField === 'notes' ? (
           <input
             type="text"
@@ -164,12 +164,12 @@ function ExpenseRow({
               if (e.key === 'Escape') handleCancel()
             }}
             autoFocus
-            className="w-full px-2 py-1 border border-blue-500 rounded text-sm"
+            className="w-full px-2 py-1 border border-[var(--primary)] rounded text-sm"
           />
         ) : (
           <button
             onClick={() => handleStartEdit('notes', expense.notes || '')}
-            className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded text-left w-full"
+            className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-left w-full"
           >
             {expense.notes || '—'}
           </button>
@@ -400,7 +400,7 @@ export default function ProjectPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Загрузка...</div>
+        <div className="text-[var(--muted-foreground)]">Загрузка...</div>
       </div>
     )
   }
@@ -409,7 +409,7 @@ export default function ProjectPage() {
     return (
       <div>
         <div className="mb-6">
-          <Link href="/agency" className="text-blue-600 hover:text-blue-800 text-sm">
+          <Link href="/agency" className="text-[var(--primary)] hover:underline text-sm">
             ← Назад к проектам
           </Link>
         </div>
@@ -461,17 +461,17 @@ export default function ProjectPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link href="/agency" className="text-blue-600 hover:text-blue-800 text-sm">
+        <Link href="/agency" className="text-[var(--primary)] hover:underline text-sm">
           ← Назад к проектам
         </Link>
       </div>
 
       {/* Детализация для клиента */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+      <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6 mb-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Детализация для клиента</h2>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Детализация для клиента</h2>
           {totalDetailsAmount > 0 && (
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-[var(--text)]">
               Итого по детализации:{' '}
               <span className="font-semibold">
                 {totalDetailsAmount.toLocaleString('ru-RU')} ₽
@@ -480,40 +480,40 @@ export default function ProjectPage() {
           )}
         </div>
 
-        <form onSubmit={handleAddDetail} className="mb-4 bg-gray-50 rounded-lg p-4">
+        <form onSubmit={handleAddDetail} className="mb-4 bg-[var(--surface-2)] rounded-lg p-4">
           <div className="grid grid-cols-12 gap-3 items-end">
             <div className="col-span-6">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Задача / услуга</label>
+              <label className="block text-xs font-medium text-[var(--text)] mb-1">Задача / услуга</label>
               <input
                 name="title"
                 type="text"
                 placeholder="Например: Обложки для рилс"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Кол-во</label>
+              <label className="block text-xs font-medium text-[var(--text)] mb-1">Кол-во</label>
               <input
                 name="quantity"
                 type="number"
                 step="0.01"
                 defaultValue="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-right"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm text-right"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Стоимость</label>
+              <label className="block text-xs font-medium text-[var(--text)] mb-1">Стоимость</label>
               <input
                 name="unitPrice"
                 type="number"
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-right"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm text-right"
               />
             </div>
             <div className="col-span-2 flex justify-end">
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                className="px-4 py-2 bg-[var(--primary)] text-white rounded-md text-sm font-medium hover:brightness-110"
               >
                 Добавить
               </button>
@@ -522,17 +522,17 @@ export default function ProjectPage() {
         </form>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-[var(--border)]">
+            <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Задача</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Кол-во</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Стоимость</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Итого</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Задача</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Кол-во</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Стоимость</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Итого</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Действия</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
               {details.map((d) => {
                 const lineTotal = d.quantity * d.unitPrice
                 return (
@@ -542,7 +542,7 @@ export default function ProjectPage() {
                         type="text"
                         defaultValue={d.title}
                         onBlur={(e) => handleUpdateDetail(d.id, 'title')(e.target.value)}
-                        className="w-full px-2 py-1 border border-transparent hover:border-gray-300 rounded-md text-sm"
+                        className="w-full px-2 py-1 border border-transparent hover:border-[var(--border)] rounded-md text-sm"
                       />
                     </td>
                     <td className="px-6 py-3 text-sm text-right">
@@ -551,7 +551,7 @@ export default function ProjectPage() {
                         step="0.01"
                         defaultValue={d.quantity}
                         onBlur={(e) => handleUpdateDetail(d.id, 'quantity')(e.target.value)}
-                        className="w-24 px-2 py-1 border border-transparent hover:border-gray-300 rounded-md text-sm text-right"
+                        className="w-24 px-2 py-1 border border-transparent hover:border-[var(--border)] rounded-md text-sm text-right"
                       />
                     </td>
                     <td className="px-6 py-3 text-sm text-right">
@@ -560,7 +560,7 @@ export default function ProjectPage() {
                         step="0.01"
                         defaultValue={d.unitPrice}
                         onBlur={(e) => handleUpdateDetail(d.id, 'unitPrice')(e.target.value)}
-                        className="w-28 px-2 py-1 border border-transparent hover:border-gray-300 rounded-md text-sm text-right"
+                        className="w-28 px-2 py-1 border border-transparent hover:border-[var(--border)] rounded-md text-sm text-right"
                       />
                     </td>
                     <td className="px-6 py-3 text-sm text-right font-medium">
@@ -578,11 +578,11 @@ export default function ProjectPage() {
                 )
               })}
               {details.length > 0 && (
-                <tr className="bg-blue-50">
-                  <td className="px-6 py-3 text-sm font-semibold text-gray-900">ИТОГО</td>
+                <tr className="bg-[var(--primary-soft)]">
+                  <td className="px-6 py-3 text-sm font-semibold text-[var(--text)]">ИТОГО</td>
                   <td />
                   <td />
-                  <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">
+                  <td className="px-6 py-3 text-sm font-bold text-right text-[var(--text)]">
                     {totalDetailsAmount.toLocaleString('ru-RU')} ₽
                   </td>
                   <td />
@@ -590,7 +590,7 @@ export default function ProjectPage() {
               )}
               {details.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
                     Детализация пока не добавлена
                   </td>
                 </tr>
@@ -601,12 +601,12 @@ export default function ProjectPage() {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
+        <h1 className="text-2xl font-bold text-[var(--text)]">{project.name}</h1>
         {project.deadline && (
-          <p className="text-sm text-gray-600 mt-1">Дедлайн: {formatDate(new Date(project.deadline))}</p>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">Дедлайн: {formatDate(new Date(project.deadline))}</p>
         )}
         {project.source_lead_id ? (
-          <p className="text-sm text-blue-700 mt-1">
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
             Лид:{" "}
             <Link href={`/sales/leads#lead-${project.source_lead_id}`} className="hover:underline">
               открыть в воронке
@@ -616,39 +616,39 @@ export default function ProjectPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="text-sm text-gray-600 mb-1">Сумма проекта</div>
-          <div className="text-xl font-bold text-gray-900">
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+          <div className="text-sm text-[var(--muted-foreground)] mb-1">Сумма проекта</div>
+          <div className="text-xl font-bold text-[var(--text)]">
             {effectiveTotalAmount.toLocaleString('ru-RU')} ₽
           </div>
           {details.length > 0 && effectiveTotalAmount !== project.totalAmount && (
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-1 text-xs text-[var(--muted-foreground)]">
               По детализации (ручное значение: {project.totalAmount.toLocaleString('ru-RU')} ₽)
             </div>
           )}
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="text-sm text-gray-600 mb-1">Оплачено</div>
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+          <div className="text-sm text-[var(--muted-foreground)] mb-1">Оплачено</div>
           <div className="text-xl font-bold text-green-600">{project.paidAmount.toLocaleString('ru-RU')} ₽</div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="text-sm text-gray-600 mb-1">Расходы</div>
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+          <div className="text-sm text-[var(--muted-foreground)] mb-1">Расходы</div>
           <div className="text-xl font-bold text-red-600">{totalExpenses.toLocaleString('ru-RU')} ₽</div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+      <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6 mb-6">
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <div className="text-sm text-gray-600">Услуга</div>
+            <div className="text-sm text-[var(--muted-foreground)]">Услуга</div>
             <div className="font-medium">{serviceLabels[project.serviceType] || project.serviceType}</div>
           </div>
           <div>
-            <div className="text-sm text-gray-600">Тип клиента</div>
+            <div className="text-sm text-[var(--muted-foreground)]">Тип клиента</div>
             <div className="font-medium">{project.clientType ? (clientTypeLabels[project.clientType] || project.clientType) : '—'}</div>
           </div>
           <div>
-            <div className="text-sm text-gray-600">Статус</div>
+            <div className="text-sm text-[var(--muted-foreground)]">Статус</div>
             <div>
               <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                 project.status === 'paid' 
@@ -662,17 +662,17 @@ export default function ProjectPage() {
             </div>
           </div>
           <div>
-            <div className="text-sm text-gray-600">Контакт заказчика</div>
+            <div className="text-sm text-[var(--muted-foreground)]">Контакт заказчика</div>
             <div className="font-medium">{project.clientContact || '—'}</div>
           </div>
           <div>
-            <div className="text-sm text-gray-600">Способ оплаты</div>
+            <div className="text-sm text-[var(--muted-foreground)]">Способ оплаты</div>
             <div className="font-medium">
               {project.paymentMethod ? paymentMethodLabels[project.paymentMethod] || project.paymentMethod : '—'}
             </div>
           </div>
           <div>
-            <div className="text-sm text-gray-600">Прибыль</div>
+            <div className="text-sm text-[var(--muted-foreground)]">Прибыль</div>
             <div className={`font-bold text-lg ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {profit.toLocaleString('ru-RU')} ₽
             </div>
@@ -680,41 +680,41 @@ export default function ProjectPage() {
         </div>
         {project.notes && (
           <div className="mt-4 pt-4 border-t">
-            <div className="text-sm text-gray-600 mb-1">Заметки</div>
+            <div className="text-sm text-[var(--muted-foreground)] mb-1">Заметки</div>
             <div className="text-sm">{project.notes}</div>
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Расходы</h2>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Расходы</h2>
           <button
             onClick={() => setShowExpenseForm(!showExpenseForm)}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
           >
             + Добавить расход
           </button>
         </div>
 
         {showExpenseForm && (
-          <form onSubmit={handleAddExpense} className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <form onSubmit={handleAddExpense} className="mb-6 p-4 bg-[var(--surface-2)] rounded-lg">
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Имя сотрудника *</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Имя сотрудника *</label>
                 <input
                   name="employeeName"
                   type="text"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Роль *</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Роль *</label>
                 <select
                   name="employeeRole"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                 >
                   <option value="designer">Дизайнер</option>
                   <option value="pm">Проджект</option>
@@ -725,21 +725,21 @@ export default function ProjectPage() {
             </div>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Сумма *</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Сумма *</label>
                 <input
                   name="amount"
                   type="number"
                   step="0.01"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Заметки</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Заметки</label>
                 <input
                   name="notes"
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                 />
               </div>
             </div>
@@ -747,13 +747,13 @@ export default function ProjectPage() {
               <button
                 type="button"
                 onClick={() => setShowExpenseForm(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-[var(--border)] rounded-md text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
               >
                 Отмена
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                className="px-4 py-2 bg-[var(--primary)] text-white rounded-md text-sm font-medium hover:brightness-110"
               >
                 Добавить
               </button>
@@ -762,17 +762,17 @@ export default function ProjectPage() {
         )}
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-[var(--border)]">
+            <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сотрудник</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Сумма</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Заметки</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Сотрудник</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Роль</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Сумма</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Заметки</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Действия</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
               {expenses.map((expense) => (
                 <ExpenseRow
                   key={expense.id}
@@ -784,7 +784,7 @@ export default function ProjectPage() {
               ))}
               {expenses.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
                     Нет расходов
                   </td>
                 </tr>

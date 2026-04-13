@@ -193,7 +193,7 @@ export default function SalesLeadsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Загрузка...</div>
+        <div className="text-[var(--muted-foreground)]">Загрузка...</div>
       </div>
     );
   }
@@ -202,48 +202,48 @@ export default function SalesLeadsPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Лиды</h1>
-          <p className="text-sm text-gray-500 mt-1">Канбан по статусам. Аналитика — вкладка «Аналитика».</p>
+          <h1 className="text-2xl font-bold text-[var(--text)]">Лиды</h1>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">Канбан по статусам. Аналитика — вкладка «Аналитика».</p>
         </div>
         <button
           type="button"
           onClick={() => setShowAddForm(!showAddForm)}
-          className="px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-md hover:bg-violet-700"
+          className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
         >
           + Новый лид
         </button>
       </div>
 
       {showAddForm && (
-        <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="mb-6 p-4 bg-[var(--surface)] rounded-lg border border-[var(--border)] shadow-[var(--shadow-card)]">
           <form onSubmit={handleAddLead}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Описание задачи *</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Описание задачи *</label>
                 <input
                   type="text"
                   name="taskDescription"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                   placeholder="Краткое описание задачи..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Контакт *</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Контакт *</label>
                 <input
                   type="text"
                   name="contact"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                   placeholder="Имя, телефон, email..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Источник *</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Источник *</label>
                 {!showCustomSource ? (
                   <select
                     name="source"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                     onChange={(e) => {
                       if (e.target.value === "__custom__") {
                         setShowCustomSource(true);
@@ -267,7 +267,7 @@ export default function SalesLeadsPage() {
                       value={newSource}
                       onChange={(e) => setNewSource(e.target.value)}
                       placeholder="Новый источник"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      className="flex-1 px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                       required
                     />
                     <button
@@ -276,7 +276,7 @@ export default function SalesLeadsPage() {
                         setShowCustomSource(false);
                         setNewSource("");
                       }}
-                      className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+                      className="px-3 py-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--text)]"
                     >
                       Отмена
                     </button>
@@ -285,15 +285,15 @@ export default function SalesLeadsPage() {
               </div>
             </div>
             <div className="mb-4">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="checkbox" name="isRecurring" className="rounded border-gray-300" />
+              <label className="inline-flex items-center gap-2 text-sm text-[var(--text)] cursor-pointer">
+                <input type="checkbox" name="isRecurring" className="rounded border-[var(--border)]" />
                 Постоянник (повторное обращение)
               </label>
             </div>
             <div className="flex space-x-2">
               <button
                 type="submit"
-                className="px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-md hover:bg-violet-700"
+                className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
               >
                 Создать
               </button>
@@ -304,7 +304,7 @@ export default function SalesLeadsPage() {
                   setNewSource("");
                   setShowCustomSource(false);
                 }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
+                className="px-4 py-2 border border-[var(--border)] text-[var(--text)] text-sm font-medium rounded-md hover:bg-[var(--surface-2)]"
               >
                 Отмена
               </button>
@@ -320,7 +320,7 @@ export default function SalesLeadsPage() {
             const columnLeads = leadsByStatus[status] || [];
             const titleExtra =
               status === "contact_established" ? (
-                <span className="block text-xs font-normal text-gray-500 mt-0.5">
+                <span className="block text-xs font-normal text-[var(--muted-foreground)] mt-0.5">
                   Включая лиды со статусом «Новые»
                 </span>
               ) : null;
@@ -328,12 +328,12 @@ export default function SalesLeadsPage() {
             return (
               <div
                 key={status}
-                className="flex-shrink-0 w-80 bg-gray-100/80 rounded-xl p-4 border border-gray-200"
+                className="flex-shrink-0 w-80 bg-[var(--surface-2)]/80 rounded-xl p-4 border border-[var(--border)]"
               >
-                <h3 className="font-semibold text-gray-900 mb-3 text-sm">
+                <h3 className="font-semibold text-[var(--text)] mb-3 text-sm">
                   <span className="block">
                     {statusLabel}{" "}
-                    <span className="text-gray-500 font-normal">({columnLeads.length})</span>
+                    <span className="text-[var(--muted-foreground)] font-normal">({columnLeads.length})</span>
                   </span>
                   {titleExtra}
                 </h3>
@@ -342,9 +342,9 @@ export default function SalesLeadsPage() {
                     <div
                       key={lead.id}
                       id={`lead-${lead.id}`}
-                      className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+                      className="bg-[var(--surface)] rounded-lg p-3 shadow-[var(--shadow-card)] border border-[var(--border)] hover:shadow-md transition-shadow"
                     >
-                      <div className="text-sm font-semibold text-gray-900 mb-2 flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold text-[var(--text)] mb-2 flex flex-wrap items-center gap-2">
                         <span>{lead.taskDescription || "Без описания"}</span>
                         {lead.status === "new" ? (
                           <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
@@ -352,33 +352,33 @@ export default function SalesLeadsPage() {
                           </span>
                         ) : null}
                       </div>
-                      <div className="text-xs text-gray-700 mb-1">
+                      <div className="text-xs text-[var(--text)] mb-1">
                         <span className="font-medium">Контакт:</span> {lead.contact}
                       </div>
-                      <div className="text-xs text-gray-600 mb-2">
+                      <div className="text-xs text-[var(--muted-foreground)] mb-2">
                         <span className="font-medium">Источник:</span> {lead.source}
                       </div>
-                      <label className="flex items-center gap-2 text-xs text-gray-700 mb-3 cursor-pointer">
+                      <label className="flex items-center gap-2 text-xs text-[var(--text)] mb-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={Boolean(lead.isRecurring)}
                           onChange={() => void handleToggleRecurring(lead)}
-                          className="rounded border-gray-300"
+                          className="rounded border-[var(--border)]"
                         />
                         Постоянник
                       </label>
                       {lead.linkedProjectId ? (
-                        <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 p-2 text-xs">
-                          <div className="text-blue-900 font-medium mb-1">Связанный проект</div>
+                        <div className="mb-3 rounded-md border border-[var(--primary)]/15 bg-[var(--primary-soft)] p-2 text-xs">
+                          <div className="text-[var(--text)] font-medium mb-1">Связанный проект</div>
                           <div className="flex flex-wrap gap-2">
                             <Link
                               href={`/agency/projects/${lead.linkedProjectId}`}
-                              className="text-blue-700 hover:underline"
+                              className="text-[var(--primary)] hover:underline"
                             >
                               Проект
                             </Link>
                             {lead.linkedCardId ? (
-                              <Link href={`/board/${lead.linkedCardId}`} className="text-blue-700 hover:underline">
+                              <Link href={`/board/${lead.linkedCardId}`} className="text-[var(--primary)] hover:underline">
                                 Карточка
                               </Link>
                             ) : null}
@@ -388,12 +388,12 @@ export default function SalesLeadsPage() {
                         <button
                           type="button"
                           onClick={() => void handleConvertToProject(lead.id)}
-                          className="mb-3 w-full rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                          className="mb-3 w-full rounded-md border border-[var(--primary)]/25 bg-[var(--primary-soft)] px-2 py-1.5 text-xs font-medium text-[var(--primary)] hover:brightness-95 dark:hover:brightness-110"
                         >
                           Создать проект из лида
                         </button>
                       )}
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
                         <InlineSelect
                           value={lead.status}
                           options={STATUS_OPTIONS}
@@ -411,7 +411,7 @@ export default function SalesLeadsPage() {
                     </div>
                   ))}
                   {columnLeads.length === 0 && (
-                    <div className="text-sm text-gray-400 text-center py-6">Нет лидов</div>
+                    <div className="text-sm text-[var(--muted-foreground)] text-center py-6">Нет лидов</div>
                   )}
                 </div>
               </div>

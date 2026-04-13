@@ -1,7 +1,11 @@
 "use client";
 
 import { apiUrl, appPath } from "@/lib/api-url";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
@@ -85,131 +89,161 @@ function LoginForm() {
     displayName.trim().length > 0 && login.trim().length > 0 && password.length >= 8 && password === password2;
 
   return (
-    <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-lg p-8">
-      <h1 className="text-xl font-bold text-slate-900 mb-1">Team Tracker</h1>
-      <p className="text-sm text-slate-500 mb-4">
-        {mode === "login"
-          ? "Вход для команды или после регистрации."
-          : "Создаётся учётка без доступа к канбану и админке — только профиль и личный учёт времени."}
-      </p>
-      {regEnabled ? (
-        <div className="flex rounded-lg border border-slate-200 p-0.5 mb-6 bg-slate-50">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("login");
-              setError(null);
-            }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium ${
-              mode === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
-            }`}
-          >
-            Вход
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("register");
-              setError(null);
-            }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium ${
-              mode === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
-            }`}
-          >
-            Регистрация
-          </button>
-        </div>
-      ) : (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-6">
-          Саморегистрация на этом сервере выключена. Нужен аккаунт от администратора или{" "}
-          <code className="text-[11px]">TEAM_TRACKER_SELF_REGISTER=1</code> в production.
-        </p>
-      )}
-      <form onSubmit={onSubmit} className="space-y-4">
-        {mode === "register" ? (
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Имя</label>
-            <input
-              type="text"
-              autoComplete="name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-              placeholder="Как к вам обращаться"
-            />
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+      className="w-full max-w-md"
+    >
+      <Card className="overflow-hidden shadow-[var(--shadow-elevated)]">
+        <CardHeader className="space-y-1 pb-2">
+          <div className="mb-2 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold text-white shadow-lg shadow-[var(--primary)]/30">
+              TT
+            </div>
+            <div>
+              <CardTitle className="text-xl">Team Tracker</CardTitle>
+              <CardDescription className="text-[13px]">
+                {mode === "login" ? "Вход для команды" : "Регистрация личного профиля"}
+              </CardDescription>
+            </div>
           </div>
-        ) : null}
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Логин</label>
-          <input
-            type="text"
-            autoComplete={mode === "register" ? "username" : "username"}
-            value={login}
-            onChange={(e) => setLogin(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Пароль</label>
-          <input
-            type="password"
-            autoComplete={mode === "register" ? "new-password" : "current-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-          />
-          {mode === "register" ? (
-            <p className="text-[11px] text-slate-400 mt-1">Не короче 8 символов.</p>
-          ) : null}
-        </div>
-        {mode === "register" ? (
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Пароль ещё раз</label>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={password2}
-              onChange={(e) => setPassword2(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-            />
-          </div>
-        ) : null}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={
-            loading ||
-            !login.trim() ||
-            !password ||
-            (mode === "register" && (!regEnabled || !canSubmitRegister))
-          }
-          className="w-full py-2.5 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-        >
-          {loading ? (mode === "register" ? "Создаём…" : "Вход…") : mode === "register" ? "Зарегистрироваться" : "Войти"}
-        </button>
-      </form>
-      <p className="text-xs text-slate-400 mt-6">
-        После входа откроется профиль.{" "}
-        <Link href={appPath("/me")} className="text-emerald-700 underline">
-          Профиль
-        </Link>
-      </p>
-    </div>
+        </CardHeader>
+        <CardContent className="space-y-5 pt-2">
+          {regEnabled ? (
+            <div className="flex rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                }}
+                className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all ${
+                  mode === "login"
+                    ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)]"
+                    : "text-[var(--muted-foreground)]"
+                }`}
+              >
+                Вход
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setError(null);
+                }}
+                className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all ${
+                  mode === "register"
+                    ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)]"
+                    : "text-[var(--muted-foreground)]"
+                }`}
+              >
+                Регистрация
+              </button>
+            </div>
+          ) : (
+            <p className="rounded-xl border border-amber-200/80 bg-[var(--warning-soft)] px-3 py-2.5 text-xs text-amber-950 dark:border-amber-900/50 dark:text-amber-100">
+              Саморегистрация выключена. Нужен аккаунт от администратора или{" "}
+              <code className="rounded bg-[var(--surface)] px-1 py-0.5 text-[11px]">TEAM_TRACKER_SELF_REGISTER=1</code>.
+            </p>
+          )}
+          <form onSubmit={onSubmit} className="space-y-4">
+            {mode === "register" ? (
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Имя</label>
+                <Input
+                  type="text"
+                  autoComplete="name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Как к вам обращаться"
+                />
+              </div>
+            ) : null}
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Логин</label>
+              <Input type="text" autoComplete="username" value={login} onChange={(e) => setLogin(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Пароль</label>
+              <Input
+                type="password"
+                autoComplete={mode === "register" ? "new-password" : "current-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              {mode === "register" ? <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">Не короче 8 символов.</p> : null}
+            </div>
+            {mode === "register" ? (
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Пароль ещё раз</label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                />
+              </div>
+            ) : null}
+            {error ? <p className="text-sm font-medium text-[var(--danger)]">{error}</p> : null}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full"
+              disabled={
+                loading ||
+                !login.trim() ||
+                !password ||
+                (mode === "register" && (!regEnabled || !canSubmitRegister))
+              }
+            >
+              {loading ? (mode === "register" ? "Создаём…" : "Вход…") : mode === "register" ? "Зарегистрироваться" : "Войти"}
+            </Button>
+          </form>
+          <p className="text-center text-xs text-[var(--muted-foreground)]">
+            После входа откроется{" "}
+            <Link href={appPath("/me")} className="font-semibold text-[var(--primary)] hover:underline">
+              профиль
+            </Link>
+            .
+          </p>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-      <Suspense
-        fallback={
-          <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-lg p-8 text-center text-slate-500 text-sm">
-            Загрузка…
-          </div>
-        }
-      >
-        <LoginForm />
-      </Suspense>
+    <div className="tt-mesh flex min-h-screen">
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-[var(--primary)] p-10 text-white lg:flex">
+        <div className="pointer-events-none absolute inset-0 opacity-40">
+          <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-white/20 blur-3xl" />
+          <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-sky-300/30 blur-3xl" />
+        </div>
+        <div className="relative z-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/80">Design ops</p>
+          <h1 className="mt-4 max-w-md text-4xl font-bold leading-tight tracking-tight">
+            Один экран — весь поток агентства
+          </h1>
+          <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/85">
+            Таймер, канбан, календарь и финансы в одной системе. Светлая и тёмная тема, синий акцент, без визуального шума.
+          </p>
+        </div>
+        <p className="relative z-10 text-xs text-white/60">Team Tracker · внутренняя панель команды</p>
+      </div>
+      <div className="flex flex-1 items-center justify-center px-4 py-12 sm:px-8">
+        <Suspense
+          fallback={
+            <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--muted-foreground)] shadow-[var(--shadow-card)]">
+              Загрузка…
+            </div>
+          }
+        >
+          <LoginForm />
+        </Suspense>
+      </div>
     </div>
   );
 }

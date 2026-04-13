@@ -66,7 +66,7 @@ function InlineInput({
         onBlur={handleSubmit}
         onKeyDown={handleKeyDown}
         autoFocus
-        className={`w-24 px-2 py-1 border border-blue-500 rounded text-sm ${className}`}
+        className={`w-24 px-2 py-1 border border-[var(--primary)] rounded text-sm ${className}`}
       />
     )
   }
@@ -74,7 +74,7 @@ function InlineInput({
   return (
     <button
       onClick={() => setEditing(true)}
-      className={`cursor-pointer hover:bg-gray-100 px-2 py-1 rounded text-right ${className}`}
+      className={`cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-right ${className}`}
     >
       {value.toLocaleString('ru-RU')} ₽
     </button>
@@ -538,7 +538,7 @@ export default function AgencyPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Загрузка...</div>
+        <div className="text-[var(--muted-foreground)]">Загрузка...</div>
       </div>
     )
   }
@@ -551,13 +551,13 @@ export default function AgencyPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-gray-900">Проекты</h1>
+          <h1 className="text-2xl font-bold text-[var(--text)]">Проекты</h1>
           {/* Селектор месяца */}
-          <div className="flex items-center space-x-2 border border-gray-300 rounded-md px-3 py-2">
+          <div className="flex items-center space-x-2 border border-[var(--border)] rounded-md px-3 py-2">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
+              className="px-2 py-1 border border-[var(--border)] rounded text-sm"
             >
               {yearOptions.map(year => (
                 <option key={year} value={year}>{year}</option>
@@ -566,13 +566,13 @@ export default function AgencyPage() {
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
+              className="px-2 py-1 border border-[var(--border)] rounded text-sm"
             >
               {monthNames.map((name, index) => (
                 <option key={index + 1} value={index + 1}>{name}</option>
               ))}
             </select>
-            <span className="text-xs text-gray-500 max-w-[11rem] leading-tight hidden md:inline">
+            <span className="text-xs text-[var(--muted-foreground)] max-w-[11rem] leading-tight hidden md:inline">
               Фильтр по месяцу создания проекта
             </span>
             {selectedYear !== today.getFullYear() || selectedMonth !== today.getMonth() + 1 ? (
@@ -581,7 +581,7 @@ export default function AgencyPage() {
                   setSelectedYear(today.getFullYear())
                   setSelectedMonth(today.getMonth() + 1)
                 }}
-                className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800"
+                className="px-2 py-1 text-xs text-[var(--primary)] hover:underline"
                 title="Вернуться к текущему месяцу"
               >
                 Сегодня
@@ -592,7 +592,7 @@ export default function AgencyPage() {
         <div className="flex space-x-3">
           <Link
             href="/agency/projects/new"
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
           >
             + Новый проект
           </Link>
@@ -601,20 +601,20 @@ export default function AgencyPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="text-sm text-gray-600 mb-1">Предполагаемая выручка</div>
-          <div className="text-xl font-bold text-gray-900">{expectedRevenue.toLocaleString('ru-RU')} ₽</div>
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+          <div className="text-sm text-[var(--muted-foreground)] mb-1">Предполагаемая выручка</div>
+          <div className="text-xl font-bold text-[var(--text)]">{expectedRevenue.toLocaleString('ru-RU')} ₽</div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="text-sm text-gray-600 mb-1">Фактическая выручка</div>
-          <div className="text-xl font-bold text-gray-900">{actualRevenue.toLocaleString('ru-RU')} ₽</div>
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+          <div className="text-sm text-[var(--muted-foreground)] mb-1">Фактическая выручка</div>
+          <div className="text-xl font-bold text-[var(--text)]">{actualRevenue.toLocaleString('ru-RU')} ₽</div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="text-sm text-gray-600 mb-1">Расходы</div>
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+          <div className="text-sm text-[var(--muted-foreground)] mb-1">Расходы</div>
           <div className="text-xl font-bold text-red-600">{totalExpenses.toLocaleString('ru-RU')} ₽</div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="text-sm text-gray-600 mb-1">Прибыль</div>
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+          <div className="text-sm text-[var(--muted-foreground)] mb-1">Прибыль</div>
           <div className={`text-xl font-bold ${expectedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {expectedProfit.toLocaleString('ru-RU')} ₽
           </div>
@@ -622,42 +622,42 @@ export default function AgencyPage() {
       </div>
 
       {/* Projects Table */}
-      <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-        <table className="w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-[var(--surface)] shadow-[var(--shadow-card)] rounded-lg overflow-hidden">
+        <table className="w-full divide-y divide-[var(--border)]">
+          <thead className="bg-[var(--surface-2)]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Проект
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Услуга
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Тип клиента
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Статус
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Контакт
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Способ оплаты
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Сумма
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Оплачено
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
             {projects.map((project) => (
               <tr key={project.id}>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
-                    <Link href={`/agency/projects/${project.id}`} className="text-base font-medium text-blue-600 hover:text-blue-800">
+                    <Link href={`/agency/projects/${project.id}`} className="text-base font-medium text-[var(--primary)] hover:underline">
                       {project.name}
                     </Link>
                     <button
@@ -678,7 +678,7 @@ export default function AgencyPage() {
                           console.error('Error copying project:', err)
                         }
                       }}
-                      className="p-1 rounded text-gray-500 hover:bg-gray-100 hover:text-blue-600"
+                      className="p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--primary)]"
                       title={`Копировать на ${monthNames[selectedMonth === 12 ? 0 : selectedMonth]} ${selectedMonth === 12 ? selectedYear + 1 : selectedYear} (с расходами)`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -704,7 +704,7 @@ export default function AgencyPage() {
                             console.error('Error moving project:', err)
                           }
                         }}
-                        className="p-1 rounded text-gray-500 hover:bg-gray-100 hover:text-blue-600"
+                        className="p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--primary)]"
                         title={`Перенести на ${monthNames[selectedMonth === 12 ? 0 : selectedMonth]} ${selectedMonth === 12 ? selectedYear + 1 : selectedYear}`}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -718,7 +718,7 @@ export default function AgencyPage() {
                         e.preventDefault()
                         handleDeleteProject(project.id)
                       }}
-                      className="p-1 rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      className="p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
                       title="Удалить проект"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -727,7 +727,7 @@ export default function AgencyPage() {
                     </button>
                   </div>
                   {project.deadline && (
-                    <div className="text-xs text-gray-500 mt-0.5">{formatDate(new Date(project.deadline))}</div>
+                    <div className="text-xs text-[var(--muted-foreground)] mt-0.5">{formatDate(new Date(project.deadline))}</div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -736,10 +736,10 @@ export default function AgencyPage() {
                     options={serviceOptions}
                     onChange={(value) => handleUpdate(project.id, 'serviceType', value)}
                     className={`text-base ${
-                      project.serviceType === 'site' ? 'bg-blue-50 text-blue-700' :
+                      project.serviceType === 'site' ? 'bg-[var(--primary-soft)] text-[var(--primary)]' :
                       project.serviceType === 'presentation' ? 'bg-purple-50 text-purple-700' :
                       project.serviceType === 'subscription' ? 'bg-green-50 text-green-700' :
-                      'bg-gray-50 text-gray-700'
+                      'bg-[var(--surface-2)] text-[var(--text)]'
                     }`}
                   />
                 </td>
@@ -755,7 +755,7 @@ export default function AgencyPage() {
                       }
                       handleUpdate(project.id, 'clientType', value || null)
                     }}
-                    className="bg-gray-50 text-gray-700 truncate block w-full max-w-full text-left text-base"
+                    className="bg-[var(--surface-2)] text-[var(--text)] truncate block w-full max-w-full text-left text-base"
                   />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -771,7 +771,7 @@ export default function AgencyPage() {
                   />
                 </td>
                 <td className="px-6 py-4">
-                  <div className="text-base text-gray-900">{project.clientContact || '—'}</div>
+                  <div className="text-base text-[var(--text)]">{project.clientContact || '—'}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {project.paymentMethod ? (
@@ -779,14 +779,14 @@ export default function AgencyPage() {
                       value={project.paymentMethod}
                       options={paymentMethodOptions}
                       onChange={(value) => handleUpdate(project.id, 'paymentMethod', value)}
-                      className="bg-gray-50 text-gray-700 text-base"
+                      className="bg-[var(--surface-2)] text-[var(--text)] text-base"
                     />
                   ) : (
                     <InlineSelect
                       value=""
                       options={[{ value: '', label: '—' }, ...paymentMethodOptions]}
                       onChange={(value) => handleUpdate(project.id, 'paymentMethod', value || null)}
-                      className="bg-gray-50 text-gray-700 text-base"
+                      className="bg-[var(--surface-2)] text-[var(--text)] text-base"
                     />
                   )}
                 </td>
@@ -814,8 +814,8 @@ export default function AgencyPage() {
             ))}
             {projects.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
-                  Нет проектов. <Link href="/agency/projects/new" className="text-blue-600 hover:underline">Создать первый проект</Link>
+                <td colSpan={8} className="px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
+                  Нет проектов. <Link href="/agency/projects/new" className="text-[var(--primary)] hover:underline">Создать первый проект</Link>
                 </td>
               </tr>
             )}
@@ -824,9 +824,9 @@ export default function AgencyPage() {
       </div>
 
       {/* General Expenses Section */}
-      <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="mt-8 bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6">
         <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Общие расходы</h2>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Общие расходы</h2>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -853,14 +853,14 @@ export default function AgencyPage() {
                   console.error('Error copying general expenses:', err)
                 }
               }}
-              className="px-3 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
+              className="px-3 py-2 border border-[var(--border)] text-[var(--text)] text-sm font-medium rounded-md hover:bg-[var(--surface-2)]"
               title={`Скопировать все общие расходы с ${monthNames[(selectedMonth === 1 ? 12 : selectedMonth - 1) - 1]} ${selectedMonth === 1 ? selectedYear - 1 : selectedYear} в текущий месяц`}
             >
               Скопировать с {monthNames[(selectedMonth === 1 ? 12 : selectedMonth - 1) - 1]}
             </button>
             <button
               onClick={() => setShowExpenseForm(!showExpenseForm)}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+              className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
             >
               + Добавить расход
             </button>
@@ -868,36 +868,36 @@ export default function AgencyPage() {
         </div>
 
         {showExpenseForm && (
-          <form onSubmit={handleAddExpense} className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <form onSubmit={handleAddExpense} className="mb-6 p-4 bg-[var(--surface-2)] rounded-lg">
             <div className="mb-4">
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isCustomExpense}
                   onChange={(e) => setIsCustomExpense(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
                 />
-                <span className="text-sm font-medium text-gray-700">Произвольный расход (налог, комиссия и т.д.)</span>
+                <span className="text-sm font-medium text-[var(--text)]">Произвольный расход (налог, комиссия и т.д.)</span>
               </label>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {!isCustomExpense ? (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Сотрудник</label>
+                    <label className="block text-sm font-medium text-[var(--text)] mb-1">Сотрудник</label>
                     <input
                       type="text"
                       name="employeeName"
                       required={!isCustomExpense}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Роль</label>
+                    <label className="block text-sm font-medium text-[var(--text)] mb-1">Роль</label>
                     <select
                       name="employeeRole"
                       required={!isCustomExpense}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                     >
                       <option value="designer">Дизайнер</option>
                       <option value="pm">Проджект</option>
@@ -908,33 +908,33 @@ export default function AgencyPage() {
                 </>
               ) : (
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Тип расхода</label>
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Тип расхода</label>
                   <input
                     type="text"
                     name="notes"
                     placeholder="Например: Налог, Комиссия, Аренда и т.д."
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                   />
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Сумма</label>
+                <label className="block text-sm font-medium text-[var(--text)] mb-1">Сумма</label>
                 <input
                   type="number"
                   name="amount"
                   step="0.01"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                 />
               </div>
               {!isCustomExpense && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Примечания</label>
+                  <label className="block text-sm font-medium text-[var(--text)] mb-1">Примечания</label>
                   <input
                     type="text"
                     name="notes"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
                   />
                 </div>
               )}
@@ -942,7 +942,7 @@ export default function AgencyPage() {
             <div className="mt-4 flex space-x-2">
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
               >
                 Сохранить
               </button>
@@ -952,7 +952,7 @@ export default function AgencyPage() {
                   setShowExpenseForm(false)
                   setIsCustomExpense(false)
                 }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
+                className="px-4 py-2 border border-[var(--border)] text-[var(--text)] text-sm font-medium rounded-md hover:bg-[var(--surface-2)]"
               >
                 Отмена
               </button>
@@ -961,41 +961,41 @@ export default function AgencyPage() {
         )}
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-[var(--border)]">
+            <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сотрудник</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Сумма</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Примечания</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Действия</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Сотрудник</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Роль</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Сумма</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Примечания</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Действия</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
               {/* Автоматический расчет налогов */}
               <tr className="bg-yellow-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-[var(--text)]">
                   Налоги (автоматически)
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--muted-foreground)]">
                   <span className="text-xs">6916 ₽/мес + 1% от расчетного счета</span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-red-600">
                   {taxAmount.toLocaleString('ru-RU')} ₽
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500 italic">
+                <td className="px-6 py-4 text-sm text-[var(--muted-foreground)] italic">
                   {accountRevenue > 0 ? `1% от ${accountRevenue.toLocaleString('ru-RU')} ₽` : 'Только базовая сумма'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <span className="text-xs text-gray-400">Автоматически</span>
+                  <span className="text-xs text-[var(--muted-foreground)]">Автоматически</span>
                 </td>
               </tr>
               {generalExpenses.map((expense) => (
                 <tr key={expense.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text)]">
                     {expense.employeeName || '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--muted-foreground)]">
                     {expense.employeeRole ? (roleLabels[expense.employeeRole] || expense.employeeRole) : '—'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-red-600">
@@ -1017,7 +1017,7 @@ export default function AgencyPage() {
                           if (e.key === 'Escape') setEditingExpenseId(null)
                         }}
                         autoFocus
-                        className="w-24 px-2 py-1 border border-blue-500 rounded text-sm text-right"
+                        className="w-24 px-2 py-1 border border-[var(--primary)] rounded text-sm text-right"
                       />
                     ) : (
                       <button
@@ -1026,13 +1026,13 @@ export default function AgencyPage() {
                           setEditingExpenseId(expense.id)
                           setEditingExpenseValue(expense.amount.toString())
                         }}
-                        className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                        className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded"
                       >
                         {expense.amount.toLocaleString('ru-RU')} ₽
                       </button>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
+                  <td className="px-6 py-4 text-sm text-[var(--muted-foreground)]">
                     {expense.notes || '—'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1047,16 +1047,16 @@ export default function AgencyPage() {
               ))}
               {generalExpenses.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
                     Нет общих расходов
                   </td>
                 </tr>
               )}
             </tbody>
             {generalExpenses.length > 0 && (
-              <tfoot className="bg-gray-50">
+              <tfoot className="bg-[var(--surface-2)]">
                 <tr>
-                  <td colSpan={2} className="px-6 py-3 text-sm font-medium text-gray-900">
+                  <td colSpan={2} className="px-6 py-3 text-sm font-medium text-[var(--text)]">
                     Итого общих расходов:
                   </td>
                   <td className="px-6 py-3 text-right text-sm font-bold text-red-600">

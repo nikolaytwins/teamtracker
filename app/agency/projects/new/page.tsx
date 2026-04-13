@@ -53,15 +53,15 @@ export default function NewProjectPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link href="/agency" className="text-blue-600 hover:text-blue-800 text-sm">
+        <Link href="/agency" className="text-sm font-medium text-[var(--primary)] hover:underline">
           ← Назад к проектам
         </Link>
       </div>
 
       <div className="max-w-2xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Новый проект</h1>
+        <h1 className="text-2xl font-bold text-[var(--text)] mb-6">Новый проект</h1>
 
-        <div className="bg-white shadow-sm rounded-lg p-6">
+        <div className="bg-[var(--surface)] shadow-[var(--shadow-card)] rounded-lg p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -70,7 +70,7 @@ export default function NewProjectPage() {
             )}
 
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="name" className="block text-sm font-medium text-[var(--text)] mb-1">
                 Название проекта *
               </label>
               <input
@@ -78,13 +78,13 @@ export default function NewProjectPage() {
                 name="name"
                 type="text"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="totalAmount" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="totalAmount" className="block text-sm font-medium text-[var(--text)] mb-1">
                   Сумма проекта *
                 </label>
                 <input
@@ -93,12 +93,12 @@ export default function NewProjectPage() {
                   type="number"
                   step="0.01"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
                 />
               </div>
 
               <div>
-                <label htmlFor="paidAmount" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="paidAmount" className="block text-sm font-medium text-[var(--text)] mb-1">
                   Оплачено
                 </label>
                 <input
@@ -107,20 +107,20 @@ export default function NewProjectPage() {
                   type="number"
                   step="0.01"
                   defaultValue="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="serviceType" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="serviceType" className="block text-sm font-medium text-[var(--text)] mb-1">
                 Тип услуги *
               </label>
               <select
                 id="serviceType"
                 name="serviceType"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
               >
                 <option value="site">Сайт</option>
                 <option value="presentation">Презентация</option>
@@ -130,13 +130,13 @@ export default function NewProjectPage() {
             </div>
 
             <div>
-              <label htmlFor="clientType" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="clientType" className="block text-sm font-medium text-[var(--text)] mb-1">
                 Тип клиента
               </label>
               <select
                 id="clientType"
                 name="clientType"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
               >
                 <option value="">Не указано</option>
                 <option value="permanent">Постоянник</option>
@@ -147,13 +147,13 @@ export default function NewProjectPage() {
             </div>
 
             <div>
-              <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="paymentMethod" className="block text-sm font-medium text-[var(--text)] mb-1">
                 Куда пришла оплата
               </label>
               <select
                 id="paymentMethod"
                 name="paymentMethod"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
               >
                 <option value="">Не указано</option>
                 <option value="card">Карта</option>
@@ -162,14 +162,14 @@ export default function NewProjectPage() {
             </div>
 
             <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="status" className="block text-sm font-medium text-[var(--text)] mb-1">
                 Статус
               </label>
               <select
                 id="status"
                 name="status"
                 defaultValue="not_paid"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
               >
                 <option value="not_paid">Не оплачен</option>
                 <option value="prepaid">Предоплата</option>
@@ -178,53 +178,53 @@ export default function NewProjectPage() {
             </div>
 
             <div>
-              <label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="deadline" className="block text-sm font-medium text-[var(--text)] mb-1">
                 Дедлайн
               </label>
               <input
                 id="deadline"
                 name="deadline"
                 type="date"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
               />
             </div>
 
             <div>
-              <label htmlFor="clientContact" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="clientContact" className="block text-sm font-medium text-[var(--text)] mb-1">
                 Контакт заказчика
               </label>
               <input
                 id="clientContact"
                 name="clientContact"
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
                 placeholder="Email или телефон"
               />
             </div>
 
             <div>
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="notes" className="block text-sm font-medium text-[var(--text)] mb-1">
                 Заметки
               </label>
               <textarea
                 id="notes"
                 name="notes"
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
               />
             </div>
 
             <div className="flex justify-end space-x-3 pt-4">
               <Link
                 href="/agency"
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-[var(--border)] rounded-md text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
               >
                 Отмена
               </Link>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-[var(--primary)] text-white rounded-md text-sm font-medium hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Создание...' : 'Создать проект'}
               </button>

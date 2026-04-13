@@ -30,7 +30,7 @@ export default function AgencyLayout({
                   (tab.href === '/agency' && pathname?.startsWith('/agency/projects')) ||
                   (tab.href === '/agency/statistics' && pathname?.startsWith('/agency/statistics'))
                     ? 'border-[var(--primary)] text-[var(--primary)]'
-                    : 'border-transparent text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border)]'
+                    : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--text)] hover:border-[var(--border)]'
                 }`}
               >
                 {tab.label}

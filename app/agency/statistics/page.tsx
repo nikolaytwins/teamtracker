@@ -132,59 +132,58 @@ export default function AgencyStatisticsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Загрузка...</div>
+        <div className="text-[var(--muted-foreground)]">Загрузка...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="space-y-8">
         <div className="mb-6">
-          <Link href="/agency" className="text-blue-600 hover:text-blue-800 text-sm mb-2 inline-block">
+          <Link href="/agency" className="mb-2 inline-block text-sm font-medium text-[var(--primary)] hover:underline">
             ← Назад к проектам
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Статистика агентства</h1>
+          <h1 className="text-3xl font-bold text-[var(--text)]">Статистика агентства</h1>
         </div>
 
         {/* Средние значения */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="text-sm text-gray-600 mb-1">Средняя месячная выручка</div>
+          <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6">
+            <div className="text-sm text-[var(--muted-foreground)] mb-1">Средняя месячная выручка</div>
             <div className="text-2xl font-bold text-green-600">
               {avgMonthlyRevenue.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽
             </div>
-            <div className="text-xs text-gray-500 mt-1">За последние 12 месяцев</div>
+            <div className="text-xs text-[var(--muted-foreground)] mt-1">За последние 12 месяцев</div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="text-sm text-gray-600 mb-1">Средняя месячная прибыль</div>
+          <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6">
+            <div className="text-sm text-[var(--muted-foreground)] mb-1">Средняя месячная прибыль</div>
             <div className={`text-2xl font-bold ${avgMonthlyProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {avgMonthlyProfit.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽
             </div>
-            <div className="text-xs text-gray-500 mt-1">За последние 12 месяцев</div>
+            <div className="text-xs text-[var(--muted-foreground)] mt-1">За последние 12 месяцев</div>
           </div>
         </div>
 
         {/* Выручка по типам услуг — за ВСЕ месяцы */}
         {revenueByService && revenueByService.items.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-1">Выручка по типам услуг</h2>
-            <div className="text-xs text-gray-500 mb-6">За все время (все проекты). Длина полосы — доля от общей выручки.</div>
+          <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6 mb-8">
+            <h2 className="text-xl font-semibold text-[var(--text)] mb-1">Выручка по типам услуг</h2>
+            <div className="text-xs text-[var(--muted-foreground)] mb-6">За все время (все проекты). Длина полосы — доля от общей выручки.</div>
 
             {/* Горизонтальные полосы: тип — полоса по % от общей выручки — сумма и % */}
             <div className="space-y-5 mb-6">
               {revenueByService.items.map((item, index) => {
-                const colors = ['bg-blue-500', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500']
+                const colors = ['bg-[var(--primary)]', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500']
                 const color = colors[index % colors.length]
                 const label = SERVICE_TYPE_LABELS[item.serviceType] || item.serviceType
                 return (
                   <div key={item.serviceType} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                     <div className="flex-shrink-0 sm:w-40">
-                      <div className="text-sm font-medium text-gray-800" title={label}>{label}</div>
-                      <div className="text-xs text-gray-500">{item.count} {item.count === 1 ? 'проект' : item.count < 5 ? 'проекта' : 'проектов'}</div>
+                      <div className="text-sm font-medium text-[var(--text)]" title={label}>{label}</div>
+                      <div className="text-xs text-[var(--muted-foreground)]">{item.count} {item.count === 1 ? 'проект' : item.count < 5 ? 'проекта' : 'проектов'}</div>
                     </div>
                     <div className="flex-1 min-h-[32px] flex items-center gap-3">
-                      <div className="flex-1 h-8 rounded-lg bg-gray-100 overflow-hidden">
+                      <div className="flex-1 h-8 rounded-lg bg-[var(--surface-2)] overflow-hidden">
                         <div
                           className={`h-full ${color} rounded-lg transition-all duration-500`}
                           style={{ width: `${Math.max(item.percent, 1)}%` }}
@@ -192,8 +191,8 @@ export default function AgencyStatisticsPage() {
                         />
                       </div>
                       <div className="flex-shrink-0 text-right w-24 sm:w-28">
-                        <div className="text-sm font-semibold text-gray-900 tabular-nums">{item.totalAmount.toLocaleString('ru-RU')} ₽</div>
-                        <div className="text-xs text-gray-500 tabular-nums">{item.percent}%</div>
+                        <div className="text-sm font-semibold text-[var(--text)] tabular-nums">{item.totalAmount.toLocaleString('ru-RU')} ₽</div>
+                        <div className="text-xs text-[var(--muted-foreground)] tabular-nums">{item.percent}%</div>
                       </div>
                     </div>
                   </div>
@@ -202,11 +201,11 @@ export default function AgencyStatisticsPage() {
             </div>
 
             {/* Итоговая полоса — состав из сегментов (как пирог в одну полосу) */}
-            <div className="border-t border-gray-200 pt-4">
-              <div className="text-xs font-medium text-gray-500 mb-2">Состав выручки</div>
+            <div className="border-t border-[var(--border)] pt-4">
+              <div className="text-xs font-medium text-[var(--muted-foreground)] mb-2">Состав выручки</div>
               <div className="h-10 rounded-lg overflow-hidden flex">
                 {revenueByService.items.map((item, index) => {
-                  const colors = ['bg-blue-500', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500']
+                  const colors = ['bg-[var(--primary)]', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500']
                   return (
                     <div
                       key={item.serviceType}
@@ -223,7 +222,7 @@ export default function AgencyStatisticsPage() {
                   )
                 })}
               </div>
-              <div className="flex justify-between mt-3 text-sm font-semibold text-gray-800">
+              <div className="flex justify-between mt-3 text-sm font-semibold text-[var(--text)]">
                 <span>Итого</span>
                 <span>{revenueByService.total.toLocaleString('ru-RU')} ₽</span>
               </div>
@@ -233,23 +232,23 @@ export default function AgencyStatisticsPage() {
 
         {/* Выручка по типам клиентов — за ВСЕ месяцы */}
         {revenueByClient && revenueByClient.items.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-1">Выручка по типам клиентов</h2>
-            <div className="text-xs text-gray-500 mb-6">За все время (все проекты). Длина полосы — доля от общей выручки.</div>
+          <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6 mb-8">
+            <h2 className="text-xl font-semibold text-[var(--text)] mb-1">Выручка по типам клиентов</h2>
+            <div className="text-xs text-[var(--muted-foreground)] mb-6">За все время (все проекты). Длина полосы — доля от общей выручки.</div>
 
             <div className="space-y-5 mb-6">
               {revenueByClient.items.map((item, index) => {
-                const colors = ['bg-blue-500', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500']
+                const colors = ['bg-[var(--primary)]', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500']
                 const color = colors[index % colors.length]
                 const label = (CLIENT_TYPE_LABELS[item.clientType] ?? item.clientType) || 'Не указан'
                 return (
                   <div key={item.clientType || '__empty__'} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                     <div className="flex-shrink-0 sm:w-40">
-                      <div className="text-sm font-medium text-gray-800" title={label}>{label}</div>
-                      <div className="text-xs text-gray-500">{item.count} {item.count === 1 ? 'проект' : item.count < 5 ? 'проекта' : 'проектов'}</div>
+                      <div className="text-sm font-medium text-[var(--text)]" title={label}>{label}</div>
+                      <div className="text-xs text-[var(--muted-foreground)]">{item.count} {item.count === 1 ? 'проект' : item.count < 5 ? 'проекта' : 'проектов'}</div>
                     </div>
                     <div className="flex-1 min-h-[32px] flex items-center gap-3">
-                      <div className="flex-1 h-8 rounded-lg bg-gray-100 overflow-hidden">
+                      <div className="flex-1 h-8 rounded-lg bg-[var(--surface-2)] overflow-hidden">
                         <div
                           className={`h-full ${color} rounded-lg transition-all duration-500`}
                           style={{ width: `${Math.max(item.percent, 1)}%` }}
@@ -257,8 +256,8 @@ export default function AgencyStatisticsPage() {
                         />
                       </div>
                       <div className="flex-shrink-0 text-right w-24 sm:w-28">
-                        <div className="text-sm font-semibold text-gray-900 tabular-nums">{item.totalAmount.toLocaleString('ru-RU')} ₽</div>
-                        <div className="text-xs text-gray-500 tabular-nums">{item.percent}%</div>
+                        <div className="text-sm font-semibold text-[var(--text)] tabular-nums">{item.totalAmount.toLocaleString('ru-RU')} ₽</div>
+                        <div className="text-xs text-[var(--muted-foreground)] tabular-nums">{item.percent}%</div>
                       </div>
                     </div>
                   </div>
@@ -266,11 +265,11 @@ export default function AgencyStatisticsPage() {
               })}
             </div>
 
-            <div className="border-t border-gray-200 pt-4">
-              <div className="text-xs font-medium text-gray-500 mb-2">Состав выручки</div>
+            <div className="border-t border-[var(--border)] pt-4">
+              <div className="text-xs font-medium text-[var(--muted-foreground)] mb-2">Состав выручки</div>
               <div className="h-10 rounded-lg overflow-hidden flex">
                 {revenueByClient.items.map((item, index) => {
-                  const colors = ['bg-blue-500', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500']
+                  const colors = ['bg-[var(--primary)]', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500']
                   const label = (CLIENT_TYPE_LABELS[item.clientType] ?? item.clientType) || 'Не указан'
                   return (
                     <div
@@ -286,7 +285,7 @@ export default function AgencyStatisticsPage() {
                   )
                 })}
               </div>
-              <div className="flex justify-between mt-3 text-sm font-semibold text-gray-800">
+              <div className="flex justify-between mt-3 text-sm font-semibold text-[var(--text)]">
                 <span>Итого</span>
                 <span>{revenueByClient.total.toLocaleString('ru-RU')} ₽</span>
               </div>
@@ -295,11 +294,11 @@ export default function AgencyStatisticsPage() {
         )}
 
         {/* Динамика по месяцам — линейный график */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Динамика по месяцам</h2>
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6">
+          <h2 className="text-xl font-semibold text-[var(--text)] mb-6">Динамика по месяцам</h2>
 
           {monthlyData.length === 0 ? (
-            <div className="h-64 flex items-center justify-center text-gray-500 text-sm border border-dashed border-gray-200 rounded-lg">
+            <div className="h-64 flex items-center justify-center text-[var(--muted-foreground)] text-sm border border-dashed border-[var(--border)] rounded-lg">
               Нет данных за последние 12 месяцев. Сохраните месяц в разделе «Проекты», чтобы появилась история.
             </div>
           ) : (
@@ -412,16 +411,16 @@ export default function AgencyStatisticsPage() {
                       {/* Тултип поверх SVG (в координатах viewBox не используем — рисуем в DOM) */}
                       {chartTooltip && (
                         <div
-                          className="absolute z-10 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg pointer-events-none whitespace-nowrap"
+                          className="absolute z-10 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--text)] text-[var(--surface)] text-xs shadow-[var(--shadow-elevated)] pointer-events-none whitespace-nowrap"
                           style={{
                             left: '50%',
                             transform: 'translateX(-50%)',
                             top: 40,
                           }}
                         >
-                          <div className="font-semibold text-gray-200 mb-1">{chartTooltip.month}</div>
+                          <div className="font-semibold text-[var(--surface)]/85 mb-1">{chartTooltip.month}</div>
                           <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            <span className="w-2 h-2 rounded-full bg-[var(--primary)]" />
                             <span>Выручка: {chartTooltip.revenue.toLocaleString('ru-RU')} ₽</span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -437,18 +436,17 @@ export default function AgencyStatisticsPage() {
 
               <div className="flex justify-center gap-6 mt-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-0.5 rounded-full bg-blue-500" />
-                  <span className="text-xs text-gray-600">Выручка</span>
+                  <div className="w-6 h-0.5 rounded-full bg-[var(--primary)]" />
+                  <span className="text-xs text-[var(--muted-foreground)]">Выручка</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-0.5 rounded-full bg-green-500" />
-                  <span className="text-xs text-gray-600">Прибыль</span>
+                  <span className="text-xs text-[var(--muted-foreground)]">Прибыль</span>
                 </div>
               </div>
             </>
           )}
         </div>
-      </div>
     </div>
   )
 }

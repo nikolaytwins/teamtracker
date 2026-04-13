@@ -18,7 +18,7 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
     <AppShell>
       <div className="bg-[var(--bg)] border-b border-[var(--border)] rounded-xl">
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-xs text-[var(--muted)] pt-3">Продажи</p>
+          <p className="text-xs text-[var(--muted-foreground)] pt-3">Продажи</p>
           <div className="flex flex-wrap gap-x-8 gap-y-1">
             {tabs.map((tab) => (
               <Link
@@ -27,7 +27,7 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
                 className={`py-3 px-1 border-b-2 text-sm font-medium ${
                   pathname === tab.href
                     ? "border-[var(--primary)] text-[var(--primary)]"
-                    : "border-transparent text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border)]"
+                    : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--text)] hover:border-[var(--border)]"
                 }`}
               >
                 {tab.label}

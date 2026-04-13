@@ -102,15 +102,15 @@ export default function SalesAnalyticsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Аналитика продаж</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-[var(--text)] mb-2">Аналитика продаж</h1>
+        <p className="text-sm text-[var(--muted-foreground)]">
           Сводка: Profi + Threads, визиты, лиды, постоянники и оплаты по проектам. Ниже — детальная воронка лидов.
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Период</h2>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Период</h2>
           <div className="flex gap-2">
             {(["week", "month", "all"] as const).map((p) => (
               <button
@@ -119,8 +119,8 @@ export default function SalesAnalyticsPage() {
                 onClick={() => setAnalyticsPeriod(p)}
                 className={`px-3 py-1.5 text-sm rounded-md ${
                   analyticsPeriod === p
-                    ? "bg-violet-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-[var(--primary)] text-white"
+                    : "bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--border)]"
                 }`}
               >
                 {p === "week" ? "Неделя" : p === "month" ? "Месяц" : "Все время"}
@@ -130,30 +130,30 @@ export default function SalesAnalyticsPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-gray-500">Загрузка…</div>
+          <div className="text-center py-8 text-[var(--muted-foreground)]">Загрузка…</div>
         ) : dashboard ? (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="p-4 rounded-lg bg-violet-50 border border-violet-100">
-                <div className="text-xs font-medium text-violet-800 uppercase">Отклики всего (Profi + Threads)</div>
-                <div className="text-2xl font-bold text-violet-900 tabular-nums mt-1">
+              <div className="p-4 rounded-lg border border-[var(--primary)]/15 bg-[var(--primary-soft)]">
+                <div className="text-xs font-medium text-[var(--primary)] uppercase">Отклики всего (Profi + Threads)</div>
+                <div className="text-2xl font-bold text-[var(--text)] tabular-nums mt-1">
                   {dashboard.outreach.combined.count}
                 </div>
                 {c && (
-                  <p className="text-xs text-violet-700 mt-2">
+                  <p className="text-xs text-[var(--muted-foreground)] mt-2">
                     Переписка+: {c.funnel.toConversation} · КП: {c.funnel.toProposal} · Оплачено:{" "}
                     {c.funnel.toPaid}
                   </p>
                 )}
               </div>
-              <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                <div className="text-xs font-medium text-slate-600 uppercase">Расходы на Profi (чистые)</div>
-                <div className="text-2xl font-bold text-slate-900 tabular-nums mt-1">
+              <div className="p-4 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                <div className="text-xs font-medium text-[var(--muted-foreground)] uppercase">Расходы на Profi (чистые)</div>
+                <div className="text-2xl font-bold text-[var(--text)] tabular-nums mt-1">
                   {dashboard.outreach.profi.stats
                     ? `${Math.round(dashboard.outreach.profi.stats.netSpent).toLocaleString("ru-RU")} ₽`
                     : "—"}
                 </div>
-                <p className="text-xs text-slate-500 mt-2">Threads: обычно 0 ₽</p>
+                <p className="text-xs text-[var(--muted-foreground)] mt-2">Threads: обычно 0 ₽</p>
               </div>
               <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-100">
                 <div className="text-xs font-medium text-emerald-800 uppercase">Выручка по проектам (сумма paid)</div>
@@ -165,23 +165,23 @@ export default function SalesAnalyticsPage() {
             </div>
 
             {c && (
-              <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-800 mb-2">Сводка воронки (оба канала)</h3>
+              <div className="p-4 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-2">Сводка воронки (оба канала)</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div>
-                    <span className="text-gray-500">Сумма проектов (оплаченные отклики)</span>
+                    <span className="text-[var(--muted-foreground)]">Сумма проектов (оплаченные отклики)</span>
                     <div className="font-semibold tabular-nums">{Math.round(c.totalProjectAmount).toLocaleString("ru-RU")} ₽</div>
                   </div>
                   <div>
-                    <span className="text-gray-500">Чистые расходы (оба)</span>
+                    <span className="text-[var(--muted-foreground)]">Чистые расходы (оба)</span>
                     <div className="font-semibold tabular-nums">{Math.round(c.netSpent).toLocaleString("ru-RU")} ₽</div>
                   </div>
                   <div>
-                    <span className="text-gray-500">Лиды (созданы в периоде)</span>
+                    <span className="text-[var(--muted-foreground)]">Лиды (созданы в периоде)</span>
                     <div className="font-semibold tabular-nums">{dashboard.leads.newInPeriod}</div>
                   </div>
                   <div>
-                    <span className="text-gray-500">Лиды → оплачен</span>
+                    <span className="text-[var(--muted-foreground)]">Лиды → оплачен</span>
                     <div className="font-semibold tabular-nums">{dashboard.leads.paidInPeriod}</div>
                   </div>
                 </div>
@@ -189,25 +189,25 @@ export default function SalesAnalyticsPage() {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 rounded-lg border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-800 mb-2">Визиты вкладок</h3>
-                <p className="text-sm text-gray-700">
+              <div className="p-4 rounded-lg border border-[var(--border)]">
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-2">Визиты вкладок</h3>
+                <p className="text-sm text-[var(--text)]">
                   Profi:{" "}
                   <span className="font-semibold tabular-nums">{dashboard.visits.profi.total}</span>
                 </p>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-[var(--text)]">
                   Threads:{" "}
                   <span className="font-semibold tabular-nums">{dashboard.visits.threads.total}</span>
                 </p>
-                <p className="text-xs text-gray-500 mt-2">Учёт с дебаунсом 30 мин на браузер</p>
+                <p className="text-xs text-[var(--muted-foreground)] mt-2">Учёт с дебаунсом 30 мин на браузер</p>
               </div>
-              <div className="p-4 rounded-lg border border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-800 mb-2">Постоянники (флаг у лида)</h3>
-                <p className="text-sm text-gray-700">
+              <div className="p-4 rounded-lg border border-[var(--border)]">
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-2">Постоянники (флаг у лида)</h3>
+                <p className="text-sm text-[var(--text)]">
                   Обратились в периоде:{" "}
                   <span className="font-semibold tabular-nums">{dashboard.recurring.contactedInPeriod}</span>
                 </p>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-[var(--text)]">
                   Статус «Оплачен» и созданы в периоде:{" "}
                   <span className="font-semibold tabular-nums">{dashboard.recurring.paidInPeriod}</span>
                 </p>
@@ -215,43 +215,43 @@ export default function SalesAnalyticsPage() {
             </div>
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">Нет данных сводки</div>
+          <div className="text-center py-8 text-[var(--muted-foreground)]">Нет данных сводки</div>
         )}
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Воронка лидов (детально)</h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <h2 className="text-lg font-semibold text-[var(--text)] mb-2">Воронка лидов (детально)</h2>
+        <p className="text-sm text-[var(--muted-foreground)] mb-4">
           Конверсии по статусам и источники — по истории лидов за тот же период.
         </p>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
           {loading ? (
-            <div className="text-center py-8 text-gray-500">Загрузка…</div>
+            <div className="text-center py-8 text-[var(--muted-foreground)]">Загрузка…</div>
           ) : analytics ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Конверсии переходов</h3>
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-3">Конверсии переходов</h3>
                 {analytics.conversions.length > 0 ? (
                   <div className="space-y-2">
                     {analytics.conversions.map((conv) => (
-                      <div key={conv.label} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <div key={conv.label} className="flex items-center justify-between p-2 bg-[var(--surface-2)] rounded">
                         <div className="flex-1">
-                          <div className="text-sm text-gray-900">{conv.label}</div>
-                          <div className="text-xs text-gray-600">{conv.count} уникальных лидов</div>
+                          <div className="text-sm text-[var(--text)]">{conv.label}</div>
+                          <div className="text-xs text-[var(--muted-foreground)]">{conv.count} уникальных лидов</div>
                         </div>
-                        <div className="text-sm font-semibold text-gray-900 tabular-nums">
+                        <div className="text-sm font-semibold text-[var(--text)] tabular-nums">
                           {conv.percentage.toFixed(1)}%
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500 italic py-2">Нет данных о конверсиях</div>
+                  <div className="text-sm text-[var(--muted-foreground)] italic py-2">Нет данных о конверсиях</div>
                 )}
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Источники</h3>
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-3">Источники</h3>
                 {analytics.sources.length > 0 ? (
                   <div className="space-y-2">
                     {[...analytics.sources]
@@ -259,22 +259,22 @@ export default function SalesAnalyticsPage() {
                       .map((source) => (
                         <div
                           key={source.source}
-                          className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                          className="flex items-center justify-between p-2 bg-[var(--surface-2)] rounded"
                         >
-                          <div className="text-sm text-gray-900">{source.source}</div>
-                          <div className="text-sm font-semibold text-gray-900 tabular-nums">
+                          <div className="text-sm text-[var(--text)]">{source.source}</div>
+                          <div className="text-sm font-semibold text-[var(--text)] tabular-nums">
                             {source.count} лидов
                           </div>
                         </div>
                       ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500 italic py-2">Нет данных об источниках</div>
+                  <div className="text-sm text-[var(--muted-foreground)] italic py-2">Нет данных об источниках</div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">Нет данных</div>
+            <div className="text-center py-8 text-[var(--muted-foreground)]">Нет данных</div>
           )}
         </div>
       </div>

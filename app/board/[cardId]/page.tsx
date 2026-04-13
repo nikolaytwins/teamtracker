@@ -309,23 +309,23 @@ export default function CardPhasesPage() {
   }, [payload.entries, logWorkerFilter, logTaskTypeFilter]);
 
   return (
-    <div className="min-h-screen bg-slate-50/80 p-4 md:p-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-4xl p-4 md:p-6">
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <Link
           href={appPath("/board")}
-          className="text-sm text-slate-600 hover:text-slate-900 underline"
+          className="text-sm text-[var(--muted-foreground)] hover:text-[var(--text)] underline"
         >
           ← Канбан
         </Link>
         <Link
           href={appPath("/board/time-analytics")}
-          className="text-sm font-medium text-emerald-700 hover:text-emerald-900 underline"
+          className="text-sm font-medium text-[var(--primary)] hover:underline"
         >
           Аналитика времени
         </Link>
       </div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-1">{card.name}</h1>
-      <p className="text-sm text-slate-500 mb-6">
+      <h1 className="text-2xl font-bold text-[var(--text)] mb-1">{card.name}</h1>
+      <p className="text-sm text-[var(--muted-foreground)] mb-6">
         Внутренние этапы и таймтрекер. Колонки канбана здесь не меняются.
       </p>
       {linkedLeadId ? (
@@ -338,11 +338,11 @@ export default function CardPhasesPage() {
       ) : null}
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs text-slate-500 uppercase tracking-wide">Всего по проекту</div>
-            <div className="text-2xl font-semibold text-slate-900 tabular-nums">
+            <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Всего по проекту</div>
+            <div className="text-2xl font-semibold text-[var(--text)] tabular-nums">
               {formatDuration(payload.projectTotalSeconds + driftSec)}
             </div>
           </div>
@@ -367,15 +367,15 @@ export default function CardPhasesPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6 space-y-3">
-        <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Перед «Приступил»</div>
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 mb-6 space-y-3">
+        <div className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">Перед «Приступил»</div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Сотрудник</label>
+            <label className="block text-xs text-[var(--muted-foreground)] mb-1">Сотрудник</label>
             <select
               value={workerSelect}
               onChange={(e) => setWorkerSelect(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)]"
             >
               <option value="">— из списка команды</option>
               {teamList.map((t) => (
@@ -392,18 +392,18 @@ export default function CardPhasesPage() {
               value={workerManual}
               onChange={(e) => setWorkerManual(e.target.value)}
               placeholder="Или введите имя вручную"
-              className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              className="mt-2 w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
             />
             {!effectiveWorker ? (
               <p className="text-xs text-amber-700 mt-1">Нужно выбрать или ввести сотрудника.</p>
             ) : null}
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Тип задачи</label>
+            <label className="block text-xs text-[var(--muted-foreground)] mb-1">Тип задачи</label>
             <select
               value={taskType}
               onChange={(e) => setTaskType(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)]"
             >
               <option value="">— не указан</option>
               {TIME_TASK_TYPE_OPTIONS.map((o) => (
@@ -412,7 +412,7 @@ export default function CardPhasesPage() {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-slate-400 mt-2">
+            <p className="text-xs text-[var(--muted-foreground)] mt-2">
               Список команды редактируется в канбане (ответственные в карточке).
             </p>
           </div>
@@ -425,7 +425,7 @@ export default function CardPhasesPage() {
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Название этапа"
-          className="flex-1 min-w-[200px] px-3 py-2 border border-slate-200 rounded-lg text-sm"
+          className="flex-1 min-w-[200px] px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
         />
         <button
           type="submit"
@@ -438,7 +438,7 @@ export default function CardPhasesPage() {
 
       <div className="space-y-3 mb-8">
         {payload.phases.length === 0 ? (
-          <p className="text-slate-500 text-sm">Добавьте этапы — затем нажмите «Приступил» на нужном.</p>
+          <p className="text-[var(--muted-foreground)] text-sm">Добавьте этапы — затем нажмите «Приступил» на нужном.</p>
         ) : (
           payload.phases.map((p) => {
             const isRunning = active && !active.ended_at && active.phase_id === p.id;
@@ -446,11 +446,11 @@ export default function CardPhasesPage() {
             return (
               <div
                 key={p.id}
-                className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl p-4"
+                className="flex flex-wrap items-center justify-between gap-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4"
               >
                 <div>
-                  <div className="font-medium text-slate-800">{p.title}</div>
-                  <div className="text-sm text-slate-600 tabular-nums">Время: {formatDuration(displaySec)}</div>
+                  <div className="font-medium text-[var(--text)]">{p.title}</div>
+                  <div className="text-sm text-[var(--muted-foreground)] tabular-nums">Время: {formatDuration(displaySec)}</div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -467,7 +467,7 @@ export default function CardPhasesPage() {
                     type="button"
                     disabled={saving || Boolean(active && !active.ended_at)}
                     onClick={() => void removePhase(p.id)}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] disabled:opacity-40"
                   >
                     Удалить
                   </button>
@@ -478,39 +478,39 @@ export default function CardPhasesPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800 mb-2">Аналитика проекта</h2>
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] overflow-hidden">
+        <div className="p-4 border-b border-[var(--border)]">
+          <h2 className="text-lg font-semibold text-[var(--text)] mb-2">Аналитика проекта</h2>
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-slate-100 p-3">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <div className="rounded-lg border border-[var(--border)] p-3">
+              <div className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide mb-2">
                 По дням
               </div>
               {analyticsByDay.length === 0 ? (
-                <p className="text-sm text-slate-500">Нет завершённых сессий</p>
+                <p className="text-sm text-[var(--muted-foreground)]">Нет завершённых сессий</p>
               ) : (
                 <ul className="space-y-1 text-sm">
                   {analyticsByDay.map((d) => (
                     <li key={d.day} className="flex justify-between gap-2">
-                      <span className="text-slate-600">{new Date(d.day).toLocaleDateString("ru-RU")}</span>
-                      <span className="tabular-nums text-slate-800">{formatDuration(d.sec)}</span>
+                      <span className="text-[var(--muted-foreground)]">{new Date(d.day).toLocaleDateString("ru-RU")}</span>
+                      <span className="tabular-nums text-[var(--text)]">{formatDuration(d.sec)}</span>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
-            <div className="rounded-lg border border-slate-100 p-3">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <div className="rounded-lg border border-[var(--border)] p-3">
+              <div className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide mb-2">
                 По типам задач
               </div>
               {analyticsByTaskType.length === 0 ? (
-                <p className="text-sm text-slate-500">Нет завершённых сессий</p>
+                <p className="text-sm text-[var(--muted-foreground)]">Нет завершённых сессий</p>
               ) : (
                 <ul className="space-y-1 text-sm">
                   {analyticsByTaskType.map((t) => (
                     <li key={t.type || "__empty"} className="flex justify-between gap-2">
-                      <span className="text-slate-600">{labelForTaskType(t.type || null)}</span>
-                      <span className="tabular-nums text-slate-800">{formatDuration(t.sec)}</span>
+                      <span className="text-[var(--muted-foreground)]">{labelForTaskType(t.type || null)}</span>
+                      <span className="tabular-nums text-[var(--text)]">{formatDuration(t.sec)}</span>
                     </li>
                   ))}
                 </ul>
@@ -518,12 +518,12 @@ export default function CardPhasesPage() {
             </div>
           </div>
         </div>
-        <h2 className="text-lg font-semibold text-slate-800 p-4 border-b border-slate-100">Сессии</h2>
-        <div className="px-4 py-3 border-b border-slate-100 grid gap-3 md:grid-cols-2">
+        <h2 className="text-lg font-semibold text-[var(--text)] p-4 border-b border-[var(--border)]">Сессии</h2>
+        <div className="px-4 py-3 border-b border-[var(--border)] grid gap-3 md:grid-cols-2">
           <select
             value={logWorkerFilter}
             onChange={(e) => setLogWorkerFilter(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+            className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)]"
           >
             <option value="">Все сотрудники</option>
             {logWorkers.map((w) => (
@@ -535,7 +535,7 @@ export default function CardPhasesPage() {
           <select
             value={logTaskTypeFilter}
             onChange={(e) => setLogTaskTypeFilter(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+            className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)]"
           >
             <option value="">Все типы задач</option>
             {TIME_TASK_TYPE_OPTIONS.map((o) => (
@@ -548,7 +548,7 @@ export default function CardPhasesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-slate-500 border-b border-slate-100">
+              <tr className="text-left text-[var(--muted-foreground)] border-b border-[var(--border)]">
                 <th className="py-2 px-4">Начало</th>
                 <th className="py-2 px-4">Конец</th>
                 <th className="py-2 px-4">Длительность</th>
@@ -561,7 +561,7 @@ export default function CardPhasesPage() {
             <tbody>
               {filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-slate-500">
+                  <td colSpan={7} className="py-6 text-center text-[var(--muted-foreground)]">
                     Записей пока нет
                   </td>
                 </tr>
@@ -573,20 +573,20 @@ export default function CardPhasesPage() {
                       ? e.duration_seconds
                       : Math.floor((Date.now() - new Date(e.started_at).getTime()) / 1000);
                   return (
-                    <tr key={e.id} className="border-b border-slate-50">
-                      <td className="py-2 px-4 whitespace-nowrap text-slate-700">
+                    <tr key={e.id} className="border-b border-[var(--border)]">
+                      <td className="py-2 px-4 whitespace-nowrap text-[var(--text)]">
                         {new Date(e.started_at).toLocaleString("ru-RU")}
                       </td>
-                      <td className="py-2 px-4 whitespace-nowrap text-slate-600">
+                      <td className="py-2 px-4 whitespace-nowrap text-[var(--muted-foreground)]">
                         {e.ended_at ? new Date(e.ended_at).toLocaleString("ru-RU") : "…"}
                       </td>
                       <td className="py-2 px-4 tabular-nums">{formatDuration(dur)}</td>
-                      <td className="py-2 px-4 text-slate-700">
+                      <td className="py-2 px-4 text-[var(--text)]">
                         {e.worker_name?.trim() ? e.worker_name : "—"}
                       </td>
-                      <td className="py-2 px-4 text-slate-600">{labelForTaskType(e.task_type)}</td>
-                      <td className="py-2 px-4 text-slate-600">{e.task_note?.trim() ? e.task_note : "—"}</td>
-                      <td className="py-2 px-4 text-slate-700">{phaseTitle}</td>
+                      <td className="py-2 px-4 text-[var(--muted-foreground)]">{labelForTaskType(e.task_type)}</td>
+                      <td className="py-2 px-4 text-[var(--muted-foreground)]">{e.task_note?.trim() ? e.task_note : "—"}</td>
+                      <td className="py-2 px-4 text-[var(--text)]">{phaseTitle}</td>
                     </tr>
                   );
                 })
