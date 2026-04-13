@@ -1,5 +1,42 @@
 import type Database from "better-sqlite3";
 
+/**
+ * Создаёт agency_leads, если её ещё нет (иначе POST /api/agency/leads падает с «no such table»).
+ * Старые БД без taskDescription добиваем ALTER-ом ниже.
+ */
+export function ensureAgencyLeadsBaseTable(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agency_leads (
+      id TEXT PRIMARY KEY,
+      contact TEXT NOT NULL,
+      source TEXT NOT NULL,
+      taskDescription TEXT,
+      status TEXT NOT NULL DEFAULT 'new',
+      nextContactDate TEXT,
+      manualDateSet INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+  `);
+}
+
+/** Prisma/старые дампы без колонки описания задачи. */
+export function ensureAgencyLeadsTaskDescriptionColumn(db: Database.Database) {
+  try {
+    db.exec(`ALTER TABLE agency_leads ADD COLUMN taskDescription TEXT`);
+  } catch {
+    /* column exists */
+  }
+}
+
+/** Вызвать перед любым обращением к agency_leads в SQLite. */
+export function ensureAgencyLeadsReady(db: Database.Database) {
+  ensureAgencyLeadsBaseTable(db);
+  ensureAgencyLeadsTaskDescriptionColumn(db);
+  ensureAgencyLeadsColumns(db);
+  ensureAgencyLeadsArchived(db);
+}
+
 /** Таблица могла отсутствовать после миграции — без неё POST лида падает. */
 export function ensureLeadHistoryTable(db: Database.Database) {
   db.exec(`
@@ -42,12 +79,10 @@ export function ensureAgencyLeadsArchived(db: Database.Database) {
       id TEXT PRIMARY KEY NOT NULL
     );
   `);
-  const done = db.prepare(`SELECT 1 AS o FROM _tt_migrations WHERE id = ?`).get("leads_archive_legacy_v1") as
-    | { o: number }
-    | undefined;
-  if (!done) {
+  // Один поток «победил» вставкой — только он делает UPDATE, без гонки и без UNIQUE-ошибки.
+  const ins = db.prepare(`INSERT OR IGNORE INTO _tt_migrations (id) VALUES (?)`).run("leads_archive_legacy_v1");
+  if (ins.changes > 0) {
     db.prepare(`UPDATE agency_leads SET archived = 1`).run();
-    db.prepare(`INSERT INTO _tt_migrations (id) VALUES (?)`).run("leads_archive_legacy_v1");
   }
 }
 

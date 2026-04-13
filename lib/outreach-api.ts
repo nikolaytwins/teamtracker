@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { ensureAgencyLeadsArchived, ensureAgencyLeadsColumns } from "@/lib/agency-leads-schema";
+import { ensureAgencyLeadsReady } from "@/lib/agency-leads-schema";
 import {
   computeOutreachStats,
   computeOutreachStatsByMonth,
@@ -93,9 +93,7 @@ export function insertOutreachResponse(
       const source = "Profi.ru";
       const taskDescription = params.notes ? `Напомнить заказчику. ${params.notes}` : "Напомнить заказчику";
       const leadId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-      ensureAgencyLeadsMinimal(db);
-      ensureAgencyLeadsColumns(db);
-      ensureAgencyLeadsArchived(db);
+      ensureAgencyLeadsReady(db);
       db.prepare(
         `INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, isRecurring, archived, createdAt, updatedAt)
          VALUES (?, ?, ?, ?, 'new', ?, 1, 0, 0, datetime('now'), datetime('now'))`
@@ -106,22 +104,6 @@ export function insertOutreachResponse(
   }
 
   return db.prepare("SELECT * FROM outreach_responses WHERE id = ?").get(id);
-}
-
-function ensureAgencyLeadsMinimal(db: Database.Database) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS agency_leads (
-      id TEXT PRIMARY KEY,
-      contact TEXT NOT NULL,
-      source TEXT NOT NULL,
-      taskDescription TEXT,
-      status TEXT NOT NULL DEFAULT 'new',
-      nextContactDate TEXT,
-      manualDateSet INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    );
-  `);
 }
 
 export function getOutreachById(db: Database.Database, id: string, platform: OutreachPlatform) {

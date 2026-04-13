@@ -1,7 +1,6 @@
 import Database from "better-sqlite3";
 import {
-  ensureAgencyLeadsArchived,
-  ensureAgencyLeadsColumns,
+  ensureAgencyLeadsReady,
   ensureAgencyProjectsColumns,
   ensureLeadHistoryTable,
 } from "@/lib/agency-leads-schema";
@@ -258,7 +257,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
   async listLeadsOrdered(opts?: { includeArchived?: boolean }): Promise<Record<string, unknown>[]> {
     const db = openSqlite();
     try {
-      ensureAgencyLeadsArchived(db);
+      ensureAgencyLeadsReady(db);
       const where = opts?.includeArchived ? "" : " WHERE COALESCE(archived, 0) = 0 ";
       return db
         .prepare(
@@ -308,8 +307,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
     const recurring = Boolean(body.isRecurring) ? 1 : 0;
     const db = openSqlite();
     try {
-      ensureAgencyLeadsColumns(db);
-      ensureAgencyLeadsArchived(db);
+      ensureAgencyLeadsReady(db);
       ensureAgencyProjectsColumns(db);
       ensureLeadHistoryTable(db);
       const autoDate = calculateNextContactDateForLead(status);
@@ -337,8 +335,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
   async getLeadById(id: string): Promise<Record<string, unknown> | undefined> {
     const db = openSqlite();
     try {
-      ensureAgencyLeadsColumns(db);
-      ensureAgencyLeadsArchived(db);
+      ensureAgencyLeadsReady(db);
       return db.prepare("SELECT * FROM agency_leads WHERE id = ?").get(id) as
         | Record<string, unknown>
         | undefined;
@@ -370,8 +367,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
 
     const db = openSqlite();
     try {
-      ensureAgencyLeadsColumns(db);
-      ensureAgencyLeadsArchived(db);
+      ensureAgencyLeadsReady(db);
       ensureAgencyProjectsColumns(db);
       ensureLeadHistoryTable(db);
       const currentLead = db.prepare("SELECT * FROM agency_leads WHERE id = ?").get(id) as any;
@@ -477,7 +473,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
   ): Promise<{ id: string; contact: string; taskDescription: string | null; status: string } | undefined> {
     const db = openSqlite();
     try {
-      ensureAgencyLeadsColumns(db);
+      ensureAgencyLeadsReady(db);
       return db
         .prepare(`SELECT id, contact, taskDescription, status FROM agency_leads WHERE id = ?`)
         .get(leadId) as
@@ -988,7 +984,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
     const db = openSqlite();
     try {
       ensureOutreachTable(db);
-      ensureAgencyLeadsColumns(db);
+      ensureAgencyLeadsReady(db);
 
       const filterByCreatedRange = (
         rows: Array<{ createdAt: string; platform: string; [k: string]: unknown }>,
@@ -1344,8 +1340,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
   }): Promise<Record<string, unknown> | undefined> {
     const db = openSqlite();
     try {
-      ensureAgencyLeadsColumns(db);
-      ensureAgencyLeadsArchived(db);
+      ensureAgencyLeadsReady(db);
       db.prepare(
         `
       INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, isRecurring, archived, createdAt, updatedAt)
