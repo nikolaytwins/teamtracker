@@ -8,7 +8,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="tt-mesh min-h-screen text-[var(--text)]">
       <Navigation />
-      <main className="w-full min-h-screen pt-16 pb-10 pl-0 pr-4 sm:pr-6 lg:pt-8 lg:pl-[var(--sidebar-w)]">
+      <main className="w-full min-h-screen pl-0 pr-4 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-16 sm:pr-6 lg:pt-8 lg:pl-[var(--sidebar-w)]">
         <motion.div
           className="mx-auto w-full max-w-[min(100%,88rem)]"
           initial={{ opacity: 0, y: 12 }}

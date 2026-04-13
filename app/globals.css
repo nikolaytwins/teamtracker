@@ -5,6 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  color-scheme: light;
   /* Team Tracker layout tokens */
   --bg: #f4f7fc;
   --surface: #ffffff;
@@ -63,6 +64,7 @@
 }
 
 html.dark {
+  color-scheme: dark;
   --bg: #070a0f;
   --surface: #101620;
   --surface-2: #161d2a;

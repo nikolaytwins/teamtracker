@@ -4,7 +4,7 @@ import { apiUrl, appPath } from "@/lib/api-url";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type MeUser = { name: string; title: string; avatarUrl: string | null; role?: string };
 
@@ -100,8 +100,11 @@ function formatNtfText(n: NtfItem): string {
   return n.type;
 }
 
-function linkClass(active: boolean) {
-  return `group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+function linkClass(active: boolean, collapsed?: boolean) {
+  const c = Boolean(collapsed);
+  return `group flex w-full items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-all duration-200 ${
+    c ? "justify-center px-2" : "px-3"
+  } ${
     active
       ? "bg-[var(--surface)] text-[var(--primary)] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]"
       : "text-[var(--muted-foreground)] hover:bg-[var(--surface)]/90 hover:text-[var(--text)]"
@@ -118,6 +121,39 @@ export default function Navigation() {
   const [ntfItems, setNtfItems] = useState<NtfItem[]>([]);
   const [ntfUnread, setNtfUnread] = useState(0);
   const ntfWrapRef = useRef<HTMLDivElement>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useLayoutEffect(() => {
+    try {
+      const raw = localStorage.getItem("tt_sidebar_collapsed");
+      const c = raw === "1";
+      setSidebarCollapsed(c);
+      if (c) {
+        document.documentElement.style.setProperty("--sidebar-w", "4.5rem");
+      } else {
+        document.documentElement.style.removeProperty("--sidebar-w");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("tt_sidebar_collapsed", next ? "1" : "0");
+        if (next) {
+          document.documentElement.style.setProperty("--sidebar-w", "4.5rem");
+        } else {
+          document.documentElement.style.removeProperty("--sidebar-w");
+        }
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("tt_theme") : null;
@@ -253,31 +289,44 @@ export default function Navigation() {
     );
   }
 
-  function renderNavLinks() {
+  function renderNavLinks(collapsed?: boolean) {
+    const c = Boolean(collapsed);
     return (
       <>
         {navItems.map((item) => (
           <motion.div key={item.href} whileTap={{ scale: 0.98 }}>
-            <Link href={item.href} className={linkClass(item.active)} onClick={() => setMobileOpen(false)}>
+            <Link
+              href={item.href}
+              className={linkClass(item.active, c)}
+              title={c ? item.label : undefined}
+              onClick={() => setMobileOpen(false)}
+            >
               <span className={item.active ? "text-[var(--primary)]" : "text-[var(--muted-foreground)] group-hover:text-[var(--text)]"}>
                 <NavGlyph name={item.icon} />
               </span>
-              {item.label}
+              {!c && item.label}
             </Link>
           </motion.div>
         ))}
-        {adminItems.length > 0 ? (
+        {adminItems.length > 0 && !c ? (
           <div className="my-3 px-1">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Управление</p>
           </div>
+        ) : adminItems.length > 0 && c ? (
+          <div className="my-2 border-t border-[var(--border)] pt-2" aria-hidden />
         ) : null}
         {adminItems.map((item) => (
           <motion.div key={item.href} whileTap={{ scale: 0.98 }}>
-            <Link href={item.href} className={linkClass(item.active)} onClick={() => setMobileOpen(false)}>
+            <Link
+              href={item.href}
+              className={linkClass(item.active, c)}
+              title={c ? item.label : undefined}
+              onClick={() => setMobileOpen(false)}
+            >
               <span className={item.active ? "text-[var(--primary)]" : "text-[var(--muted-foreground)] group-hover:text-[var(--text)]"}>
                 <NavGlyph name={item.icon} />
               </span>
-              {item.label}
+              {!c && item.label}
             </Link>
           </motion.div>
         ))}
@@ -287,21 +336,21 @@ export default function Navigation() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto flex h-14 items-center justify-between gap-3 px-4">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/90 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:hidden">
+        <div className="mx-auto flex min-h-14 items-center justify-between gap-3 px-4 pb-0.5">
           <BrandMark compact />
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={toggleTheme}
-              className="tt-focus-ring rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs font-medium text-[var(--muted-foreground)]"
+              className="tt-focus-ring min-h-11 min-w-11 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 text-xs font-medium text-[var(--muted-foreground)] sm:min-h-0 sm:min-w-0 sm:py-2"
             >
               {theme === "dark" ? "Светлая" : "Тёмная"}
             </button>
             <button
               type="button"
               onClick={() => setMobileOpen((v) => !v)}
-              className="tt-focus-ring rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs font-medium text-[var(--muted-foreground)]"
+              className="tt-focus-ring min-h-11 min-w-11 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 text-xs font-medium text-[var(--muted-foreground)] sm:min-h-0 sm:min-w-0 sm:py-2"
             >
               Меню
             </button>
@@ -324,78 +373,181 @@ export default function Navigation() {
                 Закрыть
               </button>
             </div>
-            <nav className="flex flex-col gap-0.5">{renderNavLinks()}</nav>
+            <nav className="flex flex-col gap-0.5">{renderNavLinks(false)}</nav>
           </motion.aside>
         </div>
       ) : null}
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-w)] flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)]/95 px-3 py-6 backdrop-blur-xl lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-w)] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)]/95 px-2 py-6 backdrop-blur-xl transition-[width] duration-200 ease-out lg:flex lg:px-3">
         <div className="flex h-full min-h-0 flex-col">
-          <div className="mb-8 px-1">
-            <BrandMark />
-          </div>
-          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Рабочие места</p>
-          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-0.5">{renderNavLinks()}</nav>
-          <div className="mt-auto space-y-2 border-t border-[var(--border)] pt-4">
+          <div className={`mb-6 flex w-full gap-2 px-1 ${sidebarCollapsed ? "flex-col items-center" : "items-start justify-between"}`}>
+            {sidebarCollapsed ? <BrandMark compact /> : (
+              <div className="min-w-0 flex-1">
+                <BrandMark />
+              </div>
+            )}
             <button
               type="button"
-              onClick={toggleTheme}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
+              onClick={toggleSidebarCollapsed}
+              className="tt-focus-ring shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              aria-expanded={!sidebarCollapsed}
+              aria-label={sidebarCollapsed ? "Развернуть боковое меню" : "Свернуть боковое меню"}
             >
-              <span className="text-base" aria-hidden>
-                {theme === "dark" ? "☀️" : "🌙"}
-              </span>
-              Тема: {theme === "dark" ? "тёмная" : "светлая"}
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                {sidebarCollapsed ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                )}
+              </svg>
             </button>
+          </div>
+          {!sidebarCollapsed ? (
+            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Рабочие места</p>
+          ) : null}
+          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-0.5">{renderNavLinks(sidebarCollapsed)}</nav>
+          <div className="mt-auto space-y-2 border-t border-[var(--border)] pt-4">
+            {!sidebarCollapsed ? (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
+              >
+                <span className="text-base" aria-hidden>
+                  {theme === "dark" ? "☀️" : "🌙"}
+                </span>
+                Тема: {theme === "dark" ? "тёмная" : "светлая"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)]"
+                title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+              >
+                <span className="text-lg" aria-hidden>
+                  {theme === "dark" ? "☀️" : "🌙"}
+                </span>
+              </button>
+            )}
             {me ? (
               <div
                 ref={ntfWrapRef}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-card)]"
+                className={
+                  sidebarCollapsed
+                    ? "flex flex-col items-center gap-2 border-0 bg-transparent p-0 shadow-none"
+                    : "rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-card)]"
+                }
               >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)]">
+                {sidebarCollapsed ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNtfOpen((o) => !o)}
+                      className="relative rounded-xl p-2.5 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)]"
+                      aria-label="Уведомления"
+                      title="Уведомления"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                        />
+                      </svg>
+                      {ntfUnread > 0 ? (
+                        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--danger)] px-0.5 text-[10px] font-bold text-white">
+                          {ntfUnread > 9 ? "9+" : ntfUnread}
+                        </span>
+                      ) : null}
+                    </button>
+                    <Link
+                      href={appPath("/me")}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)] hover:ring-2 hover:ring-[var(--primary-soft)]"
+                      title={`${me.name} — профиль`}
+                    >
                       {me.avatarUrl ? (
                         <img src={me.avatarUrl} alt="" className="h-full w-full object-cover" />
                       ) : (
                         me.name.charAt(0).toUpperCase()
                       )}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[var(--text)]">{me.name}</div>
-                      <div className="truncate text-xs text-[var(--muted-foreground)]">{me.title}</div>
-                    </div>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void logout()}
+                      className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)]"
+                      title="Выйти"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                        />
+                      </svg>
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setNtfOpen((o) => !o)}
-                    className="relative shrink-0 rounded-xl p-2 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface-2)]"
-                    aria-label="Уведомления"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                      />
-                    </svg>
-                    {ntfUnread > 0 ? (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--danger)] px-0.5 text-[10px] font-bold text-white">
-                        {ntfUnread > 9 ? "9+" : ntfUnread}
-                      </span>
-                    ) : null}
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void logout()}
-                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-left text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)]"
-                >
-                  Выйти
-                </button>
+                ) : (
+                  <>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)]">
+                          {me.avatarUrl ? (
+                            <img src={me.avatarUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            me.name.charAt(0).toUpperCase()
+                          )}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-[var(--text)]">{me.name}</div>
+                          <div className="truncate text-xs text-[var(--muted-foreground)]">{me.title}</div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNtfOpen((o) => !o)}
+                        className="relative shrink-0 rounded-xl p-2 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface-2)]"
+                        aria-label="Уведомления"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                          />
+                        </svg>
+                        {ntfUnread > 0 ? (
+                          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--danger)] px-0.5 text-[10px] font-bold text-white">
+                            {ntfUnread > 9 ? "9+" : ntfUnread}
+                          </span>
+                        ) : null}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void logout()}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-left text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)]"
+                    >
+                      Выйти
+                    </button>
+                  </>
+                )}
                 {ntfOpen ? (
-                  <div className="mt-2 max-h-72 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                  <div
+                    className={`max-h-72 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-elevated)] ${
+                      sidebarCollapsed
+                        ? "fixed bottom-4 z-[70] w-[min(20rem,calc(100vw-5.5rem))]"
+                        : "mt-2"
+                    }`}
+                    style={
+                      sidebarCollapsed
+                        ? { left: "max(0.5rem, calc(var(--sidebar-w, 4.5rem) + 6px))" }
+                        : undefined
+                    }
+                  >
                     <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
                       <span className="text-xs font-semibold text-[var(--text)]">Уведомления</span>
                       {ntfItems.some((x) => !x.read_at) ? (

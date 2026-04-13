@@ -66,7 +66,7 @@ function InlineInput({
         onBlur={handleSubmit}
         onKeyDown={handleKeyDown}
         autoFocus
-        className={`w-24 px-2 py-1 border border-[var(--primary)] rounded text-sm ${className}`}
+        className={`min-w-[6.5rem] w-32 max-w-[10rem] rounded border border-[var(--primary)] bg-[var(--surface)] px-2 py-1 text-sm tabular-nums text-[var(--text)] ${className}`}
       />
     )
   }
@@ -74,7 +74,7 @@ function InlineInput({
   return (
     <button
       onClick={() => setEditing(true)}
-      className={`cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-right ${className}`}
+      className={`cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-right tabular-nums whitespace-nowrap ${className}`}
     >
       {value.toLocaleString('ru-RU')} ₽
     </button>
@@ -553,11 +553,11 @@ export default function AgencyPage() {
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-bold text-[var(--text)]">Проекты</h1>
           {/* Селектор месяца */}
-          <div className="flex items-center space-x-2 border border-[var(--border)] rounded-md px-3 py-2">
+          <div className="flex items-center space-x-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-2 py-1 border border-[var(--border)] rounded text-sm"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)]"
             >
               {yearOptions.map(year => (
                 <option key={year} value={year}>{year}</option>
@@ -566,7 +566,7 @@ export default function AgencyPage() {
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="px-2 py-1 border border-[var(--border)] rounded text-sm"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)]"
             >
               {monthNames.map((name, index) => (
                 <option key={index + 1} value={index + 1}>{name}</option>
@@ -621,33 +621,33 @@ export default function AgencyPage() {
         </div>
       </div>
 
-      {/* Projects Table */}
-      <div className="bg-[var(--surface)] shadow-[var(--shadow-card)] rounded-lg overflow-hidden">
-        <table className="w-full divide-y divide-[var(--border)]">
+      {/* Projects Table — overflow-x-auto: широкая сетка не обрезает «Оплачено» */}
+      <div className="bg-[var(--surface)] shadow-[var(--shadow-card)] rounded-lg border border-[var(--border)] overflow-x-auto">
+        <table className="w-full min-w-[68rem] divide-y divide-[var(--border)]">
           <thead className="bg-[var(--surface-2)]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+              <th className="px-3 py-3 sm:px-6 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Проект
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+              <th className="px-3 py-3 sm:px-6 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Услуга
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+              <th className="px-3 py-3 sm:px-6 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Тип клиента
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+              <th className="px-3 py-3 sm:px-6 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Статус
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+              <th className="px-3 py-3 sm:px-6 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Контакт
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+              <th className="px-3 py-3 sm:px-6 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                 Способ оплаты
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+              <th className="px-3 py-3 sm:px-6 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider whitespace-nowrap">
                 Сумма
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+              <th className="px-3 py-3 sm:px-6 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider whitespace-nowrap">
                 Оплачено
               </th>
             </tr>
@@ -655,7 +655,7 @@ export default function AgencyPage() {
           <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
             {projects.map((project) => (
               <tr key={project.id}>
-                <td className="px-6 py-4">
+                <td className="px-3 py-4 sm:px-6">
                   <div className="flex items-center gap-2">
                     <Link href={`/agency/projects/${project.id}`} className="text-base font-medium text-[var(--primary)] hover:underline">
                       {project.name}
@@ -730,20 +730,20 @@ export default function AgencyPage() {
                     <div className="text-xs text-[var(--muted-foreground)] mt-0.5">{formatDate(new Date(project.deadline))}</div>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-3 py-4 sm:px-6 whitespace-nowrap">
                   <InlineSelect
                     value={project.serviceType}
                     options={serviceOptions}
                     onChange={(value) => handleUpdate(project.id, 'serviceType', value)}
                     className={`text-base ${
                       project.serviceType === 'site' ? 'bg-[var(--primary-soft)] text-[var(--primary)]' :
-                      project.serviceType === 'presentation' ? 'bg-purple-50 text-purple-700' :
-                      project.serviceType === 'subscription' ? 'bg-green-50 text-green-700' :
+                      project.serviceType === 'presentation' ? 'bg-purple-50 text-purple-800 dark:bg-violet-500/15 dark:text-violet-200' :
+                      project.serviceType === 'subscription' ? 'bg-emerald-50 text-emerald-800 dark:bg-[var(--success-soft)] dark:text-[var(--success)]' :
                       'bg-[var(--surface-2)] text-[var(--text)]'
                     }`}
                   />
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap max-w-[140px] min-w-0">
+                <td className="px-3 py-4 sm:px-6 whitespace-nowrap max-w-[140px] min-w-0">
                   <InlineSelect
                     value={project.clientType ?? ''}
                     options={clientTypeDisplayOptions}
@@ -758,22 +758,22 @@ export default function AgencyPage() {
                     className="bg-[var(--surface-2)] text-[var(--text)] truncate block w-full max-w-full text-left text-base"
                   />
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-3 py-4 sm:px-6 whitespace-nowrap">
                   <InlineSelect
                     value={project.status}
                     options={statusOptions}
                     onChange={(value) => handleUpdate(project.id, 'status', value)}
                     className={`text-base ${
-                      project.status === 'paid' ? 'bg-green-50 text-green-700' :
-                      project.status === 'prepaid' ? 'bg-yellow-50 text-yellow-700' :
-                      'bg-red-50 text-red-700'
+                      project.status === 'paid' ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' :
+                      project.status === 'prepaid' ? 'bg-amber-50 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' :
+                      'bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-300'
                     }`}
                   />
                 </td>
-                <td className="px-6 py-4">
-                  <div className="text-base text-[var(--text)]">{project.clientContact || '—'}</div>
+                <td className="px-3 py-4 sm:px-6 min-w-[8rem] max-w-[12rem]">
+                  <div className="text-base text-[var(--text)] break-words">{project.clientContact || '—'}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-3 py-4 sm:px-6 whitespace-nowrap">
                   {project.paymentMethod ? (
                     <InlineSelect
                       value={project.paymentMethod}
@@ -790,22 +790,22 @@ export default function AgencyPage() {
                     />
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
+                <td className="px-3 py-4 sm:px-6 whitespace-nowrap text-right tabular-nums">
                   <InlineInput
                     value={project.effectiveTotalAmount ?? project.totalAmount}
                     onChange={(value) => handleUpdate(project.id, 'totalAmount', value)}
-                    className="font-medium text-base"
+                    className="font-medium text-base tabular-nums"
                   />
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
+                <td className="px-3 py-4 sm:px-6 whitespace-nowrap text-right tabular-nums">
                   {project.status === 'prepaid' ? (
                     <InlineInput
                       value={project.paidAmount}
                       onChange={(value) => handleUpdate(project.id, 'paidAmount', value)}
-                      className="text-green-600 font-medium text-base"
+                      className="text-green-600 font-medium text-base tabular-nums"
                     />
                   ) : (
-                    <div className="text-green-600 font-medium text-base px-2 py-1">
+                    <div className="text-green-600 font-medium text-base px-2 py-1 tabular-nums">
                       {project.paidAmount.toLocaleString('ru-RU')} ₽
                     </div>
                   )}
@@ -814,7 +814,7 @@ export default function AgencyPage() {
             ))}
             {projects.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
+                <td colSpan={8} className="px-3 py-4 sm:px-6 text-center text-sm text-[var(--muted-foreground)]">
                   Нет проектов. <Link href="/agency/projects/new" className="text-[var(--primary)] hover:underline">Создать первый проект</Link>
                 </td>
               </tr>
@@ -889,7 +889,7 @@ export default function AgencyPage() {
                       type="text"
                       name="employeeName"
                       required={!isCustomExpense}
-                      className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
+                      className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]"
                     />
                   </div>
                   <div>
@@ -897,7 +897,7 @@ export default function AgencyPage() {
                     <select
                       name="employeeRole"
                       required={!isCustomExpense}
-                      className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
+                      className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]"
                     >
                       <option value="designer">Дизайнер</option>
                       <option value="pm">Проджект</option>
@@ -914,7 +914,7 @@ export default function AgencyPage() {
                     name="notes"
                     placeholder="Например: Налог, Комиссия, Аренда и т.д."
                     required
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]"
                   />
                 </div>
               )}
@@ -925,7 +925,7 @@ export default function AgencyPage() {
                   name="amount"
                   step="0.01"
                   required
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
+                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]"
                 />
               </div>
               {!isCustomExpense && (
@@ -934,7 +934,7 @@ export default function AgencyPage() {
                   <input
                     type="text"
                     name="notes"
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]"
                   />
                 </div>
               )}
@@ -973,7 +973,7 @@ export default function AgencyPage() {
             </thead>
             <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
               {/* Автоматический расчет налогов */}
-              <tr className="bg-yellow-50">
+              <tr className="bg-amber-50 dark:bg-amber-500/10">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-[var(--text)]">
                   Налоги (автоматически)
                 </td>
@@ -1017,7 +1017,7 @@ export default function AgencyPage() {
                           if (e.key === 'Escape') setEditingExpenseId(null)
                         }}
                         autoFocus
-                        className="w-24 px-2 py-1 border border-[var(--primary)] rounded text-sm text-right"
+                        className="w-24 rounded border border-[var(--primary)] bg-[var(--surface)] px-2 py-1 text-right text-sm text-[var(--text)] tabular-nums"
                       />
                     ) : (
                       <button

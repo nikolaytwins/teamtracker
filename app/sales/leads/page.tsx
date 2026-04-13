@@ -347,7 +347,7 @@ export default function SalesLeadsPage() {
                       <div className="text-sm font-semibold text-[var(--text)] mb-2 flex flex-wrap items-center gap-2">
                         <span>{lead.taskDescription || "Без описания"}</span>
                         {lead.status === "new" ? (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">
                             Новый
                           </span>
                         ) : null}

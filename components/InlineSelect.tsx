@@ -66,13 +66,13 @@ export default function InlineSelect({
           e.stopPropagation()
           setIsOpen(!isOpen)
         }}
-        className={`cursor-pointer hover:bg-gray-100 px-2 py-1 rounded ${className}`}
+        className={`cursor-pointer rounded px-2 py-1 text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] ${className}`}
       >
         {selectedOption?.label || value}
       </button>
       {isOpen && typeof window !== 'undefined' && createPortal(
         <div
-          className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-[9999]"
+          className="fixed z-[9999] rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-elevated)]"
           style={{
             top: `${position.top}px`,
             left: `${position.left}px`,
@@ -87,8 +87,8 @@ export default function InlineSelect({
                 onChange(option.value)
                 setIsOpen(false)
               }}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 first:rounded-t-md last:rounded-b-md ${
-                option.value === value ? 'bg-blue-50 text-blue-600' : ''
+              className={`w-full px-3 py-2 text-left text-sm transition-colors first:rounded-t-md last:rounded-b-md hover:bg-[var(--surface-2)] ${
+                option.value === value ? "bg-[var(--primary-soft)] font-medium text-[var(--primary)]" : "text-[var(--text)]"
               }`}
             >
               {option.label}

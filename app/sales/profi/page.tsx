@@ -3,6 +3,7 @@ import { apiUrl } from '@/lib/api-url'
 
 import { useEffect, useState } from 'react'
 import { formatDate } from '@/lib/utils'
+import { salesResponseRowClass } from '@/lib/sales-response-row'
 
 interface ProfiItem {
   id: string
@@ -202,7 +203,7 @@ export default function ProfiPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-[var(--muted-foreground)]">Возвраты</span>
-                <span className="font-medium text-green-600">−{stats.totalRefunded.toLocaleString('ru-RU')} ₽</span>
+                <span className="font-medium text-emerald-600 dark:text-emerald-400">−{stats.totalRefunded.toLocaleString('ru-RU')} ₽</span>
               </div>
               {stats.countDrain > 0 && (
                 <div className="flex justify-between">
@@ -220,7 +221,7 @@ export default function ProfiPage() {
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="text-[var(--text)] font-medium">ROI</span>
-                <span className={`font-semibold ${stats.roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <span className={`font-semibold ${stats.roi >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                   {stats.roi >= 0 ? '+' : ''}{stats.roi.toFixed(0)}%
                 </span>
               </div>
@@ -299,17 +300,17 @@ export default function ProfiPage() {
               </div>
               {/* 4. КП — % от переписки */}
               <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center text-sm font-bold">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--primary)]/80 text-[var(--primary-foreground)] text-sm font-bold">
                   {stats.funnel.toProposal}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-[var(--text)] flex justify-between">
+                  <div className="flex justify-between text-sm font-medium text-[var(--text)]">
                     <span>КП</span>
-                    <span className="text-indigo-600 font-semibold tabular-nums">{stats.funnel.proposalRate}% от переписки</span>
+                    <span className="font-semibold tabular-nums text-[var(--primary)]">{stats.funnel.proposalRate}% от переписки</span>
                   </div>
-                  <div className="h-2.5 rounded-full bg-[var(--surface-2)] overflow-hidden mt-0.5">
+                  <div className="mt-0.5 h-2.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
                     <div
-                      className="h-full rounded-full bg-indigo-500 transition-all"
+                      className="h-full rounded-full bg-[var(--primary)]/80 transition-all"
                       style={{ width: `${Math.max(stats.funnel.convRate * (stats.funnel.proposalRate / 100), 2)}%` }}
                     />
                   </div>
@@ -320,17 +321,17 @@ export default function ProfiPage() {
               </div>
               {/* 5. Оплачено — % от КП */}
               <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm font-bold">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--success)] text-sm font-bold text-white">
                   {stats.funnel.toPaid}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-[var(--text)] flex justify-between">
+                  <div className="flex justify-between text-sm font-medium text-[var(--text)]">
                     <span>Оплачено</span>
-                    <span className="text-emerald-600 font-semibold tabular-nums">{stats.funnel.paidRate}% от КП</span>
+                    <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{stats.funnel.paidRate}% от КП</span>
                   </div>
-                  <div className="h-2.5 rounded-full bg-[var(--surface-2)] overflow-hidden mt-0.5">
+                  <div className="mt-0.5 h-2.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
                     <div
-                      className="h-full rounded-full bg-emerald-500 transition-all"
+                      className="h-full rounded-full bg-[var(--success)] transition-all"
                       style={{ width: `${Math.max(stats.responseToPaidRate, 2)}%` }}
                     />
                   </div>
@@ -363,7 +364,7 @@ export default function ProfiPage() {
             {(stats.countDrain > 0 || stats.countRefunded > 0) && (
               <div className="mt-3 pt-3 border-t border-[var(--border)] flex flex-wrap gap-2">
                 {stats.countRefunded > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
                     Возврат: {stats.countRefunded}
                   </span>
                 )}
@@ -429,7 +430,7 @@ export default function ProfiPage() {
               value={quickCost}
               onChange={e => setQuickCost(e.target.value)}
               placeholder="0"
-              className="w-28 px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+              className="w-28 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]"
             />
           </div>
           <div className="flex-1 min-w-[200px]">
@@ -439,7 +440,7 @@ export default function ProfiPage() {
               value={quickNotes}
               onChange={e => setQuickNotes(e.target.value)}
               placeholder="Кратко о заявке"
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]"
             />
           </div>
           <button
@@ -453,7 +454,7 @@ export default function ProfiPage() {
       </div>
 
       {/* Список откликов */}
-      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] overflow-hidden">
+      <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
         <h2 className="text-lg font-semibold text-[var(--text)] p-4 border-b border-[var(--border)]">Отклики</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -477,22 +478,7 @@ export default function ProfiPage() {
                 </tr>
               ) : (
                 items.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={`border-b border-[var(--border)] ${
-                      item.status === 'response'
-                        ? 'bg-amber-50 border-l-4 border-l-amber-400 hover:bg-amber-100/80'
-                        : item.status === 'viewed'
-                          ? 'bg-green-50 border-l-4 border-l-green-400 hover:bg-green-100/80'
-                          : item.status === 'conversation'
-                            ? 'bg-green-100 border-l-4 border-l-green-500 hover:bg-green-200/80'
-                            : item.status === 'proposal'
-                              ? 'bg-sky-50 border-l-4 border-l-sky-400 hover:bg-sky-100/80'
-                              : item.status === 'paid'
-                                ? 'bg-emerald-50 border-l-4 border-l-emerald-400 hover:bg-emerald-100/80'
-                                : 'hover:bg-[var(--surface-2)]/50'
-                    }`}
-                  >
+                  <tr key={item.id} className={salesResponseRowClass(item.status)}>
                     <td className="py-2.5 px-4 whitespace-nowrap text-[var(--text)]">
                       {formatDate(item.createdAt)}
                     </td>
@@ -526,10 +512,10 @@ export default function ProfiPage() {
                           value={editRefundAmount}
                           onChange={e => setEditRefundAmount(e.target.value)}
                           onBlur={saveEdit}
-                          className="w-24 px-2 py-1 border border-[var(--border)] rounded text-sm"
+                          className="w-24 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)] tabular-nums"
                         />
                       ) : item.status === 'refunded' ? (
-                        <span className="text-green-600">{item.refundAmount.toLocaleString('ru-RU')} ₽</span>
+                        <span className="text-emerald-600 dark:text-emerald-400">{item.refundAmount.toLocaleString('ru-RU')} ₽</span>
                       ) : (
                         <span className="text-[var(--muted-foreground)]">—</span>
                       )}
@@ -542,7 +528,7 @@ export default function ProfiPage() {
                           value={editProjectAmount}
                           onChange={e => setEditProjectAmount(e.target.value)}
                           onBlur={saveEdit}
-                          className="w-28 px-2 py-1 border border-[var(--border)] rounded text-sm"
+                          className="w-28 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)] tabular-nums"
                         />
                       ) : item.status === 'paid' && item.projectAmount != null ? (
                         <span className="font-medium text-[var(--primary)]">{item.projectAmount.toLocaleString('ru-RU')} ₽</span>
