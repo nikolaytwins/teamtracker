@@ -33,18 +33,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contact, source } = body;
+    const contact = typeof body.contact === "string" ? body.contact.trim() : "";
+    const source = typeof body.source === "string" ? body.source.trim() : "";
 
     if (!contact || !source) {
       return NextResponse.json({ error: "Contact and source are required" }, { status: 400 });
     }
 
-    const lead = await getAgencyRepo().createLeadFromPost(body);
+    const lead = await getAgencyRepo().createLeadFromPost({ ...body, contact, source });
     return NextResponse.json({ success: true, lead });
   } catch (error) {
-    console.error("Error creating lead:", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    const code = error && typeof error === "object" && "code" in error ? String((error as { code?: string }).code) : "";
+    console.error("Error creating lead:", code || msg, error);
     return NextResponse.json(
-      { error: "Failed to create lead: " + (error instanceof Error ? error.message : String(error)) },
+      { error: "Failed to create lead: " + msg, code: code || undefined },
       { status: 500 }
     );
   }

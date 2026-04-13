@@ -134,33 +134,53 @@ export default function SalesLeadsPage() {
     try {
       const res = await fetch(apiUrl("/api/agency/leads"), {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contact,
-          source: finalSource,
+          source: finalSource.trim(),
           taskDescription: taskDescription || null,
           status: "new",
           isRecurring: formData.get("isRecurring") === "on",
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setShowAddForm(false);
-          e.currentTarget.reset();
-          setNewSource("");
-          setShowCustomSource(false);
-          await fetchLeads();
-        } else {
-          alert(data.error || "Ошибка при создании лида");
-        }
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        alert(errorData.error || "Ошибка при создании лида");
+      const raw = await res.text();
+      let data: { success?: boolean; lead?: unknown; error?: string; code?: string } = {};
+      try {
+        data = raw ? (JSON.parse(raw) as typeof data) : {};
+      } catch {
+        alert(
+          res.ok
+            ? "Сервер вернул не JSON. Обновите страницу и попробуйте снова."
+            : `Ошибка ${res.status}: ${raw.slice(0, 200)}`
+        );
+        return;
       }
+
+      const created = res.ok && (data.success === true || data.lead != null);
+      if (created) {
+        setShowAddForm(false);
+        e.currentTarget.reset();
+        setNewSource("");
+        setShowCustomSource(false);
+        await fetchLeads();
+        return;
+      }
+
+      const hint =
+        res.status === 401
+          ? "Сессия истекла — войдите снова."
+          : res.status === 403
+            ? "Нет доступа (нужна роль администратора для API агентства)."
+            : "";
+      alert(
+        [data.error || `Запрос не удался (${res.status})`, data.code ? `код: ${data.code}` : "", hint]
+          .filter(Boolean)
+          .join("\n")
+      );
     } catch {
-      alert("Ошибка при создании лида");
+      alert("Сеть или браузер заблокировал запрос. Проверьте соединение и попробуйте снова.");
     }
   };
 

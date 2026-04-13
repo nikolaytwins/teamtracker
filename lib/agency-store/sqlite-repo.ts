@@ -27,7 +27,10 @@ import type {
 } from "./repo-interface";
 
 function openSqlite(): Database.Database {
-  return new Database(getAgencySqlitePath());
+  const db = new Database(getAgencySqlitePath());
+  // dev.db иногда шарится с другими процессами — без таймаута INSERT падает с SQLITE_BUSY.
+  db.pragma("busy_timeout = 8000");
+  return db;
 }
 
 function ensureDetailTable(db: Database.Database) {
@@ -300,8 +303,8 @@ export class SqliteAgencyRepo implements AgencyRepo {
   }
 
   async createLeadFromPost(body: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const contact = String(body.contact ?? "");
-    const source = String(body.source ?? "");
+    const contact = String(body.contact ?? "").trim();
+    const source = String(body.source ?? "").trim();
     const taskDescription = (body.taskDescription as string) || null;
     const status = (body.status as string) || "new";
     const recurring = Boolean(body.isRecurring) ? 1 : 0;
@@ -312,21 +315,30 @@ export class SqliteAgencyRepo implements AgencyRepo {
       ensureLeadHistoryTable(db);
       const autoDate = calculateNextContactDateForLead(status);
       const nextContactDate = autoDate ? autoDate.toISOString() : null;
-      const id = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      db.prepare(
+      const id = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+      const insertLead = db.prepare(
         `
       INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, isRecurring, archived, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
     `
-      ).run(id, contact, source, taskDescription, status, nextContactDate, 0, recurring);
-      const historyId = `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      db.prepare(
+      );
+      const insertHistory = db.prepare(
         `
       INSERT INTO lead_history (id, leadId, eventType, newStatus, newSource, createdAt)
       VALUES (?, ?, 'created', ?, ?, datetime('now'))
     `
-      ).run(historyId, id, status, source);
-      return db.prepare("SELECT * FROM agency_leads WHERE id = ?").get(id) as Record<string, unknown>;
+      );
+      const selectLead = db.prepare("SELECT * FROM agency_leads WHERE id = ?");
+
+      const txn = db.transaction(() => {
+        insertLead.run(id, contact, source, taskDescription, status, nextContactDate, 0, recurring);
+        const historyId = `history_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+        insertHistory.run(historyId, id, status, source);
+      });
+      txn();
+
+      return selectLead.get(id) as Record<string, unknown>;
     } finally {
       db.close();
     }
