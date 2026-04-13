@@ -114,10 +114,10 @@ export default function Navigation() {
   }
 
   const linkClass = (active: boolean) =>
-    `inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap ${
+    `flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
       active
-        ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-        : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]"
+        ? "bg-[var(--primary-soft)] text-[var(--primary)] shadow-sm"
+        : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
     }`;
 
   const showAgencyNav = me != null && me.role === "admin";
@@ -153,7 +153,11 @@ export default function Navigation() {
             {item.label}
           </Link>
         ))}
-        {adminItems.length > 0 ? <div className="my-2 border-t border-[var(--border)]" /> : null}
+        {adminItems.length > 0 ? (
+          <div className="my-3 px-1">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">Админ</p>
+          </div>
+        ) : null}
         {adminItems.map((item) => (
           <Link key={item.href} href={item.href} className={linkClass(item.active)} onClick={() => setMobileOpen(false)}>
             {item.label}
@@ -166,7 +170,7 @@ export default function Navigation() {
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur lg:hidden">
-        <div className="mx-auto flex h-14 max-w-[1800px] items-center justify-between px-4">
+        <div className="mx-auto flex h-14 items-center justify-between px-4">
           <Link href={appPath("/me")} className="text-base font-semibold text-[var(--text)]">
             Team Tracker
           </Link>
@@ -192,7 +196,7 @@ export default function Navigation() {
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 bg-black/30 lg:hidden" onClick={() => setMobileOpen(false)}>
           <aside
-            className="absolute right-0 top-0 h-full w-72 border-l border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl"
+            className="absolute left-0 top-0 h-full w-[min(18rem,85vw)] border-r border-[var(--border)] bg-[var(--sidebar-bg)] p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -206,24 +210,26 @@ export default function Navigation() {
         </div>
       ) : null}
 
-      <aside className="fixed inset-y-0 right-0 z-30 hidden w-72 border-l border-[var(--border)] bg-[var(--surface)] px-4 py-5 lg:block">
-        <div className="flex h-full flex-col">
-          <div className="mb-5">
-            <Link href={appPath("/me")} className="text-lg font-bold text-[var(--text)]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[var(--sidebar-w)] border-r border-[var(--border)] bg-[var(--sidebar-bg)] px-3 py-5 lg:flex lg:flex-col">
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="mb-6 px-1">
+            <Link href={appPath("/me")} className="block text-[15px] font-bold tracking-tight text-[var(--text)]">
               Team Tracker
             </Link>
+            <p className="mt-0.5 text-[11px] text-[var(--muted)]">Профиль · канбан · время</p>
           </div>
-          <nav className="flex flex-1 flex-col gap-1">{renderNavLinks()}</nav>
-          <div className="mt-4 space-y-2 border-t border-[var(--border)] pt-4">
+          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">Разделы</p>
+          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-0.5">{renderNavLinks()}</nav>
+          <div className="mt-auto space-y-2 border-t border-[var(--border)] pt-4">
             <button
               type="button"
               onClick={toggleTheme}
-              className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-left text-sm text-[var(--muted)] hover:bg-[var(--surface-2)]"
+              className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)]"
             >
               Тема: {theme === "dark" ? "тёмная" : "светлая"}
             </button>
             {me ? (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-2">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-[var(--shadow-card)]">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-[var(--text)]">

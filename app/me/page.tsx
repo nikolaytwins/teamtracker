@@ -414,73 +414,7 @@ export default function MePage() {
         </div>
       </header>
 
-      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-800">Мои подзадачи</h2>
-          {!isMemberUser ? (
-            <Link href={appPath("/board")} className="text-sm text-emerald-700 hover:underline">
-              Канбан
-            </Link>
-          ) : null}
-        </div>
-        {isMemberUser ? (
-          <p className="text-sm text-slate-500">
-            Подзадачи команды здесь не отображаются, пока администратор не расширит доступ.
-          </p>
-        ) : (
-          <>
-            <p className="text-sm text-slate-500">
-              Открытые задачи, где вы исполнитель или лид, на активных карточках.
-            </p>
-            {mySubtasks.length === 0 ? (
-              <p className="text-sm text-slate-500">Нет открытых подзадач</p>
-            ) : null}
-          </>
-        )}
-        {!isMemberUser && mySubtasks.length > 0 ? (
-          <ul className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
-            {mySubtasks.map((s) => {
-              const roles: string[] = [];
-              if (user && s.assignee_user_id === user.id) roles.push("исполнитель");
-              if (user && s.lead_user_id === user.id) roles.push("лид");
-              return (
-                <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-50/50">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-slate-900">{s.title}</div>
-                    <div className="text-xs text-slate-600 mt-0.5 truncate">{s.card_name}</div>
-                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {roles.map((r) => (
-                        <span
-                          key={r}
-                          className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-200 text-slate-700"
-                        >
-                          {r}
-                        </span>
-                      ))}
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                        {statusLabel(s.card_status as PmStatusKey)}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={actionBusy || !!active}
-                    onClick={() => void startTimerOnCard(s.card_id, s.card_extra)}
-                    className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    Таймер
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-      </section>
-
-      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-[var(--shadow-card)] space-y-4">
         <h2 className="text-lg font-semibold text-slate-800">Быстрый старт</h2>
         <p className="text-sm text-slate-500">
           Выберите проект и тип задачи. Сессии привязаны к вашему профилю. Один активный таймер на человека.
@@ -578,7 +512,73 @@ export default function MePage() {
         </div>
       </section>
 
-      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-[var(--shadow-card)] space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-slate-800">Мои подзадачи</h2>
+          {!isMemberUser ? (
+            <Link href={appPath("/board")} className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+              Канбан
+            </Link>
+          ) : null}
+        </div>
+        {isMemberUser ? (
+          <p className="text-sm text-slate-500">
+            Подзадачи команды здесь не отображаются, пока администратор не расширит доступ.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-slate-500">
+              Открытые задачи, где вы исполнитель или лид, на активных карточках.
+            </p>
+            {mySubtasks.length === 0 ? (
+              <p className="text-sm text-slate-500">Нет открытых подзадач</p>
+            ) : null}
+          </>
+        )}
+        {!isMemberUser && mySubtasks.length > 0 ? (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-100">
+            {mySubtasks.map((s) => {
+              const roles: string[] = [];
+              if (user && s.assignee_user_id === user.id) roles.push("исполнитель");
+              if (user && s.lead_user_id === user.id) roles.push("лид");
+              return (
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-slate-900">{s.title}</div>
+                    <div className="mt-0.5 truncate text-xs text-slate-600">{s.card_name}</div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {roles.map((r) => (
+                        <span
+                          key={r}
+                          className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-700"
+                        >
+                          {r}
+                        </span>
+                      ))}
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900">
+                        {statusLabel(s.card_status as PmStatusKey)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={actionBusy || !!active}
+                    onClick={() => void startTimerOnCard(s.card_id, s.card_extra)}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+                  >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    Таймер
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-[var(--shadow-card)] space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-slate-800">История за неделю</h2>
           <div className="flex items-center gap-2">
