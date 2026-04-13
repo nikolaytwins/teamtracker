@@ -121,7 +121,8 @@ export default function SalesLeadsPage() {
 
   const handleAddLead = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     const contact = formData.get("contact") as string;
     const taskDescription = formData.get("taskDescription") as string;
     const finalSource = showCustomSource ? newSource : (formData.get("source") as string);
@@ -160,10 +161,14 @@ export default function SalesLeadsPage() {
 
       const created = res.ok && (data.success === true || data.lead != null);
       if (created) {
-        setShowAddForm(false);
-        e.currentTarget.reset();
+        try {
+          form.reset();
+        } catch {
+          /* после await currentTarget формы может быть невалиден в части окружений */
+        }
         setNewSource("");
         setShowCustomSource(false);
+        setShowAddForm(false);
         await fetchLeads();
         return;
       }
@@ -179,8 +184,11 @@ export default function SalesLeadsPage() {
           .filter(Boolean)
           .join("\n")
       );
-    } catch {
-      alert("Сеть или браузер заблокировал запрос. Проверьте соединение и попробуйте снова.");
+    } catch (err) {
+      console.error("handleAddLead", err);
+      alert(
+        "Запрос прервался на стороне браузера (часто это сбой после успешного сохранения). Обновите страницу: лид мог уже создаться."
+      );
     }
   };
 
