@@ -14,6 +14,12 @@ import {
   SITE_TASK_PRESETS,
   parseCardProjectType,
 } from "@/lib/work-presets";
+import {
+  bucketMySubtasks,
+  plannedRangeForMeBucket,
+  sortSubtasksInColumn,
+  type MeSubtaskBucket,
+} from "@/lib/me-subtask-buckets";
 import { statusLabel, type PmStatusKey } from "@/lib/statuses";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +55,9 @@ type MySubtaskRow = {
   title: string;
   assignee_user_id: string | null;
   lead_user_id: string | null;
+  planned_start: string | null;
+  planned_end: string | null;
+  estimated_hours: number | null;
   card_name: string;
   card_status: string;
   card_extra: string | null;
@@ -104,6 +113,16 @@ export default function MePage() {
   const [weekIso, setWeekIso] = useState(() => formatISOWeekParam());
   const [weekSessions, setWeekSessions] = useState<WeekSessionsPayload | null>(null);
   const [mySubtasks, setMySubtasks] = useState<MySubtaskRow[]>([]);
+  const [subtaskMoveBusy, setSubtaskMoveBusy] = useState<string | null>(null);
+
+  const subtaskBuckets = useMemo(() => {
+    const raw = bucketMySubtasks(mySubtasks);
+    return {
+      today: sortSubtasksInColumn(raw.today),
+      week: sortSubtasksInColumn(raw.week),
+      backlog: sortSubtasksInColumn(raw.backlog),
+    };
+  }, [mySubtasks]);
 
   const projectType = useMemo(() => {
     const c = cards.find((x) => x.id === cardId);
@@ -137,8 +156,24 @@ export default function MePage() {
   const loadMySubtasks = useCallback(async () => {
     const r = await fetch(apiUrl("/api/me/subtasks"));
     if (!r.ok) return;
-    const d = (await r.json()) as { subtasks?: MySubtaskRow[] };
-    setMySubtasks(Array.isArray(d.subtasks) ? d.subtasks : []);
+    const d = (await r.json()) as { subtasks?: Partial<MySubtaskRow>[] };
+    const rows = Array.isArray(d.subtasks) ? d.subtasks : [];
+    setMySubtasks(
+      rows.map((row) => ({
+        id: String(row.id ?? ""),
+        card_id: String(row.card_id ?? ""),
+        title: String(row.title ?? ""),
+        assignee_user_id: row.assignee_user_id ?? null,
+        lead_user_id: row.lead_user_id ?? null,
+        planned_start: row.planned_start != null ? String(row.planned_start) : null,
+        planned_end: row.planned_end != null ? String(row.planned_end) : null,
+        estimated_hours:
+          row.estimated_hours != null && !Number.isNaN(Number(row.estimated_hours)) ? Number(row.estimated_hours) : null,
+        card_name: String(row.card_name ?? ""),
+        card_status: String(row.card_status ?? ""),
+        card_extra: row.card_extra != null ? String(row.card_extra) : null,
+      })).filter((x) => x.id && x.card_id)
+    );
   }, []);
 
   const loadCards = useCallback(async () => {
@@ -279,6 +314,26 @@ export default function MePage() {
     }
   }
 
+  async function assignSubtaskToBucket(sub: MySubtaskRow, bucket: MeSubtaskBucket) {
+    setSubtaskMoveBusy(sub.id);
+    setErr(null);
+    try {
+      const { plannedStart, plannedEnd } = plannedRangeForMeBucket(bucket);
+      const r = await fetch(apiUrl(`/api/cards/${sub.card_id}/subtasks/${sub.id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plannedStart, plannedEnd }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Не удалось обновить план");
+      await loadMySubtasks();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setSubtaskMoveBusy(null);
+    }
+  }
+
   async function startTimerOnCard(cardId: string, cardExtra: string | null) {
     if (active) {
       setErr("Сначала остановите текущую сессию");
@@ -370,7 +425,7 @@ export default function MePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 px-4 py-8">
+    <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
       <header className="flex flex-wrap items-start gap-6">
         <label className="relative shrink-0 cursor-pointer">
           <input type="file" accept="image/*" className="hidden" onChange={onAvatarFile} />
@@ -518,18 +573,15 @@ export default function MePage() {
       <Card className="shadow-[var(--shadow-card)]">
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0 pb-2">
           <div>
-            <CardTitle>Мои подзадачи</CardTitle>
+            <CardTitle>Личные задачи</CardTitle>
             <CardDescription className="mt-1">
               {isMemberUser
                 ? "Доступ к командным задачам по роли."
-                : "Открытые задачи, где вы исполнитель или лид."}
+                : "Мини-канбан по плановым датам подзадач (поля «план» в карточке на канбане). Сегодня — срок сегодня или просрочка; неделя — текущая ISO-неделя; бэклог — без дат или позже."}
             </CardDescription>
           </div>
           {!isMemberUser ? (
-            <Link
-              href={appPath("/board")}
-              className="text-sm font-semibold text-[var(--primary)] hover:underline"
-            >
+            <Link href={appPath("/board")} className="text-sm font-semibold text-[var(--primary)] hover:underline">
               Канбан →
             </Link>
           ) : null}
@@ -542,46 +594,122 @@ export default function MePage() {
           ) : mySubtasks.length === 0 ? (
             <p className="text-sm text-[var(--muted-foreground)]">Нет открытых подзадач</p>
           ) : (
-            <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/50">
-              {mySubtasks.map((s) => {
-                const roles: string[] = [];
-                if (user && s.assignee_user_id === user.id) roles.push("исполнитель");
-                if (user && s.lead_user_id === user.id) roles.push("лид");
-                return (
-                  <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-[var(--text)]">{s.title}</div>
-                      <div className="mt-0.5 truncate text-xs text-[var(--muted-foreground)]">{s.card_name}</div>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {roles.map((r) => (
-                          <span
-                            key={r}
-                            className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)] ring-1 ring-[var(--border)]"
+            <div className="grid gap-4 lg:grid-cols-3">
+              {(
+                [
+                  { key: "today" as const, title: "Задачи на сегодня", hint: "Срок сегодня или просрочено", list: subtaskBuckets.today },
+                  { key: "week" as const, title: "Задачи на неделю", hint: "Текущая ISO-неделя (пн–вс), кроме «сегодня»", list: subtaskBuckets.week },
+                  { key: "backlog" as const, title: "Бэклог", hint: "Без дат или вне этой недели", list: subtaskBuckets.backlog },
+                ] as const
+              ).map((col) => (
+                <div
+                  key={col.key}
+                  className="flex min-h-[11rem] flex-col rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/40 dark:bg-[var(--surface-2)]/25"
+                >
+                  <div className="border-b border-[var(--border)] px-3 py-2.5">
+                    <h3 className="text-sm font-semibold text-[var(--text)]">{col.title}</h3>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">{col.hint}</p>
+                    <p className="mt-1 text-xs tabular-nums text-[var(--muted-foreground)]">{col.list.length}</p>
+                  </div>
+                  <ul className="flex flex-1 flex-col gap-2 p-2">
+                    {col.list.length === 0 ? (
+                      <li className="rounded-lg border border-dashed border-[var(--border)] px-3 py-6 text-center text-xs text-[var(--muted-foreground)]">
+                        Пусто
+                      </li>
+                    ) : (
+                      col.list.map((s) => {
+                        const roles: string[] = [];
+                        if (user && s.assignee_user_id === user.id) roles.push("исполнитель");
+                        if (user && s.lead_user_id === user.id) roles.push("лид");
+                        const pe = s.planned_end ? new Date(s.planned_end) : null;
+                        const startToday = new Date();
+                        startToday.setHours(0, 0, 0, 0);
+                        const overdue = pe != null && !Number.isNaN(pe.getTime()) && pe < startToday;
+                        const busy = subtaskMoveBusy === s.id;
+                        return (
+                          <li
+                            key={s.id}
+                            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-card)]"
                           >
-                            {r}
-                          </span>
-                        ))}
-                        <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-medium text-amber-950 dark:text-amber-100">
-                          {statusLabel(s.card_status as PmStatusKey)}
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={actionBusy || !!active}
-                      onClick={() => void startTimerOnCard(s.card_id, s.card_extra)}
-                      className="shrink-0 gap-1"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      Таймер
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <Link
+                                  href={appPath(`/board/${s.card_id}`)}
+                                  className="font-medium text-[var(--text)] hover:text-[var(--primary)] hover:underline"
+                                >
+                                  {s.title}
+                                </Link>
+                                <div className="mt-0.5 truncate text-xs text-[var(--muted-foreground)]">{s.card_name}</div>
+                                {(s.planned_start || s.planned_end) && (
+                                  <div className="mt-1 text-[10px] text-[var(--muted-foreground)]">
+                                    {s.planned_start
+                                      ? new Date(s.planned_start).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
+                                      : "—"}
+                                    {" → "}
+                                    {s.planned_end
+                                      ? new Date(s.planned_end).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
+                                      : "—"}
+                                    {s.estimated_hours != null && !Number.isNaN(s.estimated_hours) ? ` · ~${s.estimated_hours} ч` : ""}
+                                  </div>
+                                )}
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {roles.map((r) => (
+                                    <span
+                                      key={r}
+                                      className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)] ring-1 ring-[var(--border)]"
+                                    >
+                                      {r}
+                                    </span>
+                                  ))}
+                                  <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-medium text-amber-950 dark:text-amber-100">
+                                    {statusLabel(s.card_status as PmStatusKey)}
+                                  </span>
+                                  {overdue && col.key === "today" ? (
+                                    <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-red-800 dark:text-red-200">
+                                      Просрочено
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={actionBusy || !!active || busy}
+                                onClick={() => void startTimerOnCard(s.card_id, s.card_extra)}
+                                className="shrink-0 gap-1"
+                              >
+                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                                Таймер
+                              </Button>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-1 border-t border-[var(--border)] pt-2">
+                              <span className="mr-1 self-center text-[10px] text-[var(--muted-foreground)]">В колонку:</span>
+                              {(["today", "week", "backlog"] as const).map((b) => (
+                                <button
+                                  key={b}
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void assignSubtaskToBucket(s, b)}
+                                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-40 ${
+                                    col.key === b
+                                      ? "bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/30"
+                                      : "bg-[var(--surface-2)] text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--text)]"
+                                  }`}
+                                >
+                                  {b === "today" ? "Сегодня" : b === "week" ? "Неделя" : "Бэклог"}
+                                </button>
+                              ))}
+                            </div>
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
