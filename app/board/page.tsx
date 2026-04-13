@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { apiUrl, appPath } from "@/lib/api-url";
 import Link from "next/link";
 import {
   PM_STATUSES,
   SIMPLE_VIEW_GROUPS,
-  WORK_STAGE_KEYS,
-  STAGES_FOR_ESTIMATES,
+  APPROVAL_WAITING_STATUSES,
+  APPROVAL_WAITING_STATUS_SET,
+  ACTIVE_WORK_STAGE_KEYS,
+  ACTIVE_WORK_STAGE_SET,
   statusLabel,
   IMPORTANCE_OPTIONS,
   type PmStatusKey,
@@ -38,16 +40,9 @@ type PmSubtaskRow = {
   lead_user_id: string | null;
 };
 
-type TtTeamUser = {
-  id: string;
-  displayName: string;
-  login: string;
-  jobTitle: string;
-  avatarUrl: string | null;
-  role: string;
-};
-
 type CardExtra = {
+  /** Основной текст карточки (как в Notion) */
+  description?: string;
   figmaLink?: string;
   tzLink?: string;
   tildaAccess?: string;
@@ -93,34 +88,6 @@ function formatDate(s: string | null) {
   }
 }
 
-function daysLeft(dateStr: string | null): number | null {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  d.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((d.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-  return diff;
-}
-
-function deadlineBadgeClass(dateStr: string | null): string {
-  const d = daysLeft(dateStr);
-  if (d === null) return "bg-[var(--surface-2)] text-[var(--muted-foreground)] ring-1 ring-[var(--border)]";
-  if (d <= 1) return "bg-[var(--danger)] text-white ring-0";
-  if (d <= 3) return "bg-amber-500 text-white ring-0";
-  return "bg-[var(--surface-2)] text-[var(--muted-foreground)] ring-1 ring-[var(--border)]";
-}
-
-function parseVolume(volume: string | undefined): { blocks: number; slides: number } {
-  if (!volume) return { blocks: 0, slides: 0 };
-  const blockMatch = volume.match(/(\d+)\s*(?:блок|страниц)/i);
-  const slideMatch = volume.match(/(\d+)\s*слайд/i);
-  return {
-    blocks: blockMatch ? parseInt(blockMatch[1], 10) : 0,
-    slides: slideMatch ? parseInt(slideMatch[1], 10) : 0,
-  };
-}
-
 export default function BoardPage() {
   const [cards, setCards] = useState<PmCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,8 +100,13 @@ export default function BoardPage() {
   const [syncingFromAgency, setSyncingFromAgency] = useState(false);
   const [modalCard, setModalCard] = useState<PmCard | null>(null);
   const [modalName, setModalName] = useState("");
-  const [modalExtra, setModalExtra] = useState<CardExtra>({});
-  const [savingExtra, setSavingExtra] = useState(false);
+  const [modalDescription, setModalDescription] = useState("");
+  const [savingDoc, setSavingDoc] = useState(false);
+  const skipPersistEffect = useRef(true);
+  const draftRef = useRef({ name: "", description: "", cardId: "" });
+  const extraRef = useRef<string | null>(null);
+  const modalOpenIdRef = useRef<string | null>(null);
+  const modalNameBaselineRef = useRef("");
   const [teamList, setTeamList] = useState<TeamMember[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -149,16 +121,9 @@ export default function BoardPage() {
       return [];
     }
   });
-  const [newAssigneeInput, setNewAssigneeInput] = useState("");
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-  const [editingAvatarForId, setEditingAvatarForId] = useState<string | null>(null);
   const [canSyncAgency, setCanSyncAgency] = useState(false);
   const [modalSubtasks, setModalSubtasks] = useState<PmSubtaskRow[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
-  const [newSubtaskHours, setNewSubtaskHours] = useState("");
-  const [newSubtaskLeadId, setNewSubtaskLeadId] = useState("");
-  const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState("");
-  const [teamDirectory, setTeamDirectory] = useState<TtTeamUser[]>([]);
 
   useEffect(() => {
     void fetch(apiUrl("/api/auth/me"))
@@ -167,15 +132,6 @@ export default function BoardPage() {
         setCanSyncAgency(d.user?.role === "admin");
       })
       .catch(() => setCanSyncAgency(false));
-  }, []);
-
-  useEffect(() => {
-    void fetch(apiUrl("/api/team/users"))
-      .then((r) => r.json())
-      .then((d: { users?: TtTeamUser[] }) => {
-        setTeamDirectory(Array.isArray(d.users) ? d.users : []);
-      })
-      .catch(() => setTeamDirectory([]));
   }, []);
 
   useEffect(() => {
@@ -191,19 +147,80 @@ export default function BoardPage() {
       .catch(() => setModalSubtasks([]));
   }, [modalCard?.id]);
 
-  async function refreshBoardCard(cardId: string, syncModalExtra: boolean) {
+  async function refreshBoardCard(cardId: string) {
     try {
       const r = await fetch(apiUrl(`/api/cards/${cardId}`));
       if (!r.ok) return;
       const updated = (await r.json()) as PmCard;
       setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
-      const prog = parseExtra(updated.extra).derivedSubtaskProgress;
-      if (syncModalExtra) {
-        setModalExtra((prev) => ({ ...prev, derivedSubtaskProgress: prog }));
-      }
+      setModalCard((prev) => {
+        if (prev?.id !== cardId) return prev;
+        extraRef.current = updated.extra ?? null;
+        return updated;
+      });
     } catch {
       /* ignore */
     }
+  }
+
+  const saveCardDocument = useCallback(async (opts?: { evenIfClosed?: boolean }) => {
+    const cardId = draftRef.current.cardId;
+    if (!cardId) return;
+    if (!opts?.evenIfClosed && modalOpenIdRef.current !== cardId) return;
+    const name = draftRef.current.name.trim() || modalNameBaselineRef.current;
+    const desc = draftRef.current.description;
+    setSavingDoc(true);
+    try {
+      const prev = parseExtra(extraRef.current);
+      const nextExtra: CardExtra = {
+        ...prev,
+        description: desc.trim() || undefined,
+      };
+      const r = await fetch(apiUrl(`/api/cards/${cardId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          extra: JSON.stringify(nextExtra),
+        }),
+      });
+      if (r.ok) {
+        const updated = (await r.json()) as PmCard;
+        skipPersistEffect.current = true;
+        extraRef.current = updated.extra ?? null;
+        modalNameBaselineRef.current = updated.name;
+        setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
+        setModalCard((prev) => (prev?.id === cardId ? updated : prev));
+        setModalName(updated.name);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingDoc(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!modalCard?.id) return;
+    draftRef.current = {
+      name: modalName,
+      description: modalDescription,
+      cardId: modalCard.id,
+    };
+    if (skipPersistEffect.current) {
+      skipPersistEffect.current = false;
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void saveCardDocument();
+    }, 550);
+    return () => window.clearTimeout(t);
+  }, [modalName, modalDescription, modalCard?.id, saveCardDocument]);
+
+  function closeCardModal() {
+    void saveCardDocument({ evenIfClosed: true });
+    modalOpenIdRef.current = null;
+    setModalCard(null);
   }
 
   async function load() {
@@ -329,50 +346,33 @@ export default function BoardPage() {
       if (groupKey === "not_started") newStatus = "not_started";
       else if (groupKey === "done") newStatus = "done";
       else if (groupKey === "pause") newStatus = "pause";
-      else newStatus = (WORK_STAGE_KEYS as readonly PmStatusKey[]).includes(card.status) ? card.status : (WORK_STAGE_KEYS[0] as PmStatusKey);
+      else if (groupKey === "awaiting_approval") {
+        newStatus = APPROVAL_WAITING_STATUS_SET.has(card.status)
+          ? card.status
+          : (APPROVAL_WAITING_STATUSES[0] as PmStatusKey);
+      } else {
+        newStatus = ACTIVE_WORK_STAGE_SET.has(card.status)
+          ? card.status
+          : (ACTIVE_WORK_STAGE_KEYS[0] as PmStatusKey);
+      }
       if (card.status !== newStatus) updateStatus(cardId, newStatus);
     } catch (_) {}
   }
 
   function openModal(card: PmCard) {
+    skipPersistEffect.current = true;
+    modalOpenIdRef.current = card.id;
+    modalNameBaselineRef.current = card.name;
+    extraRef.current = card.extra ?? null;
     setModalCard(card);
     setModalName(card.name);
-    setNewSubtaskTitle("");
-    setNewSubtaskHours("");
-    setNewSubtaskLeadId("");
-    setNewSubtaskAssigneeId("");
     const ex = parseExtra(card.extra);
-    if (!ex.stageDetails) ex.stageDetails = {};
-    if (card.deadline && !ex.stageDetails[card.status]?.deadline) {
-      ex.stageDetails[card.status] = { ...ex.stageDetails[card.status], deadline: card.deadline };
-    }
-    setModalExtra(ex);
-  }
-
-  function addToTeamAndAssign(name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setTeamList((prev) => {
-      const exists = prev.find((t) => t.name === trimmed);
-      if (exists) return prev;
-      const next = [...prev, { id: `t${Date.now()}`, name: trimmed }];
-      if (typeof window !== "undefined") localStorage.setItem("pm-board-team", JSON.stringify(next));
-      return next;
-    });
-    setModalExtra((x) => ({
-      ...x,
-      assignees: [...(x.assignees ?? (x.assignee ? [x.assignee] : [])).filter((v): v is string => Boolean(v)), trimmed].filter((v, i, a) => a.indexOf(v) === i),
-    }));
-    setNewAssigneeInput("");
-  }
-
-  function setTeamMemberAvatar(id: string, dataUrl: string) {
-    setTeamList((prev) => {
-      const next = prev.map((t) => (t.id === id ? { ...t, avatar: dataUrl } : t));
-      if (typeof window !== "undefined") localStorage.setItem("pm-board-team", JSON.stringify(next));
-      return next;
-    });
-    setEditingAvatarForId(null);
+    const desc =
+      (typeof ex.description === "string" && ex.description) ||
+      [ex.explanations, ex.wishes].filter(Boolean).join("\n\n") ||
+      "";
+    setModalDescription(desc);
+    setNewSubtaskTitle("");
   }
 
   async function deleteCardOnly(cardId: string, e: React.MouseEvent) {
@@ -381,14 +381,17 @@ export default function BoardPage() {
     try {
       const r = await fetch(apiUrl(`/api/cards/${cardId}`), { method: "DELETE" });
       if (r.ok) setCards((prev) => prev.filter((c) => c.id !== cardId));
-      if (modalCard?.id === cardId) setModalCard(null);
+      if (modalCard?.id === cardId) {
+        modalOpenIdRef.current = null;
+        setModalCard(null);
+      }
     } catch (err) {
       console.error(err);
     }
   }
 
-  async function addModalSubtask(e: React.FormEvent) {
-    e.preventDefault();
+  async function addModalSubtask(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!modalCard || !newSubtaskTitle.trim()) return;
     try {
       const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`), {
@@ -396,18 +399,17 @@ export default function BoardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: newSubtaskTitle.trim(),
-          estimatedHours: newSubtaskHours.trim() ? parseFloat(newSubtaskHours) : null,
-          leadUserId: newSubtaskLeadId.trim() || null,
-          assigneeUserId: newSubtaskAssigneeId.trim() || null,
+          estimatedHours: null,
+          leadUserId: null,
+          assigneeUserId: null,
         }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "Ошибка");
       setNewSubtaskTitle("");
-      setNewSubtaskHours("");
       const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
       setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
-      await refreshBoardCard(modalCard.id, true);
+      await refreshBoardCard(modalCard.id);
     } catch (err) {
       console.error(err);
     }
@@ -424,7 +426,7 @@ export default function BoardPage() {
       if (!r.ok) return;
       const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
       setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
-      await refreshBoardCard(modalCard.id, true);
+      await refreshBoardCard(modalCard.id);
     } catch (err) {
       console.error(err);
     }
@@ -436,57 +438,9 @@ export default function BoardPage() {
       const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks/${subId}`), { method: "DELETE" });
       if (!r.ok) return;
       setModalSubtasks((prev) => prev.filter((s) => s.id !== subId));
-      await refreshBoardCard(modalCard.id, true);
+      await refreshBoardCard(modalCard.id);
     } catch (err) {
       console.error(err);
-    }
-  }
-
-  async function patchModalSubtask(
-    subId: string,
-    patch: { leadUserId?: string | null; assigneeUserId?: string | null }
-  ) {
-    if (!modalCard) return;
-    try {
-      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks/${subId}`), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      if (!r.ok) return;
-      const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
-      setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
-      await refreshBoardCard(modalCard.id, true);
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  async function saveModalExtra() {
-    if (!modalCard) return;
-    setSavingExtra(true);
-    const stageDeadline = modalExtra.stageDetails?.[modalCard.status]?.deadline ?? modalCard.deadline;
-    try {
-      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}`), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: modalName.trim() || modalCard.name,
-          deadline: stageDeadline || null,
-          extra: JSON.stringify(modalExtra),
-        }),
-      });
-      if (r.ok) {
-        const updated = await r.json();
-        setCards((prev) => prev.map((c) => (c.id === modalCard.id ? updated : c)));
-        setModalCard(updated);
-        setModalName(updated.name);
-        setModalExtra(parseExtra(updated.extra));
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSavingExtra(false);
     }
   }
 
@@ -507,7 +461,11 @@ export default function BoardPage() {
     if (groupKey === "not_started") list = filteredCards.filter((c) => c.status === "not_started");
     else if (groupKey === "done") list = filteredCards.filter((c) => c.status === "done");
     else if (groupKey === "pause") list = filteredCards.filter((c) => c.status === "pause");
-    else list = filteredCards.filter((c) => (WORK_STAGE_KEYS as readonly string[]).includes(c.status));
+    else if (groupKey === "awaiting_approval") {
+      list = filteredCards.filter((c) => APPROVAL_WAITING_STATUS_SET.has(c.status));
+    } else {
+      list = filteredCards.filter((c) => ACTIVE_WORK_STAGE_SET.has(c.status));
+    }
     return [...list].sort((a, b) => importanceOrder(a) - importanceOrder(b));
   };
 
@@ -523,7 +481,7 @@ export default function BoardPage() {
         draggable
         onDragStart={(e) => handleDragStart(e, card.id)}
         onClick={() => openModal(card)}
-        className="group cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--shadow-card)] transition-all hover:border-[var(--primary)]/25 hover:shadow-[var(--shadow-elevated)] active:scale-[0.99]"
+        className="group cursor-pointer rounded-2xl bg-[var(--surface)] p-4 shadow-[var(--shadow-kanban-card)] transition-[box-shadow,transform] hover:shadow-[var(--shadow-kanban-card-hover)] active:scale-[0.99] dark:ring-0"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -534,18 +492,20 @@ export default function BoardPage() {
             )}
             <div className="text-sm font-semibold leading-tight text-[var(--text)]">{card.name}</div>
             {showStageLabel && (
-              <span className="mt-1 inline-block rounded-md bg-[var(--surface-2)] px-2 py-0.5 text-xs font-medium text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">
+              <span className="mt-1.5 inline-block rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--muted-foreground)]">
                 {statusLabel(card.status)}
               </span>
             )}
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              <span className={`inline-block text-[10px] font-medium px-2 py-1 rounded-md ${deadlineBadgeClass(stageDeadline)}`}>
-                Этап: {formatDate(stageDeadline)}
-              </span>
-              <span className={`inline-block text-[10px] font-medium px-2 py-1 rounded-md ${deadlineBadgeClass(projectDeadline)}`}>
-                Проект: {formatDate(projectDeadline)}
-              </span>
-            </div>
+            {stageDeadline || projectDeadline ? (
+              <p className="mt-2 text-xs leading-relaxed text-[var(--muted-foreground)]">
+                {[
+                  stageDeadline ? `Этап · ${formatDate(stageDeadline)}` : null,
+                  projectDeadline ? `Проект · ${formatDate(projectDeadline)}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            ) : null}
             {extra.derivedSubtaskProgress && extra.derivedSubtaskProgress.total > 0 ? (
               <div className="mt-3 space-y-1">
                 <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
@@ -555,7 +515,7 @@ export default function BoardPage() {
                   </span>
                   <span className="font-semibold tabular-nums text-[var(--primary)]">{extra.derivedSubtaskProgress.percent}%</span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)] ring-1 ring-[var(--border)]">
+                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
                   <div
                     className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-300"
                     style={{ width: `${extra.derivedSubtaskProgress.percent}%` }}
@@ -577,7 +537,7 @@ export default function BoardPage() {
                   return (
                     <span
                       key={i}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--surface-2)] text-[10px] font-medium text-[var(--text)] ring-1 ring-[var(--border)]"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--surface-2)] text-[10px] font-medium text-[var(--text)]"
                       title={name}
                     >
                       {member?.avatar ? (
@@ -612,7 +572,7 @@ export default function BoardPage() {
           </div>
         </div>
         <select
-          className="tt-select mt-2 w-full py-1.5 text-xs"
+          className="tt-select mt-3 w-full !border-transparent bg-[var(--surface-2)]/55 py-2 text-xs dark:bg-[var(--surface-2)]/35"
           value={card.status}
           onChange={(e) => updateStatus(card.id, e.target.value as PmStatusKey)}
           onClick={(e) => e.stopPropagation()}
@@ -627,7 +587,7 @@ export default function BoardPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b border-[var(--border)] bg-[var(--bg)]/80 px-4 py-4 backdrop-blur-xl md:-mx-6 md:px-6">
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b border-[var(--border)]/60 bg-[var(--bg)]/85 px-4 py-4 backdrop-blur-xl dark:border-white/[0.06] md:-mx-6 md:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Канбан</h1>
@@ -660,7 +620,7 @@ export default function BoardPage() {
                   ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
                   : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
               }`}
-              title="Несколько колонок: не начато, в работе, пауза, готово"
+              title="Не начато, в работе, на согласовании, готово, пауза"
             >
               Простой
             </button>
@@ -694,7 +654,7 @@ export default function BoardPage() {
       {canSyncAgency ? (
         <form
           onSubmit={addProject}
-          className="mb-8 flex flex-wrap items-end gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]"
+          className="mb-8 flex flex-wrap items-end gap-3 rounded-2xl bg-[var(--surface)] p-4 shadow-[var(--shadow-kanban-card)] dark:ring-0"
         >
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Новый проект</label>
@@ -730,15 +690,17 @@ export default function BoardPage() {
           {PM_STATUSES.map(({ key }) => (
             <div
               key={key}
-              className="w-[min(100vw-2rem,20rem)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
+              className="w-[min(100vw-2rem,20rem)] shrink-0 snap-start overflow-hidden rounded-2xl bg-[var(--surface)]/90 shadow-[var(--shadow-kanban-column)] ring-1 ring-[var(--border)]/20 dark:bg-[var(--surface)]/55 dark:ring-0"
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, key)}
             >
-              <div className="sticky top-0 z-10 flex min-h-[3.5rem] flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm font-semibold text-[var(--text)]">
-                {statusLabel(key)}
-                <span className="font-normal text-[var(--muted-foreground)]">({byStatus(key).length})</span>
+              <div className="sticky top-0 z-10 flex min-h-[3.25rem] flex-wrap items-center gap-2 border-b border-[var(--border)]/45 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] dark:border-white/[0.06]">
+                <span className="text-[var(--text)] normal-case tracking-normal">{statusLabel(key)}</span>
+                <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--muted-foreground)] normal-case tracking-normal dark:bg-white/[0.06]">
+                  {byStatus(key).length}
+                </span>
               </div>
-              <div className="min-h-[min(70vh,560px)] space-y-3 bg-[var(--bg)]/50 p-3">
+              <div className="min-h-[min(70vh,560px)] space-y-3 bg-[var(--bg)]/35 p-3 dark:bg-black/10">
                 {byStatus(key).map((card) => renderCard(card, false))}
               </div>
             </div>
@@ -750,39 +712,38 @@ export default function BoardPage() {
         <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
           {SIMPLE_VIEW_GROUPS.map(({ key, label }) => {
             const groupCards = bySimpleGroup(key);
-            const isInProgress = key === "in_progress";
+            const showStageLabel = key === "in_progress" || key === "awaiting_approval";
+            const colTint =
+              key === "in_progress"
+                ? "bg-[var(--primary-soft)]/12 dark:bg-[var(--primary-soft)]/8"
+                : key === "awaiting_approval"
+                  ? "bg-amber-500/[0.05] dark:bg-amber-400/[0.06]"
+                  : "bg-[var(--surface)]/90 dark:bg-[var(--surface)]/50";
             return (
               <div
                 key={key}
-                className={`w-[min(100vw-2rem,20rem)] shrink-0 snap-start overflow-hidden rounded-2xl border shadow-[var(--shadow-card)] sm:w-72 ${
-                  isInProgress
-                    ? "border-[var(--primary)]/35 bg-[var(--primary-soft)]/25"
-                    : "border-[var(--border)] bg-[var(--surface)]"
-                }`}
+                className={`w-[min(100vw-2rem,20rem)] shrink-0 snap-start overflow-hidden rounded-2xl shadow-[var(--shadow-kanban-column)] ring-1 ring-[var(--border)]/20 dark:ring-0 sm:w-72 ${colTint}`}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleSimpleDrop(e, key)}
               >
-                <div
-                  className={`sticky top-0 z-10 flex min-h-[3.5rem] flex-wrap items-center gap-2 border-b px-4 py-3 text-sm font-semibold ${
-                    isInProgress
-                      ? "border-[var(--primary)]/25 bg-[var(--primary-soft)]/50 text-[var(--text)]"
-                      : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)]"
-                  }`}
-                >
-                  {label}
-                  {isInProgress ? (
-                    <span className="rounded-full bg-[var(--primary)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--primary)]">
-                      в работе
+                <div className="sticky top-0 z-10 flex min-h-[3.25rem] flex-wrap items-center gap-2 border-b border-[var(--border)]/45 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] dark:border-white/[0.06]">
+                  <span className="text-[var(--text)] normal-case tracking-normal">{label}</span>
+                  {key === "in_progress" ? (
+                    <span className="rounded-full bg-[var(--primary)]/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--primary)]">
+                      работа
                     </span>
                   ) : null}
-                  <span className="font-normal text-[var(--muted-foreground)]">({groupCards.length})</span>
+                  {key === "awaiting_approval" ? (
+                    <span className="rounded-full bg-amber-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200/90">
+                      клиент
+                    </span>
+                  ) : null}
+                  <span className="ml-auto rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--muted-foreground)] normal-case tracking-normal dark:bg-white/[0.06]">
+                    {groupCards.length}
+                  </span>
                 </div>
-                <div
-                  className={`min-h-[min(70vh,560px)] space-y-3 p-3 ${
-                    isInProgress ? "bg-[var(--primary-soft)]/15" : "bg-[var(--bg)]/50"
-                  }`}
-                >
-                  {groupCards.map((card) => renderCard(card, isInProgress))}
+                <div className={`min-h-[min(70vh,560px)] space-y-3 p-3 ${key === "in_progress" ? "bg-[var(--primary-soft)]/6 dark:bg-transparent" : key === "awaiting_approval" ? "bg-amber-500/[0.03] dark:bg-transparent" : "bg-[var(--bg)]/30 dark:bg-black/10"}`}>
+                  {groupCards.map((card) => renderCard(card, showStageLabel))}
                 </div>
               </div>
             );
@@ -792,350 +753,127 @@ export default function BoardPage() {
 
       {modalCard && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          onClick={() => setModalCard(null)}
+          className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/45 px-3 py-6 sm:px-6 sm:py-10"
+          onClick={closeCardModal}
+          role="presentation"
         >
           <div
-            className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-elevated)]"
+            className="relative my-auto w-full max-w-2xl min-h-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-elevated)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] p-4">
+            <button
+              type="button"
+              onClick={closeCardModal}
+              className="absolute right-3 top-3 z-10 rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+              aria-label="Закрыть"
+            >
+              ✕
+            </button>
+            <div className="max-h-[min(85vh,880px)] overflow-y-auto px-6 pb-8 pt-14 sm:px-10 sm:pt-12">
               <input
                 type="text"
                 value={modalName}
                 onChange={(e) => setModalName(e.target.value)}
-                className="flex-1 rounded-xl border border-transparent bg-transparent px-3 py-2 text-lg font-semibold text-[var(--text)] hover:border-[var(--border)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)]"
-                placeholder="Название проекта или клиента"
+                className="w-full min-w-0 border-0 bg-transparent text-2xl font-semibold tracking-tight text-[var(--text)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-0"
+                placeholder="Без названия"
               />
-              <div className="flex shrink-0 items-center gap-2">
-                <Link
-                  href={appPath(`/board/${modalCard.id}`)}
-                  className="whitespace-nowrap text-sm font-semibold text-[var(--primary)] hover:underline"
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                <span className="font-medium text-[var(--text)]">Статус</span>
+                <select
+                  value={modalCard.status}
+                  onChange={(e) => void updateStatus(modalCard.id, e.target.value as PmStatusKey)}
+                  className="tt-select py-1.5 text-xs"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  Этапы и время
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setModalCard(null)}
-                  className="rounded-xl p-2 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
-                >
-                  ✕
-                </button>
+                  {PM_STATUSES.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                {savingDoc ? <span className="text-[var(--muted-foreground)]">Сохранение…</span> : null}
               </div>
-            </div>
-            <div className="flex-1 overflow-y-auto flex flex-col md:flex-row">
-              <div className="p-4 space-y-4 md:w-1/2">
-                <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Тип проекта</label>
-                  <select value={modalExtra.projectType ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, projectType: (e.target.value || undefined) as CardExtra["projectType"] }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm">
-                    <option value="">—</option>
-                    <option value="site">сайт</option>
-                    <option value="presentation">презентация</option>
-                    <option value="other">другое</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Объём (блоки/страницы или слайды)</label>
-                  <input type="text" value={modalExtra.volume ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, volume: e.target.value || undefined }))} placeholder="Например: 5 блоков, 12 слайдов" className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Тексты от копирайтера</label>
-                  <select value={modalExtra.copywriterNeeded === true ? "yes" : modalExtra.copywriterNeeded === false ? "no" : ""} onChange={(e) => setModalExtra((x) => ({ ...x, copywriterNeeded: e.target.value === "yes" ? true : e.target.value === "no" ? false : undefined }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm">
-                    <option value="">—</option>
-                    <option value="yes">да</option>
-                    <option value="no">нет</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Важность</label>
-                  <select value={modalExtra.importance ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, importance: (e.target.value || undefined) as ImportanceKey }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm">
-                    <option value="">—</option>
-                    {IMPORTANCE_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/50 p-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs font-semibold text-[var(--text)]">Подзадачи</div>
-                    {modalSubtasks.length > 0 ? (
-                      <span className="text-[10px] font-medium text-[var(--primary)] tabular-nums">
-                        {(() => {
-                          const p = computeSubtaskProgressStats(modalSubtasks);
-                          return `${p.percent}% (${p.completed}/${p.total}${p.byHours ? ", часы" : ""})`;
-                        })()}
-                      </span>
-                    ) : null}
-                  </div>
-                  {modalSubtasks.length > 0 ? (
-                    <div className="h-1 rounded-full bg-[var(--border)] overflow-hidden">
-                      <div
-                        className="h-full bg-[var(--primary)] transition-[width]"
-                        style={{
-                          width: `${computeSubtaskProgressStats(modalSubtasks).percent}%`,
-                        }}
-                      />
-                    </div>
+              <textarea
+                value={modalDescription}
+                onChange={(e) => setModalDescription(e.target.value)}
+                placeholder="Добавьте описание…"
+                rows={10}
+                className="mt-6 w-full min-w-0 resize-y border-0 bg-transparent text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-0"
+              />
+              <div className="mt-10 border-t border-[var(--border)] pt-6">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Подзадачи</div>
+                <div className="space-y-2">
+                  {modalSubtasks.length === 0 ? (
+                    <p className="text-sm text-[var(--muted-foreground)]">Пока нет подзадач</p>
                   ) : null}
-                  <ul className="space-y-2 max-h-64 overflow-y-auto">
-                    {modalSubtasks.length === 0 ? (
-                      <li className="text-xs text-[var(--muted-foreground)]">Пока нет — добавьте ниже</li>
-                    ) : (
-                      modalSubtasks.map((sub) => (
-                        <li
-                          key={sub.id}
-                          className="text-sm bg-[var(--surface)] rounded-lg border border-[var(--border)] px-2 py-2 space-y-1.5"
-                        >
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(sub.completed_at)}
-                              onChange={() => void toggleModalSubtask(sub)}
-                              className="mt-1"
-                              aria-label="Выполнено"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <span className={sub.completed_at ? "line-through text-[var(--muted-foreground)]" : "text-[var(--text)]"}>
-                                {sub.title}
-                              </span>
-                              {sub.estimated_hours != null && !Number.isNaN(sub.estimated_hours) ? (
-                                <span className="text-xs text-[var(--muted-foreground)] ml-2 tabular-nums">
-                                  ~{sub.estimated_hours} ч
-                                </span>
-                              ) : null}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => void removeModalSubtask(sub.id)}
-                              className="text-[var(--muted-foreground)] hover:text-red-600 text-xs shrink-0"
-                              aria-label="Удалить"
-                            >
-                              ×
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-6">
-                            <label className="block">
-                              <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wide">Ведущий</span>
-                              <select
-                                value={sub.lead_user_id ?? ""}
-                                onChange={(e) =>
-                                  void patchModalSubtask(sub.id, {
-                                    leadUserId: e.target.value.trim() || null,
-                                  })
-                                }
-                                className="mt-0.5 w-full px-2 py-1 border border-[var(--border)] rounded text-xs bg-[var(--surface)]"
-                              >
-                                <option value="">—</option>
-                                {teamDirectory.map((u) => (
-                                  <option key={u.id} value={u.id}>
-                                    {u.displayName}
-                                    {u.jobTitle ? ` · ${u.jobTitle}` : ""}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="block">
-                              <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wide">Исполнитель</span>
-                              <select
-                                value={sub.assignee_user_id ?? ""}
-                                onChange={(e) =>
-                                  void patchModalSubtask(sub.id, {
-                                    assigneeUserId: e.target.value.trim() || null,
-                                  })
-                                }
-                                className="mt-0.5 w-full px-2 py-1 border border-[var(--border)] rounded text-xs bg-[var(--surface)]"
-                              >
-                                <option value="">—</option>
-                                {teamDirectory.map((u) => (
-                                  <option key={u.id} value={u.id}>
-                                    {u.displayName}
-                                    {u.jobTitle ? ` · ${u.jobTitle}` : ""}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
-                        </li>
-                      ))
-                    )}
-                  </ul>
-                  <form onSubmit={addModalSubtask} className="space-y-2">
-                    <div className="flex flex-wrap gap-2 items-end">
-                      <input
-                        type="text"
-                        value={newSubtaskTitle}
-                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                        placeholder="Название подзадачи"
-                        className="flex-1 min-w-[8rem] px-2 py-1.5 border border-[var(--border)] rounded-lg text-sm"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.5}
-                        value={newSubtaskHours}
-                        onChange={(e) => setNewSubtaskHours(e.target.value)}
-                        placeholder="ч"
-                        className="w-16 px-2 py-1.5 border border-[var(--border)] rounded-lg text-sm"
-                      />
+                  {modalSubtasks.map((sub) => (
+                    <div
+                      key={sub.id}
+                      className="group flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/35 px-3 py-2.5 transition-colors hover:border-[var(--primary)]/25 hover:bg-[var(--surface-2)]/60"
+                    >
                       <button
-                        type="submit"
-                        className="px-3 py-1.5 bg-[var(--primary)] text-white rounded-lg text-sm font-medium hover:bg-[var(--primary-hover)]"
+                        type="button"
+                        role="checkbox"
+                        aria-checked={Boolean(sub.completed_at)}
+                        onClick={() => void toggleModalSubtask(sub)}
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] font-bold transition-colors ${
+                          sub.completed_at
+                            ? "border-[var(--primary)] bg-[var(--primary)] text-white"
+                            : "border-[var(--border)] bg-[var(--surface)] text-transparent hover:border-[var(--primary)]/50"
+                        }`}
                       >
-                        +
+                        ✓
+                      </button>
+                      <span
+                        className={`min-w-0 flex-1 text-sm leading-snug ${
+                          sub.completed_at ? "text-[var(--muted-foreground)] line-through" : "text-[var(--text)]"
+                        }`}
+                      >
+                        {sub.title}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void removeModalSubtask(sub.id)}
+                        className="shrink-0 rounded p-1 text-[var(--muted-foreground)] opacity-0 transition-opacity hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] group-hover:opacity-100"
+                        aria-label="Удалить подзадачу"
+                      >
+                        ×
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <label className="block text-[10px] text-[var(--muted-foreground)]">
-                        Ведущий (при создании)
-                        <select
-                          value={newSubtaskLeadId}
-                          onChange={(e) => setNewSubtaskLeadId(e.target.value)}
-                          className="mt-0.5 w-full px-2 py-1.5 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)] text-[var(--text)]"
-                        >
-                          <option value="">—</option>
-                          {teamDirectory.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.displayName}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="block text-[10px] text-[var(--muted-foreground)]">
-                        Исполнитель (при создании)
-                        <select
-                          value={newSubtaskAssigneeId}
-                          onChange={(e) => setNewSubtaskAssigneeId(e.target.value)}
-                          className="mt-0.5 w-full px-2 py-1.5 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)] text-[var(--text)]"
-                        >
-                          <option value="">—</option>
-                          {teamDirectory.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.displayName}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  </form>
+                  ))}
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Ответственные</label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {(modalExtra.assignees ?? (modalExtra.assignee ? [modalExtra.assignee] : [])).map((name, i) => {
-                      const member = teamList.find((t) => t.name === name);
-                      return (
-                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--surface-2)] text-[var(--text)] text-sm">
-                          <span className="w-5 h-5 rounded-full bg-[var(--border)] flex items-center justify-center text-[10px] font-medium overflow-hidden flex-shrink-0">
-                            {member?.avatar ? <img src={member.avatar} alt="" className="w-full h-full object-cover" /> : (name.trim() ? name.trim().charAt(0).toUpperCase() : "?")}
-                          </span>
-                          {name}
-                          <button type="button" onClick={() => setModalExtra((x) => ({ ...x, assignees: (x.assignees ?? (x.assignee ? [x.assignee] : [])).filter((_, j) => j !== i) }))} className="text-[var(--muted-foreground)] hover:text-red-600">×</button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="text" value={newAssigneeInput} onChange={(e) => setNewAssigneeInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addToTeamAndAssign(newAssigneeInput))} placeholder="Имя ответственного" className="flex-1 px-3 py-2 border border-[var(--border)] rounded-lg text-sm" />
-                    <button type="button" onClick={() => addToTeamAndAssign(newAssigneeInput)} className="px-3 py-2 bg-[var(--surface-2)] text-[var(--text)] rounded-lg text-sm font-medium hover:bg-[var(--border)]">+ Добавить</button>
-                  </div>
-                  <input type="file" ref={avatarInputRef} accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && editingAvatarForId) { const r = new FileReader(); r.onload = () => setTeamMemberAvatar(editingAvatarForId, r.result as string); r.readAsDataURL(f); } e.target.value = ""; }} />
-                  {teamList.length > 0 && (
-                    <div className="mt-2">
-                      <span className="text-xs text-[var(--muted-foreground)] block mb-1">Список ответственных (нажмите на аватар, чтобы загрузить фото):</span>
-                      <div className="flex flex-wrap gap-2">
-                        {teamList.map((t) => (
-                          <div key={t.id} className="flex items-center gap-1.5">
-                            <button type="button" onClick={() => { setEditingAvatarForId(t.id); setTimeout(() => avatarInputRef.current?.click(), 0); }} className="w-8 h-8 rounded-full border-2 border-dashed border-[var(--border)] flex items-center justify-center overflow-hidden bg-[var(--surface-2)] hover:border-[var(--primary)] transition-colors" title="Загрузить аватар">
-                              {t.avatar ? <img src={t.avatar} alt="" className="w-full h-full object-cover" /> : <span className="text-[var(--muted-foreground)] text-xs">+</span>}
-                            </button>
-                            <span className="text-xs text-[var(--muted-foreground)]">{t.name}</span>
-                            {!(modalExtra.assignees ?? (modalExtra.assignee ? [modalExtra.assignee] : [])).includes(t.name) && (
-                              <button type="button" onClick={() => setModalExtra((x) => ({ ...x, assignees: [...(x.assignees ?? (x.assignee ? [x.assignee] : [])), t.name] }))} className="text-xs text-[var(--primary)] hover:underline">+ в карточку</button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Общий дедлайн проекта</label>
-                  <input type="date" value={modalExtra.projectDeadline ? modalExtra.projectDeadline.slice(0, 10) : ""} onChange={(e) => setModalExtra((x) => ({ ...x, projectDeadline: e.target.value || undefined }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Дедлайны и оценки по этапам</label>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    type="text"
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void addModalSubtask();
+                      }
+                    }}
+                    placeholder="Новая подзадача…"
+                    className="tt-input min-w-0 flex-1 text-sm"
+                  />
                   <button
                     type="button"
-                    onClick={() => {
-                      const { blocks, slides } = parseVolume(modalExtra.volume);
-                      const type = modalExtra.projectType;
-                      const defaults: Record<string, number> = {
-                        copywriting: 18,
-                        design_first_screen: 2,
-                        design: type === "site" ? 2 * blocks : type === "presentation" ? Math.max(0, slides / 10) : 0,
-                        layout: type === "site" ? 1 * blocks : 0,
-                      };
-                      setModalExtra((x) => {
-                        const sd = { ...(x.stageDetails ?? {}) };
-                        for (const key of STAGES_FOR_ESTIMATES) {
-                          const val = defaults[key] ?? (sd[key]?.estimatedHours ?? 0);
-                          if (val > 0) sd[key] = { ...sd[key], estimatedHours: val };
-                        }
-                        return { ...x, stageDetails: sd };
-                      });
-                    }}
-                    className="mb-2 text-xs px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--surface-2)] text-[var(--muted-foreground)]"
+                    onClick={() => void addModalSubtask()}
+                    className="shrink-0 rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[var(--primary)]/25 hover:brightness-110"
                   >
-                    Подставить часы по шаблону
+                    Добавить
                   </button>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {STAGES_FOR_ESTIMATES.map((key) => {
-                      const label = PM_STATUSES.find((s) => s.key === key)?.label ?? key;
-                      const sd = (modalExtra.stageDetails ?? {})[key] ?? {};
-                      return (
-                        <div key={key} className="grid grid-cols-[1fr_80px_70px] gap-2 items-center text-sm">
-                          <span className="text-[var(--muted-foreground)] truncate">{label}</span>
-                          <input
-                            type="date"
-                            value={sd.deadline ? sd.deadline.slice(0, 10) : ""}
-                            onChange={(e) => setModalExtra((x) => ({
-                              ...x,
-                              stageDetails: { ...(x.stageDetails ?? {}), [key]: { ...(x.stageDetails?.[key] ?? {}), deadline: e.target.value || undefined } },
-                            }))}
-                            className="px-2 py-1 border border-[var(--border)] rounded text-xs"
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.5}
-                            placeholder="ч"
-                            value={sd.estimatedHours ?? ""}
-                            onChange={(e) => setModalExtra((x) => ({
-                              ...x,
-                              stageDetails: { ...(x.stageDetails ?? {}), [key]: { ...(x.stageDetails?.[key] ?? {}), estimatedHours: e.target.value ? parseFloat(e.target.value) : undefined } },
-                            }))}
-                            className="px-2 py-1 border border-[var(--border)] rounded text-xs"
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {(() => {
-                    const total = STAGES_FOR_ESTIMATES.reduce((sum, key) => sum + ((modalExtra.stageDetails ?? {})[key]?.estimatedHours ?? 0), 0);
-                    return total > 0 ? <div className="mt-2 pt-2 border-t border-[var(--border)] text-sm font-medium text-[var(--text)]">Всего: {total} ч</div> : null;
-                  })()}
                 </div>
               </div>
-              <div className="p-4 space-y-4 md:w-1/2 border-t md:border-t-0 md:border-l border-[var(--border)]">
-                <div><label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Ссылка на Figma</label><input type="url" value={modalExtra.figmaLink ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, figmaLink: e.target.value || undefined }))} placeholder="https://..." className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm" /></div>
-                <div><label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Ссылка на ТЗ</label><input type="url" value={modalExtra.tzLink ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, tzLink: e.target.value || undefined }))} placeholder="https://..." className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm" /></div>
-                <div><label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Доступы к Tilda</label><input type="text" value={modalExtra.tildaAccess ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, tildaAccess: e.target.value || undefined }))} placeholder="Логин, пароль..." className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm" /></div>
-                <div><label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Пожелания</label><textarea value={modalExtra.wishes ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, wishes: e.target.value || undefined }))} placeholder="Пожелания клиента" rows={2} className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm" /></div>
-                <div><label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Пояснения</label><textarea value={modalExtra.explanations ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, explanations: e.target.value || undefined }))} placeholder="Пояснения по проекту" rows={2} className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm" /></div>
-                <div><label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Другие ссылки</label><textarea value={modalExtra.otherLinks ?? ""} onChange={(e) => setModalExtra((x) => ({ ...x, otherLinks: e.target.value || undefined }))} placeholder="По одной на строку" rows={2} className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm" /></div>
+              <div className="mt-8 border-t border-[var(--border)] pt-5">
+                <Link
+                  href={appPath(`/board/${modalCard.id}`)}
+                  className="text-sm font-medium text-[var(--primary)] hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Время и этапы →
+                </Link>
               </div>
-            </div>
-            <div className="p-4 border-t border-[var(--border)] flex justify-end gap-2">
-              <button type="button" onClick={() => setModalCard(null)} className="px-4 py-2 border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]">Закрыть</button>
-              <button type="button" onClick={saveModalExtra} disabled={savingExtra} className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-medium hover:bg-[var(--primary-hover)] disabled:opacity-50">{savingExtra ? "Сохранение…" : "Сохранить"}</button>
             </div>
           </div>
         </div>

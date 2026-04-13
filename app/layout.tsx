@@ -12,8 +12,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Team Tracker — профиль, канбан и агентство",
-  description: "Профиль, таймтрекер, канбан проектов и учёт агентства",
+  title: "Team Tracker",
+  description: "Внутренний сервис команды",
 };
 
 export const dynamic = "force-dynamic";

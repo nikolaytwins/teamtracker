@@ -215,7 +215,7 @@ export default function SalesLeadsPage() {
       </div>
 
       {showAddForm && (
-        <div className="mb-6 p-4 bg-[var(--surface)] rounded-lg border border-[var(--border)] shadow-[var(--shadow-card)]">
+        <div className="mb-6 rounded-2xl bg-[var(--surface)] p-4 shadow-[var(--shadow-kanban-card)] dark:ring-0">
           <form onSubmit={handleAddLead}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
@@ -328,21 +328,23 @@ export default function SalesLeadsPage() {
             return (
               <div
                 key={status}
-                className="flex-shrink-0 w-80 bg-[var(--surface-2)]/80 rounded-xl p-4 border border-[var(--border)]"
+                className="w-80 shrink-0 rounded-2xl bg-[var(--surface)]/90 p-3 shadow-[var(--shadow-kanban-column)] ring-1 ring-[var(--border)]/20 dark:bg-[var(--surface)]/55 dark:ring-0"
               >
-                <h3 className="font-semibold text-[var(--text)] mb-3 text-sm">
-                  <span className="block">
-                    {statusLabel}{" "}
-                    <span className="text-[var(--muted-foreground)] font-normal">({columnLeads.length})</span>
+                <h3 className="mb-3 border-b border-[var(--border)]/45 pb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] dark:border-white/[0.06]">
+                  <span className="flex items-center gap-2 normal-case tracking-normal">
+                    <span className="text-sm font-semibold text-[var(--text)]">{statusLabel}</span>
+                    <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold tabular-nums dark:bg-white/[0.06]">
+                      {columnLeads.length}
+                    </span>
                   </span>
                   {titleExtra}
                 </h3>
-                <div className="space-y-3 min-h-[120px]">
+                <div className="min-h-[120px] space-y-3">
                   {columnLeads.map((lead) => (
                     <div
                       key={lead.id}
                       id={`lead-${lead.id}`}
-                      className="bg-[var(--surface)] rounded-lg p-3 shadow-[var(--shadow-card)] border border-[var(--border)] hover:shadow-md transition-shadow"
+                      className="rounded-2xl bg-[var(--surface)] p-3.5 shadow-[var(--shadow-kanban-card)] transition-[box-shadow] hover:shadow-[var(--shadow-kanban-card-hover)] dark:bg-[var(--surface)]"
                     >
                       <div className="text-sm font-semibold text-[var(--text)] mb-2 flex flex-wrap items-center gap-2">
                         <span>{lead.taskDescription || "Без описания"}</span>
@@ -368,7 +370,7 @@ export default function SalesLeadsPage() {
                         Постоянник
                       </label>
                       {lead.linkedProjectId ? (
-                        <div className="mb-3 rounded-md border border-[var(--primary)]/15 bg-[var(--primary-soft)] p-2 text-xs">
+                        <div className="mb-3 rounded-xl bg-[var(--primary-soft)]/80 p-2.5 text-xs dark:bg-[var(--primary-soft)]/25">
                           <div className="text-[var(--text)] font-medium mb-1">Связанный проект</div>
                           <div className="flex flex-wrap gap-2">
                             <Link
@@ -388,12 +390,12 @@ export default function SalesLeadsPage() {
                         <button
                           type="button"
                           onClick={() => void handleConvertToProject(lead.id)}
-                          className="mb-3 w-full rounded-md border border-[var(--primary)]/25 bg-[var(--primary-soft)] px-2 py-1.5 text-xs font-medium text-[var(--primary)] hover:brightness-95 dark:hover:brightness-110"
+                          className="mb-3 w-full rounded-xl bg-[var(--primary-soft)] px-2 py-2 text-xs font-medium text-[var(--primary)] hover:brightness-95 dark:hover:brightness-110"
                         >
                           Создать проект из лида
                         </button>
                       )}
-                      <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+                      <div className="flex items-center justify-between border-t border-[var(--border)]/45 pt-3 dark:border-white/[0.06]">
                         <InlineSelect
                           value={lead.status}
                           options={STATUS_OPTIONS}

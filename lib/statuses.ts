@@ -26,22 +26,24 @@ export const APPROVAL_WAITING_STATUSES: PmStatusKey[] = [
 
 export const APPROVAL_WAITING_STATUS_SET = new Set<PmStatusKey>(APPROVAL_WAITING_STATUSES);
 
-/** Ключи «рабочих» этапов (в работе) для простого вида */
-export const WORK_STAGE_KEYS: PmStatusKey[] = [
+/** Активная работа (без этапов «ждём согласования клиента») — колонка «В работе» в простом виде */
+export const ACTIVE_WORK_STAGE_KEYS: PmStatusKey[] = [
   "copywriting",
-  "copy_approval",
   "design_first_screen",
-  "approval_first_screen",
   "design",
-  "design_approval",
   "layout",
-  "layout_approval",
 ];
 
-/** Простой вид: 4 группы */
+export const ACTIVE_WORK_STAGE_SET = new Set<PmStatusKey>(ACTIVE_WORK_STAGE_KEYS);
+
+/** Все рабочие этапы: активные + согласования (для детального канбана и сортировок) */
+export const WORK_STAGE_KEYS: PmStatusKey[] = [...ACTIVE_WORK_STAGE_KEYS, ...APPROVAL_WAITING_STATUSES];
+
+/** Простой вид: колонки канбана */
 export const SIMPLE_VIEW_GROUPS = [
   { key: "not_started" as const, label: "Не начато" },
   { key: "in_progress" as const, label: "В работе" },
+  { key: "awaiting_approval" as const, label: "На согласовании" },
   { key: "done" as const, label: "Закончен" },
   { key: "pause" as const, label: "На паузе" },
 ] as const;

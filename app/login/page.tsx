@@ -4,7 +4,6 @@ import { apiUrl, appPath } from "@/lib/api-url";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -93,32 +92,32 @@ function LoginForm() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="w-full max-w-md"
+      className="w-full max-w-md min-w-0"
     >
-      <Card className="overflow-hidden shadow-[var(--shadow-elevated)]">
+      <Card className="w-full min-w-0 overflow-hidden shadow-[var(--shadow-elevated)]">
         <CardHeader className="space-y-1 pb-2">
           <div className="mb-2 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold text-white shadow-lg shadow-[var(--primary)]/30">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold text-white shadow-lg shadow-[var(--primary)]/30">
               TT
             </div>
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-xl">Team Tracker</CardTitle>
               <CardDescription className="text-[13px]">
-                {mode === "login" ? "Вход для команды" : "Регистрация личного профиля"}
+                {mode === "login" ? "Вход по логину и паролю" : "Новая учётная запись"}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-5 pt-2">
+        <CardContent className="w-full min-w-0 space-y-5 pt-2">
           {regEnabled ? (
-            <div className="flex rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-1">
+            <div className="flex w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-1">
               <button
                 type="button"
                 onClick={() => {
                   setMode("login");
                   setError(null);
                 }}
-                className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all ${
+                className={`min-h-11 flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all ${
                   mode === "login"
                     ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)]"
                     : "text-[var(--muted-foreground)]"
@@ -132,7 +131,7 @@ function LoginForm() {
                   setMode("register");
                   setError(null);
                 }}
-                className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all ${
+                className={`min-h-11 flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all ${
                   mode === "register"
                     ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-card)]"
                     : "text-[var(--muted-foreground)]"
@@ -142,46 +141,56 @@ function LoginForm() {
               </button>
             </div>
           ) : (
-            <p className="rounded-xl border border-amber-200/80 bg-[var(--warning-soft)] px-3 py-2.5 text-xs text-amber-950 dark:border-amber-900/50 dark:text-amber-100">
-              Саморегистрация выключена. Нужен аккаунт от администратора или{" "}
-              <code className="rounded bg-[var(--surface)] px-1 py-0.5 text-[11px]">TEAM_TRACKER_SELF_REGISTER=1</code>.
+            <p className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--text)]">
+              Регистрация недоступна. Учётную запись выдаёт администратор.
             </p>
           )}
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="w-full min-w-0 space-y-4">
             {mode === "register" ? (
-              <div>
+              <div className="w-full min-w-0">
                 <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Имя</label>
                 <Input
                   type="text"
                   autoComplete="name"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Как к вам обращаться"
+                  placeholder="Имя и фамилия"
+                  className="w-full min-w-0"
                 />
               </div>
             ) : null}
-            <div>
+            <div className="w-full min-w-0">
               <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Логин</label>
-              <Input type="text" autoComplete="username" value={login} onChange={(e) => setLogin(e.target.value)} />
+              <Input
+                type="text"
+                autoComplete="username"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                className="w-full min-w-0"
+              />
             </div>
-            <div>
+            <div className="w-full min-w-0">
               <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Пароль</label>
               <Input
                 type="password"
                 autoComplete={mode === "register" ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="w-full min-w-0"
               />
-              {mode === "register" ? <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">Не короче 8 символов.</p> : null}
+              {mode === "register" ? (
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">Минимум 8 символов</p>
+              ) : null}
             </div>
             {mode === "register" ? (
-              <div>
+              <div className="w-full min-w-0">
                 <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Пароль ещё раз</label>
                 <Input
                   type="password"
                   autoComplete="new-password"
                   value={password2}
                   onChange={(e) => setPassword2(e.target.value)}
+                  className="w-full min-w-0"
                 />
               </div>
             ) : null}
@@ -202,11 +211,7 @@ function LoginForm() {
             </Button>
           </form>
           <p className="text-center text-xs text-[var(--muted-foreground)]">
-            После входа откроется{" "}
-            <Link href={appPath("/me")} className="font-semibold text-[var(--primary)] hover:underline">
-              профиль
-            </Link>
-            .
+            Проблемы со входом — к администратору.
           </p>
         </CardContent>
       </Card>
@@ -222,21 +227,16 @@ export default function LoginPage() {
           <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-white/20 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-sky-300/30 blur-3xl" />
         </div>
-        <div className="relative z-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/80">Design ops</p>
-          <h1 className="mt-4 max-w-md text-4xl font-bold leading-tight tracking-tight">
-            Один экран — весь поток агентства
-          </h1>
-          <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/85">
-            Таймер, канбан, календарь и финансы в одной системе. Светлая и тёмная тема, синий акцент, без визуального шума.
-          </p>
+        <div className="relative z-10 max-w-md">
+          <h1 className="text-3xl font-bold leading-tight tracking-tight">Team Tracker</h1>
+          <p className="mt-3 text-sm leading-relaxed text-white/90">Служебный вход для сотрудников.</p>
         </div>
-        <p className="relative z-10 text-xs text-white/60">Team Tracker · внутренняя панель команды</p>
+        <p className="relative z-10 text-xs text-white/65">Доступ только для авторизованных пользователей</p>
       </div>
-      <div className="flex flex-1 items-center justify-center px-4 py-12 sm:px-8">
+      <div className="flex min-w-0 flex-1 items-center justify-center px-4 py-12 sm:px-8">
         <Suspense
           fallback={
-            <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--muted-foreground)] shadow-[var(--shadow-card)]">
+            <div className="w-full max-w-md min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--muted-foreground)] shadow-[var(--shadow-card)]">
               Загрузка…
             </div>
           }
