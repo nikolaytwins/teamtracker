@@ -3,7 +3,7 @@
 import { apiUrl, appPath } from "@/lib/api-url";
 import { TIME_TASK_TYPE_OPTIONS, labelForTaskType } from "@/lib/time-task-types";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 const PM_BOARD_TEAM_KEY = "pm-board-team";
@@ -47,7 +47,14 @@ type PhaseRow = {
 };
 
 type Payload = {
-  card: { id: string; name: string; deadline: string | null; status: string; extra?: string | null } | null;
+  card: {
+    id: string;
+    name: string;
+    deadline: string | null;
+    status: string;
+    source_project_id?: string | null;
+    extra?: string | null;
+  } | null;
   phases: PhaseRow[];
   entries: PmTimeEntry[];
   activeEntry: PmTimeEntry | null;
@@ -78,6 +85,9 @@ export default function CardPhasesPage() {
   const [workerSelect, setWorkerSelect] = useState("");
   const [workerManual, setWorkerManual] = useState("");
   const [taskType, setTaskType] = useState("");
+  const [linkedLeadId, setLinkedLeadId] = useState<string | null>(null);
+  const [logWorkerFilter, setLogWorkerFilter] = useState("");
+  const [logTaskTypeFilter, setLogTaskTypeFilter] = useState("");
 
   useEffect(() => {
     setTeamList(loadTeamFromStorage());
@@ -104,6 +114,29 @@ export default function CardPhasesPage() {
       setWorkerSelect("");
     }
   }, [payload?.card?.id, payload?.card?.extra]);
+
+  useEffect(() => {
+    const sourceProjectId = payload?.card?.source_project_id;
+    if (!sourceProjectId) {
+      setLinkedLeadId(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch(apiUrl(`/api/agency/projects/${sourceProjectId}`));
+        const data = await r.json();
+        if (!cancelled && r.ok) {
+          setLinkedLeadId(typeof data.source_lead_id === "string" ? data.source_lead_id : null);
+        }
+      } catch {
+        if (!cancelled) setLinkedLeadId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [payload?.card?.source_project_id]);
   const applyPayload = useCallback((p: Payload) => {
     setPayload(p);
     const t = Date.now();
@@ -237,6 +270,43 @@ export default function CardPhasesPage() {
   if (!payload?.card) return <div className="p-6 text-red-600">Карточка не найдена</div>;
 
   const card = payload.card;
+  const completedEntries = useMemo(
+    () => payload.entries.filter((e) => e.ended_at && e.duration_seconds != null),
+    [payload.entries]
+  );
+  const analyticsByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of completedEntries) {
+      const key = e.started_at.slice(0, 10);
+      map.set(key, (map.get(key) ?? 0) + (e.duration_seconds ?? 0));
+    }
+    return [...map.entries()]
+      .map(([day, sec]) => ({ day, sec }))
+      .sort((a, b) => a.day.localeCompare(b.day));
+  }, [completedEntries]);
+  const analyticsByTaskType = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of completedEntries) {
+      const type = (e.task_type ?? "").trim();
+      map.set(type, (map.get(type) ?? 0) + (e.duration_seconds ?? 0));
+    }
+    return [...map.entries()]
+      .map(([type, sec]) => ({ type, sec }))
+      .sort((a, b) => b.sec - a.sec);
+  }, [completedEntries]);
+  const logWorkers = useMemo(() => {
+    const set = new Set(
+      payload.entries.map((e) => e.worker_name?.trim()).filter((x): x is string => Boolean(x))
+    );
+    return [...set].sort((a, b) => a.localeCompare(b, "ru"));
+  }, [payload.entries]);
+  const filteredEntries = useMemo(() => {
+    return payload.entries.filter((e) => {
+      const byWorker = logWorkerFilter ? (e.worker_name || "").trim() === logWorkerFilter : true;
+      const byType = logTaskTypeFilter ? (e.task_type || "") === logTaskTypeFilter : true;
+      return byWorker && byType;
+    });
+  }, [payload.entries, logWorkerFilter, logTaskTypeFilter]);
 
   return (
     <div className="min-h-screen bg-slate-50/80 p-4 md:p-6 max-w-4xl mx-auto">
@@ -258,6 +328,14 @@ export default function CardPhasesPage() {
       <p className="text-sm text-slate-500 mb-6">
         Внутренние этапы и таймтрекер. Колонки канбана здесь не меняются.
       </p>
+      {linkedLeadId ? (
+        <p className="text-sm text-blue-700 mb-4">
+          Связанный лид:{" "}
+          <Link href={appPath(`/sales/leads#lead-${linkedLeadId}`)} className="hover:underline">
+            открыть в воронке
+          </Link>
+        </p>
+      ) : null}
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
@@ -401,7 +479,72 @@ export default function CardPhasesPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-800 mb-2">Аналитика проекта</h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-100 p-3">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                По дням
+              </div>
+              {analyticsByDay.length === 0 ? (
+                <p className="text-sm text-slate-500">Нет завершённых сессий</p>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {analyticsByDay.map((d) => (
+                    <li key={d.day} className="flex justify-between gap-2">
+                      <span className="text-slate-600">{new Date(d.day).toLocaleDateString("ru-RU")}</span>
+                      <span className="tabular-nums text-slate-800">{formatDuration(d.sec)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="rounded-lg border border-slate-100 p-3">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                По типам задач
+              </div>
+              {analyticsByTaskType.length === 0 ? (
+                <p className="text-sm text-slate-500">Нет завершённых сессий</p>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {analyticsByTaskType.map((t) => (
+                    <li key={t.type || "__empty"} className="flex justify-between gap-2">
+                      <span className="text-slate-600">{labelForTaskType(t.type || null)}</span>
+                      <span className="tabular-nums text-slate-800">{formatDuration(t.sec)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
         <h2 className="text-lg font-semibold text-slate-800 p-4 border-b border-slate-100">Сессии</h2>
+        <div className="px-4 py-3 border-b border-slate-100 grid gap-3 md:grid-cols-2">
+          <select
+            value={logWorkerFilter}
+            onChange={(e) => setLogWorkerFilter(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+          >
+            <option value="">Все сотрудники</option>
+            {logWorkers.map((w) => (
+              <option key={w} value={w}>
+                {w}
+              </option>
+            ))}
+          </select>
+          <select
+            value={logTaskTypeFilter}
+            onChange={(e) => setLogTaskTypeFilter(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+          >
+            <option value="">Все типы задач</option>
+            {TIME_TASK_TYPE_OPTIONS.map((o) => (
+              <option key={o.key} value={o.key}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -411,18 +554,19 @@ export default function CardPhasesPage() {
                 <th className="py-2 px-4">Длительность</th>
                 <th className="py-2 px-4">Сотрудник</th>
                 <th className="py-2 px-4">Тип задачи</th>
+                <th className="py-2 px-4">Заметка</th>
                 <th className="py-2 px-4">Этап</th>
               </tr>
             </thead>
             <tbody>
-              {payload.entries.length === 0 ? (
+              {filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-slate-500">
+                  <td colSpan={7} className="py-6 text-center text-slate-500">
                     Записей пока нет
                   </td>
                 </tr>
               ) : (
-                payload.entries.map((e) => {
+                filteredEntries.map((e) => {
                   const phaseTitle = payload.phases.find((p) => p.id === e.phase_id)?.title ?? e.phase_id;
                   const dur =
                     e.duration_seconds != null
@@ -441,6 +585,7 @@ export default function CardPhasesPage() {
                         {e.worker_name?.trim() ? e.worker_name : "—"}
                       </td>
                       <td className="py-2 px-4 text-slate-600">{labelForTaskType(e.task_type)}</td>
+                      <td className="py-2 px-4 text-slate-600">{e.task_note?.trim() ? e.task_note : "—"}</td>
                       <td className="py-2 px-4 text-slate-700">{phaseTitle}</td>
                     </tr>
                   );

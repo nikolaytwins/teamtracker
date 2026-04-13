@@ -29,3 +29,19 @@ export function ensureAgencyLeadsColumns(db: Database.Database) {
     /* column exists */
   }
 }
+
+/** Привязка проекта к лиду (idempotent): один лид -> максимум один проект. */
+export function ensureAgencyProjectsColumns(db: Database.Database) {
+  try {
+    db.exec(`ALTER TABLE AgencyProject ADD COLUMN source_lead_id TEXT`);
+  } catch {
+    /* column exists */
+  }
+  try {
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_agency_project_source_lead_id ON AgencyProject(source_lead_id) WHERE source_lead_id IS NOT NULL AND TRIM(source_lead_id) != ''`
+    );
+  } catch {
+    /* ignore */
+  }
+}

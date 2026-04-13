@@ -14,6 +14,7 @@ User=root
 WorkingDirectory=/opt/team-tracker
 Environment=NODE_ENV=production
 Environment=PORT=3005
+Environment=TEAM_TRACKER_SELF_REGISTER=1
 # Раскомментируйте для tt.example.com без префикса /pm-board:
 Environment=TEAM_TRACKER_ROOT_DOMAIN=1
 # Секреты (см. deploy/team-tracker.env.example): создайте /etc/team-tracker.env на сервере

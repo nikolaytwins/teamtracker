@@ -2,28 +2,36 @@ import { getDb } from "@/lib/db";
 import { ensurePhasesSchema } from "@/lib/pm-phases";
 import { ANALYTICS_BUCKETS, labelForWorkPreset } from "@/lib/work-presets";
 
+export type SessionWorkerKey = { sub: string; name: string };
+
 export function secondsToHours(sec: number): number {
   return Math.round((sec / 3600) * 10) / 10;
 }
 
+const WORKER_MATCH_SQL = `(
+  (worker_user_id IS NOT NULL AND TRIM(worker_user_id) != '' AND worker_user_id = ?)
+  OR ((worker_user_id IS NULL OR TRIM(worker_user_id) = '') AND TRIM(worker_name) = ?)
+)`;
+
 /** Часы по конкретным ключам task_type за месяц */
-export function getWorkerMonthlyTaskBreakdown(workerName: string, monthYm: string) {
+export function getWorkerMonthlyTaskBreakdown(worker: SessionWorkerKey, monthYm: string) {
   ensurePhasesSchema();
   const db = getDb();
-  const name = workerName.trim();
-  if (!name) {
+  const uid = worker.sub.trim();
+  const name = worker.name.trim();
+  if (!uid && !name) {
     return { rows: [] as Array<{ taskType: string; label: string; seconds: number }>, totalSeconds: 0 };
   }
   const sqlRows = db
     .prepare(
       `SELECT COALESCE(NULLIF(TRIM(task_type), ''), '') as t, SUM(duration_seconds) as s
        FROM pm_time_entries
-       WHERE TRIM(worker_name) = ? AND strftime('%Y-%m', started_at) = ?
+       WHERE ${WORKER_MATCH_SQL} AND strftime('%Y-%m', started_at) = ?
          AND ended_at IS NOT NULL AND duration_seconds IS NOT NULL
        GROUP BY t
        ORDER BY s DESC`
     )
-    .all(name, monthYm) as Array<{ t: string; s: number }>;
+    .all(uid, name, monthYm) as Array<{ t: string; s: number }>;
   const totalSeconds = sqlRows.reduce((a, r) => a + r.s, 0);
   return {
     totalSeconds,
@@ -37,8 +45,8 @@ export function getWorkerMonthlyTaskBreakdown(workerName: string, monthYm: strin
 }
 
 /** Агрегаты по категориям (секунды по ключу task_type суммируются в подходящие ведра). */
-export function getWorkerMonthlyBuckets(workerName: string, monthYm: string) {
-  const { rows, totalSeconds } = getWorkerMonthlyTaskBreakdown(workerName, monthYm);
+export function getWorkerMonthlyBuckets(worker: SessionWorkerKey, monthYm: string) {
+  const { rows, totalSeconds } = getWorkerMonthlyTaskBreakdown(worker, monthYm);
   const taskSeconds = new Map<string, number>();
   for (const r of rows) {
     taskSeconds.set(r.taskType, r.seconds);
@@ -55,23 +63,25 @@ export function getWorkerMonthlyBuckets(workerName: string, monthYm: string) {
 }
 
 /** Средняя длительность одной сессии по типу задачи (завершённые). */
-export function getWorkerAverageSessionByTaskType(workerName: string, minSessions = 1) {
+export function getWorkerAverageSessionByTaskType(worker: SessionWorkerKey, minSessions = 1) {
   ensurePhasesSchema();
   const db = getDb();
-  const name = workerName.trim();
-  if (!name) return [] as Array<{ taskType: string; label: string; avgSeconds: number; sessions: number }>;
+  const uid = worker.sub.trim();
+  const name = worker.name.trim();
+  if (!uid && !name)
+    return [] as Array<{ taskType: string; label: string; avgSeconds: number; sessions: number }>;
   const rows = db
     .prepare(
       `SELECT COALESCE(NULLIF(TRIM(task_type), ''), '') as t,
         AVG(duration_seconds) as avg_s,
         COUNT(*) as c
        FROM pm_time_entries
-       WHERE TRIM(worker_name) = ? AND ended_at IS NOT NULL AND duration_seconds IS NOT NULL
+       WHERE ${WORKER_MATCH_SQL} AND ended_at IS NOT NULL AND duration_seconds IS NOT NULL
        GROUP BY t
        HAVING c >= ?
        ORDER BY c DESC`
     )
-    .all(name, minSessions) as Array<{ t: string; avg_s: number; c: number }>;
+    .all(uid, name, minSessions) as Array<{ t: string; avg_s: number; c: number }>;
   return rows.map((r) => ({
     taskType: r.t || "",
     label: labelForWorkPreset(r.t || ""),

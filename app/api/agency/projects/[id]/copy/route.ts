@@ -1,13 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import Database from 'better-sqlite3'
-import { getAgencySqlitePath } from '@/lib/agency-sqlite'
-import { ensureCardForAgencyProject } from '@/lib/db'
-
-const dbPath = getAgencySqlitePath()
-
-function getDb() {
-  return new Database(dbPath)
-}
+import { NextRequest, NextResponse } from "next/server";
+import { getAgencyRepo } from "@/lib/agency-store";
+import { ensureCardForAgencyProject } from "@/lib/db";
 
 /** Копировать проект (и все его расходы) на другой месяц */
 export async function POST(
@@ -15,78 +8,39 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const params = await context.params
-    const body = await request.json()
-    const year = Number(body.year)
-    const month = Number(body.month)
+    const params = await context.params;
+    const body = await request.json();
+    const year = Number(body.year);
+    const month = Number(body.month);
 
     if (!year || !month || month < 1 || month > 12) {
-      return NextResponse.json(
-        { error: 'Invalid year or month' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Invalid year or month" }, { status: 400 });
     }
 
-    const db = getDb()
-    const project = db.prepare('SELECT * FROM AgencyProject WHERE id = ?').get(params.id) as any
-    if (!project) {
-      db.close()
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    let newProject: { id: string; name: string; deadline: string | null };
+    try {
+      newProject = await getAgencyRepo().copyProjectToMonth(params.id, year, month);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message === "not_found") {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+      throw e;
     }
-
-    const newProjectId = `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-    const newDate = `${year}-${String(month).padStart(2, '0')}-01 00:00:00`
-
-    db.prepare(`
-      INSERT INTO AgencyProject (id, name, totalAmount, paidAmount, deadline, status, serviceType, clientType, paymentMethod, clientContact, notes, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run(
-      newProjectId,
-      project.name,
-      project.totalAmount,
-      0,
-      project.deadline,
-      'not_paid',
-      project.serviceType,
-      project.clientType,
-      project.paymentMethod,
-      project.clientContact,
-      project.notes,
-      newDate
-    )
-
-    const expenses = db.prepare('SELECT * FROM AgencyExpense WHERE projectId = ?').all(params.id) as any[]
-    for (const exp of expenses) {
-      const newExpId = `agexp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-      db.prepare(`
-        INSERT INTO AgencyExpense (id, projectId, employeeName, employeeRole, amount, notes, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `).run(newExpId, newProjectId, exp.employeeName, exp.employeeRole, exp.amount, exp.notes)
-    }
-
-    const newProject = db.prepare('SELECT * FROM AgencyProject WHERE id = ?').get(newProjectId) as {
-      id: string
-      name: string
-      deadline: string | null
-    }
-    db.close()
 
     try {
       ensureCardForAgencyProject({
         id: newProject.id,
         name: newProject.name,
         deadline: newProject.deadline ?? null,
-      })
+      });
     } catch (syncErr) {
-      console.error('ensureCardForAgencyProject after copy:', syncErr)
+      console.error("ensureCardForAgencyProject after copy:", syncErr);
     }
 
-    return NextResponse.json({ success: true, project: newProject })
-  } catch (error: any) {
-    console.error('Error copying project:', error)
-    return NextResponse.json(
-      { error: 'Failed to copy project', details: error.message },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: true, project: newProject });
+  } catch (error: unknown) {
+    console.error("Error copying project:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: "Failed to copy project", details: message }, { status: 500 });
   }
 }

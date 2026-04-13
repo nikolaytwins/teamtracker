@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import { getAgencySqlitePath } from "@/lib/agency-sqlite";
-import { getOutreachListJson, insertOutreachResponse } from "@/lib/outreach-api";
-
-const dbPath = getAgencySqlitePath();
-
-function getDb() {
-  return new Database(dbPath);
-}
+import { getAgencyRepo } from "@/lib/agency-store";
 
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
     const { searchParams } = new URL(request.url);
     const withStats = searchParams.get("stats") === "1";
-    const payload = getOutreachListJson(db, "threads", withStats);
-    db.close();
+    const payload = await getAgencyRepo().outreachListJson("threads", withStats);
     return NextResponse.json(payload);
   } catch (error) {
     console.error("Error fetching threads responses:", error);
@@ -32,10 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "cost must be >= 0" }, { status: 400 });
     }
 
-    const db = getDb();
-    const row = insertOutreachResponse(db, "threads", { cost: c, notes: notes || null });
-    db.close();
-
+    const row = await getAgencyRepo().insertOutreachResponse("threads", { cost: c, notes: notes || null });
     return NextResponse.json({ success: true, item: row });
   } catch (error) {
     console.error("Error creating threads response:", error);

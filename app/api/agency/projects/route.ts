@@ -1,78 +1,61 @@
-import { NextRequest, NextResponse } from 'next/server'
-import Database from 'better-sqlite3'
-import { getAgencySqlitePath } from '@/lib/agency-sqlite'
-import { ensureCardForAgencyProject } from '@/lib/db'
-
-const dbPath = getAgencySqlitePath()
-
-function getDb() {
-  return new Database(dbPath)
-}
+import { NextRequest, NextResponse } from "next/server";
+import { getAgencyRepo } from "@/lib/agency-store";
+import { ensureCardForAgencyProject } from "@/lib/db";
 
 export async function GET() {
   try {
-    const db = getDb()
-    const projects = db.prepare(`
-      SELECT p.*, 
-        COALESCE(SUM(e.amount), 0) as totalExpenses
-      FROM AgencyProject p
-      LEFT JOIN AgencyExpense e ON p.id = e.projectId
-      GROUP BY p.id
-      ORDER BY p.createdAt DESC
-    `).all()
-    db.close()
-    return NextResponse.json(projects)
+    const projects = await getAgencyRepo().listProjectsWithTotalExpenses();
+    return NextResponse.json(projects);
   } catch (error) {
-    console.error('Error fetching projects:', error)
-    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 })
+    console.error("Error fetching projects:", error);
+    return NextResponse.json({ error: "Failed to fetch projects" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { name, totalAmount, paidAmount, deadline, status, serviceType, clientType, paymentMethod, clientContact, notes } = body
-    
-    const db = getDb()
-    const id = `proj_${Date.now()}`
-    
-    db.prepare(`
-      INSERT INTO AgencyProject (id, name, totalAmount, paidAmount, deadline, status, serviceType, clientType, paymentMethod, clientContact, notes, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `).run(
-      id,
+    const body = await request.json();
+    const {
       name,
-      totalAmount || 0,
-      paidAmount || 0,
-      deadline || null,
-      status || 'not_paid',
+      totalAmount,
+      paidAmount,
+      deadline,
+      status,
       serviceType,
-      clientType || null,
-      paymentMethod || null,
-      clientContact || null,
-      notes || null
-    )
-    
-    const project = db.prepare('SELECT * FROM AgencyProject WHERE id = ?').get(id) as {
-      id: string
-      name: string
-      deadline: string | null
-    }
-    db.close()
+      clientType,
+      paymentMethod,
+      clientContact,
+      notes,
+    } = body;
+
+    const repo = getAgencyRepo();
+    const created = await repo.createProject({
+      name,
+      totalAmount,
+      paidAmount,
+      deadline,
+      status,
+      serviceType,
+      clientType,
+      paymentMethod,
+      clientContact,
+      notes,
+    });
+    const project = (await repo.getProjectById(created.id)) ?? created;
 
     try {
       ensureCardForAgencyProject({
-        id: project.id,
-        name: project.name,
-        deadline: project.deadline ?? null,
-      })
+        id: created.id,
+        name: String(project.name ?? created.name),
+        deadline: (project.deadline as string | null) ?? created.deadline ?? null,
+      });
     } catch (syncErr) {
-      console.error('ensureCardForAgencyProject after create:', syncErr)
+      console.error("ensureCardForAgencyProject after create:", syncErr);
     }
 
-    return NextResponse.json({ success: true, project })
+    return NextResponse.json({ success: true, project });
   } catch (error) {
-    console.error('Error creating project:', error)
-    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
+    console.error("Error creating project:", error);
+    return NextResponse.json({ error: "Failed to create project" }, { status: 500 });
   }
 }

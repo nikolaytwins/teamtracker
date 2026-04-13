@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import { getAgencySqlitePath } from "@/lib/agency-sqlite";
-import { insertPlatformVisit, type VisitPlatform } from "@/lib/platform-visits";
-
-const dbPath = getAgencySqlitePath();
-
-function getDb() {
-  return new Database(dbPath);
-}
+import { getAgencyRepo } from "@/lib/agency-store";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,9 +8,7 @@ export async function POST(request: NextRequest) {
     if (platform !== "profi" && platform !== "threads") {
       return NextResponse.json({ error: "platform must be profi or threads" }, { status: 400 });
     }
-    const db = getDb();
-    insertPlatformVisit(db, platform as VisitPlatform);
-    db.close();
+    await getAgencyRepo().insertPlatformVisit(platform);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("platform-visits POST:", error);

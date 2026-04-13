@@ -1,8 +1,12 @@
+import { normalizeTtUserRole, type TtUserRole } from "@/lib/roles";
+
 export type SessionPayload = {
   sub: string;
   login: string;
   name: string;
   title: string;
+  /** admin | designer | pm | member — в старых JWT может отсутствовать (считается admin). */
+  role?: TtUserRole;
   exp: number;
 };
 
@@ -69,5 +73,6 @@ export async function verifySession(token: string, secret: string): Promise<Sess
   }
   if (typeof data.exp !== "number" || data.exp < Date.now() / 1000) return null;
   if (!data.sub || !data.name) return null;
-  return data;
+  const role = data.role !== undefined ? normalizeTtUserRole(String(data.role)) : ("admin" as TtUserRole);
+  return { ...data, role };
 }

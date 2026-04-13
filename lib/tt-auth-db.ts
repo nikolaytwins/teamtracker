@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { getDb } from "@/lib/db";
+import { normalizeTtUserRole, type TtUserRole } from "@/lib/roles";
 
 export interface TtUserRow {
   id: string;
@@ -9,6 +10,11 @@ export interface TtUserRow {
   display_name: string;
   job_title: string;
   avatar_url: string | null;
+  role: TtUserRole;
+  supabase_id: string | null;
+  /** Email для Supabase Auth (signInWithPassword), если отличается от логина. */
+  auth_email: string | null;
+  weekly_capacity_hours: number;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +35,38 @@ export function ensureTtUsersSchema() {
     );
     CREATE INDEX IF NOT EXISTS idx_tt_users_login ON tt_users(login);
   `);
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN supabase_id TEXT`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN weekly_capacity_hours REAL NOT NULL DEFAULT 40`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN auth_email TEXT`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tt_users_supabase_id ON tt_users(supabase_id) WHERE supabase_id IS NOT NULL AND supabase_id != ''`);
+  } catch {
+    /* ignore */
+  }
+  try {
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_tt_users_auth_email_lower ON tt_users(lower(trim(auth_email))) WHERE auth_email IS NOT NULL AND trim(auth_email) != ''`
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 function hashPassword(password: string, saltHex: string): string {
@@ -50,20 +88,160 @@ export function hashNewPassword(password: string): { password_hash: string; salt
   return { password_hash, salt };
 }
 
+function rowToUser(row: Record<string, unknown> | undefined): TtUserRow | null {
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    login: String(row.login),
+    password_hash: String(row.password_hash),
+    salt: String(row.salt),
+    display_name: String(row.display_name),
+    job_title: String(row.job_title ?? ""),
+    avatar_url: row.avatar_url != null ? String(row.avatar_url) : null,
+    role: normalizeTtUserRole(row.role != null ? String(row.role) : "admin"),
+    supabase_id: row.supabase_id != null && String(row.supabase_id).trim() ? String(row.supabase_id) : null,
+    auth_email:
+      row.auth_email != null && String(row.auth_email).trim() ? String(row.auth_email).trim() : null,
+    weekly_capacity_hours:
+      row.weekly_capacity_hours != null && !Number.isNaN(Number(row.weekly_capacity_hours))
+        ? Number(row.weekly_capacity_hours)
+        : 40,
+    created_at: String(row.created_at ?? ""),
+    updated_at: String(row.updated_at ?? ""),
+  };
+}
+
 export function getUserByLogin(login: string): TtUserRow | null {
   ensureTtUsersSchema();
   const db = getDb();
   const row = db.prepare(`SELECT * FROM tt_users WHERE lower(login) = lower(?)`).get(login.trim()) as
-    | TtUserRow
+    | Record<string, unknown>
     | undefined;
-  return row ?? null;
+  return rowToUser(row);
 }
 
 export function getUserById(id: string): TtUserRow | null {
   ensureTtUsersSchema();
   const db = getDb();
-  const row = db.prepare(`SELECT * FROM tt_users WHERE id = ?`).get(id) as TtUserRow | undefined;
-  return row ?? null;
+  const row = db.prepare(`SELECT * FROM tt_users WHERE id = ?`).get(id) as Record<string, unknown> | undefined;
+  return rowToUser(row);
+}
+
+/** Публичные поля без секретов (списки, админка). */
+export type TtUserPublic = {
+  id: string;
+  login: string;
+  display_name: string;
+  job_title: string;
+  role: TtUserRole;
+  weekly_capacity_hours: number;
+  avatar_url: string | null;
+  /** Email для входа через Supabase (если задан). */
+  auth_email: string | null;
+  created_at: string;
+};
+
+export function toTtUserPublic(row: TtUserRow): TtUserPublic {
+  return {
+    id: row.id,
+    login: row.login,
+    display_name: row.display_name,
+    job_title: row.job_title,
+    role: row.role,
+    weekly_capacity_hours: row.weekly_capacity_hours,
+    avatar_url: row.avatar_url,
+    auth_email: row.auth_email,
+    created_at: row.created_at,
+  };
+}
+
+/** Email для signInWithPassword: явный auth_email или логин, если он уже в формате email. */
+export function getAuthEmailForUser(user: TtUserRow): string | null {
+  if (user.auth_email?.trim()) return user.auth_email.trim();
+  const login = user.login.trim();
+  if (login.includes("@")) return login;
+  return null;
+}
+
+function normalizeAuthEmailInput(raw: string | null): string | null {
+  if (raw == null) return null;
+  const t = raw.trim();
+  if (!t) return null;
+  if (!t.includes("@")) {
+    throw new Error("auth_email должен быть email (содержать @)");
+  }
+  return t;
+}
+
+export function listUserIdsWithRole(role: TtUserRole): string[] {
+  ensureTtUsersSchema();
+  const db = getDb();
+  const rows = db.prepare(`SELECT id, role FROM tt_users`).all() as { id: string; role: string | null }[];
+  return rows.filter((r) => normalizeTtUserRole(r.role) === role).map((r) => String(r.id));
+}
+
+export function listUsersPublic(): TtUserPublic[] {
+  ensureTtUsersSchema();
+  const db = getDb();
+  const rows = db
+    .prepare(`SELECT * FROM tt_users ORDER BY display_name COLLATE NOCASE ASC`)
+    .all() as Record<string, unknown>[];
+  return rows.map((row) => toTtUserPublic(rowToUser(row)!));
+}
+
+function countEffectiveAdmins(): number {
+  ensureTtUsersSchema();
+  const db = getDb();
+  const rows = db.prepare(`SELECT role FROM tt_users`).all() as { role: string | null }[];
+  return rows.filter((r) => normalizeTtUserRole(r.role) === "admin").length;
+}
+
+export function updateUserRole(
+  targetUserId: string,
+  newRole: TtUserRole
+): { ok: true; user: TtUserPublic } | { ok: false; error: string } {
+  const target = getUserById(targetUserId);
+  if (!target) return { ok: false, error: "Пользователь не найден" };
+  if (normalizeTtUserRole(target.role) === "admin" && newRole !== "admin") {
+    if (countEffectiveAdmins() <= 1) {
+      return { ok: false, error: "Нельзя снять роль администратора с единственного админа" };
+    }
+  }
+  const db = getDb();
+  db.prepare(`UPDATE tt_users SET role = ?, updated_at = datetime('now') WHERE id = ?`).run(newRole, targetUserId);
+  const updated = getUserById(targetUserId);
+  if (!updated) return { ok: false, error: "Ошибка обновления" };
+  return { ok: true, user: toTtUserPublic(updated) };
+}
+
+export function updateUserAuthEmail(
+  targetUserId: string,
+  authEmail: string | null
+): { ok: true; user: TtUserPublic } | { ok: false; error: string } {
+  const target = getUserById(targetUserId);
+  if (!target) return { ok: false, error: "Пользователь не найден" };
+  let normalized: string | null;
+  try {
+    normalized = normalizeAuthEmailInput(authEmail);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Некорректный email" };
+  }
+  const db = getDb();
+  try {
+    db.prepare(`UPDATE tt_users SET auth_email = ?, updated_at = datetime('now') WHERE id = ?`).run(
+      normalized,
+      targetUserId
+    );
+  } catch (e) {
+    const msg = String(e);
+    if (msg.includes("UNIQUE") || msg.includes("unique")) {
+      return { ok: false, error: "Такой auth_email уже занят" };
+    }
+    throw e;
+  }
+  const updated = getUserById(targetUserId);
+  if (!updated) return { ok: false, error: "Ошибка обновления" };
+  return { ok: true, user: toTtUserPublic(updated) };
 }
 
 export function upsertUserFromPlain(params: {
@@ -72,27 +250,50 @@ export function upsertUserFromPlain(params: {
   display_name: string;
   job_title?: string;
   avatar_url?: string | null;
+  role?: TtUserRole;
+  weekly_capacity_hours?: number;
+  auth_email?: string | null;
 }): TtUserRow {
   ensureTtUsersSchema();
   const db = getDb();
   const { password_hash, salt } = hashNewPassword(params.password);
+  const role = params.role != null ? normalizeTtUserRole(params.role) : undefined;
+  const cap =
+    params.weekly_capacity_hours != null && !Number.isNaN(Number(params.weekly_capacity_hours))
+      ? Number(params.weekly_capacity_hours)
+      : undefined;
+  let nextAuth: string | null | undefined;
+  if (params.auth_email !== undefined) {
+    try {
+      nextAuth = normalizeAuthEmailInput(params.auth_email);
+    } catch {
+      nextAuth = undefined;
+    }
+  }
   const existing = getUserByLogin(params.login);
   if (existing) {
+    const nextRole = role ?? existing.role;
+    const nextCap = cap ?? existing.weekly_capacity_hours;
+    const authToStore = nextAuth !== undefined ? nextAuth : existing.auth_email;
     db.prepare(
-      `UPDATE tt_users SET password_hash = ?, salt = ?, display_name = ?, job_title = ?, avatar_url = COALESCE(?, avatar_url), updated_at = datetime('now') WHERE id = ?`
+      `UPDATE tt_users SET password_hash = ?, salt = ?, display_name = ?, job_title = ?, avatar_url = COALESCE(?, avatar_url), role = ?, weekly_capacity_hours = ?, auth_email = ?, updated_at = datetime('now') WHERE id = ?`
     ).run(
       password_hash,
       salt,
       params.display_name.trim(),
       (params.job_title ?? existing.job_title).trim(),
       params.avatar_url ?? null,
+      nextRole,
+      nextCap,
+      authToStore,
       existing.id
     );
     return getUserById(existing.id)!;
   }
   const id = `u_${randomBytes(12).toString("hex")}`;
+  const insertAuth = nextAuth !== undefined ? nextAuth : null;
   db.prepare(
-    `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url, role, weekly_capacity_hours, auth_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     params.login.trim(),
@@ -100,9 +301,91 @@ export function upsertUserFromPlain(params: {
     salt,
     params.display_name.trim(),
     (params.job_title ?? "").trim(),
-    params.avatar_url ?? null
+    params.avatar_url ?? null,
+    role ?? "admin",
+    cap ?? 40,
+    insertAuth
   );
   return getUserById(id)!;
+}
+
+const SELF_REG_MIN_LOGIN = 2;
+const SELF_REG_MIN_PASSWORD = 8;
+
+/** Новая учётка с ролью `member` (саморегистрация). */
+export function registerSelfServeMember(params: {
+  login: string;
+  password: string;
+  display_name: string;
+  job_title?: string;
+}): { ok: true; user: TtUserRow } | { ok: false; error: string } {
+  ensureTtUsersSchema();
+  const login = params.login.trim();
+  if (login.length < SELF_REG_MIN_LOGIN) {
+    return { ok: false, error: "Логин слишком короткий" };
+  }
+  if (params.password.length < SELF_REG_MIN_PASSWORD) {
+    return { ok: false, error: `Пароль не короче ${SELF_REG_MIN_PASSWORD} символов` };
+  }
+  const display_name = params.display_name.trim();
+  if (!display_name) return { ok: false, error: "Укажите имя" };
+  if (getUserByLogin(login)) return { ok: false, error: "Такой логин уже занят" };
+
+  const { password_hash, salt } = hashNewPassword(params.password);
+  const id = `u_${randomBytes(12).toString("hex")}`;
+  let authEmail: string | null = null;
+  if (login.includes("@")) {
+    try {
+      authEmail = normalizeAuthEmailInput(login);
+    } catch {
+      authEmail = null;
+    }
+  }
+  const db = getDb();
+  try {
+    db.prepare(
+      `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url, role, weekly_capacity_hours, auth_email) VALUES (?, ?, ?, ?, ?, ?, NULL, 'member', 40, ?)`
+    ).run(
+      id,
+      login,
+      password_hash,
+      salt,
+      display_name,
+      (params.job_title ?? "").trim(),
+      authEmail
+    );
+  } catch (e) {
+    const msg = String(e);
+    if (msg.includes("UNIQUE") || msg.includes("unique")) {
+      return { ok: false, error: "Такой логин или email уже занят" };
+    }
+    throw e;
+  }
+  const row = getUserById(id);
+  if (!row) return { ok: false, error: "Не удалось создать учётку" };
+  return { ok: true, user: row };
+}
+
+/** После успешного Supabase signIn: записать supabase_id, если не занят другой учёткой. */
+export function linkTtUserToSupabaseAuthId(
+  ttUserId: string,
+  supabaseUserId: string
+): { ok: true } | { ok: false; error: string } {
+  ensureTtUsersSchema();
+  const sid = supabaseUserId.trim();
+  if (!sid) return { ok: false, error: "Пустой supabase id" };
+  const db = getDb();
+  const other = db
+    .prepare(`SELECT id FROM tt_users WHERE supabase_id = ? AND id != ?`)
+    .get(sid, ttUserId) as { id: string } | undefined;
+  if (other) {
+    return { ok: false, error: "Этот Supabase-пользователь уже привязан к другой учётке" };
+  }
+  db.prepare(`UPDATE tt_users SET supabase_id = ?, updated_at = datetime('now') WHERE id = ?`).run(
+    sid,
+    ttUserId
+  );
+  return { ok: true };
 }
 
 export function updateUserAvatar(userId: string, avatar_url: string | null): boolean {
@@ -119,7 +402,16 @@ export function updateUserAvatar(userId: string, avatar_url: string | null): boo
 export function syncUsersFromEnv(): void {
   const raw = process.env.TEAM_TRACKER_USERS_JSON?.trim();
   if (!raw) return;
-  let arr: Array<{ login: string; password: string; name: string; title?: string; avatar?: string | null }>;
+  let arr: Array<{
+    login: string;
+    password: string;
+    name: string;
+    title?: string;
+    avatar?: string | null;
+    role?: string;
+    weekly_capacity_hours?: number;
+    auth_email?: string | null;
+  }>;
   try {
     arr = JSON.parse(raw);
   } catch (e) {
@@ -135,6 +427,9 @@ export function syncUsersFromEnv(): void {
       display_name: String(u.name),
       job_title: u.title != null ? String(u.title) : "",
       avatar_url: u.avatar != null ? String(u.avatar) : null,
+      role: u.role != null ? normalizeTtUserRole(String(u.role)) : undefined,
+      weekly_capacity_hours: u.weekly_capacity_hours,
+      auth_email: u.auth_email,
     });
   }
 }

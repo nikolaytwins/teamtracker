@@ -1,12 +1,20 @@
 "use client";
 
 import { apiUrl, appPath } from "@/lib/api-url";
+import { formatISOWeekParam, shiftISOWeek } from "@/lib/iso-week";
+import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
+import {
+  defaultTimerTaskTypeForCard,
+  TIMER_TASK_OPTIONS_OTHER,
+  TIMER_TASK_OPTIONS_PROJECT,
+} from "@/lib/time-task-types";
 import {
   PRESENTATION_TASK_PRESETS,
   SALES_TASK,
   SITE_TASK_PRESETS,
   parseCardProjectType,
 } from "@/lib/work-presets";
+import { statusLabel, type PmStatusKey } from "@/lib/statuses";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -32,6 +40,37 @@ type StatsPayload = {
   averages: Array<{ taskType: string; label: string; avgHours: number; sessions: number }>;
 };
 
+type MySubtaskRow = {
+  id: string;
+  card_id: string;
+  title: string;
+  assignee_user_id: string | null;
+  lead_user_id: string | null;
+  card_name: string;
+  card_status: string;
+  card_extra: string | null;
+};
+
+type WeekSessionsPayload = {
+  week: string;
+  weekStart: string;
+  weekEnd: string;
+  days: Array<{
+    date: string;
+    sessions: Array<{
+      id: string;
+      cardId: string;
+      cardName: string;
+      taskType: string | null;
+      taskLabel: string;
+      taskNote: string | null;
+      startedAt: string;
+      endedAt: string;
+      durationSeconds: number;
+    }>;
+  }>;
+};
+
 function currentMonthYm(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -40,13 +79,16 @@ function currentMonthYm(): string {
 export default function MePage() {
   const router = useRouter();
   const [user, setUser] = useState<{
+    id: string;
     name: string;
     title: string;
     avatarUrl: string | null;
+    role?: string;
   } | null>(null);
+  const isMemberUser = user?.role === "member";
   const [cards, setCards] = useState<PmCard[]>([]);
   const [cardId, setCardId] = useState("");
-  const [taskChoice, setTaskChoice] = useState<string>("sales");
+  const [taskChoice, setTaskChoice] = useState<string>("design_concept");
   const [customText, setCustomText] = useState("");
   const [active, setActive] = useState<ActiveInfo | null>(null);
   /** Avoid Date.now() in useState initializer — SSR and client differ → hydration errors and broken clicks. */
@@ -56,34 +98,48 @@ export default function MePage() {
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [weekIso, setWeekIso] = useState(() => formatISOWeekParam());
+  const [weekSessions, setWeekSessions] = useState<WeekSessionsPayload | null>(null);
+  const [mySubtasks, setMySubtasks] = useState<MySubtaskRow[]>([]);
 
   const projectType = useMemo(() => {
     const c = cards.find((x) => x.id === cardId);
     return parseCardProjectType(c?.extra ?? null);
   }, [cards, cardId]);
 
+  const isOtherCard = cardId === VIRTUAL_OTHER_CARD_ID || projectType === "other";
+
   const presetOptions = useMemo(() => {
+    if (isOtherCard) return [...TIMER_TASK_OPTIONS_OTHER];
     if (projectType === "presentation") return [...PRESENTATION_TASK_PRESETS];
     if (projectType === "site") return [...SITE_TASK_PRESETS];
-    return [...SITE_TASK_PRESETS, ...PRESENTATION_TASK_PRESETS];
-  }, [projectType]);
+    return [...TIMER_TASK_OPTIONS_PROJECT];
+  }, [projectType, isOtherCard]);
 
   useEffect(() => {
     const valid =
-      taskChoice === "sales" ||
-      taskChoice === "custom" ||
-      presetOptions.some((p) => p.key === taskChoice);
-    if (!valid) setTaskChoice("sales");
+      taskChoice === "custom" || presetOptions.some((p) => p.key === taskChoice);
+    if (!valid) {
+      setTaskChoice(presetOptions[0]?.key ?? "sales");
+    }
   }, [cardId, presetOptions, taskChoice]);
 
   const loadMe = useCallback(async () => {
     const r = await fetch(apiUrl("/api/auth/me"));
     const d = await r.json();
-    if (d.user) setUser(d.user);
+    if (d.user)
+      setUser(d.user as { id: string; name: string; title: string; avatarUrl: string | null; role?: string });
+  }, []);
+
+  const loadMySubtasks = useCallback(async () => {
+    const r = await fetch(apiUrl("/api/me/subtasks"));
+    if (!r.ok) return;
+    const d = (await r.json()) as { subtasks?: MySubtaskRow[] };
+    setMySubtasks(Array.isArray(d.subtasks) ? d.subtasks : []);
   }, []);
 
   const loadCards = useCallback(async () => {
-    const r = await fetch(apiUrl("/api/cards"));
+    const r = await fetch(apiUrl("/api/cards/active"));
     if (!r.ok) return;
     const data = (await r.json()) as PmCard[];
     setCards(data);
@@ -111,17 +167,28 @@ export default function MePage() {
     setStats(d as StatsPayload);
   }, [monthYm]);
 
+  const loadWeekSessions = useCallback(async () => {
+    const r = await fetch(apiUrl(`/api/me/timer/sessions?week=${encodeURIComponent(weekIso)}`));
+    if (!r.ok) return;
+    const d = await r.json();
+    setWeekSessions(d as WeekSessionsPayload);
+  }, [weekIso]);
+
   useEffect(() => {
     void (async () => {
       setLoading(true);
-      await Promise.all([loadMe(), loadCards(), loadActive()]);
+      await Promise.all([loadMe(), loadCards(), loadActive(), loadMySubtasks()]);
       setLoading(false);
     })();
-  }, [loadMe, loadCards, loadActive]);
+  }, [loadMe, loadCards, loadActive, loadMySubtasks]);
 
   useEffect(() => {
     void loadStats();
   }, [monthYm, loadStats]);
+
+  useEffect(() => {
+    void loadWeekSessions();
+  }, [loadWeekSessions]);
 
   useEffect(() => {
     if (!active) return;
@@ -156,7 +223,11 @@ export default function MePage() {
       return;
     }
     const payloadTaskType =
-      taskChoice === "custom" ? "custom" : taskChoice === "sales" ? SALES_TASK.key : taskChoice;
+      taskChoice === "custom"
+        ? "custom"
+        : taskChoice === "sales"
+          ? SALES_TASK.key
+          : taskChoice;
     setActionBusy(true);
     try {
       const r = await fetch(apiUrl("/api/me/timer/start"), {
@@ -171,6 +242,7 @@ export default function MePage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Ошибка");
       await loadActive();
+      await loadWeekSessions();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Ошибка");
     } finally {
@@ -187,6 +259,77 @@ export default function MePage() {
       if (!r.ok) throw new Error(d.error || "Ошибка");
       setActive(null);
       await loadStats();
+      await loadWeekSessions();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  function formatClock(iso: string): string {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return iso;
+    }
+  }
+
+  async function startTimerOnCard(cardId: string, cardExtra: string | null) {
+    if (active) {
+      setErr("Сначала остановите текущую сессию");
+      return;
+    }
+    setErr(null);
+    const taskType = defaultTimerTaskTypeForCard(cardId, cardExtra);
+    setActionBusy(true);
+    try {
+      const r = await fetch(apiUrl("/api/me/timer/start"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId, taskType, taskNote: "" }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Ошибка");
+      await loadActive();
+      await loadWeekSessions();
+      await loadMySubtasks();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function continueFromSession(s: WeekSessionsPayload["days"][0]["sessions"][0]) {
+    if (active) {
+      setErr("Сначала остановите текущую сессию");
+      return;
+    }
+    setErr(null);
+    let taskType = (s.taskType || "").trim();
+    let taskNote = (s.taskNote || "").trim();
+    if (taskType.startsWith("custom:")) {
+      taskNote = taskType.slice("custom:".length).trim() || taskNote;
+      taskType = "custom";
+    }
+    if (!taskType) taskType = "custom";
+    setActionBusy(true);
+    try {
+      const r = await fetch(apiUrl("/api/me/timer/start"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cardId: s.cardId,
+          taskType,
+          taskNote,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Ошибка");
+      await loadActive();
+      await loadWeekSessions();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Ошибка");
     } finally {
@@ -248,24 +391,99 @@ export default function MePage() {
             >
               Выйти
             </button>
-            <Link href={appPath("/board")} className="text-sm font-medium text-emerald-700 hover:underline">
-              Канбан
-            </Link>
-            <Link
-              href={appPath("/board/time-analytics")}
-              className="text-sm font-medium text-emerald-700 hover:underline"
-            >
-              Аналитика времени
-            </Link>
+            {!isMemberUser ? (
+              <>
+                <Link href={appPath("/board")} className="text-sm font-medium text-emerald-700 hover:underline">
+                  Канбан
+                </Link>
+                <Link
+                  href={appPath("/board/time-analytics")}
+                  className="text-sm font-medium text-emerald-700 hover:underline"
+                >
+                  Аналитика времени
+                </Link>
+              </>
+            ) : null}
           </div>
+          {isMemberUser ? (
+            <p className="text-sm text-slate-600 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              У вас пока нет доступа к командной доске и админским разделам. После выдачи роли администратором
+              появятся канбан, календарь и аналитика команды.
+            </p>
+          ) : null}
         </div>
       </header>
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-slate-800">Мои подзадачи</h2>
+          {!isMemberUser ? (
+            <Link href={appPath("/board")} className="text-sm text-emerald-700 hover:underline">
+              Канбан
+            </Link>
+          ) : null}
+        </div>
+        {isMemberUser ? (
+          <p className="text-sm text-slate-500">
+            Подзадачи команды здесь не отображаются, пока администратор не расширит доступ.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-slate-500">
+              Открытые задачи, где вы исполнитель или лид, на активных карточках.
+            </p>
+            {mySubtasks.length === 0 ? (
+              <p className="text-sm text-slate-500">Нет открытых подзадач</p>
+            ) : null}
+          </>
+        )}
+        {!isMemberUser && mySubtasks.length > 0 ? (
+          <ul className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
+            {mySubtasks.map((s) => {
+              const roles: string[] = [];
+              if (user && s.assignee_user_id === user.id) roles.push("исполнитель");
+              if (user && s.lead_user_id === user.id) roles.push("лид");
+              return (
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-50/50">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-slate-900">{s.title}</div>
+                    <div className="text-xs text-slate-600 mt-0.5 truncate">{s.card_name}</div>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {roles.map((r) => (
+                        <span
+                          key={r}
+                          className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-200 text-slate-700"
+                        >
+                          {r}
+                        </span>
+                      ))}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                        {statusLabel(s.card_status as PmStatusKey)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={actionBusy || !!active}
+                    onClick={() => void startTimerOnCard(s.card_id, s.card_extra)}
+                    className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    Таймер
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </section>
+
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
         <h2 className="text-lg font-semibold text-slate-800">Быстрый старт</h2>
         <p className="text-sm text-slate-500">
-          Выберите проект и тип задачи. Сессии привязаны к вашему имени в отчётах. Один активный таймер на
-          человека.
+          Выберите проект и тип задачи. Сессии привязаны к вашему профилю. Один активный таймер на человека.
         </p>
         {err && <p className="text-sm text-red-600">{err}</p>}
 
@@ -321,7 +539,6 @@ export default function MePage() {
               }}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
             >
-              <option value="sales">{SALES_TASK.label}</option>
               {presetOptions.map((p) => (
                 <option key={p.key} value={p.key}>
                   {p.label}
@@ -359,6 +576,89 @@ export default function MePage() {
           </button>
           {!cardId && <span className="text-xs text-amber-700">Сначала выберите проект</span>}
         </div>
+      </section>
+
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold text-slate-800">История за неделю</h2>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setWeekIso((w) => shiftISOWeek(w, -1))}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              ←
+            </button>
+            <span className="text-sm font-medium text-slate-700 tabular-nums min-w-[8rem] text-center">
+              {weekSessions ? `${weekSessions.weekStart} — ${weekSessions.weekEnd}` : weekIso}
+            </span>
+            <button
+              type="button"
+              onClick={() => setWeekIso((w) => shiftISOWeek(w, 1))}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              →
+            </button>
+            <button
+              type="button"
+              onClick={() => setWeekIso(formatISOWeekParam())}
+              className="px-3 py-1.5 rounded-lg text-sm text-blue-600 hover:bg-blue-50"
+            >
+              Сегодня
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500">Неделя в формате ISO ({weekIso}). Завершённые сессии, по дням.</p>
+        {weekSessions && (
+          <div className="space-y-6">
+            {weekSessions.days.every((d) => d.sessions.length === 0) ? (
+              <p className="text-sm text-slate-500">Нет записей за эту неделю</p>
+            ) : (
+              weekSessions.days.map((day) =>
+                day.sessions.length === 0 ? null : (
+                  <div key={day.date}>
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      {new Date(day.date + "T12:00:00").toLocaleDateString("ru-RU", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                      })}
+                    </h3>
+                    <ul className="space-y-2">
+                      {day.sessions.map((s) => (
+                        <li
+                          key={s.id}
+                          className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-0"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-slate-900 truncate">{s.cardName}</div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mt-0.5">
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                                {s.taskLabel}
+                              </span>
+                              <span>
+                                {formatClock(s.startedAt)} — {formatClock(s.endedAt)}
+                              </span>
+                              <span className="tabular-nums">{formatDur(s.durationSeconds)}</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={actionBusy || !!active}
+                            onClick={() => void continueFromSession(s)}
+                            className="shrink-0 text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-40"
+                          >
+                            Продолжить
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              )
+            )}
+          </div>
+        )}
       </section>
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">

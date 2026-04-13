@@ -13,6 +13,7 @@ import {
   type PmStatusKey,
   type ImportanceKey,
 } from "@/lib/statuses";
+import { computeSubtaskProgressStats } from "@/lib/subtask-progress";
 
 type TeamMember = { id: string; name: string; avatar?: string };
 
@@ -26,6 +27,24 @@ type PmCard = {
   extra?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type PmSubtaskRow = {
+  id: string;
+  title: string;
+  estimated_hours: number | null;
+  completed_at: string | null;
+  assignee_user_id: string | null;
+  lead_user_id: string | null;
+};
+
+type TtTeamUser = {
+  id: string;
+  displayName: string;
+  login: string;
+  jobTitle: string;
+  avatarUrl: string | null;
+  role: string;
 };
 
 type CardExtra = {
@@ -44,6 +63,14 @@ type CardExtra = {
   projectDeadline?: string;
   estimatedHours?: number;
   stageDetails?: Record<string, { deadline?: string; estimatedHours?: number }>;
+  /** Кэш из подзадач, обновляется при CRUD pm_subtasks */
+  derivedSubtaskProgress?: {
+    percent: number;
+    completed: number;
+    total: number;
+    byHours: boolean;
+    updatedAt?: string;
+  };
 };
 
 function parseExtra(s: string | null | undefined): CardExtra {
@@ -125,6 +152,59 @@ export default function BoardPage() {
   const [newAssigneeInput, setNewAssigneeInput] = useState("");
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [editingAvatarForId, setEditingAvatarForId] = useState<string | null>(null);
+  const [canSyncAgency, setCanSyncAgency] = useState(false);
+  const [modalSubtasks, setModalSubtasks] = useState<PmSubtaskRow[]>([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [newSubtaskHours, setNewSubtaskHours] = useState("");
+  const [newSubtaskLeadId, setNewSubtaskLeadId] = useState("");
+  const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState("");
+  const [teamDirectory, setTeamDirectory] = useState<TtTeamUser[]>([]);
+
+  useEffect(() => {
+    void fetch(apiUrl("/api/auth/me"))
+      .then((r) => r.json())
+      .then((d: { user?: { role?: string } }) => {
+        setCanSyncAgency(d.user?.role === "admin");
+      })
+      .catch(() => setCanSyncAgency(false));
+  }, []);
+
+  useEffect(() => {
+    void fetch(apiUrl("/api/team/users"))
+      .then((r) => r.json())
+      .then((d: { users?: TtTeamUser[] }) => {
+        setTeamDirectory(Array.isArray(d.users) ? d.users : []);
+      })
+      .catch(() => setTeamDirectory([]));
+  }, []);
+
+  useEffect(() => {
+    if (!modalCard?.id) {
+      setModalSubtasks([]);
+      return;
+    }
+    void fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`))
+      .then((r) => r.json())
+      .then((d: { subtasks?: PmSubtaskRow[] }) => {
+        setModalSubtasks(Array.isArray(d.subtasks) ? d.subtasks : []);
+      })
+      .catch(() => setModalSubtasks([]));
+  }, [modalCard?.id]);
+
+  async function refreshBoardCard(cardId: string, syncModalExtra: boolean) {
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${cardId}`));
+      if (!r.ok) return;
+      const updated = (await r.json()) as PmCard;
+      setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
+      const prog = parseExtra(updated.extra).derivedSubtaskProgress;
+      if (syncModalExtra) {
+        setModalExtra((prev) => ({ ...prev, derivedSubtaskProgress: prog }));
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -257,6 +337,10 @@ export default function BoardPage() {
   function openModal(card: PmCard) {
     setModalCard(card);
     setModalName(card.name);
+    setNewSubtaskTitle("");
+    setNewSubtaskHours("");
+    setNewSubtaskLeadId("");
+    setNewSubtaskAssigneeId("");
     const ex = parseExtra(card.extra);
     if (!ex.stageDetails) ex.stageDetails = {};
     if (card.deadline && !ex.stageDetails[card.status]?.deadline) {
@@ -298,6 +382,81 @@ export default function BoardPage() {
       const r = await fetch(apiUrl(`/api/cards/${cardId}`), { method: "DELETE" });
       if (r.ok) setCards((prev) => prev.filter((c) => c.id !== cardId));
       if (modalCard?.id === cardId) setModalCard(null);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function addModalSubtask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!modalCard || !newSubtaskTitle.trim()) return;
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newSubtaskTitle.trim(),
+          estimatedHours: newSubtaskHours.trim() ? parseFloat(newSubtaskHours) : null,
+          leadUserId: newSubtaskLeadId.trim() || null,
+          assigneeUserId: newSubtaskAssigneeId.trim() || null,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Ошибка");
+      setNewSubtaskTitle("");
+      setNewSubtaskHours("");
+      const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
+      setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
+      await refreshBoardCard(modalCard.id, true);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function toggleModalSubtask(sub: PmSubtaskRow) {
+    if (!modalCard) return;
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks/${sub.id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: !sub.completed_at }),
+      });
+      if (!r.ok) return;
+      const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
+      setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
+      await refreshBoardCard(modalCard.id, true);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function removeModalSubtask(subId: string) {
+    if (!modalCard || !confirm("Удалить подзадачу?")) return;
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks/${subId}`), { method: "DELETE" });
+      if (!r.ok) return;
+      setModalSubtasks((prev) => prev.filter((s) => s.id !== subId));
+      await refreshBoardCard(modalCard.id, true);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function patchModalSubtask(
+    subId: string,
+    patch: { leadUserId?: string | null; assigneeUserId?: string | null }
+  ) {
+    if (!modalCard) return;
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks/${subId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) return;
+      const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
+      setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
+      await refreshBoardCard(modalCard.id, true);
     } catch (err) {
       console.error(err);
     }
@@ -384,6 +543,23 @@ export default function BoardPage() {
                 Проект: {formatDate(projectDeadline)}
               </span>
             </div>
+            {extra.derivedSubtaskProgress && extra.derivedSubtaskProgress.total > 0 ? (
+              <div className="mt-3 space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-600">
+                  <span>
+                    Подзадачи {extra.derivedSubtaskProgress.completed}/{extra.derivedSubtaskProgress.total}
+                    {extra.derivedSubtaskProgress.byHours ? " · по часам" : ""}
+                  </span>
+                  <span className="font-semibold tabular-nums text-sky-700">{extra.derivedSubtaskProgress.percent}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-sky-500 transition-[width] duration-300"
+                    style={{ width: `${extra.derivedSubtaskProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
             <Link
               href={appPath(`/board/${card.id}`)}
               onClick={(e) => e.stopPropagation()}
@@ -491,32 +667,54 @@ export default function BoardPage() {
             >
               Все этапы
             </button>
-            <button
-              type="button"
-              onClick={() => void syncFromAgency()}
-              disabled={syncingFromAgency}
-              className="px-3 py-2 rounded-lg text-sm font-medium bg-emerald-700 text-white hover:bg-emerald-800 disabled:opacity-50"
-              title="Добавить на канбан проекты из «Проекты и финансы», для которых ещё нет карточки"
-            >
-              {syncingFromAgency ? "Синхронизация…" : "Подтянуть из финансов"}
-            </button>
+            {canSyncAgency ? (
+              <button
+                type="button"
+                onClick={() => void syncFromAgency()}
+                disabled={syncingFromAgency}
+                className="px-3 py-2 rounded-lg text-sm font-medium bg-emerald-700 text-white hover:bg-emerald-800 disabled:opacity-50"
+                title="Добавить на канбан проекты из «Проекты и финансы», для которых ещё нет карточки"
+              >
+                {syncingFromAgency ? "Синхронизация…" : "Подтянуть из финансов"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
 
-      <form onSubmit={addProject} className="mb-6 flex flex-wrap items-end gap-3 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Новый проект</label>
-          <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Название проекта или клиента" className="w-64 px-3 py-2 border border-slate-200 rounded-lg text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Дедлайн</label>
-          <input type="date" value={newDeadline} onChange={(e) => setNewDeadline(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg text-sm" />
-        </div>
-        <button type="submit" disabled={adding || !newName.trim()} className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 disabled:opacity-50">
-          {adding ? "Создание…" : "+ Добавить проект"}
-        </button>
-      </form>
+      {canSyncAgency ? (
+        <form
+          onSubmit={addProject}
+          className="mb-6 flex flex-wrap items-end gap-3 p-4 bg-white rounded-xl border border-slate-200 shadow-sm"
+        >
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Новый проект</label>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Название проекта или клиента"
+              className="w-64 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Дедлайн</label>
+            <input
+              type="date"
+              value={newDeadline}
+              onChange={(e) => setNewDeadline(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={adding || !newName.trim()}
+            className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 disabled:opacity-50"
+          >
+            {adding ? "Создание…" : "+ Добавить проект"}
+          </button>
+        </form>
+      ) : null}
 
       {viewMode === "detailed" && (
         <div className="flex gap-4 overflow-x-auto pb-6 snap-x snap-mandatory">
@@ -615,6 +813,169 @@ export default function BoardPage() {
                     <option value="">—</option>
                     {IMPORTANCE_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
                   </select>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-slate-700">Подзадачи</div>
+                    {modalSubtasks.length > 0 ? (
+                      <span className="text-[10px] font-medium text-sky-700 tabular-nums">
+                        {(() => {
+                          const p = computeSubtaskProgressStats(modalSubtasks);
+                          return `${p.percent}% (${p.completed}/${p.total}${p.byHours ? ", часы" : ""})`;
+                        })()}
+                      </span>
+                    ) : null}
+                  </div>
+                  {modalSubtasks.length > 0 ? (
+                    <div className="h-1 rounded-full bg-slate-200 overflow-hidden">
+                      <div
+                        className="h-full bg-sky-500 transition-[width]"
+                        style={{
+                          width: `${computeSubtaskProgressStats(modalSubtasks).percent}%`,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  <ul className="space-y-2 max-h-64 overflow-y-auto">
+                    {modalSubtasks.length === 0 ? (
+                      <li className="text-xs text-slate-500">Пока нет — добавьте ниже</li>
+                    ) : (
+                      modalSubtasks.map((sub) => (
+                        <li
+                          key={sub.id}
+                          className="text-sm bg-white rounded-lg border border-slate-100 px-2 py-2 space-y-1.5"
+                        >
+                          <div className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(sub.completed_at)}
+                              onChange={() => void toggleModalSubtask(sub)}
+                              className="mt-1"
+                              aria-label="Выполнено"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className={sub.completed_at ? "line-through text-slate-500" : "text-slate-900"}>
+                                {sub.title}
+                              </span>
+                              {sub.estimated_hours != null && !Number.isNaN(sub.estimated_hours) ? (
+                                <span className="text-xs text-slate-500 ml-2 tabular-nums">
+                                  ~{sub.estimated_hours} ч
+                                </span>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void removeModalSubtask(sub.id)}
+                              className="text-slate-400 hover:text-red-600 text-xs shrink-0"
+                              aria-label="Удалить"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-6">
+                            <label className="block">
+                              <span className="text-[10px] text-slate-500 uppercase tracking-wide">Ведущий</span>
+                              <select
+                                value={sub.lead_user_id ?? ""}
+                                onChange={(e) =>
+                                  void patchModalSubtask(sub.id, {
+                                    leadUserId: e.target.value.trim() || null,
+                                  })
+                                }
+                                className="mt-0.5 w-full px-2 py-1 border border-slate-200 rounded text-xs bg-white"
+                              >
+                                <option value="">—</option>
+                                {teamDirectory.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.displayName}
+                                    {u.jobTitle ? ` · ${u.jobTitle}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-slate-500 uppercase tracking-wide">Исполнитель</span>
+                              <select
+                                value={sub.assignee_user_id ?? ""}
+                                onChange={(e) =>
+                                  void patchModalSubtask(sub.id, {
+                                    assigneeUserId: e.target.value.trim() || null,
+                                  })
+                                }
+                                className="mt-0.5 w-full px-2 py-1 border border-slate-200 rounded text-xs bg-white"
+                              >
+                                <option value="">—</option>
+                                {teamDirectory.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.displayName}
+                                    {u.jobTitle ? ` · ${u.jobTitle}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                  <form onSubmit={addModalSubtask} className="space-y-2">
+                    <div className="flex flex-wrap gap-2 items-end">
+                      <input
+                        type="text"
+                        value={newSubtaskTitle}
+                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                        placeholder="Название подзадачи"
+                        className="flex-1 min-w-[8rem] px-2 py-1.5 border border-slate-200 rounded-lg text-sm"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={newSubtaskHours}
+                        onChange={(e) => setNewSubtaskHours(e.target.value)}
+                        placeholder="ч"
+                        className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm"
+                      />
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <label className="block text-[10px] text-slate-500">
+                        Ведущий (при создании)
+                        <select
+                          value={newSubtaskLeadId}
+                          onChange={(e) => setNewSubtaskLeadId(e.target.value)}
+                          className="mt-0.5 w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900"
+                        >
+                          <option value="">—</option>
+                          {teamDirectory.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-[10px] text-slate-500">
+                        Исполнитель (при создании)
+                        <select
+                          value={newSubtaskAssigneeId}
+                          onChange={(e) => setNewSubtaskAssigneeId(e.target.value)}
+                          className="mt-0.5 w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900"
+                        >
+                          <option value="">—</option>
+                          {teamDirectory.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </form>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Ответственные</label>

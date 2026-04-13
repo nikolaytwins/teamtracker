@@ -18,6 +18,7 @@ interface Project {
   paymentMethod: string | null
   clientContact: string | null
   notes: string | null
+  source_lead_id?: string | null
   createdAt: string
 }
 
@@ -604,6 +605,14 @@ export default function ProjectPage() {
         {project.deadline && (
           <p className="text-sm text-gray-600 mt-1">Дедлайн: {formatDate(new Date(project.deadline))}</p>
         )}
+        {project.source_lead_id ? (
+          <p className="text-sm text-blue-700 mt-1">
+            Лид:{" "}
+            <Link href={`/sales/leads#lead-${project.source_lead_id}`} className="hover:underline">
+              открыть в воронке
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { requireAgencyAccess } from "@/lib/require-role";
 import { syncMissingAgencyProjectsToBoard } from "@/lib/sync-agency-board";
 
 /** Body: { onlyMonth?: "2025-03" | "2026-03", clearFirst?: boolean } — только проекты, созданные в этом месяце (страница месяца в Agency); clearFirst — сначала очистить канбан. */
 export async function POST(request: Request) {
   try {
+    const auth = await requireAgencyAccess();
+    if (!auth.ok) return auth.response;
     let onlyMonth: string | undefined;
     let clearFirst = false;
     try {
@@ -16,7 +19,7 @@ export async function POST(request: Request) {
       /* no body */
     }
 
-    const result = syncMissingAgencyProjectsToBoard({ onlyMonth, clearFirst });
+    const result = await syncMissingAgencyProjectsToBoard({ onlyMonth, clearFirst });
     return NextResponse.json({
       success: true,
       created: result.created,

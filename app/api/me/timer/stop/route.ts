@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
-import { getActiveEntryForWorker, stopTimer } from "@/lib/pm-phases";
+import { getActiveEntryForSessionUser, stopTimer } from "@/lib/pm-phases";
 
 export async function POST() {
   try {
     const session = await getServerSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const active = getActiveEntryForWorker(session.name);
+    const active = getActiveEntryForSessionUser(session);
     if (!active) return NextResponse.json({ error: "Нет активной сессии" }, { status: 400 });
     const entry = stopTimer(active.card_id);
     return NextResponse.json({ ok: true, entry });

@@ -141,6 +141,8 @@ npm run build
 
 Скопировать пример и поправить пути:
 
+Секреты и флаги (один раз): скопируйте `deploy/team-tracker.env.example` → `/etc/team-tracker.env`, выставьте `chmod 600`, подставьте `TEAM_TRACKER_AUTH_SECRET` и при необходимости `TEAM_TRACKER_USERS_JSON`. В примере уже включено **`TEAM_TRACKER_SELF_REGISTER=1`** (форма регистрации на `/login`). Unit-файл ниже подключает этот файл через `EnvironmentFile=-/etc/team-tracker.env`.
+
 ```bash
 cp /opt/team-tracker/deploy/team-tracker.vps.example.service /etc/systemd/system/team-tracker.service
 nano /etc/systemd/system/team-tracker.service

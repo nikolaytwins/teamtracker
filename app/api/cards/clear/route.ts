@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { deleteAllCards } from "@/lib/db";
+import { requireAgencyAccess } from "@/lib/require-role";
 
 /** Очистить канбан: удалить все карточки. В Agency проекты остаются. */
 export async function POST() {
   try {
+    const auth = await requireAgencyAccess();
+    if (!auth.ok) return auth.response;
     const deleted = deleteAllCards();
     return NextResponse.json({ success: true, deleted });
   } catch (e) {

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCard, listCards } from "@/lib/db";
+import { filterCardsForMemberRestrictedRole } from "@/lib/member-board-access";
+import { requireAgencyAccess, requireSessionRole } from "@/lib/require-role";
 import { isValidStatus, DEFAULT_STATUS, type PmStatusKey } from "@/lib/statuses";
 
 export async function GET() {
   try {
-    const cards = listCards();
+    const auth = await requireSessionRole();
+    if (!auth.ok) return auth.response;
+    const cards = filterCardsForMemberRestrictedRole(auth.role, listCards());
     return NextResponse.json(cards);
   } catch (e) {
     console.error("GET /api/cards", e);
@@ -14,6 +18,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAgencyAccess();
+    if (!auth.ok) return auth.response;
     const body = await request.json();
     const name = body.name;
     if (!name || typeof name !== "string") {

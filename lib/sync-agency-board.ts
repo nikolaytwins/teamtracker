@@ -1,5 +1,4 @@
-import Database from "better-sqlite3";
-import { getAgencySqlitePath } from "@/lib/agency-sqlite";
+import { getAgencyRepo } from "@/lib/agency-store";
 import { createCard, listCards, deleteAllCards } from "@/lib/db";
 import { DEFAULT_STATUS } from "@/lib/statuses";
 
@@ -16,16 +15,14 @@ export type SyncAgencyBoardResult = {
 };
 
 /**
- * Создаёт карточки канбана для проектов из agency.db, у которых ещё нет pm_cards с тем же source_project_id.
+ * Создаёт карточки канбана для проектов из источника агентства (SQLite или Supabase), у которых ещё нет pm_cards с тем же source_project_id.
  */
-export function syncMissingAgencyProjectsToBoard(options: SyncAgencyBoardOptions = {}): SyncAgencyBoardResult {
+export async function syncMissingAgencyProjectsToBoard(
+  options: SyncAgencyBoardOptions = {}
+): Promise<SyncAgencyBoardResult> {
   const { onlyMonth, clearFirst = false } = options;
 
-  const adb = new Database(getAgencySqlitePath());
-  const projects = adb
-    .prepare(`SELECT id, name, deadline, createdAt FROM AgencyProject ORDER BY createdAt DESC`)
-    .all() as { id: string; name: string; deadline: string | null; createdAt?: string }[];
-  adb.close();
+  const projects = await getAgencyRepo().listProjectsForSync();
 
   let toSync = projects;
   if (onlyMonth) {

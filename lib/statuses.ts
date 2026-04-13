@@ -16,6 +16,16 @@ export type PmStatusKey = (typeof PM_STATUSES)[number]["key"];
 
 export const DEFAULT_STATUS: PmStatusKey = "not_started";
 
+/** Статусы «ждём согласования клиента» — для таймера простоя и уведомлений. */
+export const APPROVAL_WAITING_STATUSES: PmStatusKey[] = [
+  "copy_approval",
+  "approval_first_screen",
+  "design_approval",
+  "layout_approval",
+];
+
+export const APPROVAL_WAITING_STATUS_SET = new Set<PmStatusKey>(APPROVAL_WAITING_STATUSES);
+
 /** Ключи «рабочих» этапов (в работе) для простого вида */
 export const WORK_STAGE_KEYS: PmStatusKey[] = [
   "copywriting",

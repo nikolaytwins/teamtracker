@@ -15,10 +15,10 @@ export async function GET(request: NextRequest) {
     if (!month || !/^\d{4}-\d{2}$/.test(month)) {
       return NextResponse.json({ error: "month=YYYY-MM required" }, { status: 400 });
     }
-    const name = session.name;
-    const breakdown = getWorkerMonthlyTaskBreakdown(name, month);
-    const buckets = getWorkerMonthlyBuckets(name, month);
-    const averages = getWorkerAverageSessionByTaskType(name, 1);
+    const worker = { sub: session.sub, name: session.name };
+    const breakdown = getWorkerMonthlyTaskBreakdown(worker, month);
+    const buckets = getWorkerMonthlyBuckets(worker, month);
+    const averages = getWorkerAverageSessionByTaskType(worker, 1);
     return NextResponse.json({
       month,
       totalHours: secondsToHours(breakdown.totalSeconds),

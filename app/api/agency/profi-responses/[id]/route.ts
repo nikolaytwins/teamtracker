@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import { getAgencySqlitePath } from "@/lib/agency-sqlite";
-import { deleteOutreachResponse, getOutreachById, patchOutreachResponse } from "@/lib/outreach-api";
-
-const dbPath = getAgencySqlitePath();
-
-function getDb() {
-  return new Database(dbPath);
-}
+import { getAgencyRepo } from "@/lib/agency-store";
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const db = getDb();
-    const row = getOutreachById(db, id, "profi");
-    db.close();
+    const row = await getAgencyRepo().getOutreachById(id, "profi");
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(row);
   } catch (error) {
@@ -29,9 +19,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const body = await request.json();
     const { status, refundAmount, projectAmount, notes } = body;
 
-    const db = getDb();
-    const row = patchOutreachResponse(db, id, "profi", { status, refundAmount, projectAmount, notes });
-    db.close();
+    const row = await getAgencyRepo().patchOutreachResponse(id, "profi", {
+      status,
+      refundAmount,
+      projectAmount,
+      notes,
+    });
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ success: true, item: row });
   } catch (error) {
@@ -43,9 +36,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
-    const db = getDb();
-    const ok = deleteOutreachResponse(db, id, "profi");
-    db.close();
+    const ok = await getAgencyRepo().deleteOutreachResponse(id, "profi");
     if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     if (!phase) return NextResponse.json({ error: "Не удалось создать этап" }, { status: 500 });
     const result = startTimer(cardId, phase.id, {
       workerName: session.name,
+      workerUserId: session.sub,
       taskType: taskType || null,
       taskNote: taskNoteRaw && taskType !== "custom" ? taskNoteRaw : null,
     });

@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { getCard } from "@/lib/db";
 import { getServerSession } from "@/lib/get-session";
-import { getActiveEntryForWorker } from "@/lib/pm-phases";
-import { labelForWorkPreset } from "@/lib/work-presets";
+import { getActiveEntryForSessionUser } from "@/lib/pm-phases";
+import { labelForTaskType } from "@/lib/time-task-types";
 
 export async function GET() {
   try {
     const session = await getServerSession();
     if (!session) return NextResponse.json({ active: null }, { status: 200 });
-    const active = getActiveEntryForWorker(session.name);
+    const active = getActiveEntryForSessionUser(session);
     if (!active) return NextResponse.json({ active: null });
     const card = getCard(active.card_id);
     return NextResponse.json({
@@ -19,7 +19,7 @@ export async function GET() {
         phaseId: active.phase_id,
         startedAt: active.started_at,
         taskType: active.task_type,
-        taskLabel: labelForWorkPreset(active.task_type),
+        taskLabel: labelForTaskType(active.task_type),
       },
     });
   } catch (e) {

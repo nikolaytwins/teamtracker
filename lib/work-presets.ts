@@ -41,6 +41,13 @@ export const ANALYTICS_BUCKETS = [
   },
   { id: "site_rev", label: "Сайт: правки", match: (k: string) => k === "site:revisions" },
   { id: "pres_all", label: "Презентация (все этапы)", match: (k: string) => k.startsWith("pres:") },
+  {
+    id: "unified_design",
+    label: "Проект: дизайн / вёрстка / правки",
+    match: (k: string) =>
+      k === "design_concept" || k === "design" || k === "layout" || k === "revisions",
+  },
+  { id: "sales_unified", label: "Продажи", match: (k: string) => k === "sales" || k.startsWith("sales:") },
   { id: "custom", label: "Своя задача", match: (k: string) => k.startsWith("custom:") },
 ] as const;
 

@@ -3,6 +3,7 @@
 import { apiUrl } from "@/lib/api-url";
 import { useCallback, useEffect, useState } from "react";
 import InlineSelect from "@/components/InlineSelect";
+import Link from "next/link";
 
 interface Lead {
   id: string;
@@ -11,6 +12,9 @@ interface Lead {
   taskDescription: string | null;
   status: string;
   isRecurring?: number | boolean;
+  linkedProjectId?: string | null;
+  linkedProjectName?: string | null;
+  linkedCardId?: string | null;
 }
 
 const STATUS_OPTIONS = [
@@ -149,6 +153,22 @@ export default function SalesLeadsPage() {
       if (res.ok) await fetchLeads();
     } catch (error) {
       console.error("Error deleting lead:", error);
+    }
+  };
+
+  const handleConvertToProject = async (leadId: string) => {
+    try {
+      const res = await fetch(apiUrl(`/api/agency/leads/${leadId}/convert`), {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Не удалось создать проект");
+        return;
+      }
+      await fetchLeads();
+    } catch {
+      alert("Не удалось создать проект");
     }
   };
 
@@ -321,6 +341,7 @@ export default function SalesLeadsPage() {
                   {columnLeads.map((lead) => (
                     <div
                       key={lead.id}
+                      id={`lead-${lead.id}`}
                       className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
                     >
                       <div className="text-sm font-semibold text-gray-900 mb-2 flex flex-wrap items-center gap-2">
@@ -346,6 +367,32 @@ export default function SalesLeadsPage() {
                         />
                         Постоянник
                       </label>
+                      {lead.linkedProjectId ? (
+                        <div className="mb-3 rounded-md border border-blue-100 bg-blue-50 p-2 text-xs">
+                          <div className="text-blue-900 font-medium mb-1">Связанный проект</div>
+                          <div className="flex flex-wrap gap-2">
+                            <Link
+                              href={`/agency/projects/${lead.linkedProjectId}`}
+                              className="text-blue-700 hover:underline"
+                            >
+                              Проект
+                            </Link>
+                            {lead.linkedCardId ? (
+                              <Link href={`/board/${lead.linkedCardId}`} className="text-blue-700 hover:underline">
+                                Карточка
+                              </Link>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleConvertToProject(lead.id)}
+                          className="mb-3 w-full rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                        >
+                          Создать проект из лида
+                        </button>
+                      )}
                       <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                         <InlineSelect
                           value={lead.status}

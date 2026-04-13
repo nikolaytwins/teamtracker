@@ -19,6 +19,7 @@ export async function GET() {
             name: row.display_name,
             title: row.job_title,
             avatarUrl: row.avatar_url,
+            role: row.role,
           }
         : {
             id: session.sub,
@@ -26,6 +27,7 @@ export async function GET() {
             name: session.name,
             title: session.title,
             avatarUrl: null as string | null,
+            role: session.role ?? "admin",
           },
     });
   } catch (e) {

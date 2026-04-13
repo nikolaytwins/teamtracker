@@ -1,5 +1,7 @@
 import { getDb } from "@/lib/db";
 import { ensurePhasesSchema } from "@/lib/pm-phases";
+import { listUsersPublic } from "@/lib/tt-auth-db";
+import { parseISOWeekParam } from "@/lib/iso-week";
 
 function ensureTimeSchema() {
   ensurePhasesSchema();
@@ -186,4 +188,80 @@ export function listDistinctWorkers() {
     )
     .all() as Array<{ w: string }>;
   return rows.map((r) => r.w);
+}
+
+export type TeamWeekLoadRow = {
+  userId: string;
+  displayName: string;
+  role: string;
+  weeklyCapacityHours: number;
+  weekSeconds: number;
+  previousWeekSeconds: number;
+};
+
+export function getTeamWeekLoad(isoWeek: string): {
+  week: string;
+  mondayIso: string;
+  nextMondayIso: string;
+  rows: TeamWeekLoadRow[];
+} {
+  ensureTimeSchema();
+  const parsed = parseISOWeekParam(isoWeek);
+  if (!parsed) {
+    throw new Error("invalid week");
+  }
+  const db = getDb();
+  const users = listUsersPublic();
+
+  const mondayIso = parsed.monday.toISOString();
+  const nextMondayIso = parsed.nextMonday.toISOString();
+  const prevMonday = new Date(parsed.monday);
+  prevMonday.setDate(prevMonday.getDate() - 7);
+  const prevNextMonday = new Date(parsed.monday);
+  const prevMondayIso = prevMonday.toISOString();
+  const prevNextMondayIso = prevNextMonday.toISOString();
+
+  const currentRows = db
+    .prepare(
+      `SELECT worker_user_id as uid, SUM(duration_seconds) as s
+       FROM pm_time_entries
+       WHERE worker_user_id IS NOT NULL
+         AND TRIM(worker_user_id) != ''
+         AND ended_at IS NOT NULL
+         AND duration_seconds IS NOT NULL
+         AND started_at >= ?
+         AND started_at < ?
+       GROUP BY worker_user_id`
+    )
+    .all(mondayIso, nextMondayIso) as Array<{ uid: string; s: number }>;
+
+  const previousRows = db
+    .prepare(
+      `SELECT worker_user_id as uid, SUM(duration_seconds) as s
+       FROM pm_time_entries
+       WHERE worker_user_id IS NOT NULL
+         AND TRIM(worker_user_id) != ''
+         AND ended_at IS NOT NULL
+         AND duration_seconds IS NOT NULL
+         AND started_at >= ?
+         AND started_at < ?
+       GROUP BY worker_user_id`
+    )
+    .all(prevMondayIso, prevNextMondayIso) as Array<{ uid: string; s: number }>;
+
+  const currentByUser = new Map<string, number>(currentRows.map((r) => [r.uid, Number(r.s) || 0]));
+  const previousByUser = new Map<string, number>(previousRows.map((r) => [r.uid, Number(r.s) || 0]));
+
+  const rows = users
+    .map((u) => ({
+      userId: u.id,
+      displayName: u.display_name,
+      role: u.role,
+      weeklyCapacityHours: u.weekly_capacity_hours,
+      weekSeconds: currentByUser.get(u.id) ?? 0,
+      previousWeekSeconds: previousByUser.get(u.id) ?? 0,
+    }))
+    .sort((a, b) => b.weekSeconds - a.weekSeconds || a.displayName.localeCompare(b.displayName, "ru"));
+
+  return { week: parsed.week, mondayIso, nextMondayIso, rows };
 }

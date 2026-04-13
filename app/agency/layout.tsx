@@ -1,6 +1,6 @@
 'use client'
 
-import Navigation from '@/components/Navigation'
+import AppShell from '@/components/AppShell'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -17,9 +17,8 @@ export default function AgencyLayout({
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navigation />
-      <div className="bg-gray-50 border-b border-gray-200">
+    <AppShell>
+      <div className="bg-[var(--bg)] border-b border-[var(--border)] rounded-xl">
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
             {tabs.map((tab) => (
@@ -30,8 +29,8 @@ export default function AgencyLayout({
                   pathname === tab.href ||
                   (tab.href === '/agency' && pathname?.startsWith('/agency/projects')) ||
                   (tab.href === '/agency/statistics' && pathname?.startsWith('/agency/statistics'))
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border)]'
                 }`}
               >
                 {tab.label}
@@ -43,6 +42,6 @@ export default function AgencyLayout({
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </div>
-    </div>
+    </AppShell>
   )
 }

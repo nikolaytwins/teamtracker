@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isSupabasePasswordLoginConfigured } from "@/lib/auth-supabase-config";
 import { sessionCookieSecure } from "@/lib/session-cookie";
-import { syncUsersFromEnv, getUserByLogin, verifyPassword } from "@/lib/tt-auth-db";
 import { signSession, getAuthSecret } from "@/lib/session-token";
+import { signInWithSupabaseEmailPassword } from "@/lib/supabase-password-auth";
+import {
+  syncUsersFromEnv,
+  getUserByLogin,
+  verifyPassword,
+  getAuthEmailForUser,
+  linkTtUserToSupabaseAuthId,
+} from "@/lib/tt-auth-db";
 
 const COOKIE = "tt_session";
 const MAX_AGE = 60 * 60 * 24 * 14;
@@ -26,7 +34,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Логин и пароль обязательны" }, { status: 400 });
     }
     const user = getUserByLogin(login);
-    if (!user || !verifyPassword(password, user)) {
+    if (!user) {
+      return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
+    }
+
+    const emailForSupabase = getAuthEmailForUser(user);
+    /** Учётки member после саморегистрации ходят только по локальному паролю (без пользователя в Supabase Auth). */
+    const useSupabase =
+      isSupabasePasswordLoginConfigured() &&
+      emailForSupabase != null &&
+      user.role !== "member";
+
+    if (useSupabase) {
+      const supa = await signInWithSupabaseEmailPassword(emailForSupabase, password);
+      if (!supa.ok) {
+        return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
+      }
+      const linked = linkTtUserToSupabaseAuthId(user.id, supa.supabaseUserId);
+      if (!linked.ok) {
+        console.error("POST /api/auth/login Supabase link", linked.error);
+        return NextResponse.json({ error: "Внутренняя ошибка входа" }, { status: 500 });
+      }
+    } else if (!verifyPassword(password, user)) {
       return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
     }
     const exp = Math.floor(Date.now() / 1000) + MAX_AGE;
@@ -36,6 +65,7 @@ export async function POST(request: NextRequest) {
         login: user.login,
         name: user.display_name,
         title: user.job_title,
+        role: user.role,
         exp,
       },
       secret
@@ -48,6 +78,7 @@ export async function POST(request: NextRequest) {
         name: user.display_name,
         title: user.job_title,
         avatarUrl: user.avatar_url,
+        role: user.role,
       },
     });
     const secure = sessionCookieSecure(request);
