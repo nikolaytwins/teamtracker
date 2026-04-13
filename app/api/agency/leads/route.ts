@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAgencyRepo } from "@/lib/agency-store";
 import { getCardBySourceProjectId } from "@/lib/db";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const repo = getAgencyRepo();
     if (!(await repo.agencyLeadsTableExists())) {
       return NextResponse.json([]);
     }
 
-    const leads = await repo.listLeadsOrdered();
+    const includeArchived = request.nextUrl.searchParams.get("includeArchived") === "1";
+    const leads = await repo.listLeadsOrdered({ includeArchived });
     const projectRows = await repo.listProjectsWithSourceLead();
     const projectByLeadId = new Map(projectRows.map((r) => [r.source_lead_id, r]));
     const enriched = (Array.isArray(leads) ? leads : []).map((lead) => {

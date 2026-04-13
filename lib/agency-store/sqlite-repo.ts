@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import {
+  ensureAgencyLeadsArchived,
   ensureAgencyLeadsColumns,
   ensureAgencyProjectsColumns,
   ensureLeadHistoryTable,
@@ -254,13 +255,16 @@ export class SqliteAgencyRepo implements AgencyRepo {
     }
   }
 
-  async listLeadsOrdered(): Promise<Record<string, unknown>[]> {
+  async listLeadsOrdered(opts?: { includeArchived?: boolean }): Promise<Record<string, unknown>[]> {
     const db = openSqlite();
     try {
+      ensureAgencyLeadsArchived(db);
+      const where = opts?.includeArchived ? "" : " WHERE COALESCE(archived, 0) = 0 ";
       return db
         .prepare(
           `
       SELECT * FROM agency_leads
+      ${where}
       ORDER BY
         CASE status
           WHEN 'new' THEN 1
@@ -269,6 +273,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
           WHEN 'thinking' THEN 4
           WHEN 'paid' THEN 5
           WHEN 'pause' THEN 6
+          WHEN 'lost' THEN 7
         END,
         createdAt DESC
     `
@@ -304,6 +309,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
     const db = openSqlite();
     try {
       ensureAgencyLeadsColumns(db);
+      ensureAgencyLeadsArchived(db);
       ensureAgencyProjectsColumns(db);
       ensureLeadHistoryTable(db);
       const autoDate = calculateNextContactDateForLead(status);
@@ -311,8 +317,8 @@ export class SqliteAgencyRepo implements AgencyRepo {
       const id = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       db.prepare(
         `
-      INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, isRecurring, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, isRecurring, archived, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
     `
       ).run(id, contact, source, taskDescription, status, nextContactDate, 0, recurring);
       const historyId = `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -332,6 +338,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
     const db = openSqlite();
     try {
       ensureAgencyLeadsColumns(db);
+      ensureAgencyLeadsArchived(db);
       return db.prepare("SELECT * FROM agency_leads WHERE id = ?").get(id) as
         | Record<string, unknown>
         | undefined;
@@ -359,10 +366,12 @@ export class SqliteAgencyRepo implements AgencyRepo {
     const status = body.status as string | undefined;
     const nextContactDate = body.nextContactDate;
     const isRecurring = body.isRecurring;
+    const archivedBody = body.archived;
 
     const db = openSqlite();
     try {
       ensureAgencyLeadsColumns(db);
+      ensureAgencyLeadsArchived(db);
       ensureAgencyProjectsColumns(db);
       ensureLeadHistoryTable(db);
       const currentLead = db.prepare("SELECT * FROM agency_leads WHERE id = ?").get(id) as any;
@@ -391,6 +400,9 @@ export class SqliteAgencyRepo implements AgencyRepo {
             ? 1
             : 0;
 
+      const archivedVal =
+        archivedBody !== undefined ? (Boolean(archivedBody) ? 1 : 0) : currentLead.archived ? 1 : 0;
+
       db.prepare(
         `
       UPDATE agency_leads
@@ -401,6 +413,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
           nextContactDate = ?,
           manualDateSet = ?,
           isRecurring = ?,
+          archived = ?,
           updatedAt = datetime('now')
       WHERE id = ?
     `
@@ -412,6 +425,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         finalNextContactDate,
         finalManualDateSet,
         recurringVal,
+        archivedVal,
         id
       );
 
@@ -1331,10 +1345,11 @@ export class SqliteAgencyRepo implements AgencyRepo {
     const db = openSqlite();
     try {
       ensureAgencyLeadsColumns(db);
+      ensureAgencyLeadsArchived(db);
       db.prepare(
         `
-      INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, isRecurring, archived, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
     `
       ).run(
         input.leadId,

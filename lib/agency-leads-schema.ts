@@ -30,6 +30,27 @@ export function ensureAgencyLeadsColumns(db: Database.Database) {
   }
 }
 
+/** Архив канбана: скрытые с доски лиды (list по умолчанию без них). */
+export function ensureAgencyLeadsArchived(db: Database.Database) {
+  try {
+    db.exec(`ALTER TABLE agency_leads ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    /* column exists */
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _tt_migrations (
+      id TEXT PRIMARY KEY NOT NULL
+    );
+  `);
+  const done = db.prepare(`SELECT 1 AS o FROM _tt_migrations WHERE id = ?`).get("leads_archive_legacy_v1") as
+    | { o: number }
+    | undefined;
+  if (!done) {
+    db.prepare(`UPDATE agency_leads SET archived = 1`).run();
+    db.prepare(`INSERT INTO _tt_migrations (id) VALUES (?)`).run("leads_archive_legacy_v1");
+  }
+}
+
 /** Привязка проекта к лиду (idempotent): один лид -> максимум один проект. */
 export function ensureAgencyProjectsColumns(db: Database.Database) {
   try {

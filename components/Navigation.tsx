@@ -100,6 +100,59 @@ function formatNtfText(n: NtfItem): string {
   return n.type;
 }
 
+function UserAccountOverflowMenu({
+  onLogout,
+  collapsed,
+}: {
+  onLogout: () => void | Promise<void>;
+  collapsed: boolean;
+}) {
+  return (
+    <div className={`group/user-menu relative shrink-0 ${collapsed ? "flex justify-center" : ""}`}>
+      <button
+        type="button"
+        className="rounded-xl p-2 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+        aria-label="Меню аккаунта"
+        aria-haspopup="menu"
+      >
+        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <circle cx="12" cy="5" r="1.75" />
+          <circle cx="12" cy="12" r="1.75" />
+          <circle cx="12" cy="19" r="1.75" />
+        </svg>
+      </button>
+      <div
+        className={`pointer-events-none absolute bottom-full z-[85] flex opacity-0 invisible transition-opacity duration-150 group-hover/user-menu:pointer-events-auto group-hover/user-menu:visible group-hover/user-menu:opacity-100 group-focus-within/user-menu:pointer-events-auto group-focus-within/user-menu:visible group-focus-within/user-menu:opacity-100 ${
+          collapsed ? "left-1/2 w-max -translate-x-1/2 pb-1.5" : "right-0 pb-1.5"
+        }`}
+      >
+        <div
+          role="menu"
+          aria-label="Аккаунт"
+          className="min-w-[9.5rem] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--shadow-elevated)]"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]"
+            onClick={() => void onLogout()}
+          >
+            <svg className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            Выйти
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function linkClass(active: boolean, collapsed?: boolean) {
   const c = Boolean(collapsed);
   return `group flex w-full items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-all duration-200 ${
@@ -473,25 +526,11 @@ export default function Navigation() {
                         me.name.charAt(0).toUpperCase()
                       )}
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => void logout()}
-                      className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-2.5 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)]"
-                      title="Выйти"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                        />
-                      </svg>
-                    </button>
+                    <UserAccountOverflowMenu onLogout={logout} collapsed />
                   </div>
                 ) : (
                   <>
-                    <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="mb-0 flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)]">
                           {me.avatarUrl ? (
@@ -505,34 +544,30 @@ export default function Navigation() {
                           <div className="truncate text-xs text-[var(--muted-foreground)]">{me.title}</div>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setNtfOpen((o) => !o)}
-                        className="relative shrink-0 rounded-xl p-2 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface-2)]"
-                        aria-label="Уведомления"
-                      >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                          />
-                        </svg>
-                        {ntfUnread > 0 ? (
-                          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--danger)] px-0.5 text-[10px] font-bold text-white">
-                            {ntfUnread > 9 ? "9+" : ntfUnread}
-                          </span>
-                        ) : null}
-                      </button>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setNtfOpen((o) => !o)}
+                          className="relative rounded-xl p-2 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface-2)]"
+                          aria-label="Уведомления"
+                        >
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                            />
+                          </svg>
+                          {ntfUnread > 0 ? (
+                            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--danger)] px-0.5 text-[10px] font-bold text-white">
+                              {ntfUnread > 9 ? "9+" : ntfUnread}
+                            </span>
+                          ) : null}
+                        </button>
+                        <UserAccountOverflowMenu onLogout={logout} collapsed={false} />
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void logout()}
-                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-left text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)]"
-                    >
-                      Выйти
-                    </button>
                   </>
                 )}
                 {ntfOpen ? (

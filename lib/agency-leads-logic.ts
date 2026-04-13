@@ -19,6 +19,7 @@ export function calculateNextContactDateForLead(status: string): Date | null {
     }
     case "paid":
     case "pause":
+    case "lost":
       return null;
     default:
       return null;

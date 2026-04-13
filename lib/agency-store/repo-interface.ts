@@ -48,7 +48,7 @@ export interface AgencyRepo {
   >;
 
   agencyLeadsTableExists(): Promise<boolean>;
-  listLeadsOrdered(): Promise<Record<string, unknown>[]>;
+  listLeadsOrdered(opts?: { includeArchived?: boolean }): Promise<Record<string, unknown>[]>;
   listProjectsWithSourceLead(): Promise<Array<{ id: string; name: string; source_lead_id: string }>>;
   /** POST /api/agency/leads — contact, source, taskDescription, status, isRecurring */
   createLeadFromPost(body: Record<string, unknown>): Promise<Record<string, unknown>>;

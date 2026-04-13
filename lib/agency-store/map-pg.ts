@@ -29,6 +29,7 @@ export function mapLeadRow(r: Record<string, unknown>): Record<string, unknown> 
     nextContactDate: r.next_contact_date,
     manualDateSet: r.manual_date_set ? 1 : 0,
     isRecurring: r.is_recurring ? 1 : 0,
+    archived: r.archived === true || r.archived === 1 ? 1 : 0,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

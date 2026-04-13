@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { ensureAgencyLeadsColumns } from "@/lib/agency-leads-schema";
+import { ensureAgencyLeadsArchived, ensureAgencyLeadsColumns } from "@/lib/agency-leads-schema";
 import {
   computeOutreachStats,
   computeOutreachStatsByMonth,
@@ -95,9 +95,10 @@ export function insertOutreachResponse(
       const leadId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
       ensureAgencyLeadsMinimal(db);
       ensureAgencyLeadsColumns(db);
+      ensureAgencyLeadsArchived(db);
       db.prepare(
-        `INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, 'new', ?, 1, datetime('now'), datetime('now'))`
+        `INSERT INTO agency_leads (id, contact, source, taskDescription, status, nextContactDate, manualDateSet, isRecurring, archived, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, 'new', ?, 1, 0, 0, datetime('now'), datetime('now'))`
       ).run(leadId, contact, source, taskDescription, nextContactDateIso);
     } catch {
       /* ignore */

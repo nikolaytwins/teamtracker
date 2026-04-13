@@ -196,8 +196,12 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     return !error;
   }
 
-  async listLeadsOrdered(): Promise<Record<string, unknown>[]> {
-    const { data, error } = await this.sb.from("agency_leads").select("*");
+  async listLeadsOrdered(opts?: { includeArchived?: boolean }): Promise<Record<string, unknown>[]> {
+    let q = this.sb.from("agency_leads").select("*");
+    if (!opts?.includeArchived) {
+      q = q.or("archived.is.null,archived.eq.false");
+    }
+    const { data, error } = await q;
     if (error) throw error;
     const order: Record<string, number> = {
       new: 1,
@@ -206,6 +210,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       thinking: 4,
       paid: 5,
       pause: 6,
+      lost: 7,
     };
     const rows = (data ?? []).map((r) => mapLeadRow(r as Record<string, unknown>));
     rows.sort((a, b) => {
@@ -251,6 +256,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       next_contact_date: nextContactDate,
       manual_date_set: false,
       is_recurring: recurring,
+      archived: false,
       created_at: now,
       updated_at: now,
     });
@@ -295,6 +301,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     const status = body.status as string | undefined;
     const nextContactDate = body.nextContactDate;
     const isRecurring = body.isRecurring;
+    const archivedBody = body.archived;
 
     const currentLead = await this.getLeadById(id);
     if (!currentLead) return undefined;
@@ -316,6 +323,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     const recurringVal =
       isRecurring !== undefined ? Boolean(isRecurring) : Boolean(Number(currentLead.isRecurring));
 
+    const archivedVal =
+      archivedBody !== undefined ? Boolean(archivedBody) : Boolean(Number(currentLead.archived));
+
     const { error: e1 } = await this.sb
       .from("agency_leads")
       .update({
@@ -326,6 +336,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         next_contact_date: finalNext,
         manual_date_set: finalManual,
         is_recurring: recurringVal,
+        archived: archivedVal,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -1135,6 +1146,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
           next_contact_date: nextContactDateIso,
           manual_date_set: true,
           is_recurring: false,
+          archived: false,
           created_at: now,
           updated_at: now,
         });
@@ -1234,6 +1246,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       next_contact_date: input.nextContactDateIso,
       manual_date_set: Boolean(input.manualDateSet),
       is_recurring: false,
+      archived: false,
       created_at: now,
       updated_at: now,
     });
