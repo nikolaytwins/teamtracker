@@ -158,7 +158,11 @@ export interface AgencyRepo {
     sources: Array<{ source: string; count: number }>;
   }>;
 
-  outreachListJson(platform: OutreachPlatform, withStats: boolean): Promise<unknown>;
+  outreachListJson(
+    platform: OutreachPlatform,
+    withStats: boolean,
+    opts?: { omitItems?: boolean }
+  ): Promise<unknown>;
   insertOutreachResponse(
     platform: OutreachPlatform,
     params: { cost: number; notes: string | null }

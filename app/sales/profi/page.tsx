@@ -1,5 +1,6 @@
 'use client'
-import { apiUrl } from '@/lib/api-url'
+import { apiUrl, appPath } from '@/lib/api-url'
+import Link from 'next/link'
 
 import { useEffect, useState } from 'react'
 import { formatDate } from '@/lib/utils'
@@ -16,35 +17,6 @@ interface ProfiItem {
   updatedAt: string
 }
 
-interface ProfiStats {
-  totalPaid: number
-  totalRefunded: number
-  netSpent: number
-  totalResponses: number
-  countResponse: number
-  countConversation: number
-  countProposal: number
-  countPaid: number
-  countRefunded: number
-  countDrain: number
-  totalProjectAmount: number
-  roi: number
-  responseToPaidRate: number
-  costPerPayingClient: number | null
-  avgCheckPaying: number | null
-  funnel: {
-    responses: number
-    viewedResponses: number
-    toConversation: number
-    toProposal: number
-    toPaid: number
-    convRate: number
-    proposalRate: number
-    paidRate: number
-  }
-}
-
-// Порядок: отклик → просмотрено → переписка → КП → оплачено; выходы: возврат, слив
 const STATUS_OPTIONS = [
   { value: 'response', label: 'Отклик' },
   { value: 'viewed', label: 'Просмотрено' },
@@ -57,8 +29,6 @@ const STATUS_OPTIONS = [
 
 export default function ProfiPage() {
   const [items, setItems] = useState<ProfiItem[]>([])
-  const [stats, setStats] = useState<ProfiStats | null>(null)
-  const [byMonth, setByMonth] = useState<Record<string, ProfiStats>>({})
   const [loading, setLoading] = useState(true)
   const [quickCost, setQuickCost] = useState('')
   const [quickNotes, setQuickNotes] = useState('')
@@ -66,19 +36,12 @@ export default function ProfiPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editProjectAmount, setEditProjectAmount] = useState('')
   const [editRefundAmount, setEditRefundAmount] = useState('')
-  const fetchData = async () => {
+
+  const fetchItems = async () => {
     try {
-      const res = await fetch(apiUrl('/api/agency/profi-responses?stats=1'))
+      const res = await fetch(apiUrl('/api/agency/profi-responses'))
       const data = await res.json()
-      if (data.items !== undefined) {
-        setItems(data.items)
-        setStats(data.stats ?? null)
-        setByMonth(data.byMonth ?? {})
-      } else if (Array.isArray(data)) {
-        setItems(data)
-        setStats(null)
-        setByMonth({})
-      }
+      setItems(Array.isArray(data) ? data : [])
     } catch (e) {
       console.error(e)
     } finally {
@@ -87,13 +50,7 @@ export default function ProfiPage() {
   }
 
   useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      if (!cancelled) await fetchData()
-    })()
-    return () => {
-      cancelled = true
-    }
+    void fetchItems()
   }, [])
 
   const handleQuickAdd = async (e: React.FormEvent) => {
@@ -112,7 +69,7 @@ export default function ProfiPage() {
         setItems(prev => [json.item, ...prev])
         setQuickCost('')
         setQuickNotes('')
-        fetchData()
+        void fetchItems()
       }
     } catch (e) {
       console.error(e)
@@ -135,7 +92,7 @@ export default function ProfiPage() {
       const json = await res.json()
       if (json.success && json.item) {
         setItems(prev => prev.map(r => r.id === id ? json.item : r))
-        fetchData()
+        void fetchItems()
       }
     } catch (e) {
       console.error(e)
@@ -168,7 +125,7 @@ export default function ProfiPage() {
       const data = await res.json()
       if (data.success) {
         setItems(prev => prev.filter(r => r.id !== id))
-        fetchData()
+        void fetchItems()
       } else {
         alert(data.error || 'Ошибка удаления')
       }
@@ -186,240 +143,20 @@ export default function ProfiPage() {
 
   return (
     <div className="space-y-6">
-      <div className="mb-2">
-        <h1 className="text-2xl font-bold text-[var(--text)]">Profi.ru — экономика откликов</h1>
-        <p className="text-sm text-[var(--muted-foreground)] mt-1">Раздел «Продажи» — отклики и воронка без напоминаний.</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text)]">Profi.ru</h1>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
+            Быстрый ввод и список откликов. Экономика и воронка — в{' '}
+            <Link href={appPath('/sales/analytics#profi')} className="font-semibold text-[var(--primary)] hover:underline">
+              аналитике
+            </Link>
+            .
+          </p>
+        </div>
       </div>
 
-      {/* Экономика и конверсии (инфографика) */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4">
-            <h2 className="text-lg font-semibold text-[var(--text)] mb-3">Экономика</h2>
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-[var(--muted-foreground)]">Заплатил за отклики</span>
-                <span className="font-medium">{stats.totalPaid.toLocaleString('ru-RU')} ₽</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--muted-foreground)]">Возвраты</span>
-                <span className="font-medium text-emerald-600 dark:text-emerald-400">−{stats.totalRefunded.toLocaleString('ru-RU')} ₽</span>
-              </div>
-              {stats.countDrain > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted-foreground)]">Сливов (отказ)</span>
-                  <span className="font-medium text-[var(--muted-foreground)]">{stats.countDrain}</span>
-                </div>
-              )}
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-[var(--text)] font-medium">Чистые расходы</span>
-                <span className="font-semibold">{stats.netSpent.toLocaleString('ru-RU')} ₽</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--muted-foreground)]">Сумма проектов</span>
-                <span className="font-medium text-[var(--primary)]">{stats.totalProjectAmount.toLocaleString('ru-RU')} ₽</span>
-              </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-[var(--text)] font-medium">ROI</span>
-                <span className={`font-semibold ${stats.roi >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {stats.roi >= 0 ? '+' : ''}{stats.roi.toFixed(0)}%
-                </span>
-              </div>
-            </dl>
-            <p className="mt-3 text-xs text-[var(--muted-foreground)]">
-              {stats.totalProjectAmount >= stats.netSpent
-                ? 'Окупается: выручка по проектам больше расходов на отклики.'
-                : 'Пока не окупается: расходы на отклики больше выручки по проектам.'}
-            </p>
-          </div>
-
-          {/* Конверсии — логика: % от отклика в переписку → % от переписки в КП → % от КП в оплату */}
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4">
-            <h2 className="text-lg font-semibold text-[var(--text)] mb-4">Конверсии</h2>
-            <div className="space-y-0">
-              {/* 1. Количество откликов */}
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-sm font-bold">
-                  {stats.funnel.responses}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-[var(--text)]">Откликов</div>
-                  <div className="h-2.5 rounded-full bg-[var(--surface-2)] overflow-hidden mt-0.5">
-                    <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: '100%' }} />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-center py-0.5">
-                <span className="text-[var(--muted-foreground)] text-lg">↓</span>
-              </div>
-              {/* 2. Просмотренные отклики (без возврата) */}
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--primary)]/75 text-white flex items-center justify-center text-sm font-bold">
-                  {stats.funnel.viewedResponses}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-[var(--text)] flex justify-between">
-                    <span>Просмотренные отклики</span>
-                    <span className="text-[var(--primary)] font-semibold tabular-nums">
-                      {stats.funnel.responses > 0
-                        ? `${Math.round((stats.funnel.viewedResponses / stats.funnel.responses) * 1000) / 10}% от отклика`
-                        : '—'}
-                    </span>
-                  </div>
-                  <div className="h-2.5 rounded-full bg-[var(--surface-2)] overflow-hidden mt-0.5">
-                    <div
-                      className="h-full rounded-full bg-[var(--primary)]/75 transition-all"
-                      style={{ width: `${stats.funnel.responses > 0 ? Math.max((stats.funnel.viewedResponses / stats.funnel.responses) * 100, 2) : 2}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-center py-0.5">
-                <span className="text-[var(--muted-foreground)] text-lg">↓</span>
-              </div>
-              {/* 3. Переписка — % от отклика */}
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--primary)]/60 text-white flex items-center justify-center text-sm font-bold">
-                  {stats.funnel.toConversation}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-[var(--text)] flex justify-between">
-                    <span>Переписка</span>
-                    <span className="text-[var(--primary)] font-semibold tabular-nums">{stats.funnel.convRate}% от отклика</span>
-                  </div>
-                  <div className="h-2.5 rounded-full bg-[var(--surface-2)] overflow-hidden mt-0.5">
-                    <div
-                      className="h-full rounded-full bg-[var(--primary)]/60 transition-all"
-                      style={{ width: `${Math.max(stats.funnel.convRate, 2)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-center py-0.5">
-                <span className="text-[var(--muted-foreground)] text-lg">↓</span>
-              </div>
-              {/* 4. КП — % от переписки */}
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--primary)]/80 text-[var(--primary-foreground)] text-sm font-bold">
-                  {stats.funnel.toProposal}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-sm font-medium text-[var(--text)]">
-                    <span>КП</span>
-                    <span className="font-semibold tabular-nums text-[var(--primary)]">{stats.funnel.proposalRate}% от переписки</span>
-                  </div>
-                  <div className="mt-0.5 h-2.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
-                    <div
-                      className="h-full rounded-full bg-[var(--primary)]/80 transition-all"
-                      style={{ width: `${Math.max(stats.funnel.convRate * (stats.funnel.proposalRate / 100), 2)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-center py-0.5">
-                <span className="text-[var(--muted-foreground)] text-lg">↓</span>
-              </div>
-              {/* 5. Оплачено — % от КП */}
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--success)] text-sm font-bold text-white">
-                  {stats.funnel.toPaid}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-sm font-medium text-[var(--text)]">
-                    <span>Оплачено</span>
-                    <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{stats.funnel.paidRate}% от КП</span>
-                  </div>
-                  <div className="mt-0.5 h-2.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
-                    <div
-                      className="h-full rounded-full bg-[var(--success)] transition-all"
-                      style={{ width: `${Math.max(stats.responseToPaidRate, 2)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Итого от отклика в оплату + цена и чек платящего */}
-            <div className="mt-4 pt-3 border-t border-[var(--border)] space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--muted-foreground)]">Итого от отклика в оплату</span>
-                <span className="font-semibold text-[var(--primary)] tabular-nums">{stats.responseToPaidRate}%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--muted-foreground)]">Цена платящего клиента</span>
-                <span className="font-medium tabular-nums text-[var(--text)]">
-                  {stats.costPerPayingClient != null
-                    ? `${Math.round(stats.costPerPayingClient).toLocaleString('ru-RU')} ₽`
-                    : '—'}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--muted-foreground)]">Средний чек платящего</span>
-                <span className="font-medium tabular-nums text-[var(--text)]">
-                  {stats.avgCheckPaying != null
-                    ? `${Math.round(stats.avgCheckPaying).toLocaleString('ru-RU')} ₽`
-                    : '—'}
-                </span>
-              </div>
-            </div>
-            {(stats.countDrain > 0 || stats.countRefunded > 0) && (
-              <div className="mt-3 pt-3 border-t border-[var(--border)] flex flex-wrap gap-2">
-                {stats.countRefunded > 0 && (
-                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
-                    Возврат: {stats.countRefunded}
-                  </span>
-                )}
-                {stats.countDrain > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--surface-2)] text-[var(--text)]">
-                    Слив: {stats.countDrain}
-                  </span>
-                )}
-              </div>
-            )}
-            <p className="mt-3 text-xs text-[var(--muted-foreground)]">
-              Узкое место — шаг с самым низким %.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {Object.keys(byMonth).length > 0 && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 overflow-x-auto">
-          <h2 className="text-lg font-semibold text-[var(--text)] mb-3">По месяцам (по дате отклика)</h2>
-          <table className="w-full text-sm min-w-[920px]">
-            <thead>
-              <tr className="text-left text-[var(--muted-foreground)] border-b border-[var(--border)]">
-                <th className="py-2 pr-3 font-medium">Месяц</th>
-                <th className="py-2 pr-3 font-medium">Отклики</th>
-                <th className="py-2 pr-3 font-medium">Просмотров откликов</th>
-                <th className="py-2 pr-3 font-medium">Переписок</th>
-                <th className="py-2 pr-3 font-medium">КП</th>
-                <th className="py-2 pr-3 font-medium">Оплачено</th>
-                <th className="py-2 pr-3 font-medium">Чистые расходы, ₽</th>
-                <th className="py-2 pr-3 font-medium">Доходы, ₽</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(byMonth)
-                .sort(([a], [b]) => b.localeCompare(a))
-                .map(([ym, m]) => (
-                  <tr key={ym} className="border-b border-[var(--border)]">
-                    <td className="py-2 pr-3 font-medium text-[var(--text)]">{ym}</td>
-                    <td className="py-2 pr-3 tabular-nums">{m.funnel.responses}</td>
-                    <td className="py-2 pr-3 tabular-nums">{m.funnel.viewedResponses}</td>
-                    <td className="py-2 pr-3 tabular-nums">{m.funnel.toConversation}</td>
-                    <td className="py-2 pr-3 tabular-nums">{m.funnel.toProposal}</td>
-                    <td className="py-2 pr-3 tabular-nums">{m.countPaid}</td>
-                    <td className="py-2 pr-3 tabular-nums">{Math.round(m.netSpent).toLocaleString('ru-RU')}</td>
-                    <td className="py-2 pr-3 tabular-nums text-[var(--primary)]">{Math.round(m.totalProjectAmount).toLocaleString('ru-RU')}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Добавить отклик — под экономикой */}
-      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
         <h2 className="text-lg font-semibold text-[var(--text)] mb-3">Добавить отклик</h2>
         <form onSubmit={handleQuickAdd} className="flex flex-wrap items-end gap-3">
           <div>
@@ -453,7 +190,6 @@ export default function ProfiPage() {
         </form>
       </div>
 
-      {/* Список откликов */}
       <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
         <h2 className="text-lg font-semibold text-[var(--text)] p-4 border-b border-[var(--border)]">Отклики</h2>
         <div className="overflow-x-auto">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
 import { assertMemberCardAccess } from "@/lib/member-board-access";
+import { extendCardPhasesPayload } from "@/lib/extend-card-phases-payload";
 import { buildCardPhasesPayload, startTimer, stopTimer } from "@/lib/pm-phases";
 import { requireSessionRole } from "@/lib/require-role";
 
@@ -17,10 +18,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     const action = body?.action as string;
     if (action === "stop") {
       const entry = stopTimer(id);
+      const base = buildCardPhasesPayload(id);
+      const payload = await extendCardPhasesPayload(id, base);
       return NextResponse.json({
         success: true,
         entry,
-        payload: buildCardPhasesPayload(id),
+        payload,
       });
     }
     if (action === "start") {
@@ -42,10 +45,12 @@ export async function POST(request: NextRequest, { params }: Params) {
         wn.toLowerCase() === sn.toLowerCase() ? session.sub : (typeof body.workerUserId === "string" ? body.workerUserId.trim() : "");
       const result = startTimer(id, phaseId, { workerName, workerUserId, taskType, taskNote });
       if (!result) return NextResponse.json({ error: "Invalid card or phase" }, { status: 400 });
+      const base = buildCardPhasesPayload(id);
+      const payload = await extendCardPhasesPayload(id, base);
       return NextResponse.json({
         success: true,
         ...result,
-        payload: buildCardPhasesPayload(id),
+        payload,
       });
     }
     return NextResponse.json({ error: "action must be start or stop" }, { status: 400 });

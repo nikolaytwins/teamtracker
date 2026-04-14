@@ -1,14 +1,25 @@
 import type Database from "better-sqlite3";
 import { ensureAgencyLeadsReady } from "@/lib/agency-leads-schema";
 import {
+  computeOutreachByMonthWithWeeks,
   computeOutreachStats,
-  computeOutreachStatsByMonth,
   ensureOutreachTable,
   type OutreachPlatform,
 } from "@/lib/outreach";
 import { getVisitAggregates } from "@/lib/platform-visits";
 
-export function getOutreachListJson(db: Database.Database, platform: OutreachPlatform, withStats: boolean) {
+export type OutreachListJsonOptions = {
+  /** Не отдавать массив items (легче для страницы только-аналитики). */
+  omitItems?: boolean;
+};
+
+export function getOutreachListJson(
+  db: Database.Database,
+  platform: OutreachPlatform,
+  withStats: boolean,
+  opts?: OutreachListJsonOptions
+) {
+  const omitItems = Boolean(opts?.omitItems);
   ensureOutreachTable(db);
   db.prepare(`UPDATE outreach_responses SET status = 'paid' WHERE status = 'project' AND platform = ?`).run(platform);
 
@@ -60,10 +71,18 @@ export function getOutreachListJson(db: Database.Database, platform: OutreachPla
 
   if (withStats) {
     const stats = itemsWithReminder.length > 0 ? computeOutreachStats(itemsWithReminder) : null;
-    const byMonth =
-      itemsWithReminder.length > 0 ? computeOutreachStatsByMonth(itemsWithReminder) : {};
+    const { byMonth, byMonthWeeks } =
+      itemsWithReminder.length > 0
+        ? computeOutreachByMonthWithWeeks(itemsWithReminder)
+        : { byMonth: {}, byMonthWeeks: {} };
     const visits = getVisitAggregates(db, platform);
-    return { items: itemsWithReminder, stats, byMonth, visits };
+    return {
+      ...(omitItems ? {} : { items: itemsWithReminder }),
+      stats,
+      byMonth,
+      byMonthWeeks,
+      visits,
+    };
   }
   return itemsWithReminder;
 }

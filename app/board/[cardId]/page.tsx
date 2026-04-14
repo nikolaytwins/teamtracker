@@ -1,6 +1,7 @@
 "use client";
 
 import { apiUrl, appPath } from "@/lib/api-url";
+import type { ExtendedCardPhasesPayload } from "@/lib/extend-card-phases-payload";
 import { TIME_TASK_TYPE_OPTIONS, labelForTaskType } from "@/lib/time-task-types";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -46,20 +47,7 @@ type PhaseRow = {
   totalSeconds: number;
 };
 
-type Payload = {
-  card: {
-    id: string;
-    name: string;
-    deadline: string | null;
-    status: string;
-    source_project_id?: string | null;
-    extra?: string | null;
-  } | null;
-  phases: PhaseRow[];
-  entries: PmTimeEntry[];
-  activeEntry: PmTimeEntry | null;
-  projectTotalSeconds: number;
-};
+type Payload = ExtendedCardPhasesPayload;
 
 function formatDuration(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec));
@@ -264,15 +252,10 @@ export default function CardPhasesPage() {
     }
   }
 
-  if (!cardId) return <div className="p-6">Некорректная ссылка</div>;
-  if (loading) return <div className="p-6">Загрузка…</div>;
-  if (error && !payload) return <div className="p-6 text-red-600">{error}</div>;
-  if (!payload?.card) return <div className="p-6 text-red-600">Карточка не найдена</div>;
-
-  const card = payload.card;
+  const entries = payload?.entries ?? [];
   const completedEntries = useMemo(
-    () => payload.entries.filter((e) => e.ended_at && e.duration_seconds != null),
-    [payload.entries]
+    () => entries.filter((e) => e.ended_at && e.duration_seconds != null),
+    [entries]
   );
   const analyticsByDay = useMemo(() => {
     const map = new Map<string, number>();
@@ -295,18 +278,47 @@ export default function CardPhasesPage() {
       .sort((a, b) => b.sec - a.sec);
   }, [completedEntries]);
   const logWorkers = useMemo(() => {
-    const set = new Set(
-      payload.entries.map((e) => e.worker_name?.trim()).filter((x): x is string => Boolean(x))
-    );
+    const set = new Set(entries.map((e) => e.worker_name?.trim()).filter((x): x is string => Boolean(x)));
     return [...set].sort((a, b) => a.localeCompare(b, "ru"));
-  }, [payload.entries]);
+  }, [entries]);
   const filteredEntries = useMemo(() => {
-    return payload.entries.filter((e) => {
+    return entries.filter((e) => {
       const byWorker = logWorkerFilter ? (e.worker_name || "").trim() === logWorkerFilter : true;
       const byType = logTaskTypeFilter ? (e.task_type || "") === logTaskTypeFilter : true;
       return byWorker && byType;
     });
-  }, [payload.entries, logWorkerFilter, logTaskTypeFilter]);
+  }, [entries, logWorkerFilter, logTaskTypeFilter]);
+
+  const cardAssignees = useMemo(() => {
+    if (!payload?.card?.extra) return [] as string[];
+    try {
+      const ex = JSON.parse(payload.card.extra);
+      const raw = ex.assignees ?? (ex.assignee ? [ex.assignee] : []);
+      return Array.isArray(raw)
+        ? raw.filter((n: unknown): n is string => typeof n === "string" && n.trim().length > 0)
+        : [];
+    } catch {
+      return [];
+    }
+  }, [payload?.card?.extra]);
+
+  const matrixWorkerColumns = useMemo(() => {
+    const tm = payload?.timeMatrix ?? [];
+    const set = new Set<string>();
+    for (const row of tm) {
+      for (const w of Object.keys(row.byWorker)) {
+        if ((row.byWorker[w]?.seconds ?? 0) > 0) set.add(w);
+      }
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "ru"));
+  }, [payload?.timeMatrix]);
+
+  if (!cardId) return <div className="p-6">Некорректная ссылка</div>;
+  if (loading) return <div className="p-6">Загрузка…</div>;
+  if (error && !payload) return <div className="p-6 text-red-600">{error}</div>;
+  if (!payload?.card) return <div className="p-6 text-red-600">Карточка не найдена</div>;
+
+  const card = payload.card;
 
   return (
     <div className="mx-auto max-w-4xl p-4 md:p-6">
@@ -325,9 +337,15 @@ export default function CardPhasesPage() {
         </Link>
       </div>
       <h1 className="text-2xl font-bold text-[var(--text)] mb-1">{card.name}</h1>
-      <p className="text-sm text-[var(--muted-foreground)] mb-6">
+      <p className="text-sm text-[var(--muted-foreground)] mb-3">
         Внутренние этапы и таймтрекер. Колонки канбана здесь не меняются.
       </p>
+      {cardAssignees.length > 0 ? (
+        <p className="text-sm text-[var(--text)] mb-4">
+          <span className="text-[var(--muted-foreground)]">Ответственные в карточке:</span>{" "}
+          {cardAssignees.join(", ")}
+        </p>
+      ) : null}
       {linkedLeadId ? (
         <p className="text-sm text-blue-700 mb-4">
           Связанный лид:{" "}
@@ -339,26 +357,85 @@ export default function CardPhasesPage() {
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Всего по проекту</div>
-            <div className="text-2xl font-semibold text-[var(--text)] tabular-nums">
-              {formatDuration(payload.projectTotalSeconds + driftSec)}
+        <div className="grid gap-6 md:grid-cols-2 md:items-start">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Всего по проекту</div>
+              <div className="text-2xl font-semibold text-[var(--text)] tabular-nums">
+                {formatDuration(payload.projectTotalSeconds + driftSec)}
+              </div>
+              <div className="mt-1 text-xs text-[var(--muted-foreground)]">
+                Этапов: {payload.phases.length}
+                {payload.phases.length > 0
+                  ? ` · ${payload.phases
+                      .slice(0, 5)
+                      .map((p) => p.title)
+                      .join(", ")}${payload.phases.length > 5 ? "…" : ""}`
+                  : ""}
+              </div>
             </div>
+            {active && !active.ended_at ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void stopWork()}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                Стоп
+              </button>
+            ) : null}
           </div>
-          {active && !active.ended_at ? (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void stopWork()}
-              className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-            >
-              Стоп
-            </button>
-          ) : null}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)]/30 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] mb-2">
+              Окупаемость
+            </div>
+            {payload.economics ? (
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between gap-2 tabular-nums">
+                  <span className="text-[var(--muted-foreground)]">Оплачено</span>
+                  <span className="font-semibold text-emerald-700">
+                    {payload.economics.paidAmount.toLocaleString("ru-RU")} ₽
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2 tabular-nums">
+                  <span className="text-[var(--muted-foreground)]">По договору</span>
+                  <span className="text-[var(--text)]">
+                    {payload.economics.totalAmount.toLocaleString("ru-RU")} ₽
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2 tabular-nums">
+                  <span className="text-[var(--muted-foreground)]">Учтено часов</span>
+                  <span className="text-[var(--text)]">{payload.economics.completedHours} ч</span>
+                </div>
+                <div className="flex justify-between gap-2 tabular-nums">
+                  <span className="text-[var(--muted-foreground)]">₽ за отработанный час</span>
+                  <span className="font-medium text-[var(--text)]">
+                    {payload.economics.effectiveHourlyPaidRub != null
+                      ? `${payload.economics.effectiveHourlyPaidRub.toLocaleString("ru-RU")} ₽/ч`
+                      : "—"}
+                  </span>
+                </div>
+                <Link
+                  href={appPath(`/agency/projects/${payload.economics.projectId}`)}
+                  className="inline-block pt-1 text-xs font-medium text-[var(--primary)] hover:underline"
+                >
+                  Открыть проект в финансах →
+                </Link>
+              </div>
+            ) : card.source_project_id?.trim() ? (
+              <p className="text-xs text-amber-800">
+                В агентстве не найден проект с этим id — проверьте привязку карточки.
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                Чтобы видеть оплату и эффективную ставку, создайте карточку из проекта агентства или привяжите{" "}
+                <code className="rounded bg-[var(--surface-2)] px-1">source_project_id</code>.
+              </p>
+            )}
+          </div>
         </div>
         {active && !active.ended_at && (
-          <p className="text-sm text-emerald-700 mt-2">
+          <p className="text-sm text-emerald-700 mt-4 border-t border-[var(--border)] pt-3">
             Идёт учёт… {formatDuration(sessionElapsedSec)} ·{" "}
             {active.worker_name ? active.worker_name : "—"} ·{" "}
             {labelForTaskType(active.task_type)} · этап:{" "}
@@ -366,6 +443,71 @@ export default function CardPhasesPage() {
           </p>
         )}
       </div>
+
+      {(payload.timeMatrix ?? []).length > 0 && matrixWorkerColumns.length > 0 ? (
+        <div className="mb-6 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
+          <div className="border-b border-[var(--border)] px-4 py-3">
+            <h2 className="text-base font-semibold text-[var(--text)]">Часы по этапам и сотрудникам</h2>
+            <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+              Завершённые сессии и текущий таймер (если запущен).
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--muted-foreground)]">
+                  <th className="py-2 pl-4 pr-2 font-medium">Этап</th>
+                  <th className="py-2 px-2 font-medium tabular-nums">Σ</th>
+                  {matrixWorkerColumns.map((w) => (
+                    <th key={w} className="py-2 px-2 font-medium">
+                      {w}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(payload.timeMatrix ?? []).map((row) => (
+                  <tr key={row.phaseId} className="border-b border-[var(--border)]/80">
+                    <td className="py-2 pl-4 pr-2 text-[var(--text)]">{row.phaseTitle}</td>
+                    <td className="py-2 px-2 tabular-nums text-[var(--muted-foreground)]">
+                      {row.phaseHours > 0 ? `${row.phaseHours} ч` : "—"}
+                    </td>
+                    {matrixWorkerColumns.map((w) => {
+                      const h = row.byWorker[w]?.hours ?? 0;
+                      return (
+                        <td key={w} className="py-2 px-2 tabular-nums text-[var(--text)]">
+                          {h > 0 ? `${h} ч` : "—"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (payload.phases.length > 0 || (payload.timeMatrix ?? []).length > 0) ? (
+        <p className="mb-6 text-sm text-[var(--muted-foreground)]">
+          Этапы заведены, но пока нет учтённого времени — нажмите «Приступил» на нужном этапе.
+        </p>
+      ) : null}
+
+      {payload.workerBreakdown && Object.keys(payload.workerBreakdown).length > 0 ? (
+        <div className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
+          <h2 className="text-sm font-semibold text-[var(--text)] mb-2">Итого по людям</h2>
+          <ul className="space-y-1 text-sm">
+            {Object.entries(payload.workerBreakdown)
+              .filter(([, v]) => v.seconds > 0)
+              .sort((a, b) => b[1].seconds - a[1].seconds)
+              .map(([name, v]) => (
+                <li key={name} className="flex justify-between gap-2 tabular-nums">
+                  <span className="text-[var(--text)]">{name}</span>
+                  <span className="text-[var(--muted-foreground)]">{v.hours} ч</span>
+                </li>
+              ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 mb-6 space-y-3">
         <div className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">Перед «Приступил»</div>

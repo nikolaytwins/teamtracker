@@ -1,6 +1,7 @@
 import { calculateNextContactDateForLead } from "@/lib/agency-leads-logic";
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
 import {
+  computeOutreachByMonthWithWeeks,
   computeOutreachStats,
   computeOutreachStatsByMonth,
   type OutreachPlatform,
@@ -1060,7 +1061,11 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
   }
 
-  async outreachListJson(platform: OutreachPlatform, withStats: boolean): Promise<unknown> {
+  async outreachListJson(
+    platform: OutreachPlatform,
+    withStats: boolean,
+    opts?: { omitItems?: boolean }
+  ): Promise<unknown> {
     await this.sb.from("outreach_responses").update({ status: "paid" }).eq("status", "project").eq("platform", platform);
 
     const { data: itemsRaw, error } = await this.sb
@@ -1097,13 +1102,20 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     if (withStats) {
       const stats =
         itemsWithReminder.length > 0 ? computeOutreachStats(itemsWithReminder as unknown as Record<string, unknown>[]) : null;
-      const byMonth =
+      const { byMonth, byMonthWeeks } =
         itemsWithReminder.length > 0
-          ? computeOutreachStatsByMonth(itemsWithReminder as unknown as Record<string, unknown>[])
-          : {};
+          ? computeOutreachByMonthWithWeeks(itemsWithReminder as unknown as Record<string, unknown>[])
+          : { byMonth: {}, byMonthWeeks: {} };
       const { data: vrows } = await this.sb.from("platform_visits").select("visited_at").eq("platform", platform);
       const visits = visitAggregatesFromRows((vrows ?? []) as Array<{ visited_at: string }>);
-      return { items: itemsWithReminder, stats, byMonth, visits };
+      const omitItems = Boolean(opts?.omitItems);
+      return {
+        ...(omitItems ? {} : { items: itemsWithReminder }),
+        stats,
+        byMonth,
+        byMonthWeeks,
+        visits,
+      };
     }
     return itemsWithReminder;
   }

@@ -3,6 +3,7 @@ import { getServerSession } from "@/lib/get-session";
 import {
   getWorkerAverageSessionByTaskType,
   getWorkerMonthlyBuckets,
+  getWorkerMonthlyByDaySeries,
   getWorkerMonthlyTaskBreakdown,
   secondsToHours,
 } from "@/lib/me-analytics";
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
     const worker = { sub: session.sub, name: session.name };
     const breakdown = getWorkerMonthlyTaskBreakdown(worker, month);
     const buckets = getWorkerMonthlyBuckets(worker, month);
+    const byDay = getWorkerMonthlyByDaySeries(worker, month);
     const averages = getWorkerAverageSessionByTaskType(worker, 1);
     return NextResponse.json({
       month,
@@ -25,6 +27,7 @@ export async function GET(request: NextRequest) {
       totalSeconds: breakdown.totalSeconds,
       breakdown: breakdown.rows,
       buckets: buckets.buckets,
+      byDay,
       averages,
     });
   } catch (e) {

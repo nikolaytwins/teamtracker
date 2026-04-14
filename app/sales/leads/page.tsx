@@ -481,14 +481,14 @@ export default function SalesLeadsPage() {
                             setEditing(lead);
                           }
                         }}
-                        className={`cursor-pointer rounded-2xl bg-[var(--surface)] p-3.5 shadow-[var(--shadow-kanban-card)] transition-[box-shadow] hover:shadow-[var(--shadow-kanban-card-hover)] dark:bg-[var(--surface)] ${
+                        className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-[var(--border)]/80 bg-[var(--surface)] py-3.5 pl-4 pr-3.5 shadow-[var(--shadow-kanban-card)] transition-all duration-200 dark:border-white/[0.08] dark:bg-[var(--surface)] ${
                           todayReminder
-                            ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-[var(--bg)] dark:ring-amber-400 dark:ring-offset-0 dark:shadow-[0_0_0_1px_rgb(251_191_36/0.5),0_0_28px_rgb(245_158_11/0.35)]"
-                            : ""
+                            ? "border-l-[3px] border-l-[var(--success)] shadow-[0_2px_14px_rgb(5_150_105/0.12)] ring-2 ring-[var(--success)]/35 ring-offset-2 ring-offset-[var(--bg)] dark:shadow-[0_0_0_1px_rgb(52_211_153/0.35),0_8px_28px_rgb(16_185_129/0.18)] dark:ring-[var(--success)]/45 dark:ring-offset-0"
+                            : "border-l-[3px] border-l-[var(--primary)] hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:shadow-[var(--shadow-kanban-card-hover)]"
                         } ${archivedLead ? "opacity-75" : ""}`}
                       >
                         {todayReminder ? (
-                          <div className="mb-2 rounded-lg bg-amber-500 px-2 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
+                          <div className="mb-2.5 rounded-lg bg-[var(--success)] px-2.5 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-white shadow-sm dark:shadow-[0_1px_0_rgb(0_0_0/0.2)]">
                             Напоминание сегодня
                           </div>
                         ) : null}
@@ -497,23 +497,35 @@ export default function SalesLeadsPage() {
                             В архиве
                           </div>
                         ) : null}
-                        <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-semibold text-[var(--text)]">
-                          <span>{lead.taskDescription || "Без описания"}</span>
+                        <div className="mb-2.5 flex flex-wrap items-start gap-2">
+                          <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug tracking-tight text-[var(--text)]">
+                            {lead.taskDescription || "Без описания"}
+                          </span>
                           {lead.status === "new" ? (
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">
+                            <span className="shrink-0 rounded-md bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--primary)] dark:text-[var(--primary)]">
                               Новый
                             </span>
                           ) : null}
                         </div>
-                        <div className="mb-1 text-xs text-[var(--text)]">
-                          <span className="font-medium">Контакт:</span> {lead.contact}
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-medium text-[var(--muted-foreground)]">Источник</span>
+                          <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--primary)]">
+                            {lead.source}
+                          </span>
                         </div>
-                        <div className="mb-2 text-xs text-[var(--muted-foreground)]">
-                          <span className="font-medium">Источник:</span> {lead.source}
+                        <div className="mb-2 text-sm text-[var(--text)]">
+                          <span className="text-xs font-medium text-[var(--muted-foreground)]">Контакт · </span>
+                          <span className="font-medium">{lead.contact}</span>
                         </div>
                         {lead.nextContactDate ? (
-                          <div className="mb-2 text-xs text-[var(--muted-foreground)]">
-                            <span className="font-medium text-[var(--text)]">Напоминание:</span>{" "}
+                          <div
+                            className={`mb-2 text-xs ${
+                              todayReminder ? "font-semibold text-[var(--success)]" : "text-[var(--muted-foreground)]"
+                            }`}
+                          >
+                            <span className={todayReminder ? "text-[var(--success)]" : "font-medium text-[var(--text)]"}>
+                              Напоминание:
+                            </span>{" "}
                             {new Date(lead.nextContactDate).toLocaleDateString("ru-RU")}
                           </div>
                         ) : null}
@@ -667,7 +679,7 @@ export default function SalesLeadsPage() {
                   className="tt-input w-full text-sm"
                 />
                 <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                  Если дата — сегодня, карточка на канбане подсвечивается.
+                  Если дата — сегодня, карточка подсвечивается зелёным на канбане.
                 </p>
               </div>
               <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text)]">

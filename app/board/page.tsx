@@ -12,10 +12,14 @@ import {
   ACTIVE_WORK_STAGE_SET,
   statusLabel,
   IMPORTANCE_OPTIONS,
+  defaultStatusForSimpleViewGroup,
+  statusToSimpleViewGroup,
   type PmStatusKey,
   type ImportanceKey,
+  type SimpleViewGroupKey,
 } from "@/lib/statuses";
 import { computeSubtaskProgressStats } from "@/lib/subtask-progress";
+import type { PmSubtaskWithCard } from "@/lib/pm-subtasks";
 
 type TeamMember = { id: string; name: string; avatar?: string };
 
@@ -88,16 +92,37 @@ function formatDate(s: string | null) {
   }
 }
 
+function formatPhaseDuration(totalSec: number): string {
+  const s = Math.max(0, Math.floor(totalSec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h} ч ${m} м`;
+  if (m > 0) return `${m} м`;
+  return s > 0 ? `${s} с` : "0";
+}
+
 export default function BoardPage() {
   const [cards, setCards] = useState<PmCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"detailed" | "simple">("simple");
+  const [boardDisplay, setBoardDisplay] = useState<"projects" | "tasks" | "stages">(() => {
+    if (typeof window === "undefined") return "projects";
+    const v = localStorage.getItem("pm-board-display");
+    if (v === "tasks" || v === "stages" || v === "projects") return v;
+    return "projects";
+  });
   const [filterQuery, setFilterQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
+  const [newProjectStatus, setNewProjectStatus] = useState<PmStatusKey>("not_started");
   const [adding, setAdding] = useState(false);
-  const [syncingFromAgency, setSyncingFromAgency] = useState(false);
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
+  const [boardSubtasks, setBoardSubtasks] = useState<PmSubtaskWithCard[]>([]);
+  const [quickCardTitle, setQuickCardTitle] = useState<Record<string, string>>({});
+  const [quickCardBusy, setQuickCardBusy] = useState<string | null>(null);
+  const [quickSubtaskTitle, setQuickSubtaskTitle] = useState<Record<string, string>>({});
+  const [quickSubtaskCardId, setQuickSubtaskCardId] = useState<Record<string, string>>({});
+  const [quickSubBusy, setQuickSubBusy] = useState<string | null>(null);
   const [modalCard, setModalCard] = useState<PmCard | null>(null);
   const [modalName, setModalName] = useState("");
   const [modalDescription, setModalDescription] = useState("");
@@ -121,18 +146,15 @@ export default function BoardPage() {
       return [];
     }
   });
-  const [canSyncAgency, setCanSyncAgency] = useState(false);
   const [modalSubtasks, setModalSubtasks] = useState<PmSubtaskRow[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
-
-  useEffect(() => {
-    void fetch(apiUrl("/api/auth/me"))
-      .then((r) => r.json())
-      .then((d: { user?: { role?: string } }) => {
-        setCanSyncAgency(d.user?.role === "admin");
-      })
-      .catch(() => setCanSyncAgency(false));
-  }, []);
+  const [modalPhaseInsight, setModalPhaseInsight] = useState<{
+    projectTotalSeconds: number;
+    phases: { title: string }[];
+    topMatrixRows: { phaseTitle: string; phaseHours: number }[];
+    economics: { paidAmount: number; effectiveHourlyPaidRub: number | null } | null;
+  } | null>(null);
+  const [modalPhaseInsightLoading, setModalPhaseInsightLoading] = useState(false);
 
   useEffect(() => {
     if (!modalCard?.id) {
@@ -145,6 +167,49 @@ export default function BoardPage() {
         setModalSubtasks(Array.isArray(d.subtasks) ? d.subtasks : []);
       })
       .catch(() => setModalSubtasks([]));
+  }, [modalCard?.id]);
+
+  useEffect(() => {
+    if (!modalCard?.id) {
+      setModalPhaseInsight(null);
+      return;
+    }
+    let cancelled = false;
+    setModalPhaseInsightLoading(true);
+    void (async () => {
+      try {
+        const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/phases`));
+        const data = (await r.json()) as {
+          projectTotalSeconds?: number;
+          phases?: { title: string }[];
+          timeMatrix?: { phaseTitle: string; phaseHours: number }[];
+          economics?: { paidAmount: number; effectiveHourlyPaidRub: number | null } | null;
+        };
+        if (cancelled) return;
+        if (!r.ok) {
+          setModalPhaseInsight(null);
+          return;
+        }
+        const tm = Array.isArray(data.timeMatrix) ? data.timeMatrix : [];
+        const topMatrixRows = tm
+          .filter((row) => row.phaseHours > 0)
+          .sort((a, b) => b.phaseHours - a.phaseHours)
+          .slice(0, 4);
+        setModalPhaseInsight({
+          projectTotalSeconds: data.projectTotalSeconds ?? 0,
+          phases: Array.isArray(data.phases) ? data.phases.map((p) => ({ title: p.title })) : [],
+          topMatrixRows,
+          economics: data.economics ?? null,
+        });
+      } catch {
+        if (!cancelled) setModalPhaseInsight(null);
+      } finally {
+        if (!cancelled) setModalPhaseInsightLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [modalCard?.id]);
 
   async function refreshBoardCard(cardId: string) {
@@ -248,29 +313,30 @@ export default function BoardPage() {
     return cards.filter((c) => c.name.toLowerCase().includes(q));
   }, [cards, filterQuery]);
 
-  async function syncFromAgency() {
-    setSyncingFromAgency(true);
-    setError(null);
+  useEffect(() => {
     try {
-      const r = await fetch(apiUrl("/api/cards/sync-from-agency"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || "Не удалось подтянуть проекты");
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка синхронизации");
-    } finally {
-      setSyncingFromAgency(false);
+      localStorage.setItem("pm-board-display", boardDisplay);
+    } catch {
+      /* ignore */
     }
-  }
+  }, [boardDisplay]);
 
-  async function addProject(e: React.FormEvent) {
+  const loadBoardSubtasks = useCallback(async () => {
+    const r = await fetch(apiUrl("/api/board/open-subtasks"));
+    if (!r.ok) return;
+    const d = (await r.json()) as { subtasks?: PmSubtaskWithCard[] };
+    setBoardSubtasks(Array.isArray(d.subtasks) ? d.subtasks : []);
+  }, []);
+
+  useEffect(() => {
+    if (boardDisplay === "tasks") void loadBoardSubtasks();
+  }, [boardDisplay, cards, loadBoardSubtasks]);
+
+  async function submitNewProject(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
     setAdding(true);
+    setError(null);
     try {
       const r = await fetch(apiUrl("/api/cards"), {
         method: "POST",
@@ -278,18 +344,18 @@ export default function BoardPage() {
         body: JSON.stringify({
           name: newName.trim(),
           deadline: newDeadline || null,
-          status: "not_started",
+          status: newProjectStatus,
         }),
       });
-      if (r.ok) {
-        const card = await r.json();
-        setCards((prev) => [card, ...prev]);
-        setNewName("");
-        setNewDeadline("");
-      } else {
-        const err = await r.json().catch(() => ({}));
-        setError(err.error || "Не удалось создать");
-      }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось создать");
+      const card = data as PmCard;
+      setCards((prev) => [card, ...prev]);
+      setNewName("");
+      setNewDeadline("");
+      setNewProjectStatus("not_started");
+      setAddProjectOpen(false);
+      if (boardDisplay === "tasks") await loadBoardSubtasks();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка");
     } finally {
@@ -308,6 +374,7 @@ export default function BoardPage() {
       const updated = await r.json();
       setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
       if (modalCard?.id === cardId) setModalCard(updated);
+      if (boardDisplay === "tasks") void loadBoardSubtasks();
     } catch (e) {
       console.error(e);
     }
@@ -380,7 +447,10 @@ export default function BoardPage() {
     if (!confirm("Удалить карточку из канбана? В Agency проект останется.")) return;
     try {
       const r = await fetch(apiUrl(`/api/cards/${cardId}`), { method: "DELETE" });
-      if (r.ok) setCards((prev) => prev.filter((c) => c.id !== cardId));
+      if (r.ok) {
+        setCards((prev) => prev.filter((c) => c.id !== cardId));
+        if (boardDisplay === "tasks") void loadBoardSubtasks();
+      }
       if (modalCard?.id === cardId) {
         modalOpenIdRef.current = null;
         setModalCard(null);
@@ -410,6 +480,7 @@ export default function BoardPage() {
       const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
       setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
       await refreshBoardCard(modalCard.id);
+      if (boardDisplay === "tasks") void loadBoardSubtasks();
     } catch (err) {
       console.error(err);
     }
@@ -427,6 +498,7 @@ export default function BoardPage() {
       const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
       setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
       await refreshBoardCard(modalCard.id);
+      if (boardDisplay === "tasks") void loadBoardSubtasks();
     } catch (err) {
       console.error(err);
     }
@@ -439,6 +511,7 @@ export default function BoardPage() {
       if (!r.ok) return;
       setModalSubtasks((prev) => prev.filter((s) => s.id !== subId));
       await refreshBoardCard(modalCard.id);
+      if (boardDisplay === "tasks") void loadBoardSubtasks();
     } catch (err) {
       console.error(err);
     }
@@ -468,6 +541,71 @@ export default function BoardPage() {
     }
     return [...list].sort((a, b) => importanceOrder(a) - importanceOrder(b));
   };
+
+  function subtasksForSimpleColumn(col: SimpleViewGroupKey): PmSubtaskWithCard[] {
+    const q = filterQuery.trim().toLowerCase();
+    return boardSubtasks.filter((s) => {
+      if (statusToSimpleViewGroup(s.card_status) !== col) return false;
+      if (!q) return true;
+      return (
+        s.title.toLowerCase().includes(q) ||
+        s.card_name.toLowerCase().includes(q)
+      );
+    });
+  }
+
+  async function quickAddCardInColumn(columnKey: string, status: PmStatusKey) {
+    const title = (quickCardTitle[columnKey] || "").trim();
+    if (!title) return;
+    setQuickCardBusy(columnKey);
+    setError(null);
+    try {
+      const r = await fetch(apiUrl("/api/cards"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: title, deadline: null, status }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось создать");
+      const card = data as PmCard;
+      setCards((prev) => [card, ...prev]);
+      setQuickCardTitle((prev) => ({ ...prev, [columnKey]: "" }));
+      if (boardDisplay === "tasks") await loadBoardSubtasks();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setQuickCardBusy(null);
+    }
+  }
+
+  async function quickAddSubtaskInColumn(columnKey: SimpleViewGroupKey, groupCards: PmCard[]) {
+    const title = (quickSubtaskTitle[columnKey] || "").trim();
+    const cardId = quickSubtaskCardId[columnKey] || groupCards[0]?.id;
+    if (!title || !cardId) return;
+    setQuickSubBusy(columnKey);
+    setError(null);
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${cardId}/subtasks`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          estimatedHours: null,
+          leadUserId: null,
+          assigneeUserId: null,
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось добавить подзадачу");
+      setQuickSubtaskTitle((prev) => ({ ...prev, [columnKey]: "" }));
+      await loadBoardSubtasks();
+      await refreshBoardCard(cardId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setQuickSubBusy(null);
+    }
+  }
 
   function renderCard(card: PmCard, showStageLabel: boolean) {
     const extra = parseExtra(card.extra);
@@ -585,6 +723,30 @@ export default function BoardPage() {
     );
   }
 
+  function renderBoardSubtaskRow(s: PmSubtaskWithCard) {
+    const parent = cards.find((c) => c.id === s.card_id);
+    return (
+      <div
+        key={s.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => {
+          if (parent) openModal(parent);
+        }}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && parent) {
+            e.preventDefault();
+            openModal(parent);
+          }
+        }}
+        className="cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left shadow-sm transition-colors hover:border-[var(--primary)]/35 hover:bg-[var(--surface-2)]/50"
+      >
+        <div className="text-sm font-medium leading-snug text-[var(--text)]">{s.title}</div>
+        <div className="mt-1 truncate text-xs text-[var(--muted-foreground)]">{s.card_name}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6">
       <div className="sticky top-0 z-20 -mx-4 mb-6 border-b border-[var(--border)]/60 bg-[var(--bg)]/85 px-4 py-4 backdrop-blur-xl dark:border-white/[0.06] md:-mx-6 md:px-6">
@@ -592,9 +754,16 @@ export default function BoardPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Канбан</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              Перетаскивайте карточки. Клик — детали. Показано{" "}
-              <span className="font-semibold text-[var(--text)]">{filteredCards.length}</span>
-              {filterQuery.trim() ? <span className="text-[var(--muted-foreground)]"> из {cards.length}</span> : null}
+              {boardDisplay === "tasks"
+                ? "Подзадачи по колонкам статуса проекта. Клик — карточка проекта."
+                : "Перетаскивайте карточки. Клик — детали."}{" "}
+              Показано{" "}
+              <span className="font-semibold text-[var(--text)]">
+                {boardDisplay === "tasks" ? boardSubtasks.length : filteredCards.length}
+              </span>
+              {boardDisplay !== "tasks" && filterQuery.trim() ? (
+                <span className="text-[var(--muted-foreground)]"> из {cards.length}</span>
+              ) : null}
             </p>
             <Link
               href={appPath("/board/time-analytics")}
@@ -608,84 +777,149 @@ export default function BoardPage() {
               type="search"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Поиск по названию…"
+              placeholder={boardDisplay === "tasks" ? "Поиск задачи или проекта…" : "Поиск по названию…"}
               className="tt-input w-full text-sm sm:w-56"
             />
-            <span className="hidden text-sm text-[var(--muted-foreground)] sm:inline">Вид:</span>
+            <span className="hidden text-sm text-[var(--muted-foreground)] sm:inline">Показать:</span>
             <button
               type="button"
-              onClick={() => setViewMode("simple")}
+              onClick={() => setBoardDisplay("projects")}
               className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                viewMode === "simple"
+                boardDisplay === "projects"
                   ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
                   : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
               }`}
-              title="Не начато, в работе, на согласовании, готово, пауза"
+              title="Карточки проектов по сводным колонкам"
             >
-              Простой
+              Проекты
             </button>
             <button
               type="button"
-              onClick={() => setViewMode("detailed")}
+              onClick={() => setBoardDisplay("tasks")}
               className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                viewMode === "detailed"
+                boardDisplay === "tasks"
+                  ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
+                  : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+              }`}
+              title="Открытые подзадачи по колонкам статуса родительского проекта"
+            >
+              Задачи
+            </button>
+            <button
+              type="button"
+              onClick={() => setBoardDisplay("stages")}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                boardDisplay === "stages"
                   ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
                   : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
               }`}
               title="Все этапы отдельными колонками"
             >
-              Все этапы
+              Этапы
             </button>
-            {canSyncAgency ? (
-              <button
-                type="button"
-                onClick={() => void syncFromAgency()}
-                disabled={syncingFromAgency}
-                className="rounded-xl bg-[var(--success)] px-3 py-2 text-sm font-semibold text-white shadow-md shadow-[var(--success)]/20 hover:brightness-110 disabled:opacity-50"
-                title="Добавить на канбан проекты из «Проекты и финансы», для которых ещё нет карточки"
-              >
-                {syncingFromAgency ? "Синхронизация…" : "Подтянуть из финансов"}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setAddProjectOpen(true);
+                setError(null);
+              }}
+              className="rounded-xl bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white shadow-md shadow-[var(--primary)]/25 hover:brightness-110"
+            >
+              + Добавить проект
+            </button>
           </div>
         </div>
       </div>
 
-      {canSyncAgency ? (
-        <form
-          onSubmit={addProject}
-          className="mb-8 flex flex-wrap items-end gap-3 rounded-2xl bg-[var(--surface)] p-4 shadow-[var(--shadow-kanban-card)] dark:ring-0"
+      {addProjectOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-3 py-6"
+          onClick={() => setAddProjectOpen(false)}
+          role="presentation"
         >
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Новый проект</label>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Название проекта или клиента"
-              className="tt-input w-64 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Дедлайн</label>
-            <input
-              type="date"
-              value={newDeadline}
-              onChange={(e) => setNewDeadline(e.target.value)}
-              className="tt-input text-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={adding || !newName.trim()}
-            className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[var(--primary)]/25 hover:brightness-110 disabled:opacity-50"
+          <div
+            className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-elevated)]"
+            onClick={(e) => e.stopPropagation()}
           >
-            {adding ? "Создание…" : "+ Добавить проект"}
-          </button>
-        </form>
+            <div className="mb-4 flex items-start justify-between gap-2">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Новый проект</h2>
+              <button
+                type="button"
+                className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+                onClick={() => setAddProjectOpen(false)}
+                aria-label="Закрыть"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={(e) => void submitNewProject(e)} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Название</label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Проект или клиент"
+                  className="tt-input w-full text-sm"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Дедлайн</label>
+                <input
+                  type="date"
+                  value={newDeadline}
+                  onChange={(e) => setNewDeadline(e.target.value)}
+                  className="tt-input w-full text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Стартовая колонка</label>
+                <select
+                  className="tt-select w-full text-sm"
+                  value={newProjectStatus}
+                  onChange={(e) => setNewProjectStatus(e.target.value as PmStatusKey)}
+                >
+                  {boardDisplay === "stages"
+                    ? PM_STATUSES.map((s) => (
+                        <option key={s.key} value={s.key}>
+                          {s.label}
+                        </option>
+                      ))
+                    : SIMPLE_VIEW_GROUPS.map((g) => (
+                        <option key={g.key} value={defaultStatusForSimpleViewGroup(g.key)}>
+                          {g.label}
+                        </option>
+                      ))}
+                </select>
+                <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                  {boardDisplay === "stages"
+                    ? "Точный этап канбана."
+                    : "Колонка «Проекты» / «Задачи»: выберите сводную колонку — карточка получит подходящий статус."}
+                </p>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface-2)]"
+                  onClick={() => setAddProjectOpen(false)}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={adding || !newName.trim()}
+                  className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[var(--primary)]/25 hover:brightness-110 disabled:opacity-50"
+                >
+                  {adding ? "Создание…" : "Создать"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
 
-      {viewMode === "detailed" && (
+      {boardDisplay === "stages" && (
         <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
           {PM_STATUSES.map(({ key }) => (
             <div
@@ -702,23 +936,51 @@ export default function BoardPage() {
               </div>
               <div className="min-h-[min(70vh,560px)] space-y-3 bg-[var(--bg)]/35 p-3 dark:bg-black/10">
                 {byStatus(key).map((card) => renderCard(card, false))}
+                <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)]/50 p-2 dark:bg-[var(--surface)]/30">
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Быстро в колонку
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={quickCardTitle[key] ?? ""}
+                      onChange={(e) => setQuickCardTitle((prev) => ({ ...prev, [key]: e.target.value }))}
+                      placeholder="Название карточки"
+                      className="tt-input min-w-0 flex-1 py-1.5 text-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void quickAddCardInColumn(key, key);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!!quickCardBusy || !(quickCardTitle[key] || "").trim()}
+                      onClick={() => void quickAddCardInColumn(key, key)}
+                      className="shrink-0 rounded-lg bg-[var(--primary)] px-2 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40"
+                    >
+                      {quickCardBusy === key ? "…" : "+"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {viewMode === "simple" && (
+      {(boardDisplay === "projects" || boardDisplay === "tasks") && (
         <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
           {SIMPLE_VIEW_GROUPS.map(({ key, label }) => {
             const groupCards = bySimpleGroup(key);
+            const subtasksCol = subtasksForSimpleColumn(key);
             const showStageLabel = key === "in_progress" || key === "awaiting_approval";
             const colTint =
               key === "in_progress"
                 ? "bg-[var(--primary-soft)]/12 dark:bg-[var(--primary-soft)]/8"
-                : key === "awaiting_approval"
-                  ? "bg-amber-500/[0.05] dark:bg-amber-400/[0.06]"
-                  : "bg-[var(--surface)]/90 dark:bg-[var(--surface)]/50";
+                : "bg-[var(--surface)]/90 dark:bg-[var(--surface)]/50";
+            const defaultStatus = defaultStatusForSimpleViewGroup(key);
             return (
               <div
                 key={key}
@@ -734,16 +996,107 @@ export default function BoardPage() {
                     </span>
                   ) : null}
                   {key === "awaiting_approval" ? (
-                    <span className="rounded-full bg-amber-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200/90">
+                    <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">
                       клиент
                     </span>
                   ) : null}
                   <span className="ml-auto rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--muted-foreground)] normal-case tracking-normal dark:bg-white/[0.06]">
-                    {groupCards.length}
+                    {boardDisplay === "tasks" ? subtasksCol.length : groupCards.length}
                   </span>
                 </div>
-                <div className={`min-h-[min(70vh,560px)] space-y-3 p-3 ${key === "in_progress" ? "bg-[var(--primary-soft)]/6 dark:bg-transparent" : key === "awaiting_approval" ? "bg-amber-500/[0.03] dark:bg-transparent" : "bg-[var(--bg)]/30 dark:bg-black/10"}`}>
-                  {groupCards.map((card) => renderCard(card, showStageLabel))}
+                <div
+                  className={`flex min-h-[min(70vh,560px)] flex-col gap-3 p-3 ${
+                    key === "in_progress" ? "bg-[var(--primary-soft)]/6 dark:bg-transparent" : "bg-[var(--bg)]/30 dark:bg-black/10"
+                  }`}
+                >
+                  <div className="min-h-0 flex-1 space-y-3">
+                    {boardDisplay === "tasks" ? (
+                      subtasksCol.length === 0 ? (
+                        <p className="px-1 text-xs text-[var(--muted-foreground)]">Нет открытых подзадач</p>
+                      ) : (
+                        subtasksCol.map((s) => renderBoardSubtaskRow(s))
+                      )
+                    ) : (
+                      groupCards.map((card) => renderCard(card, showStageLabel))
+                    )}
+                  </div>
+                  <div className="mt-auto shrink-0 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)]/60 p-2 dark:bg-[var(--surface)]/35">
+                    <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                      {boardDisplay === "tasks" ? "Подзадача" : "Новая карточка"}
+                    </div>
+                    {boardDisplay === "tasks" ? (
+                      groupCards.length === 0 ? (
+                        <p className="text-[11px] leading-snug text-[var(--muted-foreground)]">
+                          Добавьте проект в эту колонку или через «Добавить проект», затем можно вешать подзадачи.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          <select
+                            className="tt-select w-full py-1.5 text-xs"
+                            value={quickSubtaskCardId[key] || groupCards[0]?.id || ""}
+                            onChange={(e) =>
+                              setQuickSubtaskCardId((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                          >
+                            {groupCards.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              value={quickSubtaskTitle[key] ?? ""}
+                              onChange={(e) =>
+                                setQuickSubtaskTitle((prev) => ({ ...prev, [key]: e.target.value }))
+                              }
+                              placeholder="Текст подзадачи"
+                              className="tt-input min-w-0 flex-1 py-1.5 text-xs"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  void quickAddSubtaskInColumn(key, groupCards);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              disabled={!!quickSubBusy || !(quickSubtaskTitle[key] || "").trim()}
+                              onClick={() => void quickAddSubtaskInColumn(key, groupCards)}
+                              className="shrink-0 rounded-lg bg-[var(--primary)] px-2 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40"
+                            >
+                              {quickSubBusy === key ? "…" : "+"}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          value={quickCardTitle[key] ?? ""}
+                          onChange={(e) => setQuickCardTitle((prev) => ({ ...prev, [key]: e.target.value }))}
+                          placeholder="Название"
+                          className="tt-input min-w-0 flex-1 py-1.5 text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void quickAddCardInColumn(key, defaultStatus);
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={!!quickCardBusy || !(quickCardTitle[key] || "").trim()}
+                          onClick={() => void quickAddCardInColumn(key, defaultStatus)}
+                          className="shrink-0 rounded-lg bg-[var(--primary)] px-2 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40"
+                        >
+                          {quickCardBusy === key ? "…" : "+"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -792,6 +1145,74 @@ export default function BoardPage() {
                   ))}
                 </select>
                 {savingDoc ? <span className="text-[var(--muted-foreground)]">Сохранение…</span> : null}
+              </div>
+              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/40 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] mb-2">
+                  Время и этапы
+                </div>
+                {modalPhaseInsightLoading ? (
+                  <p className="text-sm text-[var(--muted-foreground)]">Загрузка…</p>
+                ) : modalPhaseInsight ? (
+                  <div className="space-y-2 text-sm">
+                    <p className="text-[var(--text)]">
+                      <span className="tabular-nums font-semibold">
+                        {formatPhaseDuration(modalPhaseInsight.projectTotalSeconds)}
+                      </span>
+                      {" · "}
+                      этапов: {modalPhaseInsight.phases.length}
+                    </p>
+                    {modalPhaseInsight.phases.length > 0 ? (
+                      <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                        {modalPhaseInsight.phases
+                          .slice(0, 4)
+                          .map((p) => p.title)
+                          .join(" · ")}
+                        {modalPhaseInsight.phases.length > 4 ? "…" : ""}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-800">
+                        Этапов пока нет — добавьте на странице учёта времени.
+                      </p>
+                    )}
+                    {modalPhaseInsight.topMatrixRows.length > 0 ? (
+                      <ul className="mt-2 space-y-1 border-t border-[var(--border)] pt-2 text-xs">
+                        {modalPhaseInsight.topMatrixRows.map((row) => (
+                          <li key={row.phaseTitle} className="flex justify-between gap-2 tabular-nums">
+                            <span className="truncate text-[var(--muted-foreground)]">{row.phaseTitle}</span>
+                            <span className="shrink-0 text-[var(--text)]">{row.phaseHours} ч</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {modalPhaseInsight.economics ? (
+                      <div className="mt-2 space-y-0.5 border-t border-[var(--border)] pt-2 text-xs">
+                        <div className="flex justify-between gap-2 tabular-nums">
+                          <span className="text-[var(--muted-foreground)]">Оплачено</span>
+                          <span className="font-medium text-emerald-700">
+                            {modalPhaseInsight.economics.paidAmount.toLocaleString("ru-RU")} ₽
+                          </span>
+                        </div>
+                        {modalPhaseInsight.economics.effectiveHourlyPaidRub != null ? (
+                          <div className="flex justify-between gap-2 tabular-nums">
+                            <span className="text-[var(--muted-foreground)]">₽/ч по оплате</span>
+                            <span className="text-[var(--text)]">
+                              {modalPhaseInsight.economics.effectiveHourlyPaidRub.toLocaleString("ru-RU")} ₽
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <Link
+                      href={appPath(`/board/${modalCard.id}`)}
+                      className="inline-block pt-2 text-xs font-semibold text-[var(--primary)] hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Полный учёт времени и окупаемость →
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--muted-foreground)]">Не удалось загрузить сводку.</p>
+                )}
               </div>
               <textarea
                 value={modalDescription}

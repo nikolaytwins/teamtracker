@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { getISOWeekInfo } from "@/lib/iso-week";
 
 export type OutreachPlatform = "profi" | "threads";
 
@@ -127,4 +128,44 @@ export function computeOutreachStatsByMonth(
     if (s) byMonth[ym] = s;
   }
   return byMonth;
+}
+
+/** Месяцы (YYYY-MM) + внутри каждого месяца — статистика по ISO-неделям. */
+export function computeOutreachByMonthWithWeeks(
+  itemsWithReminder: Array<Record<string, unknown> & { createdAt?: string }>
+): {
+  byMonth: Record<string, NonNullable<ReturnType<typeof computeOutreachStats>>>;
+  byMonthWeeks: Record<string, Record<string, NonNullable<ReturnType<typeof computeOutreachStats>>>>;
+} {
+  const byMonth = computeOutreachStatsByMonth(itemsWithReminder);
+  const byMonthWeeks: Record<string, Record<string, NonNullable<ReturnType<typeof computeOutreachStats>>>> = {};
+  const groups = new Map<string, Array<Record<string, unknown>>>();
+  for (const item of itemsWithReminder) {
+    const created = item.createdAt as string | undefined;
+    if (!created || created.length < 7) continue;
+    const ym = created.slice(0, 7);
+    if (!groups.has(ym)) groups.set(ym, []);
+    groups.get(ym)!.push(item);
+  }
+  for (const [ym, list] of groups) {
+    const weekMap = new Map<string, Array<Record<string, unknown>>>();
+    for (const item of list) {
+      const raw = item.createdAt as string | undefined;
+      if (!raw) continue;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) continue;
+      const { isoYear, week } = getISOWeekInfo(d);
+      const wk = `${isoYear}-W${String(week).padStart(2, "0")}`;
+      if (!weekMap.has(wk)) weekMap.set(wk, []);
+      weekMap.get(wk)!.push(item);
+    }
+    const inner: Record<string, NonNullable<ReturnType<typeof computeOutreachStats>>> = {};
+    const wkeys = [...weekMap.keys()].sort((a, b) => a.localeCompare(b));
+    for (const wk of wkeys) {
+      const s = computeOutreachStats(weekMap.get(wk)!);
+      if (s) inner[wk] = s;
+    }
+    byMonthWeeks[ym] = inner;
+  }
+  return { byMonth, byMonthWeeks };
 }

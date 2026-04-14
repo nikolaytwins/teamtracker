@@ -13,6 +13,7 @@ export const TIME_TASK_TYPE_OPTIONS = [
   { key: "layout", label: "Вёрстка" },
   { key: "revisions", label: "Правки" },
   { key: "sales", label: "Продажи" },
+  { key: "ai", label: "ИИ" },
   { key: "site", label: "Сайт" },
   { key: "presentation", label: "Презентация" },
   { key: "copy", label: "Тексты / копирайт" },
@@ -26,10 +27,15 @@ export const TIMER_TASK_OPTIONS_PROJECT = [
   { key: "design", label: "Дизайн" },
   { key: "layout", label: "Вёрстка" },
   { key: "revisions", label: "Правки" },
+  { key: "sales", label: "Продажи" },
+  { key: "ai", label: "ИИ" },
 ] as const;
 
 /** Селект для виртуальной карточки «Другое». */
-export const TIMER_TASK_OPTIONS_OTHER = [{ key: "sales", label: "Продажи" }] as const;
+export const TIMER_TASK_OPTIONS_OTHER = [
+  { key: "sales", label: "Продажи" },
+  { key: "ai", label: "ИИ" },
+] as const;
 
 /** Первый пресет типа задачи для карточки (быстрый старт с канбана / «Мои подзадачи»). */
 export function defaultTimerTaskTypeForCard(cardId: string, cardExtra: string | null): string {

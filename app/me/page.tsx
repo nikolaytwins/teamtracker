@@ -21,6 +21,7 @@ import {
   type MeSubtaskBucket,
 } from "@/lib/me-subtask-buckets";
 import { statusLabel, type PmStatusKey } from "@/lib/statuses";
+import { MeMonthlyBucketsChart, MeMonthlyByDayChart } from "@/components/me/me-monthly-charts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,8 +45,9 @@ type ActiveInfo = {
 type StatsPayload = {
   month: string;
   totalHours: number;
+  byDay?: Array<{ date: string; seconds: number; hours: number }>;
   breakdown: Array<{ taskType: string; label: string; hours: number }>;
-  buckets: Array<{ id: string; label: string; hours: number }>;
+  buckets: Array<{ id: string; label: string; hours: number; seconds?: number }>;
   averages: Array<{ taskType: string; label: string; avgHours: number; sessions: number }>;
 };
 
@@ -114,6 +116,8 @@ export default function MePage() {
   const [weekSessions, setWeekSessions] = useState<WeekSessionsPayload | null>(null);
   const [mySubtasks, setMySubtasks] = useState<MySubtaskRow[]>([]);
   const [subtaskMoveBusy, setSubtaskMoveBusy] = useState<string | null>(null);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
 
   const subtaskBuckets = useMemo(() => {
     const raw = bucketMySubtasks(mySubtasks);
@@ -123,6 +127,18 @@ export default function MePage() {
       backlog: sortSubtasksInColumn(raw.backlog),
     };
   }, [mySubtasks]);
+
+  const weekHistoryTotals = useMemo(() => {
+    if (!weekSessions) return { totalSec: 0, byDay: {} as Record<string, number> };
+    const byDay: Record<string, number> = {};
+    let totalSec = 0;
+    for (const d of weekSessions.days) {
+      const daySum = d.sessions.reduce((acc, s) => acc + s.durationSeconds, 0);
+      byDay[d.date] = daySum;
+      totalSec += daySum;
+    }
+    return { totalSec, byDay };
+  }, [weekSessions]);
 
   const projectType = useMemo(() => {
     const c = cards.find((x) => x.id === cardId);
@@ -250,6 +266,53 @@ export default function MePage() {
     return `${r}с`;
   }
 
+  /** Крупный вывод длительности сессии (часы и минуты — заметнее секунд). */
+  function formatSessionDurationPrimary(sec: number): string {
+    const s = Math.max(0, Math.floor(sec));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const r = s % 60;
+    if (h > 0) return `${h}\u00a0ч ${m}\u00a0м`;
+    if (m > 0) return `${m}\u00a0м ${r}\u00a0с`;
+    return `${r}\u00a0с`;
+  }
+
+  function formatHoursFromSeconds(sec: number): string {
+    const h = Math.max(0, sec) / 3600;
+    return `${h.toFixed(2)}\u00a0ч`;
+  }
+
+  async function quickCreateProject(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newProjectName.trim();
+    if (!name || creatingProject) return;
+    setCreatingProject(true);
+    setErr(null);
+    try {
+      const r = await fetch(apiUrl("/api/cards"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          deadline: null,
+          status: "not_started",
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Не удалось создать проект");
+      const card = d as PmCard;
+      if (card?.id) {
+        setNewProjectName("");
+        await loadCards();
+        setCardId(card.id);
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setCreatingProject(false);
+    }
+  }
+
   async function startSession() {
     setErr(null);
     if (!cardId) {
@@ -266,6 +329,7 @@ export default function MePage() {
         : taskChoice === "sales"
           ? SALES_TASK.key
           : taskChoice;
+    const isCustom = taskChoice === "custom";
     setActionBusy(true);
     try {
       const r = await fetch(apiUrl("/api/me/timer/start"), {
@@ -274,13 +338,15 @@ export default function MePage() {
         body: JSON.stringify({
           cardId,
           taskType: payloadTaskType,
-          taskNote: taskChoice === "custom" ? customText.trim() : "",
+          taskNote: isCustom ? customText.trim() : "",
+          createSubtask: isCustom && Boolean(customText.trim()),
         }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Ошибка");
       await loadActive();
       await loadWeekSessions();
+      await loadMySubtasks();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Ошибка");
     } finally {
@@ -477,7 +543,8 @@ export default function MePage() {
         <CardHeader className="pb-2">
           <CardTitle>Быстрый старт</CardTitle>
           <CardDescription>
-            Выберите проект и тип задачи. Сессии привязаны к вашему профилю. Один активный таймер на человека.
+            Выберите или создайте проект и тип задачи. Сессии привязаны к вашему профилю. Один активный таймер на человека.
+            Своя задача при старте добавляется на карточку как подзадача с вами в исполнителях.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -518,6 +585,22 @@ export default function MePage() {
                   Тип в карточке:{" "}
                   {projectType === "site" ? "сайт" : projectType === "presentation" ? "презентация" : "другое"}
                 </p>
+              ) : null}
+              {!isMemberUser ? (
+                <form onSubmit={(e) => void quickCreateProject(e)} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <Input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder="Новый проект — название карточки"
+                    className="flex-1 text-sm"
+                    disabled={creatingProject}
+                    aria-label="Название нового проекта"
+                  />
+                  <Button type="submit" variant="secondary" size="sm" disabled={creatingProject || !newProjectName.trim()} className="shrink-0">
+                    {creatingProject ? "Создание…" : "Создать"}
+                  </Button>
+                </form>
               ) : null}
             </div>
             <div>
@@ -715,14 +798,25 @@ export default function MePage() {
       </Card>
 
       <Card className="shadow-[var(--shadow-card)]">
-        <CardHeader className="flex flex-col gap-4 space-y-0 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>История за неделю</CardTitle>
-            <CardDescription className="mt-1">
-              Неделя ISO {weekIso}. Завершённые сессии по дням.
+        <CardHeader className="flex flex-col gap-4 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <CardTitle>История за неделю</CardTitle>
+              {weekSessions && weekHistoryTotals.totalSec > 0 ? (
+                <span className="rounded-lg bg-[var(--primary-soft)] px-2.5 py-1 text-lg font-bold tabular-nums tracking-tight text-[var(--primary)] ring-1 ring-[var(--primary)]/25">
+                  {formatSessionDurationPrimary(weekHistoryTotals.totalSec)}
+                  <span className="ml-2 text-xs font-semibold text-[var(--primary)]/80">
+                    ({formatHoursFromSeconds(weekHistoryTotals.totalSec)} всего)
+                  </span>
+                </span>
+              ) : null}
+            </div>
+            <CardDescription className="mt-1.5">
+              Неделя {weekIso}
+              {weekSessions ? ` · ${weekSessions.weekStart} — ${weekSessions.weekEnd}` : ""}. Завершённые сессии по дням.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="secondary"
@@ -749,46 +843,68 @@ export default function MePage() {
         </CardHeader>
         <CardContent>
           {weekSessions ? (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {weekSessions.days.every((d) => d.sessions.length === 0) ? (
                 <p className="text-sm text-[var(--muted-foreground)]">Нет записей за эту неделю</p>
               ) : (
                 weekSessions.days.map((day) =>
                   day.sessions.length === 0 ? null : (
                     <div key={day.date}>
-                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                        {new Date(day.date + "T12:00:00").toLocaleDateString("ru-RU", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                        })}
-                      </h3>
-                      <ul className="space-y-2">
+                      <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-[var(--border)] pb-2">
+                        <h3 className="text-sm font-semibold text-[var(--text)]">
+                          {new Date(day.date + "T12:00:00").toLocaleDateString("ru-RU", {
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                          })}
+                        </h3>
+                        {(weekHistoryTotals.byDay[day.date] ?? 0) > 0 ? (
+                          <span className="text-base font-bold tabular-nums text-[var(--text)]">
+                            {formatSessionDurationPrimary(weekHistoryTotals.byDay[day.date]!)}
+                            <span className="ml-1.5 text-xs font-semibold text-[var(--muted-foreground)]">
+                              за день · {formatHoursFromSeconds(weekHistoryTotals.byDay[day.date]!)}
+                            </span>
+                          </span>
+                        ) : null}
+                      </div>
+                      <ul className="space-y-3">
                         {day.sessions.map((s) => (
                           <li
                             key={s.id}
-                            className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] py-2 last:border-0"
+                            className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/35 p-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 dark:bg-[var(--surface-2)]/20"
                           >
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate font-medium text-[var(--text)]">{s.cardName}</div>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
-                                <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 font-medium text-[var(--text)] ring-1 ring-[var(--border)]">
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <div className="truncate text-base font-semibold leading-snug text-[var(--text)]">{s.cardName}</div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="max-w-full truncate rounded-full bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--text)] ring-1 ring-[var(--border)]">
                                   {s.taskLabel}
                                 </span>
-                                <span>
+                                <span className="text-xs tabular-nums text-[var(--muted-foreground)]">
                                   {formatClock(s.startedAt)} — {formatClock(s.endedAt)}
                                 </span>
-                                <span className="tabular-nums">{formatDur(s.durationSeconds)}</span>
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              disabled={actionBusy || !!active}
-                              onClick={() => void continueFromSession(s)}
-                              className="shrink-0 text-sm font-semibold text-[var(--primary)] hover:underline disabled:opacity-40"
-                            >
-                              Продолжить
-                            </button>
+                            <div className="flex flex-row items-center justify-between gap-3 sm:justify-end sm:gap-4">
+                              <div className="flex min-w-0 flex-1 flex-col sm:min-w-[7.5rem] sm:flex-none sm:items-end sm:text-right">
+                                <span
+                                  className="text-2xl font-bold tabular-nums leading-none tracking-tight text-[var(--text)] sm:text-3xl"
+                                  title={formatDur(s.durationSeconds)}
+                                >
+                                  {formatSessionDurationPrimary(s.durationSeconds)}
+                                </span>
+                                <span className="mt-1 text-xs font-medium tabular-nums text-[var(--muted-foreground)]">
+                                  {formatHoursFromSeconds(s.durationSeconds)} в сессии
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={actionBusy || !!active}
+                                onClick={() => void continueFromSession(s)}
+                                className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-[var(--primary)] ring-1 ring-[var(--primary)]/35 transition-colors hover:bg-[var(--primary-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Продолжить
+                              </button>
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -805,7 +921,7 @@ export default function MePage() {
         <CardHeader className="flex flex-col gap-4 space-y-0 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <CardTitle>Моя работа за месяц</CardTitle>
-            <CardDescription className="mt-1">Сводка и средние по сессиям</CardDescription>
+            <CardDescription className="mt-1">Сводка, графики по дням и категориям, детализация по задачам.</CardDescription>
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Месяц</label>
@@ -823,19 +939,10 @@ export default function MePage() {
               <p className="text-2xl font-bold tabular-nums tracking-tight text-[var(--text)]">
                 Всего: {stats.totalHours} ч
               </p>
-              <h3 className="text-sm font-semibold text-[var(--text)]">По категориям</h3>
-              <ul className="space-y-1 text-sm">
-                {stats.buckets.length === 0 ? (
-                  <li className="text-[var(--muted-foreground)]">Нет данных за месяц</li>
-                ) : (
-                  stats.buckets.map((b) => (
-                    <li key={b.id} className="flex justify-between gap-2 border-b border-[var(--border)] py-1.5 last:border-0">
-                      <span className="text-[var(--text)]">{b.label}</span>
-                      <span className="tabular-nums font-medium text-[var(--muted-foreground)]">{b.hours} ч</span>
-                    </li>
-                  ))
-                )}
-              </ul>
+              {stats.byDay && stats.byDay.length > 0 ? (
+                <MeMonthlyByDayChart byDay={stats.byDay} monthLabel={stats.month} />
+              ) : null}
+              <MeMonthlyBucketsChart buckets={stats.buckets} />
               <h3 className="pt-1 text-sm font-semibold text-[var(--text)]">Детально по задачам</h3>
               <ul className="space-y-1 text-sm text-[var(--muted-foreground)]">
                 {stats.breakdown.length === 0 ? (

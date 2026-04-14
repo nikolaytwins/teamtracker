@@ -62,6 +62,46 @@ export function getWorkerMonthlyBuckets(worker: SessionWorkerKey, monthYm: strin
   return { buckets, totalSeconds, rawRows: rows };
 }
 
+/** Все дни месяца YYYY-MM с суммой секунд (0 для дней без записей). */
+export function getWorkerMonthlyByDaySeries(worker: SessionWorkerKey, monthYm: string) {
+  ensurePhasesSchema();
+  const db = getDb();
+  const uid = worker.sub.trim();
+  const name = worker.name.trim();
+  const m = /^(\d{4})-(\d{2})$/.exec(monthYm);
+  if (!m) return [] as Array<{ date: string; seconds: number; hours: number }>;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  if (!y || mo < 1 || mo > 12) return [];
+  const lastDay = new Date(y, mo, 0).getDate();
+
+  const sparse =
+    !uid && !name
+      ? ([] as Array<{ d: string; s: number }>)
+      : (db
+          .prepare(
+            `SELECT strftime('%Y-%m-%d', started_at) as d, SUM(duration_seconds) as s
+             FROM pm_time_entries
+             WHERE ${WORKER_MATCH_SQL} AND strftime('%Y-%m', started_at) = ?
+               AND ended_at IS NOT NULL AND duration_seconds IS NOT NULL
+             GROUP BY d`
+          )
+          .all(uid, name, monthYm) as Array<{ d: string; s: number }>);
+
+  const byDate = new Map<string, number>();
+  for (const row of sparse) {
+    if (row.d) byDate.set(row.d, Number(row.s) || 0);
+  }
+
+  const out: Array<{ date: string; seconds: number; hours: number }> = [];
+  for (let day = 1; day <= lastDay; day++) {
+    const date = `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const seconds = byDate.get(date) ?? 0;
+    out.push({ date, seconds, hours: secondsToHours(seconds) });
+  }
+  return out;
+}
+
 /** Средняя длительность одной сессии по типу задачи (завершённые). */
 export function getWorkerAverageSessionByTaskType(worker: SessionWorkerKey, minSessions = 1) {
   ensurePhasesSchema();

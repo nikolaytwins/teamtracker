@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertMemberCardAccess } from "@/lib/member-board-access";
+import { extendCardPhasesPayload } from "@/lib/extend-card-phases-payload";
 import { buildCardPhasesPayload, deletePhase, updatePhase } from "@/lib/pm-phases";
 import { requireSessionRole } from "@/lib/require-role";
 
@@ -18,7 +19,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (body.sort_order != null) updates.sort_order = Number(body.sort_order);
     const phase = updatePhase(id, phaseId, updates);
     if (!phase) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ success: true, phase, payload: buildCardPhasesPayload(id) });
+    const base = buildCardPhasesPayload(id);
+    const payload = await extendCardPhasesPayload(id, base);
+    return NextResponse.json({ success: true, phase, payload });
   } catch (e) {
     console.error("PATCH phase", e);
     return NextResponse.json({ error: "Failed" }, { status: 500 });
@@ -34,7 +37,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     if (denied) return denied;
     const ok = deletePhase(id, phaseId);
     if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ success: true, payload: buildCardPhasesPayload(id) });
+    const base = buildCardPhasesPayload(id);
+    const payload = await extendCardPhasesPayload(id, base);
+    return NextResponse.json({ success: true, payload });
   } catch (e) {
     console.error("DELETE phase", e);
     return NextResponse.json({ error: "Failed" }, { status: 500 });

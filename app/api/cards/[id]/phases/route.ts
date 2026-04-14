@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertMemberCardAccess } from "@/lib/member-board-access";
+import { extendCardPhasesPayload } from "@/lib/extend-card-phases-payload";
 import { buildCardPhasesPayload, createPhase } from "@/lib/pm-phases";
 import { requireSessionRole } from "@/lib/require-role";
 
@@ -12,8 +13,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
     const { id } = await params;
     const denied = assertMemberCardAccess(auth.role, id);
     if (denied) return denied;
-    const payload = buildCardPhasesPayload(id);
-    if (!payload.card) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const base = buildCardPhasesPayload(id);
+    if (!base.card) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const payload = await extendCardPhasesPayload(id, base);
     return NextResponse.json(payload);
   } catch (e) {
     console.error("GET /api/cards/[id]/phases", e);
@@ -33,7 +35,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });
     const phase = createPhase(id, title);
     if (!phase) return NextResponse.json({ error: "Card not found" }, { status: 404 });
-    return NextResponse.json({ success: true, phase, payload: buildCardPhasesPayload(id) });
+    const base = buildCardPhasesPayload(id);
+    const payload = await extendCardPhasesPayload(id, base);
+    return NextResponse.json({ success: true, phase, payload });
   } catch (e) {
     console.error("POST /api/cards/[id]/phases", e);
     return NextResponse.json({ error: "Failed" }, { status: 500 });

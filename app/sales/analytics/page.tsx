@@ -1,5 +1,6 @@
 "use client";
 
+import { ProfiAnalyticsSection } from "@/components/sales/profi-analytics-section";
 import { apiUrl } from "@/lib/api-url";
 import { useCallback, useEffect, useState } from "react";
 
@@ -104,9 +105,11 @@ export default function SalesAnalyticsPage() {
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)] mb-2">Аналитика продаж</h1>
         <p className="text-sm text-[var(--muted-foreground)]">
-          Сводка: Profi + Threads, визиты, лиды, постоянники и оплаты по проектам. Ниже — детальная воронка лидов.
+          Profi.ru — конверсии и экономика; сводка по визитам и лидам; воронка лидов ниже.
         </p>
       </div>
+
+      <ProfiAnalyticsSection />
 
       <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -135,7 +138,7 @@ export default function SalesAnalyticsPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg border border-[var(--primary)]/15 bg-[var(--primary-soft)]">
-                <div className="text-xs font-medium text-[var(--primary)] uppercase">Отклики всего (Profi + Threads)</div>
+                <div className="text-xs font-medium text-[var(--primary)] uppercase">Отклики (Profi + Threads в данных)</div>
                 <div className="text-2xl font-bold text-[var(--text)] tabular-nums mt-1">
                   {dashboard.outreach.combined.count}
                 </div>
@@ -153,7 +156,7 @@ export default function SalesAnalyticsPage() {
                     ? `${Math.round(dashboard.outreach.profi.stats.netSpent).toLocaleString("ru-RU")} ₽`
                     : "—"}
                 </div>
-                <p className="text-xs text-[var(--muted-foreground)] mt-2">Threads: обычно 0 ₽</p>
+                <p className="text-xs text-[var(--muted-foreground)] mt-2">Раздел Threads временно скрыт</p>
               </div>
               <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-100">
                 <div className="text-xs font-medium text-emerald-800 uppercase">Выручка по проектам (сумма paid)</div>
@@ -190,14 +193,9 @@ export default function SalesAnalyticsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-lg border border-[var(--border)]">
-                <h3 className="text-sm font-semibold text-[var(--text)] mb-2">Визиты вкладок</h3>
+                <h3 className="text-sm font-semibold text-[var(--text)] mb-2">Визиты Profi.ru</h3>
                 <p className="text-sm text-[var(--text)]">
-                  Profi:{" "}
                   <span className="font-semibold tabular-nums">{dashboard.visits.profi.total}</span>
-                </p>
-                <p className="text-sm text-[var(--text)]">
-                  Threads:{" "}
-                  <span className="font-semibold tabular-nums">{dashboard.visits.threads.total}</span>
                 </p>
                 <p className="text-xs text-[var(--muted-foreground)] mt-2">Учёт с дебаунсом 30 мин на браузер</p>
               </div>

@@ -1,4 +1,5 @@
 import { getCard, getDb, updateCard } from "@/lib/db";
+import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
 import { computeSubtaskProgressStats } from "@/lib/subtask-progress";
 import type { PmStatusKey } from "@/lib/statuses";
 
@@ -51,6 +52,31 @@ export type PmSubtaskWithCard = PmSubtask & {
 };
 
 /** Открытые подзадачи пользователя (исполнитель или лид) на активных карточках. */
+/** Все незавершённые подзадачи на активных карточках (доска, режим «Задачи»). */
+export function listBoardOpenSubtasks(): PmSubtaskWithCard[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT s.*, c.name AS card_name, c.status AS card_status, c.extra AS card_extra
+       FROM pm_subtasks s
+       INNER JOIN pm_cards c ON c.id = s.card_id
+       WHERE s.completed_at IS NULL
+         AND c.id != ?
+         AND c.status NOT IN ('done', 'pause')
+       ORDER BY c.deadline ASC NULLS LAST, c.name ASC, s.sort_order ASC, s.created_at ASC`
+    )
+    .all(VIRTUAL_OTHER_CARD_ID) as Record<string, unknown>[];
+  return rows.map((row) => {
+    const sub = rowToSubtask(row);
+    return {
+      ...sub,
+      card_name: String(row.card_name ?? ""),
+      card_status: String(row.card_status) as PmStatusKey,
+      card_extra: row.card_extra != null ? String(row.card_extra) : null,
+    };
+  });
+}
+
 export function listOpenSubtasksForUser(userId: string): PmSubtaskWithCard[] {
   const uid = userId.trim();
   if (!uid) return [];

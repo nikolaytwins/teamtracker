@@ -5,7 +5,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const withStats = searchParams.get("stats") === "1";
-    const payload = await getAgencyRepo().outreachListJson("profi", withStats);
+    const omitItems = searchParams.get("omitItems") === "1";
+    const payload = await getAgencyRepo().outreachListJson("profi", withStats, { omitItems });
     return NextResponse.json(payload);
   } catch (error) {
     console.error("Error fetching profi responses:", error);

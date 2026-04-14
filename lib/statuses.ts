@@ -48,6 +48,26 @@ export const SIMPLE_VIEW_GROUPS = [
   { key: "pause" as const, label: "На паузе" },
 ] as const;
 
+export type SimpleViewGroupKey = (typeof SIMPLE_VIEW_GROUPS)[number]["key"];
+
+/** Сводная колонка простого вида по фактическому статусу карточки */
+export function statusToSimpleViewGroup(status: PmStatusKey): SimpleViewGroupKey {
+  if (status === "not_started") return "not_started";
+  if (status === "done") return "done";
+  if (status === "pause") return "pause";
+  if (APPROVAL_WAITING_STATUS_SET.has(status)) return "awaiting_approval";
+  return "in_progress";
+}
+
+/** Статус новой карточки при добавлении в сводную колонку */
+export function defaultStatusForSimpleViewGroup(group: SimpleViewGroupKey): PmStatusKey {
+  if (group === "not_started") return "not_started";
+  if (group === "done") return "done";
+  if (group === "pause") return "pause";
+  if (group === "awaiting_approval") return "copy_approval";
+  return "copywriting";
+}
+
 export function isValidStatus(s: string): s is PmStatusKey {
   return PM_STATUSES.some(({ key }) => key === s);
 }

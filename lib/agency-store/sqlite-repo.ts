@@ -1277,10 +1277,14 @@ export class SqliteAgencyRepo implements AgencyRepo {
     }
   }
 
-  async outreachListJson(platform: OutreachPlatform, withStats: boolean): Promise<unknown> {
+  async outreachListJson(
+    platform: OutreachPlatform,
+    withStats: boolean,
+    opts?: { omitItems?: boolean }
+  ): Promise<unknown> {
     const db = openSqlite();
     try {
-      return getOutreachListJson(db, platform, withStats);
+      return getOutreachListJson(db, platform, withStats, opts);
     } finally {
       db.close();
     }

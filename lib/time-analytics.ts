@@ -1,7 +1,9 @@
 import { getDb } from "@/lib/db";
-import { ensurePhasesSchema } from "@/lib/pm-phases";
+import { ensurePhasesSchema, type PmTimeEntry } from "@/lib/pm-phases";
 import { listUsersPublic } from "@/lib/tt-auth-db";
 import { parseISOWeekParam } from "@/lib/iso-week";
+
+const UNKNOWN_WORKER_LABEL = "(не указан)";
 
 function ensureTimeSchema() {
   ensurePhasesSchema();
@@ -68,7 +70,10 @@ export function searchProjectsWithTime(query: string) {
   return rows;
 }
 
-export function getProjectTimeDetail(cardId: string) {
+export function getProjectTimeDetail(
+  cardId: string,
+  opts?: { activeEntry: PmTimeEntry | null; nowMs?: number }
+) {
   ensureTimeSchema();
   const db = getDb();
   const card = db.prepare(`SELECT id, name FROM pm_cards WHERE id = ?`).get(cardId) as
@@ -83,7 +88,7 @@ export function getProjectTimeDetail(cardId: string) {
     )
     .get(cardId) as { s: number };
 
-  const byWorker = db
+  const byWorkerRows = db
     .prepare(
       `SELECT COALESCE(NULLIF(TRIM(worker_name), ''), '(не указан)') as w, SUM(duration_seconds) as s
        FROM pm_time_entries
@@ -105,7 +110,18 @@ export function getProjectTimeDetail(cardId: string) {
     )
     .all(cardId) as Array<{ phase_id: string; w: string; s: number }>;
 
-  const workerList = [...new Set(byWorker.map((r) => r.w))].sort();
+  let activeElapsed = 0;
+  let activeWorker: string | null = null;
+  let activePhaseId: string | null = null;
+  const a = opts?.activeEntry;
+  if (a && !a.ended_at && a.card_id === cardId) {
+    const nowMs = opts?.nowMs ?? Date.now();
+    activeElapsed = Math.max(0, Math.floor((nowMs - new Date(a.started_at).getTime()) / 1000));
+    activeWorker = a.worker_name?.trim() ? a.worker_name.trim() : UNKNOWN_WORKER_LABEL;
+    activePhaseId = a.phase_id;
+  }
+
+  const workerList = [...new Set([...byWorkerRows.map((r) => r.w), ...(activeWorker ? [activeWorker] : [])])].sort();
 
   const matrix = phases.map((p) => {
     const byW: Record<string, number> = {};
@@ -113,20 +129,26 @@ export function getProjectTimeDetail(cardId: string) {
     for (const r of raw) {
       if (r.phase_id === p.id) byW[r.w] = (byW[r.w] || 0) + r.s;
     }
+    if (activePhaseId === p.id && activeWorker && activeElapsed > 0) {
+      byW[activeWorker] = (byW[activeWorker] || 0) + activeElapsed;
+    }
     const phaseTotal = Object.values(byW).reduce((a, b) => a + b, 0);
     return { phaseId: p.id, phaseTitle: p.title, byWorker: byW, phaseSeconds: phaseTotal };
   });
 
+  const byWorkerMap = Object.fromEntries(byWorkerRows.map((r) => [r.w, r.s])) as Record<string, number>;
+  if (activeWorker && activeElapsed > 0) {
+    byWorkerMap[activeWorker] = (byWorkerMap[activeWorker] || 0) + activeElapsed;
+  }
+
   return {
     card,
-    totalSeconds: Number(totalRow?.s) || 0,
-    byWorker: Object.fromEntries(byWorker.map((r) => [r.w, r.s])) as Record<string, number>,
+    totalSeconds: (Number(totalRow?.s) || 0) + activeElapsed,
+    byWorker: byWorkerMap,
     workerList,
     matrix,
   };
 }
-
-const UNKNOWN_WORKER_LABEL = "(не указан)";
 
 export function getEmployeeMonthly(workerName: string, monthYm: string) {
   ensureTimeSchema();
