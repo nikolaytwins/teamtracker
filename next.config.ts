@@ -11,6 +11,8 @@ const root =
 const basePath = root ? "" : "/pm-board";
 
 const nextConfig: NextConfig = {
+  /** Сборка даёт `.next/standalone` — деплой на слабый VPS без `npm run build` на сервере (см. .github/workflows/deploy.yml). */
+  output: "standalone",
   ...(basePath ? { basePath } : {}),
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
 };

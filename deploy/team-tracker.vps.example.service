@@ -1,17 +1,18 @@
-# Пример для VPS: один репозиторий team-tracker, SQLite в data/ рядом с приложением.
+# Пример для VPS: один репозиторий team-tracker, SQLite в data/ рядом с корнем клона (не внутри .next/standalone).
 # 1) Скопировать: sudo cp deploy/team-tracker.vps.example.service /etc/systemd/system/team-tracker.service
-# 2) Править WorkingDirectory и User под ваш сервер
-# 3) Корень домена: TEAM_TRACKER_ROOT_DOMAIN=1 и сборка: TEAM_TRACKER_ROOT_DOMAIN=1 npm run build
-# 4) Под /pm-board: убрать TEAM_TRACKER_ROOT_DOMAIN из unit и собрать без этой переменной
+# 2) Править пути /opt/team-tracker, User, PORT под ваш сервер
+# 3) Деплой из GitHub Actions собирает standalone на раннере; на сервере запускается node server.js из .next/standalone
+# 4) Корень домена: в unit TEAM_TRACKER_ROOT_DOMAIN=1 и в GitHub Variables DEPLOY_BUILD_ROOT_DOMAIN=1
+# 5) Под /pm-board: убрать TEAM_TRACKER_ROOT_DOMAIN из unit и в Variables задать DEPLOY_BUILD_ROOT_DOMAIN не равным 1
 
 [Unit]
-Description=Team Tracker (Next.js)
+Description=Team Tracker (Next.js standalone)
 After=network.target
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/team-tracker
+WorkingDirectory=/opt/team-tracker/.next/standalone
 Environment=NODE_ENV=production
 Environment=PORT=3005
 Environment=TEAM_TRACKER_SELF_REGISTER=1
@@ -19,11 +20,10 @@ Environment=TEAM_TRACKER_SELF_REGISTER=1
 Environment=TEAM_TRACKER_ROOT_DOMAIN=1
 # Секреты (см. deploy/team-tracker.env.example): создайте /etc/team-tracker.env на сервере
 EnvironmentFile=-/etc/team-tracker.env
-# По умолчанию приложение использует data/agency.db и data/pm-board.db в WorkingDirectory.
-# Раскомментируйте, если базы лежат в другом месте:
-# Environment=AGENCY_SQLITE_PATH=/opt/team-tracker/data/agency.db
-# Environment=PM_BOARD_SQLITE_PATH=/opt/team-tracker/data/pm-board.db
-ExecStart=/usr/bin/npm run start
+# Обязательно абсолютные пути к клону — WorkingDirectory внутри .next/standalone
+Environment=AGENCY_SQLITE_PATH=/opt/team-tracker/data/agency.db
+Environment=PM_BOARD_SQLITE_PATH=/opt/team-tracker/data/pm-board.db
+ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=5
 

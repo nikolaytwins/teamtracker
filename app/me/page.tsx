@@ -20,7 +20,7 @@ import {
   sortSubtasksInColumn,
   type MeSubtaskBucket,
 } from "@/lib/me-subtask-buckets";
-import { parseExecutionDatesFromJson } from "@/lib/pm-subtasks";
+import { parseExecutionDatesFromJson } from "@/lib/pm-subtasks-shared";
 import { statusLabel, type PmStatusKey } from "@/lib/statuses";
 import { MeMonthlyBucketsChart, MeMonthlyByDayChart } from "@/components/me/me-monthly-charts";
 import { Button } from "@/components/ui/button";

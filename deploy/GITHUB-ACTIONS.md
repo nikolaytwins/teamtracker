@@ -1,12 +1,14 @@
 # Деплой через GitHub Actions
 
-После каждого **push в `main`** (и при ручном запуске **Actions → Deploy → Run workflow**) job подключается к VPS по **SSH**, делает `git fetch` + `reset` на `origin/main`, `npm ci`, `npm run build` и `systemctl restart` сервиса.
+После каждого **push в `main`** (и при ручном запуске **Actions → Deploy → Run workflow**) раннер GitHub **собирает** приложение (`npm ci`, `npm run build` с `output: "standalone"`), упаковывает `.next/standalone` в архив и по **SCP** кладёт его на VPS. На сервере выполняются только **лёгкие** шаги: `git fetch` + `reset` на `origin/main`, распаковка в `.next/standalone`, при необходимости **однократная** правка unit systemd (с `npm run start` на `node server.js`) и `systemctl restart`. **На VPS не запускаются** `npm ci` и `npm run build` — это снимает нагрузку по RAM/CPU на слабом VPS.
 
 ## 1. Один раз на сервере
 
-Как в [VPS-SETUP.md](./VPS-SETUP.md): клон в каталог (например `/opt/team-tracker`), первый `npm ci` / `build`, unit **systemd** (например `team-tracker`), nginx. На сервере должен быть **SSH-доступ** (ключ или пароль — ниже только ключ).
+Как в [VPS-SETUP.md](./VPS-SETUP.md): клон в каталог (например `/opt/team-tracker`), unit **systemd** (например `team-tracker`), nginx, при необходимости первый запуск после первого успешного деплоя из Actions (каталог `.next/standalone` создаёт workflow). Ручная `npm ci` / `build` на сервере **не обязательны**, если вы обновляетесь только через этот workflow.
 
-У пользователя, под которым заходит Actions, должны быть права на `git` в каталоге приложения и на `systemctl restart` (часто это **root** или пользователь в `sudoers` без пароля для этих команд).
+На сервере должен быть **SSH-доступ** по ключу. У пользователя, под которым заходит Actions, должны быть права на `git` в каталоге приложения и на `systemctl restart` (часто **root** или пользователь в `sudoers` без пароля для этих команд).
+
+**SQLite:** в unit для режима standalone `WorkingDirectory` указывает на `…/проект/.next/standalone`, поэтому пути к базам должны быть **абсолютные** (например `Environment=AGENCY_SQLITE_PATH=/opt/team-tracker/data/agency.db`), а не относительный только `data/…` от корня репо — см. [team-tracker.vps.example.service](./team-tracker.vps.example.service).
 
 ## 2. Deploy key или отдельный ключ только для CI
 
@@ -38,17 +40,17 @@ ssh-keygen -t ed25519 -f ./gha-team-tracker-deploy -N "" -C "github-actions-team
 
 | Переменная | По умолчанию | Смысл |
 |------------|--------------|--------|
-| `DEPLOY_PATH` | `/opt/team-tracker` | **Абсолютный путь на сервере**, где лежит клон (`git clone`). Если на VPS проект в другом месте — **обязательно** задайте эту переменную (иначе будет ошибка `cd: ... No such file or directory`). |
+| `DEPLOY_PATH` | `/opt/team-tracker` | **Абсолютный путь на сервере**, где лежит клон (`git clone`). Если проект в другом месте — задайте переменную (иначе будет ошибка «нет каталога»). |
 | `DEPLOY_SYSTEMD_UNIT` | `team-tracker` | Имя unit для `systemctl restart` |
-| `DEPLOY_BUILD_ROOT_DOMAIN` | `1` | `1` — сборка с `TEAM_TRACKER_ROOT_DOMAIN=1` (корень домена); любое другое значение — `npm run build` без этой переменной (сценарий с префиксом `/pm-board`) |
+| `DEPLOY_BUILD_ROOT_DOMAIN` | `1` | `1` — сборка на раннере с `TEAM_TRACKER_ROOT_DOMAIN=1` (корень домена); любое другое значение — `npm run build` **без** этой переменной (сценарий с префиксом `/pm-board`) |
 
-Переменные должны **совпадать** с тем, как у вас собрано приложение на сервере (см. unit и [VPS-SETUP.md](./VPS-SETUP.md)).
+Переменная `DEPLOY_BUILD_ROOT_DOMAIN` должна **совпадать** с тем, как у вас задано в systemd (`TEAM_TRACKER_ROOT_DOMAIN` в unit или в `EnvironmentFile`), см. [VPS-SETUP.md](./VPS-SETUP.md).
 
 ## 5. Проверка
 
 1. Заполните секреты (минимум `DEPLOY_HOST` + `DEPLOY_SSH_KEY`).
 2. Сделайте пустой коммит в `main` или **Run workflow** вручную.
-3. Во вкладке **Actions** откройте последний **Deploy** и смотрите лог шага **SSH — обновление и перезапуск**.
+3. Во вкладке **Actions** откройте последний **Deploy** и смотрите логи шагов **Сборка**, **Загрузка архива**, **Распаковка и перезапуск**.
 
 Если шаг падает на `systemctl`, на сервере настройте права для пользователя SSH или укажите `DEPLOY_USER` с нужными sudo-правилами.
 
@@ -60,28 +62,29 @@ ssh-keygen -t ed25519 -f ./gha-team-tracker-deploy -N "" -C "github-actions-team
 
 ### `Host key verification failed`
 
-На первом запуске SSH может не доверять ключу хоста. Варианты:
-
-- один раз с Mac выполнить `ssh user@host` и подтвердить fingerprint;
-- либо в репозитории добавить секрет **`DEPLOY_SSH_KNOWN_HOSTS`** (одна строка из вывода `ssh-keyscan -H ваш_хост`) и расширить workflow отдельным шагом записи в `~/.ssh/known_hosts` на раннере **или** использовать [fingerprints](https://github.com/appleboy/ssh-action#fingerprints) у `appleboy/ssh-action`, если добавите соответствующий input.
+На шаге **SCP** раннер добавляет хост в `known_hosts` через `ssh-keyscan`. Если хост менял ключ — обновите fingerprint вручную или перезапустите workflow после первого успешного `ssh-keyscan`.
 
 ### Приватный репозиторий GitHub
 
 На сервере `git fetch` должен иметь доступ к GitHub: **Deploy key** (read-only) на репозиторий, добавленный в `~/.ssh` на сервере и `git remote` на `git@github.com:...`, либо другой способ (HTTPS + token в `credential.helper` и т.д.).
 
-### `cd: /opt/team-tracker: No such file or directory`
+### `Нет каталога ... DEPLOY_PATH`
 
 На сервере **нет** каталога по умолчанию `/opt/team-tracker`. Варианты:
 
 1. **Создать и клонировать** (как в [VPS-SETUP.md](./VPS-SETUP.md)):
 
 ```bash
-sudo mkdir -p /opt && sudo git clone git@github.com:nikolaytwins/teamtracker.git /opt/team-tracker
+sudo mkdir -p /opt && sudo git clone git@github.com:USER/team-tracker.git /opt/team-tracker
 ```
 
-(подставьте свой URL репозитория, если другой.)
+(подставьте свой URL репозитория.)
 
-2. Либо в GitHub → **Variables** задать **`DEPLOY_PATH`** = тот путь, где у вас **уже** лежит проект (узнать на сервере: зайти по SSH и выполнить `pwd` внутри папки с `package.json`).
+2. Либо в GitHub → **Variables** задать **`DEPLOY_PATH`** = путь, где у вас **уже** лежит проект.
+
+### После деплоя пустые данные / не та база
+
+Проверьте в unit **абсолютные** `AGENCY_SQLITE_PATH` и `PM_BOARD_SQLITE_PATH` на каталог **клона** (родитель `.next/standalone`), не на внутреннюю папку standalone.
 
 ### `git reset --hard` стёр локальные правки на сервере
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { apiUrl } from "@/lib/api-url";
-import { parseExecutionDatesFromJson } from "@/lib/pm-subtasks";
+import { parseExecutionDatesFromJson } from "@/lib/pm-subtasks-shared";
 import { useCallback, useEffect, useState } from "react";
 
 const DROP_UNASSIGNED = "__unassigned__";

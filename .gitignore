@@ -2,6 +2,7 @@
 .DS_Store
 node_modules
 .next
+deploy-standalone.tgz
 *.db
 *.db.backup*
 .env*

@@ -1,4 +1,4 @@
-# Деплой на VPS по push в main (см. deploy/GITHUB-ACTIONS.md).
+# Сборка на раннере GitHub → на VPS только git sync, распаковка архива и restart (без npm ci/build на сервере).
 name: Deploy
 
 on:
@@ -8,51 +8,94 @@ on:
 
 concurrency:
   group: deploy-main
-  # Не обрываем деплой посередине — второй push дождётся конца первого
   cancel-in-progress: false
+
+env:
+  DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/team-tracker' }}
+  DEPLOY_SYSTEMD_UNIT: ${{ vars.DEPLOY_SYSTEMD_UNIT || 'team-tracker' }}
+  BUILD_ROOT_DOMAIN: ${{ vars.DEPLOY_BUILD_ROOT_DOMAIN || '1' }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      # Repository variables (Settings → Secrets and variables → Actions → Variables)
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/team-tracker' }}
-      DEPLOY_SYSTEMD_UNIT: ${{ vars.DEPLOY_SYSTEMD_UNIT || 'team-tracker' }}
-      # "1" = сборка как в VPS-SETUP с TEAM_TRACKER_ROOT_DOMAIN=1; иначе — обычный npm run build (/pm-board)
-      BUILD_ROOT_DOMAIN: ${{ vars.DEPLOY_BUILD_ROOT_DOMAIN || '1' }}
+    timeout-minutes: 45
     steps:
       - name: Проверка секретов
         shell: bash
         run: |
           if [[ -z "${{ secrets.DEPLOY_HOST }}" || -z "${{ secrets.DEPLOY_SSH_KEY }}" ]]; then
-            echo "::error::Задайте секреты DEPLOY_HOST и DEPLOY_SSH_KEY (и при необходимости DEPLOY_USER). Инструкция: deploy/GITHUB-ACTIONS.md"
+            echo "::error::Задайте DEPLOY_HOST и DEPLOY_SSH_KEY. См. deploy/GITHUB-ACTIONS.md"
             exit 1
           fi
 
-      - name: SSH — обновление и перезапуск
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Сборка (на раннере GitHub, не на VPS)
+        run: |
+          npm ci
+          if [[ "$BUILD_ROOT_DOMAIN" == "1" ]]; then
+            export TEAM_TRACKER_ROOT_DOMAIN=1
+          fi
+          npm run build
+
+      - name: Архив standalone
+        run: bash scripts/ci-package-standalone.sh
+
+      - name: SSH-ключ и known_hosts
+        run: |
+          install -d -m 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | tr -d '\r' | install -m 600 /dev/stdin ~/.ssh/deploy_ci_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Загрузка архива на сервер
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
+        run: |
+          scp -i ~/.ssh/deploy_ci_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            deploy-standalone.tgz \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/deploy-standalone.tgz"
+
+      - name: Распаковка и перезапуск (на VPS — только лёгкие команды)
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER != '' && secrets.DEPLOY_USER || 'root' }}
+          username: ${{ secrets.DEPLOY_USER || 'root' }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_SSH_PORT != '' && secrets.DEPLOY_SSH_PORT || 22 }}
-          command_timeout: 25m
-          envs: DEPLOY_PATH,DEPLOY_SYSTEMD_UNIT,BUILD_ROOT_DOMAIN
+          port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
+          command_timeout: 10m
+          envs: DEPLOY_PATH,DEPLOY_SYSTEMD_UNIT
           script: |
             set -euo pipefail
             if [ ! -d "$DEPLOY_PATH" ]; then
-              echo "::error::Каталог не найден: $DEPLOY_PATH. На сервере создайте каталог и клонируйте репо (см. deploy/VPS-SETUP.md), либо в GitHub → Settings → Variables задайте DEPLOY_PATH на реальный путь (например /root/team-tracker)."
+              echo "::error::Нет каталога $DEPLOY_PATH — задайте переменную DEPLOY_PATH или создайте symlink (см. deploy/GITHUB-ACTIONS.md)"
               exit 1
             fi
-            cd "$DEPLOY_PATH"
-            git config --global --add safe.directory "$DEPLOY_PATH" 2>/dev/null || true
+            REAL="$(readlink -f "$DEPLOY_PATH")"
+            cd "$REAL"
+            git config --global --add safe.directory "$REAL" 2>/dev/null || true
             git fetch origin main
             git reset --hard origin/main
-            npm ci
-            if [ "$BUILD_ROOT_DOMAIN" = "1" ]; then
-              TEAM_TRACKER_ROOT_DOMAIN=1 npm run build
-            else
-              npm run build
+            test -f /tmp/deploy-standalone.tgz
+            mkdir -p .next
+            rm -rf .next/standalone
+            mkdir -p .next/standalone
+            tar -xzf /tmp/deploy-standalone.tgz -C .next/standalone
+            rm -f /tmp/deploy-standalone.tgz
+            UNIT="/etc/systemd/system/${DEPLOY_SYSTEMD_UNIT}.service"
+            if [[ -f "$UNIT" ]] && grep -q 'npm run start' "$UNIT"; then
+              cp -a "$UNIT" "${UNIT}.bak.before-standalone-$(date +%Y%m%d%H%M%S)"
+              sed -i \
+                -e "s|^WorkingDirectory=.*|WorkingDirectory=${REAL}/.next/standalone|" \
+                -e "s|^ExecStart=.*|ExecStart=/usr/bin/node server.js|" \
+                "$UNIT"
+              systemctl daemon-reload
             fi
             systemctl restart "$DEPLOY_SYSTEMD_UNIT"
             systemctl is-active "$DEPLOY_SYSTEMD_UNIT"

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Запускать на VPS из корня репозитория (после git push с Mac).
+# Ручное обновление на VPS с полной сборкой (npm ci + build) — тяжело по RAM.
+# Обычно используйте деплой из GitHub Actions (см. deploy/GITHUB-ACTIONS.md): сборка на раннере, на VPS только распаковка.
 # Пример: cd /opt/team-tracker && TEAM_TRACKER_ROOT_DOMAIN=1 ./deploy/update-production.sh
 # Для префикса /pm-board: ./deploy/update-production.sh (без TEAM_TRACKER_ROOT_DOMAIN)
 set -euo pipefail

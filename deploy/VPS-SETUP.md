@@ -119,7 +119,9 @@ export PM_BOARD_SQLITE_PATH=/путь/к/pm-board.db
 
 ### 2.5. Сборка
 
-**Вариант A — сайт с корня домена** (как `tt.twinlabs.ru`, без `/pm-board`):
+**Вариант C (рекомендуется на слабом VPS)** — только **[GitHub Actions](GITHUB-ACTIONS.md)**: сборка идёт на раннере GitHub, на сервер уезжает готовый архив standalone; на VPS не нужны `npm ci` / `npm run build`. Достаточно клона, systemd и nginx.
+
+**Вариант A — сайт с корня домена** (как `tt.twinlabs.ru`, без `/pm-board`), сборка **вручную на сервере или локально**:
 
 ```bash
 cd /opt/team-tracker
@@ -135,7 +137,7 @@ npm ci
 npm run build
 ```
 
-Важно: режим `TEAM_TRACKER_ROOT_DOMAIN` должен **совпадать** при `npm run build` и при `npm start` (те же переменные в systemd).
+Важно: режим `TEAM_TRACKER_ROOT_DOMAIN` должен **совпадать** при `npm run build` и при запуске (те же переменные в systemd и в переменной **`DEPLOY_BUILD_ROOT_DOMAIN`** в GitHub, если деплоите через Actions).
 
 ### 2.6. systemd
 
@@ -146,7 +148,7 @@ npm run build
 ```bash
 cp /opt/team-tracker/deploy/team-tracker.vps.example.service /etc/systemd/system/team-tracker.service
 nano /etc/systemd/system/team-tracker.service
-# проверить WorkingDirectory, User, PORT, TEAM_TRACKER_ROOT_DOMAIN
+# проверить WorkingDirectory (для Actions: …/.next/standalone), ExecStart (node server.js), абсолютные пути к SQLite, User, PORT, TEAM_TRACKER_ROOT_DOMAIN
 systemctl daemon-reload
 systemctl enable team-tracker
 systemctl start team-tracker
@@ -169,7 +171,11 @@ journalctl -u team-tracker -f
 
 ---
 
-## Обновление после правок (ручной деплой одной командой на сервере)
+## Обновление после правок
+
+Обычно достаточно **push в `main`**: workflow из **[GITHUB-ACTIONS.md](./GITHUB-ACTIONS.md)** сам собирает проект на GitHub и обновляет только артефакт на VPS (без тяжёлой сборки на сервере).
+
+Ручной деплой на сервере (если Actions не используете):
 
 ```bash
 cd /opt/team-tracker
@@ -182,7 +188,7 @@ systemctl restart team-tracker
 
 ### Автодеплой из GitHub Actions
 
-После настройки секретов и переменных каждый **push в `main`** может сам обновлять сервер (те же шаги: `git reset` на `origin/main`, `npm ci`, `build`, `systemctl restart`). Полная инструкция: **[deploy/GITHUB-ACTIONS.md](./GITHUB-ACTIONS.md)**.
+После настройки секретов и переменных каждый **push в `main`** обновляет сервер: `git reset` на `origin/main`, распаковка standalone, `systemctl restart`. Полная инструкция: **[deploy/GITHUB-ACTIONS.md](./GITHUB-ACTIONS.md)**.
 
 ---
 
@@ -190,11 +196,11 @@ systemctl restart team-tracker
 
 | Симптом | Что проверить |
 |--------|----------------|
-| `Module not found` / ошибки импорта | На сервере выполнен `npm ci` после `git pull`. |
-| Падает на `better-sqlite3` | Установлен `build-essential`, пересборка: `rm -rf node_modules && npm ci`. |
+| `Module not found` / ошибки импорта | При ручной сборке на сервере: `npm ci` после `git pull`. При деплое через Actions сборка на раннере — на VPS проверьте, что последний workflow прошёл успешно. |
+| Падает на `better-sqlite3` | Только для ручной сборки на VPS: `build-essential`, `rm -rf node_modules && npm ci`. Через Actions нативный модуль собирается на раннере Ubuntu. |
 | 502 Bad Gateway | `systemctl status team-tracker`, процесс слушает `PORT` из unit; nginx `proxy_pass` на тот же порт. |
-| Страница без стилей / битые ссылки | Несовпадение `basePath`: пересобрать с тем же `TEAM_TRACKER_ROOT_DOMAIN`, что в systemd. |
-| `npm run build` убит (Killed) | Мало RAM — добавить swap или собирать на Mac и копировать `.next` (неудобно); лучше swap 2G. |
+| Страница без стилей / битые ссылки | Несовпадение `basePath`: в GitHub задать **`DEPLOY_BUILD_ROOT_DOMAIN`** так же, как `TEAM_TRACKER_ROOT_DOMAIN` в systemd, и перезапустить деплой. |
+| `npm run build` убит (Killed) на VPS | Перейти на деплой через GitHub Actions (сборка не на VPS) или добавить swap. |
 | Пустые проекты / нет данных | Нет файлов в `data/*.db` — скопировать с прода или с локальной машины (`scp`). |
 
 ---
