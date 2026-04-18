@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3003",
-    "build": "next build",
+    "build": "next build && bash scripts/sync-standalone-assets.sh",
     "start": "next start",
     "import-agency-to-supabase": "tsx scripts/import-agency-sqlite-to-supabase.ts",
     "backfill-worker-user-id": "tsx scripts/backfill-worker-user-id.ts"
