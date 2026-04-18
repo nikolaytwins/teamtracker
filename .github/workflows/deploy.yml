@@ -40,6 +40,10 @@ jobs:
           envs: DEPLOY_PATH,DEPLOY_SYSTEMD_UNIT,BUILD_ROOT_DOMAIN
           script: |
             set -euo pipefail
+            if [ ! -d "$DEPLOY_PATH" ]; then
+              echo "::error::Каталог не найден: $DEPLOY_PATH. На сервере создайте каталог и клонируйте репо (см. deploy/VPS-SETUP.md), либо в GitHub → Settings → Variables задайте DEPLOY_PATH на реальный путь (например /root/team-tracker)."
+              exit 1
+            fi
             cd "$DEPLOY_PATH"
             git config --global --add safe.directory "$DEPLOY_PATH" 2>/dev/null || true
             git fetch origin main

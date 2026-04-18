@@ -38,7 +38,7 @@ ssh-keygen -t ed25519 -f ./gha-team-tracker-deploy -N "" -C "github-actions-team
 
 | Переменная | По умолчанию | Смысл |
 |------------|--------------|--------|
-| `DEPLOY_PATH` | `/opt/team-tracker` | Каталог с клоном репозитория на сервере |
+| `DEPLOY_PATH` | `/opt/team-tracker` | **Абсолютный путь на сервере**, где лежит клон (`git clone`). Если на VPS проект в другом месте — **обязательно** задайте эту переменную (иначе будет ошибка `cd: ... No such file or directory`). |
 | `DEPLOY_SYSTEMD_UNIT` | `team-tracker` | Имя unit для `systemctl restart` |
 | `DEPLOY_BUILD_ROOT_DOMAIN` | `1` | `1` — сборка с `TEAM_TRACKER_ROOT_DOMAIN=1` (корень домена); любое другое значение — `npm run build` без этой переменной (сценарий с префиксом `/pm-board`) |
 
@@ -68,6 +68,20 @@ ssh-keygen -t ed25519 -f ./gha-team-tracker-deploy -N "" -C "github-actions-team
 ### Приватный репозиторий GitHub
 
 На сервере `git fetch` должен иметь доступ к GitHub: **Deploy key** (read-only) на репозиторий, добавленный в `~/.ssh` на сервере и `git remote` на `git@github.com:...`, либо другой способ (HTTPS + token в `credential.helper` и т.д.).
+
+### `cd: /opt/team-tracker: No such file or directory`
+
+На сервере **нет** каталога по умолчанию `/opt/team-tracker`. Варианты:
+
+1. **Создать и клонировать** (как в [VPS-SETUP.md](./VPS-SETUP.md)):
+
+```bash
+sudo mkdir -p /opt && sudo git clone git@github.com:nikolaytwins/teamtracker.git /opt/team-tracker
+```
+
+(подставьте свой URL репозитория, если другой.)
+
+2. Либо в GitHub → **Variables** задать **`DEPLOY_PATH`** = тот путь, где у вас **уже** лежит проект (узнать на сервере: зайти по SSH и выполнить `pwd` внутри папки с `package.json`).
 
 ### `git reset --hard` стёр локальные правки на сервере
 
