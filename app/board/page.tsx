@@ -94,6 +94,18 @@ function formatDate(s: string | null) {
   }
 }
 
+/** Левая полоска на карточке: согласование — оранж., в работе — зелёная. */
+function cardStatusLeftAccent(card: PmCard): string {
+  const g = statusToSimpleViewGroup(card.status);
+  if (g === "awaiting_approval") return "border-l-4 border-l-orange-500";
+  if (g === "in_progress") return "border-l-4 border-l-emerald-500";
+  if (g === "done") return "border-l-4 border-l-slate-400";
+  if (g === "pause") return "border-l-4 border-l-amber-500";
+  return "border-l-4 border-l-[var(--border)]";
+}
+
+const BOARD_VIEW_LS = "pm-board-view-v1";
+
 function formatPhaseDuration(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec));
   const h = Math.floor(s / 3600);
@@ -109,8 +121,12 @@ export default function BoardPage() {
   const [error, setError] = useState<string | null>(null);
   const [boardDisplay, setBoardDisplay] = useState<"list" | "projects" | "tasks" | "stages">(() => {
     if (typeof window === "undefined") return "list";
-    const v = localStorage.getItem("pm-board-display");
-    if (v === "tasks" || v === "stages" || v === "projects" || v === "list") return v;
+    try {
+      const v = localStorage.getItem(BOARD_VIEW_LS);
+      if (v === "tasks" || v === "stages" || v === "projects" || v === "list") return v;
+    } catch {
+      /* ignore */
+    }
     return "list";
   });
   const [projectScopeTab, setProjectScopeTab] = useState<"active" | "full">(() => {
@@ -348,7 +364,7 @@ export default function BoardPage() {
 
   useEffect(() => {
     try {
-      localStorage.setItem("pm-board-display", boardDisplay);
+      localStorage.setItem(BOARD_VIEW_LS, boardDisplay);
     } catch {
       /* ignore */
     }
@@ -662,7 +678,7 @@ export default function BoardPage() {
         draggable
         onDragStart={(e) => handleDragStart(e, card.id)}
         onClick={() => openModal(card)}
-        className="group cursor-pointer rounded-2xl bg-[var(--surface)] p-4 shadow-[var(--shadow-kanban-card)] transition-[box-shadow,transform] hover:shadow-[var(--shadow-kanban-card-hover)] active:scale-[0.99] dark:ring-0"
+        className={`group cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 pl-3 shadow-[var(--shadow-kanban-card)] transition-[box-shadow,transform] hover:shadow-[var(--shadow-kanban-card-hover)] active:scale-[0.99] dark:ring-0 ${cardStatusLeftAccent(card)}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -1021,7 +1037,7 @@ export default function BoardPage() {
       )}
 
       {boardDisplay === "list" && (
-        <div className="mx-auto max-w-3xl space-y-4 pb-10">
+        <div className="mx-auto w-full max-w-none space-y-4 pb-10">
           {cardsForSimpleBoard.length === 0 ? (
             <p className="text-sm text-[var(--muted-foreground)]">Нет проектов в этом фильтре.</p>
           ) : (
@@ -1032,7 +1048,7 @@ export default function BoardPage() {
               return (
                 <div
                   key={card.id}
-                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-kanban-card)]"
+                  className={`overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] pl-0 shadow-[var(--shadow-kanban-card)] ${cardStatusLeftAccent(card)}`}
                 >
                   <div
                     role="button"
@@ -1064,7 +1080,7 @@ export default function BoardPage() {
                           {simpleScopeLabel(card)}
                         </span>
                         <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text)] ring-1 ring-[var(--border)]">
-                          {statusLabel(card.status)}
+                          {simpleScopeLabel(card)}
                         </span>
                       </div>
                       {prog && prog.total > 0 ? (
@@ -1089,13 +1105,15 @@ export default function BoardPage() {
                     </div>
                     <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                       <select
-                        className="tt-select max-w-[10.5rem] py-2 text-xs"
-                        value={card.status}
-                        onChange={(e) => void updateStatus(card.id, e.target.value as PmStatusKey)}
+                        className="tt-select max-w-[11rem] py-2 text-xs"
+                        value={statusToSimpleViewGroup(card.status)}
+                        onChange={(e) =>
+                          void updateStatus(card.id, defaultStatusForSimpleViewGroup(e.target.value as SimpleViewGroupKey))
+                        }
                       >
-                        {PM_STATUSES.map((s) => (
-                          <option key={s.key} value={s.key}>
-                            {s.label}
+                        {SIMPLE_VIEW_GROUPS.map((g) => (
+                          <option key={g.key} value={g.key}>
+                            {g.label}
                           </option>
                         ))}
                       </select>
@@ -1116,7 +1134,7 @@ export default function BoardPage() {
                       onClick={() => openModal(card)}
                       className="text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--text)] hover:underline"
                     >
-                      Описание и комментарии
+                      Описание и подзадачи
                     </button>
                   </div>
                   {open ? (
@@ -1343,16 +1361,18 @@ export default function BoardPage() {
                 placeholder="Без названия"
               />
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
-                <span className="font-medium text-[var(--text)]">Статус</span>
+                <span className="font-medium text-[var(--text)]">Статус проекта</span>
                 <select
-                  value={modalCard.status}
-                  onChange={(e) => void updateStatus(modalCard.id, e.target.value as PmStatusKey)}
+                  value={statusToSimpleViewGroup(modalCard.status)}
+                  onChange={(e) =>
+                    void updateStatus(modalCard.id, defaultStatusForSimpleViewGroup(e.target.value as SimpleViewGroupKey))
+                  }
                   className="tt-select py-1.5 text-xs"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {PM_STATUSES.map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.label}
+                  {SIMPLE_VIEW_GROUPS.map((g) => (
+                    <option key={g.key} value={g.key}>
+                      {g.label}
                     </option>
                   ))}
                 </select>

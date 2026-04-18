@@ -6,8 +6,14 @@ import { TIME_TASK_TYPE_OPTIONS, labelForTaskType } from "@/lib/time-task-types"
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { CardCommentsPanel } from "@/components/board/CardCommentsPanel";
 import { ProjectSubtasksPanel } from "@/components/board/ProjectSubtasksPanel";
+import {
+  SIMPLE_VIEW_GROUPS,
+  defaultStatusForSimpleViewGroup,
+  statusToSimpleViewGroup,
+  type PmStatusKey,
+  type SimpleViewGroupKey,
+} from "@/lib/statuses";
 
 const PM_BOARD_TEAM_KEY = "pm-board-team";
 
@@ -79,6 +85,8 @@ export default function CardPhasesPage() {
   const [linkedLeadId, setLinkedLeadId] = useState<string | null>(null);
   const [logWorkerFilter, setLogWorkerFilter] = useState("");
   const [logTaskTypeFilter, setLogTaskTypeFilter] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [savingDesc, setSavingDesc] = useState(false);
 
   useEffect(() => {
     setTeamList(loadTeamFromStorage());
@@ -150,6 +158,68 @@ export default function CardPhasesPage() {
       setLoading(false);
     }
   }, [cardId, applyPayload]);
+
+  useEffect(() => {
+    if (!payload?.card) return;
+    let ex: Record<string, unknown> = {};
+    try {
+      ex = payload.card.extra ? JSON.parse(payload.card.extra) : {};
+      if (typeof ex !== "object" || ex === null) ex = {};
+    } catch {
+      ex = {};
+    }
+    const d = typeof ex.description === "string" ? ex.description : "";
+    setProjectDescription(d);
+  }, [payload?.card?.id, payload?.card?.extra]);
+
+  const persistDescription = useCallback(async () => {
+    const card = payload?.card;
+    if (!card || !cardId) return;
+    let ex: Record<string, unknown> = {};
+    try {
+      ex = card.extra ? JSON.parse(card.extra) : {};
+      if (typeof ex !== "object" || ex === null) ex = {};
+    } catch {
+      ex = {};
+    }
+    const next: Record<string, unknown> = { ...ex };
+    if (projectDescription.trim()) next.description = projectDescription.trim();
+    else delete next.description;
+    setSavingDesc(true);
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${cardId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: card.name, extra: JSON.stringify(next) }),
+      });
+      const updated = await r.json();
+      if (r.ok) setPayload((p) => (p ? { ...p, card: updated } : p));
+    } catch {
+      /* ignore */
+    } finally {
+      setSavingDesc(false);
+    }
+  }, [cardId, payload?.card, projectDescription]);
+
+  async function updateCardSimpleStatus(g: SimpleViewGroupKey) {
+    const newStatus: PmStatusKey = defaultStatusForSimpleViewGroup(g);
+    setSaving(true);
+    setError(null);
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${cardId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Не удалось обновить статус");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -339,10 +409,37 @@ export default function CardPhasesPage() {
           Аналитика времени
         </Link>
       </div>
-      <h1 className="text-2xl font-bold text-[var(--text)] mb-1">{card.name}</h1>
-      <p className="text-sm text-[var(--muted-foreground)] mb-3">
-        Этапы, подзадачи и таймтрекер. Статусы колонок канбана меняются на доске «Проекты».
-      </p>
+      <h1 className="text-2xl font-bold text-[var(--text)] mb-3">{card.name}</h1>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <label className="text-sm text-[var(--muted-foreground)]">
+          Статус проекта
+          <select
+            className="tt-select ml-2 py-1.5 text-sm"
+            value={statusToSimpleViewGroup(card.status)}
+            onChange={(e) => void updateCardSimpleStatus(e.target.value as SimpleViewGroupKey)}
+          >
+            {SIMPLE_VIEW_GROUPS.map((g) => (
+              <option key={g.key} value={g.key}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="mb-6">
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+          Описание и ссылки
+        </label>
+        <textarea
+          value={projectDescription}
+          onChange={(e) => setProjectDescription(e.target.value)}
+          onBlur={() => void persistDescription()}
+          placeholder="Ссылки на ТЗ, Figma, договор…"
+          rows={5}
+          className="tt-input w-full min-h-[120px] resize-y text-sm leading-relaxed"
+        />
+        {savingDesc ? <p className="mt-1 text-xs text-[var(--muted-foreground)]">Сохранение…</p> : null}
+      </div>
       {cardAssignees.length > 0 ? (
         <p className="text-sm text-[var(--text)] mb-4">
           <span className="text-[var(--muted-foreground)]">Ответственные в карточке:</span>{" "}
@@ -360,17 +457,59 @@ export default function CardPhasesPage() {
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       <div className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
-        <h2 className="text-base font-semibold text-[var(--text)]">Этапы и подзадачи</h2>
-        <p className="mt-1 text-xs text-[var(--muted-foreground)]">Синхронизировано со списком на доске.</p>
-        <ProjectSubtasksPanel cardId={cardId} onChanged={() => void load()} />
-      </div>
-
-      <div className="mb-6">
-        <CardCommentsPanel cardId={cardId} />
-      </div>
-
-      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 mb-6">
-        <div className="grid gap-6 md:grid-cols-2 md:items-start">
+        <h2 className="text-lg font-semibold text-[var(--text)] mb-1">Этапы, таймер и подзадачи</h2>
+        <p className="mb-4 text-xs text-[var(--muted-foreground)] leading-relaxed">
+          Чтобы запустить учёт времени, нажмите «Приступил» на этапе ниже. Перед этим выберите сотрудника и при необходимости тип задачи.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 border-b border-[var(--border)]/70 pb-4">
+          <div>
+            <label className="block text-xs text-[var(--muted-foreground)] mb-1">Сотрудник</label>
+            <select
+              value={workerSelect}
+              onChange={(e) => setWorkerSelect(e.target.value)}
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)]"
+            >
+              <option value="">— из списка команды</option>
+              {teamList.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+              {workerSelect && !teamList.some((t) => t.name === workerSelect) ? (
+                <option value={workerSelect}>{workerSelect}</option>
+              ) : null}
+            </select>
+            <input
+              type="text"
+              value={workerManual}
+              onChange={(e) => setWorkerManual(e.target.value)}
+              placeholder="Или введите имя вручную"
+              className="mt-2 w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+            />
+            {!effectiveWorker ? (
+              <p className="text-xs text-amber-700 mt-1">Нужно выбрать или ввести сотрудника.</p>
+            ) : null}
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--muted-foreground)] mb-1">Тип задачи</label>
+            <select
+              value={taskType}
+              onChange={(e) => setTaskType(e.target.value)}
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)]"
+            >
+              <option value="">— не указан</option>
+              {TIME_TASK_TYPE_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-[var(--muted-foreground)] mt-2">
+              Список команды редактируется в канбане (ответственные в карточке).
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-6 md:grid-cols-2 md:items-start">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Всего по проекту</div>
@@ -447,14 +586,74 @@ export default function CardPhasesPage() {
             )}
           </div>
         </div>
-        {active && !active.ended_at && (
+        {active && !active.ended_at ? (
           <p className="text-sm text-emerald-700 mt-4 border-t border-[var(--border)] pt-3">
             Идёт учёт… {formatDuration(sessionElapsedSec)} ·{" "}
             {active.worker_name ? active.worker_name : "—"} ·{" "}
             {labelForTaskType(active.task_type)} · этап:{" "}
             {payload.phases.find((p) => p.id === active.phase_id)?.title ?? "—"}
           </p>
-        )}
+        ) : null}
+        <form onSubmit={addPhase} className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
+          <input
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Название этапа для таймера"
+            className="flex-1 min-w-[200px] px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+          />
+          <button
+            type="submit"
+            disabled={saving || !newTitle.trim()}
+            className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-700 disabled:opacity-50"
+          >
+            Добавить этап
+          </button>
+        </form>
+        <div className="mt-4 space-y-3 border-t border-[var(--border)] pt-4">
+          {payload.phases.length === 0 ? (
+            <p className="text-[var(--muted-foreground)] text-sm">Добавьте этап выше — затем нажмите «Приступил».</p>
+          ) : (
+            payload.phases.map((p) => {
+              const isRunning = active && !active.ended_at && active.phase_id === p.id;
+              const displaySec = p.totalSeconds + (isRunning ? driftSec : 0);
+              return (
+                <div
+                  key={p.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)]/20 p-4"
+                >
+                  <div>
+                    <div className="font-medium text-[var(--text)]">{p.title}</div>
+                    <div className="text-sm text-[var(--muted-foreground)] tabular-nums">
+                      Время: {formatDuration(displaySec)}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={saving || Boolean(active && !active.ended_at) || !effectiveWorker.trim()}
+                      onClick={() => void startWork(p.id)}
+                      className="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40"
+                    >
+                      Приступил
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving || Boolean(active && !active.ended_at)}
+                      onClick={() => void removePhase(p.id)}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] disabled:opacity-40"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <div className="mt-4 border-t border-[var(--border)] pt-2">
+          <ProjectSubtasksPanel cardId={cardId} onChanged={() => void load()} />
+        </div>
       </div>
 
       {(payload.timeMatrix ?? []).length > 0 && matrixWorkerColumns.length > 0 ? (
@@ -521,117 +720,6 @@ export default function CardPhasesPage() {
           </ul>
         </div>
       ) : null}
-
-      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 mb-6 space-y-3">
-        <div className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">Перед «Приступил»</div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="block text-xs text-[var(--muted-foreground)] mb-1">Сотрудник</label>
-            <select
-              value={workerSelect}
-              onChange={(e) => setWorkerSelect(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)]"
-            >
-              <option value="">— из списка команды</option>
-              {teamList.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name}
-                </option>
-              ))}
-              {workerSelect && !teamList.some((t) => t.name === workerSelect) ? (
-                <option value={workerSelect}>{workerSelect}</option>
-              ) : null}
-            </select>
-            <input
-              type="text"
-              value={workerManual}
-              onChange={(e) => setWorkerManual(e.target.value)}
-              placeholder="Или введите имя вручную"
-              className="mt-2 w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
-            />
-            {!effectiveWorker ? (
-              <p className="text-xs text-amber-700 mt-1">Нужно выбрать или ввести сотрудника.</p>
-            ) : null}
-          </div>
-          <div>
-            <label className="block text-xs text-[var(--muted-foreground)] mb-1">Тип задачи</label>
-            <select
-              value={taskType}
-              onChange={(e) => setTaskType(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm bg-[var(--surface)]"
-            >
-              <option value="">— не указан</option>
-              {TIME_TASK_TYPE_OPTIONS.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-[var(--muted-foreground)] mt-2">
-              Список команды редактируется в канбане (ответственные в карточке).
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <form onSubmit={addPhase} className="flex flex-wrap gap-2 mb-6">
-        <input
-          type="text"
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          placeholder="Название этапа"
-          className="flex-1 min-w-[200px] px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
-        />
-        <button
-          type="submit"
-          disabled={saving || !newTitle.trim()}
-          className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-700 disabled:opacity-50"
-        >
-          Добавить этап
-        </button>
-      </form>
-
-      <div className="space-y-3 mb-8">
-        {payload.phases.length === 0 ? (
-          <p className="text-[var(--muted-foreground)] text-sm">Добавьте этапы — затем нажмите «Приступил» на нужном.</p>
-        ) : (
-          payload.phases.map((p) => {
-            const isRunning = active && !active.ended_at && active.phase_id === p.id;
-            const displaySec = p.totalSeconds + (isRunning ? driftSec : 0);
-            return (
-              <div
-                key={p.id}
-                className="flex flex-wrap items-center justify-between gap-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4"
-              >
-                <div>
-                  <div className="font-medium text-[var(--text)]">{p.title}</div>
-                  <div className="text-sm text-[var(--muted-foreground)] tabular-nums">Время: {formatDuration(displaySec)}</div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={
-                      saving || Boolean(active && !active.ended_at) || !effectiveWorker.trim()
-                    }
-                    onClick={() => void startWork(p.id)}
-                    className="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40"
-                  >
-                    Приступил
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saving || Boolean(active && !active.ended_at)}
-                    onClick={() => void removePhase(p.id)}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] disabled:opacity-40"
-                  >
-                    Удалить
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
 
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] overflow-hidden">
         <div className="p-4 border-b border-[var(--border)]">
