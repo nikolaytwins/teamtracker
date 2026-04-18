@@ -180,6 +180,10 @@ TEAM_TRACKER_ROOT_DOMAIN=1 npm run build   # или без переменной 
 systemctl restart team-tracker
 ```
 
+### Автодеплой из GitHub Actions
+
+После настройки секретов и переменных каждый **push в `main`** может сам обновлять сервер (те же шаги: `git reset` на `origin/main`, `npm ci`, `build`, `systemctl restart`). Полная инструкция: **[deploy/GITHUB-ACTIONS.md](./GITHUB-ACTIONS.md)**.
+
 ---
 
 ## Частые ошибки

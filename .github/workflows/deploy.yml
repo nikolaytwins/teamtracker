@@ -1,0 +1,54 @@
+# Деплой на VPS по push в main (см. deploy/GITHUB-ACTIONS.md).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  # Не обрываем деплой посередине — второй push дождётся конца первого
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Repository variables (Settings → Secrets and variables → Actions → Variables)
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/team-tracker' }}
+      DEPLOY_SYSTEMD_UNIT: ${{ vars.DEPLOY_SYSTEMD_UNIT || 'team-tracker' }}
+      # "1" = сборка как в VPS-SETUP с TEAM_TRACKER_ROOT_DOMAIN=1; иначе — обычный npm run build (/pm-board)
+      BUILD_ROOT_DOMAIN: ${{ vars.DEPLOY_BUILD_ROOT_DOMAIN || '1' }}
+    steps:
+      - name: Проверка секретов
+        shell: bash
+        run: |
+          if [[ -z "${{ secrets.DEPLOY_HOST }}" || -z "${{ secrets.DEPLOY_SSH_KEY }}" ]]; then
+            echo "::error::Задайте секреты DEPLOY_HOST и DEPLOY_SSH_KEY (и при необходимости DEPLOY_USER). Инструкция: deploy/GITHUB-ACTIONS.md"
+            exit 1
+          fi
+
+      - name: SSH — обновление и перезапуск
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER != '' && secrets.DEPLOY_USER || 'root' }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_SSH_PORT != '' && secrets.DEPLOY_SSH_PORT || 22 }}
+          command_timeout: 25m
+          envs: DEPLOY_PATH,DEPLOY_SYSTEMD_UNIT,BUILD_ROOT_DOMAIN
+          script: |
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+            git config --global --add safe.directory "$DEPLOY_PATH" 2>/dev/null || true
+            git fetch origin main
+            git reset --hard origin/main
+            npm ci
+            if [ "$BUILD_ROOT_DOMAIN" = "1" ]; then
+              TEAM_TRACKER_ROOT_DOMAIN=1 npm run build
+            else
+              npm run build
+            fi
+            systemctl restart "$DEPLOY_SYSTEMD_UNIT"
+            systemctl is-active "$DEPLOY_SYSTEMD_UNIT"
