@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCard } from "@/lib/db";
 import { getServerSession } from "@/lib/get-session";
-import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
 import {
   getOrCreatePhaseByTitle,
   QUICK_WORK_PHASE_TITLE,
   startTimer,
 } from "@/lib/pm-phases";
-import { createSubtask } from "@/lib/pm-subtasks";
+import { createSubtask, findOpenSubtaskByTitle } from "@/lib/pm-subtasks";
 import { notifySubtaskCreated } from "@/lib/subtask-notifications";
 
 export async function POST(request: NextRequest) {
@@ -19,7 +18,6 @@ export async function POST(request: NextRequest) {
     const rawTaskType = body.taskType != null ? String(body.taskType).trim() : "";
     let taskType = rawTaskType;
     const taskNoteRaw = body.taskNote != null ? String(body.taskNote).trim() : "";
-    const createSubtaskFlag = body.createSubtask === true;
     if (taskType === "custom") {
       taskType = taskNoteRaw ? `custom:${taskNoteRaw}` : "custom";
     }
@@ -27,26 +25,29 @@ export async function POST(request: NextRequest) {
     if (!getCard(cardId)) return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
     const phase = getOrCreatePhaseByTitle(cardId, QUICK_WORK_PHASE_TITLE);
     if (!phase) return NextResponse.json({ error: "Не удалось создать этап" }, { status: 500 });
+    let subtaskId: string | null = null;
+    if (rawTaskType === "custom" && taskNoteRaw) {
+      const existing = findOpenSubtaskByTitle(cardId, taskNoteRaw);
+      const sub =
+        existing ??
+        createSubtask({
+          cardId,
+          title: taskNoteRaw,
+          assigneeUserId: session.sub,
+        });
+      if (sub) {
+        subtaskId = sub.id;
+        if (!existing) notifySubtaskCreated({ actorUserId: session.sub, cardId, subtask: sub });
+      }
+    }
     const result = startTimer(cardId, phase.id, {
       workerName: session.name,
       workerUserId: session.sub,
       taskType: taskType || null,
       taskNote: taskNoteRaw && taskType !== "custom" ? taskNoteRaw : null,
+      subtaskId,
     });
     if (!result) return NextResponse.json({ error: "Не удалось запустить таймер" }, { status: 400 });
-    if (
-      createSubtaskFlag &&
-      cardId !== VIRTUAL_OTHER_CARD_ID &&
-      rawTaskType === "custom" &&
-      taskNoteRaw
-    ) {
-      const sub = createSubtask({
-        cardId,
-        title: taskNoteRaw,
-        assigneeUserId: session.sub,
-      });
-      if (sub) notifySubtaskCreated({ actorUserId: session.sub, cardId, subtask: sub });
-    }
     return NextResponse.json({ ok: true, entry: result.entry });
   } catch (e) {
     console.error("POST /api/me/timer/start", e);

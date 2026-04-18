@@ -283,7 +283,7 @@ export default function Navigation() {
         { href: appPath("/me"), label: "Профиль", active: pathname === "/me", icon: "me" },
         {
           href: appPath("/board"),
-          label: "Канбан",
+          label: "Проекты",
           active:
             pathname === "/board" ||
             (!!pathname?.startsWith("/board/") &&
@@ -335,7 +335,7 @@ export default function Navigation() {
         {!compact ? (
           <div className="min-w-0">
             <div className="truncate text-[15px] font-bold tracking-tight text-[var(--text)]">Team Tracker</div>
-            <p className="text-[11px] text-[var(--muted-foreground)]">Профиль · канбан · финансы</p>
+            <p className="text-[11px] text-[var(--muted-foreground)]">Профиль · проекты · финансы</p>
           </div>
         ) : null}
       </Link>

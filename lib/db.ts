@@ -55,8 +55,23 @@ function ensureDb() {
   }
   ensureOtherCard(_db);
   ensurePmSubtasksTable(_db);
+  ensurePmCardCommentsTable(_db);
   ensureTtNotificationsTable(_db);
   return _db;
+}
+
+function ensurePmCardCommentsTable(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pm_card_comments (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      author_user_id TEXT NOT NULL,
+      author_display_name TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_pm_card_comments_card_created ON pm_card_comments(card_id, created_at ASC);
+  `);
 }
 
 function ensureTtNotificationsTable(db: Database.Database) {
@@ -91,6 +106,21 @@ function ensurePmSubtasksTable(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_pm_subtasks_card ON pm_subtasks(card_id);
   `);
+  try {
+    db.exec(`ALTER TABLE pm_subtasks ADD COLUMN phase_id TEXT`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE pm_subtasks ADD COLUMN deadline_at TEXT`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE pm_subtasks ADD COLUMN execution_dates_json TEXT`);
+  } catch {
+    /* exists */
+  }
 }
 
 function ensureOtherCard(db: Database.Database) {

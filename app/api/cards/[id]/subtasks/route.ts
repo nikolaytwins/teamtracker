@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
 import { isMemberRestrictedRole } from "@/lib/roles";
 import { effectiveUserRole } from "@/lib/require-role";
-import { createSubtask, listSubtasksForCard } from "@/lib/pm-subtasks";
+import { getActiveEntry, sumTrackedSecondsForSubtask } from "@/lib/pm-phases";
+import {
+  createSubtask,
+  listSubtasksForCard,
+  parseExecutionDatesFromJson,
+  serializeExecutionDates,
+} from "@/lib/pm-subtasks";
 import { notifySubtaskCreated } from "@/lib/subtask-notifications";
 
 type Params = { params: Promise<{ id: string }> };
@@ -18,7 +24,14 @@ export async function GET(_request: NextRequest, { params }: Params) {
     const cardId = typeof id === "string" ? id.trim() : "";
     if (!cardId) return NextResponse.json({ error: "id required" }, { status: 400 });
     const subtasks = listSubtasksForCard(cardId);
-    return NextResponse.json({ subtasks });
+    const active = getActiveEntry(cardId);
+    const nowMs = Date.now();
+    const enriched = subtasks.map((s) => ({
+      ...s,
+      executionDates: parseExecutionDatesFromJson(s.execution_dates_json),
+      trackedSeconds: sumTrackedSecondsForSubtask(s.id, active, nowMs),
+    }));
+    return NextResponse.json({ subtasks: enriched });
   } catch (e) {
     console.error("GET subtasks", e);
     return NextResponse.json({ error: "Failed" }, { status: 500 });
@@ -38,6 +51,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     const body = await request.json().catch(() => ({}));
     const title = typeof body.title === "string" ? body.title.trim() : "";
     if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
+    const executionDates = Array.isArray(body.executionDates)
+      ? body.executionDates.filter((x: unknown): x is string => typeof x === "string")
+      : null;
     const sub = createSubtask({
       cardId,
       title,
@@ -46,6 +62,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       estimatedHours: typeof body.estimatedHours === "number" ? body.estimatedHours : null,
       plannedStart: typeof body.plannedStart === "string" ? body.plannedStart : null,
       plannedEnd: typeof body.plannedEnd === "string" ? body.plannedEnd : null,
+      phaseId: typeof body.phaseId === "string" ? body.phaseId : null,
+      deadlineAt: typeof body.deadlineAt === "string" ? body.deadlineAt : null,
+      executionDatesJson: executionDates ? serializeExecutionDates(executionDates) : null,
     });
     if (!sub) return NextResponse.json({ error: "Не удалось создать" }, { status: 400 });
     notifySubtaskCreated({ actorUserId: session.sub, cardId, subtask: sub });

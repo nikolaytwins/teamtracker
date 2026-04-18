@@ -20,6 +20,8 @@ import {
 } from "@/lib/statuses";
 import { computeSubtaskProgressStats } from "@/lib/subtask-progress";
 import type { PmSubtaskWithCard } from "@/lib/pm-subtasks";
+import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
+import { ProjectSubtasksPanel } from "@/components/board/ProjectSubtasksPanel";
 
 type TeamMember = { id: string; name: string; avatar?: string };
 
@@ -105,12 +107,17 @@ export default function BoardPage() {
   const [cards, setCards] = useState<PmCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [boardDisplay, setBoardDisplay] = useState<"projects" | "tasks" | "stages">(() => {
-    if (typeof window === "undefined") return "projects";
+  const [boardDisplay, setBoardDisplay] = useState<"list" | "projects" | "tasks" | "stages">(() => {
+    if (typeof window === "undefined") return "list";
     const v = localStorage.getItem("pm-board-display");
-    if (v === "tasks" || v === "stages" || v === "projects") return v;
-    return "projects";
+    if (v === "tasks" || v === "stages" || v === "projects" || v === "list") return v;
+    return "list";
   });
+  const [projectScopeTab, setProjectScopeTab] = useState<"active" | "full">(() => {
+    if (typeof window === "undefined") return "active";
+    return localStorage.getItem("pm-board-project-scope") === "full" ? "full" : "active";
+  });
+  const [expandedProjectIds, setExpandedProjectIds] = useState<Record<string, boolean>>({});
   const [filterQuery, setFilterQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
@@ -313,6 +320,32 @@ export default function BoardPage() {
     return cards.filter((c) => c.name.toLowerCase().includes(q));
   }, [cards, filterQuery]);
 
+  const cardsMinusVirtual = useMemo(
+    () => filteredCards.filter((c) => c.id !== VIRTUAL_OTHER_CARD_ID),
+    [filteredCards]
+  );
+
+  const cardsForSimpleBoard = useMemo(() => {
+    const importanceOrderInner = (c: PmCard) => {
+      const ex = parseExtra(c.extra);
+      const o: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      return o[ex.importance ?? ""] ?? 3;
+    };
+    const base =
+      projectScopeTab === "full"
+        ? cardsMinusVirtual
+        : cardsMinusVirtual.filter((c) => {
+            const g = statusToSimpleViewGroup(c.status);
+            return g === "in_progress" || g === "awaiting_approval";
+          });
+    return [...base].sort((a, b) => importanceOrderInner(a) - importanceOrderInner(b));
+  }, [cardsMinusVirtual, projectScopeTab]);
+
+  const activeCardIdSet = useMemo(() => {
+    if (projectScopeTab !== "active") return null;
+    return new Set(cardsForSimpleBoard.map((c) => c.id));
+  }, [projectScopeTab, cardsForSimpleBoard]);
+
   useEffect(() => {
     try {
       localStorage.setItem("pm-board-display", boardDisplay);
@@ -320,6 +353,14 @@ export default function BoardPage() {
       /* ignore */
     }
   }, [boardDisplay]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pm-board-project-scope", projectScopeTab);
+    } catch {
+      /* ignore */
+    }
+  }, [projectScopeTab]);
 
   const loadBoardSubtasks = useCallback(async () => {
     const r = await fetch(apiUrl("/api/board/open-subtasks"));
@@ -523,21 +564,22 @@ export default function BoardPage() {
     );
   if (error) return <div className="p-6 text-sm font-medium text-[var(--danger)]">{error}</div>;
 
-  const byStatus = (status: PmStatusKey) => filteredCards.filter((c) => c.status === status);
+  const byStatus = (status: PmStatusKey) => cardsMinusVirtual.filter((c) => c.status === status);
   const importanceOrder = (c: PmCard) => {
     const ex = parseExtra(c.extra);
     const o: Record<string, number> = { high: 0, medium: 1, low: 2 };
     return o[ex.importance ?? ""] ?? 3;
   };
   const bySimpleGroup = (groupKey: (typeof SIMPLE_VIEW_GROUPS)[number]["key"]) => {
+    const src = cardsForSimpleBoard;
     let list: PmCard[];
-    if (groupKey === "not_started") list = filteredCards.filter((c) => c.status === "not_started");
-    else if (groupKey === "done") list = filteredCards.filter((c) => c.status === "done");
-    else if (groupKey === "pause") list = filteredCards.filter((c) => c.status === "pause");
+    if (groupKey === "not_started") list = src.filter((c) => c.status === "not_started");
+    else if (groupKey === "done") list = src.filter((c) => c.status === "done");
+    else if (groupKey === "pause") list = src.filter((c) => c.status === "pause");
     else if (groupKey === "awaiting_approval") {
-      list = filteredCards.filter((c) => APPROVAL_WAITING_STATUS_SET.has(c.status));
+      list = src.filter((c) => APPROVAL_WAITING_STATUS_SET.has(c.status));
     } else {
-      list = filteredCards.filter((c) => ACTIVE_WORK_STAGE_SET.has(c.status));
+      list = src.filter((c) => ACTIVE_WORK_STAGE_SET.has(c.status));
     }
     return [...list].sort((a, b) => importanceOrder(a) - importanceOrder(b));
   };
@@ -545,6 +587,7 @@ export default function BoardPage() {
   function subtasksForSimpleColumn(col: SimpleViewGroupKey): PmSubtaskWithCard[] {
     const q = filterQuery.trim().toLowerCase();
     return boardSubtasks.filter((s) => {
+      if (activeCardIdSet && !activeCardIdSet.has(s.card_id)) return false;
       if (statusToSimpleViewGroup(s.card_status) !== col) return false;
       if (!q) return true;
       return (
@@ -723,6 +766,16 @@ export default function BoardPage() {
     );
   }
 
+  function simpleScopeLabel(card: PmCard): string {
+    const g = statusToSimpleViewGroup(card.status);
+    if (g === "in_progress") return "В работе";
+    if (g === "awaiting_approval") return "На согласовании";
+    if (g === "done") return "Завершён";
+    if (g === "not_started") return "Не начат";
+    if (g === "pause") return "Пауза";
+    return g;
+  }
+
   function renderBoardSubtaskRow(s: PmSubtaskWithCard) {
     const parent = cards.find((c) => c.id === s.card_id);
     return (
@@ -752,14 +805,22 @@ export default function BoardPage() {
       <div className="sticky top-0 z-20 -mx-4 mb-6 border-b border-[var(--border)]/60 bg-[var(--bg)]/85 px-4 py-4 backdrop-blur-xl dark:border-white/[0.06] md:-mx-6 md:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Канбан</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Проекты</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              {boardDisplay === "tasks"
-                ? "Подзадачи по колонкам статуса проекта. Клик — карточка проекта."
-                : "Перетаскивайте карточки. Клик — детали."}{" "}
+              {boardDisplay === "list"
+                ? "Список крупных карточек: этапы и подзадачи внутри. По умолчанию — только активные и на согласовании."
+                : boardDisplay === "tasks"
+                  ? "Подзадачи по колонкам статуса проекта. Клик — карточка проекта."
+                  : boardDisplay === "projects"
+                    ? "Канбан по сводным колонкам. Перетаскивайте карточки."
+                    : "Все этапы отдельными колонками. Перетаскивайте карточки."}{" "}
               Показано{" "}
               <span className="font-semibold text-[var(--text)]">
-                {boardDisplay === "tasks" ? boardSubtasks.length : filteredCards.length}
+                {boardDisplay === "tasks"
+                  ? boardSubtasks.length
+                  : boardDisplay === "list" || boardDisplay === "projects"
+                    ? cardsForSimpleBoard.length
+                    : cardsMinusVirtual.length}
               </span>
               {boardDisplay !== "tasks" && filterQuery.trim() ? (
                 <span className="text-[var(--muted-foreground)]"> из {cards.length}</span>
@@ -780,7 +841,19 @@ export default function BoardPage() {
               placeholder={boardDisplay === "tasks" ? "Поиск задачи или проекта…" : "Поиск по названию…"}
               className="tt-input w-full text-sm sm:w-56"
             />
-            <span className="hidden text-sm text-[var(--muted-foreground)] sm:inline">Показать:</span>
+            <span className="hidden text-sm text-[var(--muted-foreground)] sm:inline">Вид:</span>
+            <button
+              type="button"
+              onClick={() => setBoardDisplay("list")}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                boardDisplay === "list"
+                  ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
+                  : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+              }`}
+              title="Список проектов с раскрытием"
+            >
+              Список
+            </button>
             <button
               type="button"
               onClick={() => setBoardDisplay("projects")}
@@ -789,9 +862,9 @@ export default function BoardPage() {
                   ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
                   : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
               }`}
-              title="Карточки проектов по сводным колонкам"
+              title="Карточки проектов по сводным колонкам канбана"
             >
-              Проекты
+              Канбан
             </button>
             <button
               type="button"
@@ -918,6 +991,145 @@ export default function BoardPage() {
           </div>
         </div>
       ) : null}
+
+      {(boardDisplay === "list" || boardDisplay === "projects") && (
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Фильтр:</span>
+          <button
+            type="button"
+            onClick={() => setProjectScopeTab("active")}
+            className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
+              projectScopeTab === "active"
+                ? "bg-[var(--primary)] text-white shadow-sm"
+                : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+            }`}
+          >
+            В работе и на согласовании
+          </button>
+          <button
+            type="button"
+            onClick={() => setProjectScopeTab("full")}
+            className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
+              projectScopeTab === "full"
+                ? "bg-[var(--primary)] text-white shadow-sm"
+                : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+            }`}
+          >
+            Все проекты
+          </button>
+        </div>
+      )}
+
+      {boardDisplay === "list" && (
+        <div className="mx-auto max-w-3xl space-y-4 pb-10">
+          {cardsForSimpleBoard.length === 0 ? (
+            <p className="text-sm text-[var(--muted-foreground)]">Нет проектов в этом фильтре.</p>
+          ) : (
+            cardsForSimpleBoard.map((card) => {
+              const ex = parseExtra(card.extra);
+              const open = Boolean(expandedProjectIds[card.id]);
+              const prog = ex.derivedSubtaskProgress;
+              return (
+                <div
+                  key={card.id}
+                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-kanban-card)]"
+                >
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="flex w-full cursor-pointer items-start gap-3 p-4 text-left transition-colors hover:bg-[var(--surface-2)]/40"
+                    onClick={() =>
+                      setExpandedProjectIds((prev) => ({
+                        ...prev,
+                        [card.id]: !prev[card.id],
+                      }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setExpandedProjectIds((prev) => ({
+                          ...prev,
+                          [card.id]: !prev[card.id],
+                        }));
+                      }
+                    }}
+                  >
+                    <span className="mt-1 shrink-0 text-[var(--muted-foreground)]" aria-hidden>
+                      {open ? "▼" : "▶"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-lg font-semibold leading-snug text-[var(--text)]">{card.name}</span>
+                        <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--muted-foreground)]">
+                          {simpleScopeLabel(card)}
+                        </span>
+                        <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text)] ring-1 ring-[var(--border)]">
+                          {statusLabel(card.status)}
+                        </span>
+                      </div>
+                      {prog && prog.total > 0 ? (
+                        <div className="mt-3 space-y-1">
+                          <div className="flex items-center justify-between text-[11px] text-[var(--muted-foreground)]">
+                            <span>
+                              Подзадачи {prog.completed}/{prog.total}
+                              {prog.byHours ? " · по часам" : ""}
+                            </span>
+                            <span className="font-semibold tabular-nums text-[var(--primary)]">{prog.percent}%</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
+                            <div
+                              className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-300"
+                              style={{ width: `${prog.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-[var(--muted-foreground)]">Добавьте подзадачи — появится прогресс.</p>
+                      )}
+                    </div>
+                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <select
+                        className="tt-select max-w-[10.5rem] py-2 text-xs"
+                        value={card.status}
+                        onChange={(e) => void updateStatus(card.id, e.target.value as PmStatusKey)}
+                      >
+                        {PM_STATUSES.map((s) => (
+                          <option key={s.key} value={s.key}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div
+                    className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--border)]/60 bg-[var(--bg)]/25 px-4 py-2.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Link
+                      href={appPath(`/board/${card.id}`)}
+                      className="text-xs font-semibold text-[var(--primary)] hover:underline"
+                    >
+                      Страница проекта →
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => openModal(card)}
+                      className="text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--text)] hover:underline"
+                    >
+                      Описание и комментарии
+                    </button>
+                  </div>
+                  {open ? (
+                    <div className="border-t border-[var(--border)] px-4 py-4">
+                      <ProjectSubtasksPanel cardId={card.id} onChanged={() => void refreshBoardCard(card.id)} />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {boardDisplay === "stages" && (
         <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">

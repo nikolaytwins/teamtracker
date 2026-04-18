@@ -1,5 +1,4 @@
 import { getCard, getDb, updateCard } from "@/lib/db";
-import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
 import { computeSubtaskProgressStats } from "@/lib/subtask-progress";
 import type { PmStatusKey } from "@/lib/statuses";
 
@@ -13,9 +12,34 @@ export interface PmSubtask {
   completed_at: string | null;
   planned_start: string | null;
   planned_end: string | null;
+  /** Этап реализации (pm_project_phases). */
+  phase_id: string | null;
+  /** Дедлайн подзадачи (может отличаться от дат выполнения). */
+  deadline_at: string | null;
+  /** JSON-массив строк дат YYYY-MM-DD — попадают в личные задачи / календарь. */
+  execution_dates_json: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+export function parseExecutionDatesFromJson(raw: string | null | undefined): string[] {
+  if (raw == null || !String(raw).trim()) return [];
+  try {
+    const a = JSON.parse(String(raw)) as unknown;
+    if (!Array.isArray(a)) return [];
+    return a
+      .filter((x): x is string => typeof x === "string" && /^\d{4}-\d{2}-\d{2}/.test(x.trim()))
+      .map((x) => x.trim().slice(0, 10));
+  } catch {
+    return [];
+  }
+}
+
+export function serializeExecutionDates(dates: string[]): string | null {
+  const norm = [...new Set(dates.map((d) => d.trim().slice(0, 10)).filter(Boolean))].sort();
+  if (norm.length === 0) return null;
+  return JSON.stringify(norm);
 }
 
 function rowToSubtask(row: Record<string, unknown>): PmSubtask {
@@ -30,6 +54,12 @@ function rowToSubtask(row: Record<string, unknown>): PmSubtask {
     completed_at: row.completed_at != null && String(row.completed_at).trim() ? String(row.completed_at) : null,
     planned_start: row.planned_start != null && String(row.planned_start).trim() ? String(row.planned_start) : null,
     planned_end: row.planned_end != null && String(row.planned_end).trim() ? String(row.planned_end) : null,
+    phase_id: row.phase_id != null && String(row.phase_id).trim() ? String(row.phase_id) : null,
+    deadline_at: row.deadline_at != null && String(row.deadline_at).trim() ? String(row.deadline_at) : null,
+    execution_dates_json:
+      row.execution_dates_json != null && String(row.execution_dates_json).trim()
+        ? String(row.execution_dates_json)
+        : null,
     sort_order: Number(row.sort_order) || 0,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
@@ -61,11 +91,10 @@ export function listBoardOpenSubtasks(): PmSubtaskWithCard[] {
        FROM pm_subtasks s
        INNER JOIN pm_cards c ON c.id = s.card_id
        WHERE s.completed_at IS NULL
-         AND c.id != ?
          AND c.status NOT IN ('done', 'pause')
        ORDER BY c.deadline ASC NULLS LAST, c.name ASC, s.sort_order ASC, s.created_at ASC`
     )
-    .all(VIRTUAL_OTHER_CARD_ID) as Record<string, unknown>[];
+    .all() as Record<string, unknown>[];
   return rows.map((row) => {
     const sub = rowToSubtask(row);
     return {
@@ -101,6 +130,19 @@ export function listOpenSubtasksForUser(userId: string): PmSubtaskWithCard[] {
       card_extra: row.card_extra != null ? String(row.card_extra) : null,
     };
   });
+}
+
+/** Открытая подзадача с тем же названием (без учёта регистра). */
+export function findOpenSubtaskByTitle(cardId: string, title: string): PmSubtask | null {
+  const t = title.trim();
+  if (!t || !getCard(cardId)) return null;
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT * FROM pm_subtasks WHERE card_id = ? AND completed_at IS NULL AND LOWER(TRIM(title)) = LOWER(?) LIMIT 1`
+    )
+    .get(cardId, t) as Record<string, unknown> | undefined;
+  return row ? rowToSubtask(row) : null;
 }
 
 export function getSubtask(cardId: string, subtaskId: string): PmSubtask | null {
@@ -142,6 +184,9 @@ export function createSubtask(params: {
   estimatedHours?: number | null;
   plannedStart?: string | null;
   plannedEnd?: string | null;
+  phaseId?: string | null;
+  deadlineAt?: string | null;
+  executionDatesJson?: string | null;
 }): PmSubtask | null {
   if (!getCard(params.cardId)) return null;
   const title = params.title.trim();
@@ -153,8 +198,8 @@ export function createSubtask(params: {
   const sortOrder = (maxRow?.m ?? -1) + 1;
   const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   db.prepare(
-    `INSERT INTO pm_subtasks (id, card_id, title, assignee_user_id, lead_user_id, estimated_hours, completed_at, planned_start, planned_end, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
+    `INSERT INTO pm_subtasks (id, card_id, title, assignee_user_id, lead_user_id, estimated_hours, completed_at, planned_start, planned_end, phase_id, deadline_at, execution_dates_json, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     params.cardId,
@@ -164,6 +209,9 @@ export function createSubtask(params: {
     params.estimatedHours != null && !Number.isNaN(Number(params.estimatedHours)) ? Number(params.estimatedHours) : null,
     params.plannedStart?.trim() || null,
     params.plannedEnd?.trim() || null,
+    params.phaseId?.trim() || null,
+    params.deadlineAt?.trim() || null,
+    params.executionDatesJson?.trim() || null,
     sortOrder
   );
   const row = db.prepare(`SELECT * FROM pm_subtasks WHERE id = ?`).get(id) as Record<string, unknown>;
@@ -182,6 +230,9 @@ export function updateSubtask(
     completedAt?: string | null;
     plannedStart?: string | null;
     plannedEnd?: string | null;
+    phaseId?: string | null;
+    deadlineAt?: string | null;
+    executionDatesJson?: string | null;
     sortOrder?: number;
   }
 ): PmSubtask | null {
@@ -212,9 +263,17 @@ export function updateSubtask(
     updates.plannedStart !== undefined ? updates.plannedStart?.trim() || null : (cur.planned_start as string | null);
   const planned_end =
     updates.plannedEnd !== undefined ? updates.plannedEnd?.trim() || null : (cur.planned_end as string | null);
+  const phase_id =
+    updates.phaseId !== undefined ? updates.phaseId?.trim() || null : ((cur.phase_id as string | null) ?? null);
+  const deadline_at =
+    updates.deadlineAt !== undefined ? updates.deadlineAt?.trim() || null : ((cur.deadline_at as string | null) ?? null);
+  const execution_dates_json =
+    updates.executionDatesJson !== undefined
+      ? updates.executionDatesJson?.trim() || null
+      : ((cur.execution_dates_json as string | null) ?? null);
   const sort_order = updates.sortOrder !== undefined ? updates.sortOrder : Number(cur.sort_order) || 0;
   db.prepare(
-    `UPDATE pm_subtasks SET title = ?, assignee_user_id = ?, lead_user_id = ?, estimated_hours = ?, completed_at = ?, planned_start = ?, planned_end = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ? AND card_id = ?`
+    `UPDATE pm_subtasks SET title = ?, assignee_user_id = ?, lead_user_id = ?, estimated_hours = ?, completed_at = ?, planned_start = ?, planned_end = ?, phase_id = ?, deadline_at = ?, execution_dates_json = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ? AND card_id = ?`
   ).run(
     title,
     assignee_user_id,
@@ -223,6 +282,9 @@ export function updateSubtask(
     completed_at,
     planned_start,
     planned_end,
+    phase_id,
+    deadline_at,
+    execution_dates_json,
     sort_order,
     subtaskId,
     cardId

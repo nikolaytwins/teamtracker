@@ -6,6 +6,8 @@ import { TIME_TASK_TYPE_OPTIONS, labelForTaskType } from "@/lib/time-task-types"
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { CardCommentsPanel } from "@/components/board/CardCommentsPanel";
+import { ProjectSubtasksPanel } from "@/components/board/ProjectSubtasksPanel";
 
 const PM_BOARD_TEAM_KEY = "pm-board-team";
 
@@ -36,6 +38,7 @@ type PmTimeEntry = {
   worker_name: string;
   task_type: string | null;
   task_note: string | null;
+  subtask_id?: string | null;
 };
 
 type PhaseRow = {
@@ -327,7 +330,7 @@ export default function CardPhasesPage() {
           href={appPath("/board")}
           className="text-sm text-[var(--muted-foreground)] hover:text-[var(--text)] underline"
         >
-          ← Канбан
+          ← Проекты
         </Link>
         <Link
           href={appPath("/board/time-analytics")}
@@ -338,7 +341,7 @@ export default function CardPhasesPage() {
       </div>
       <h1 className="text-2xl font-bold text-[var(--text)] mb-1">{card.name}</h1>
       <p className="text-sm text-[var(--muted-foreground)] mb-3">
-        Внутренние этапы и таймтрекер. Колонки канбана здесь не меняются.
+        Этапы, подзадачи и таймтрекер. Статусы колонок канбана меняются на доске «Проекты».
       </p>
       {cardAssignees.length > 0 ? (
         <p className="text-sm text-[var(--text)] mb-4">
@@ -355,6 +358,16 @@ export default function CardPhasesPage() {
         </p>
       ) : null}
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+
+      <div className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
+        <h2 className="text-base font-semibold text-[var(--text)]">Этапы и подзадачи</h2>
+        <p className="mt-1 text-xs text-[var(--muted-foreground)]">Синхронизировано со списком на доске.</p>
+        <ProjectSubtasksPanel cardId={cardId} onChanged={() => void load()} />
+      </div>
+
+      <div className="mb-6">
+        <CardCommentsPanel cardId={cardId} />
+      </div>
 
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4 mb-6">
         <div className="grid gap-6 md:grid-cols-2 md:items-start">

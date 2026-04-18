@@ -19,6 +19,8 @@ export interface PmTimeEntry {
   worker_user_id: string | null;
   task_type: string | null;
   task_note: string | null;
+  /** Связь с подзадачей (произвольный текст таймера → подзадача). */
+  subtask_id: string | null;
 }
 
 /** Одна фаза для учёта из профиля (не плодим этапы вручную). */
@@ -71,6 +73,11 @@ export function ensurePhasesSchema() {
   } catch {
     /* exists */
   }
+  try {
+    db.exec(`ALTER TABLE pm_time_entries ADD COLUMN subtask_id TEXT`);
+  } catch {
+    /* exists */
+  }
 }
 
 function secondsBetween(startIso: string, endIso: string): number {
@@ -79,14 +86,32 @@ function secondsBetween(startIso: string, endIso: string): number {
   return Math.max(0, Math.floor((b - a) / 1000));
 }
 
+export function rowToTimeEntry(row: Record<string, unknown>): PmTimeEntry {
+  const sid = row.subtask_id != null && String(row.subtask_id).trim() ? String(row.subtask_id) : null;
+  return {
+    id: String(row.id),
+    card_id: String(row.card_id),
+    phase_id: String(row.phase_id),
+    started_at: String(row.started_at),
+    ended_at: row.ended_at != null ? String(row.ended_at) : null,
+    duration_seconds: row.duration_seconds != null && !Number.isNaN(Number(row.duration_seconds)) ? Number(row.duration_seconds) : null,
+    worker_name: String(row.worker_name ?? ""),
+    worker_user_id: row.worker_user_id != null && String(row.worker_user_id).trim() ? String(row.worker_user_id) : null,
+    task_type: row.task_type != null && String(row.task_type).trim() ? String(row.task_type) : null,
+    task_note: row.task_note != null && String(row.task_note).trim() ? String(row.task_note) : null,
+    subtask_id: sid,
+  };
+}
+
 function closeOpenEntriesForCard(cardId: string, endIso: string) {
   const db = getDb();
   const open = db
     .prepare(
       `SELECT * FROM pm_time_entries WHERE card_id = ? AND ended_at IS NULL ORDER BY started_at DESC`
     )
-    .all(cardId) as PmTimeEntry[];
-  for (const e of open) {
+    .all(cardId) as Record<string, unknown>[];
+  for (const raw of open) {
+    const e = rowToTimeEntry(raw);
     const dur = secondsBetween(e.started_at, endIso);
     db.prepare(
       `UPDATE pm_time_entries SET ended_at = ?, duration_seconds = ? WHERE id = ?`
@@ -104,8 +129,9 @@ export function closeOpenEntriesForWorker(workerName: string, endIso: string) {
     .prepare(
       `SELECT * FROM pm_time_entries WHERE TRIM(worker_name) = ? AND ended_at IS NULL ORDER BY started_at ASC`
     )
-    .all(name) as PmTimeEntry[];
-  for (const e of open) {
+    .all(name) as Record<string, unknown>[];
+  for (const raw of open) {
+    const e = rowToTimeEntry(raw);
     const dur = secondsBetween(e.started_at, endIso);
     db.prepare(`UPDATE pm_time_entries SET ended_at = ?, duration_seconds = ? WHERE id = ?`).run(
       endIso,
@@ -129,8 +155,9 @@ export function closeOpenEntriesForSessionUser(session: { sub: string; name: str
         OR ((worker_user_id IS NULL OR TRIM(worker_user_id) = '') AND TRIM(worker_name) = ?)
       ) ORDER BY started_at ASC`
     )
-    .all(uid, name) as PmTimeEntry[];
-  for (const e of open) {
+    .all(uid, name) as Record<string, unknown>[];
+  for (const raw of open) {
+    const e = rowToTimeEntry(raw);
     const dur = secondsBetween(e.started_at, endIso);
     db.prepare(`UPDATE pm_time_entries SET ended_at = ?, duration_seconds = ? WHERE id = ?`).run(
       endIso,
@@ -156,8 +183,8 @@ export function getActiveEntryForWorker(workerName: string): PmTimeEntry | null 
     .prepare(
       `SELECT * FROM pm_time_entries WHERE TRIM(worker_name) = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1`
     )
-    .get(name) as PmTimeEntry | undefined;
-  return row ?? null;
+    .get(name) as Record<string, unknown> | undefined;
+  return row ? rowToTimeEntry(row) : null;
 }
 
 export function getActiveEntryForSessionUser(session: { sub: string; name: string }): PmTimeEntry | null {
@@ -173,8 +200,8 @@ export function getActiveEntryForSessionUser(session: { sub: string; name: strin
         OR ((worker_user_id IS NULL OR TRIM(worker_user_id) = '') AND TRIM(worker_name) = ?)
       ) ORDER BY started_at DESC LIMIT 1`
     )
-    .get(uid, name) as PmTimeEntry | undefined;
-  return row ?? null;
+    .get(uid, name) as Record<string, unknown> | undefined;
+  return row ? rowToTimeEntry(row) : null;
 }
 
 export function listPhasesForCard(cardId: string): PmProjectPhase[] {
@@ -226,6 +253,7 @@ export function deletePhase(cardId: string, phaseId: string): boolean {
   const db = getDb();
   const exists = db.prepare(`SELECT id FROM pm_project_phases WHERE id = ? AND card_id = ?`).get(phaseId, cardId);
   if (!exists) return false;
+  db.prepare(`UPDATE pm_subtasks SET phase_id = NULL WHERE phase_id = ?`).run(phaseId);
   db.prepare(`DELETE FROM pm_time_entries WHERE phase_id = ?`).run(phaseId);
   db.prepare(`DELETE FROM pm_project_phases WHERE id = ? AND card_id = ?`).run(phaseId, cardId);
   return true;
@@ -236,8 +264,8 @@ export function getActiveEntry(cardId: string): PmTimeEntry | null {
   const db = getDb();
   const row = db
     .prepare(`SELECT * FROM pm_time_entries WHERE card_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1`)
-    .get(cardId) as PmTimeEntry | undefined;
-  return row ?? null;
+    .get(cardId) as Record<string, unknown> | undefined;
+  return row ? rowToTimeEntry(row) : null;
 }
 
 export function startTimer(
@@ -248,6 +276,7 @@ export function startTimer(
     workerUserId: string;
     taskType?: string | null;
     taskNote?: string | null;
+    subtaskId?: string | null;
   }
 ): { entry: PmTimeEntry; closedPrevious: boolean } | null {
   const worker = (opts.workerName || "").trim();
@@ -268,11 +297,14 @@ export function startTimer(
   const taskType = opts.taskType != null && String(opts.taskType).trim() ? String(opts.taskType).trim() : null;
   const taskNote =
     opts.taskNote != null && String(opts.taskNote).trim() ? String(opts.taskNote).trim() : null;
+  const subtaskId =
+    opts.subtaskId != null && String(opts.subtaskId).trim() ? String(opts.subtaskId).trim() : null;
   const id = `tent_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   db.prepare(
-    `INSERT INTO pm_time_entries (id, card_id, phase_id, started_at, ended_at, duration_seconds, worker_name, worker_user_id, task_type, task_note) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)`
-  ).run(id, cardId, phaseId, now, worker, workerUserId || null, taskType, taskNote);
-  const entry = db.prepare(`SELECT * FROM pm_time_entries WHERE id = ?`).get(id) as PmTimeEntry;
+    `INSERT INTO pm_time_entries (id, card_id, phase_id, started_at, ended_at, duration_seconds, worker_name, worker_user_id, task_type, task_note, subtask_id) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)`
+  ).run(id, cardId, phaseId, now, worker, workerUserId || null, taskType, taskNote, subtaskId);
+  const entryRow = db.prepare(`SELECT * FROM pm_time_entries WHERE id = ?`).get(id) as Record<string, unknown>;
+  const entry = rowToTimeEntry(entryRow);
   return { entry, closedPrevious: hadOpenBefore };
 }
 
@@ -288,15 +320,17 @@ export function stopTimer(cardId: string): PmTimeEntry | null {
     dur,
     active.id
   );
-  return db.prepare(`SELECT * FROM pm_time_entries WHERE id = ?`).get(active.id) as PmTimeEntry;
+  const row = db.prepare(`SELECT * FROM pm_time_entries WHERE id = ?`).get(active.id) as Record<string, unknown>;
+  return rowToTimeEntry(row);
 }
 
 export function listTimeEntriesForCard(cardId: string): PmTimeEntry[] {
   ensurePhasesSchema();
   const db = getDb();
-  return db
+  const rows = db
     .prepare(`SELECT * FROM pm_time_entries WHERE card_id = ? ORDER BY started_at DESC`)
-    .all(cardId) as PmTimeEntry[];
+    .all(cardId) as Record<string, unknown>[];
+  return rows.map(rowToTimeEntry);
 }
 
 /** Завершённые записи пользователя за полуинтервал [startIso, endIso) по `started_at`. */
@@ -310,7 +344,7 @@ export function listCompletedEntriesForSessionUserInRange(
   const name = session.name.trim();
   if (!uid && !name) return [];
   const db = getDb();
-  return db
+  const rows = db
     .prepare(
       `SELECT * FROM pm_time_entries
        WHERE ended_at IS NOT NULL AND duration_seconds IS NOT NULL
@@ -321,7 +355,8 @@ export function listCompletedEntriesForSessionUserInRange(
          )
        ORDER BY started_at DESC`
     )
-    .all(startIso, endIso, uid, name) as PmTimeEntry[];
+    .all(startIso, endIso, uid, name) as Record<string, unknown>[];
+  return rows.map(rowToTimeEntry);
 }
 
 export function sumCompletedSecondsForPhase(phaseId: string): number {
@@ -331,6 +366,30 @@ export function sumCompletedSecondsForPhase(phaseId: string): number {
     .prepare(`SELECT COALESCE(SUM(duration_seconds), 0) as s FROM pm_time_entries WHERE phase_id = ? AND ended_at IS NOT NULL`)
     .get(phaseId) as { s: number };
   return Number(row?.s) || 0;
+}
+
+export function sumCompletedSecondsForSubtask(subtaskId: string): number {
+  ensurePhasesSchema();
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(duration_seconds), 0) as s FROM pm_time_entries WHERE subtask_id = ? AND ended_at IS NOT NULL`
+    )
+    .get(subtaskId) as { s: number };
+  return Number(row?.s) || 0;
+}
+
+/** Завершённое + текущая открытая сессия по этой подзадаче (если активна на карточке). */
+export function sumTrackedSecondsForSubtask(
+  subtaskId: string,
+  activeOnCard: PmTimeEntry | null,
+  nowMs: number
+): number {
+  let sec = sumCompletedSecondsForSubtask(subtaskId);
+  if (activeOnCard && !activeOnCard.ended_at && activeOnCard.subtask_id === subtaskId) {
+    sec += Math.floor((nowMs - new Date(activeOnCard.started_at).getTime()) / 1000);
+  }
+  return sec;
 }
 
 export function buildCardPhasesPayload(cardId: string): {

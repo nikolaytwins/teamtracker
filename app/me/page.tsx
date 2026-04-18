@@ -20,6 +20,7 @@ import {
   sortSubtasksInColumn,
   type MeSubtaskBucket,
 } from "@/lib/me-subtask-buckets";
+import { parseExecutionDatesFromJson } from "@/lib/pm-subtasks";
 import { statusLabel, type PmStatusKey } from "@/lib/statuses";
 import { MeMonthlyBucketsChart, MeMonthlyByDayChart } from "@/components/me/me-monthly-charts";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,8 @@ type MySubtaskRow = {
   planned_start: string | null;
   planned_end: string | null;
   estimated_hours: number | null;
+  execution_dates_json?: string | null;
+  executionDates?: string[];
   card_name: string;
   card_status: string;
   card_extra: string | null;
@@ -120,7 +123,11 @@ export default function MePage() {
   const [creatingProject, setCreatingProject] = useState(false);
 
   const subtaskBuckets = useMemo(() => {
-    const raw = bucketMySubtasks(mySubtasks);
+    const enriched = mySubtasks.map((s) => ({
+      ...s,
+      executionDates: parseExecutionDatesFromJson(s.execution_dates_json ?? null),
+    }));
+    const raw = bucketMySubtasks(enriched);
     return {
       today: sortSubtasksInColumn(raw.today),
       week: sortSubtasksInColumn(raw.week),
@@ -185,6 +192,7 @@ export default function MePage() {
         planned_end: row.planned_end != null ? String(row.planned_end) : null,
         estimated_hours:
           row.estimated_hours != null && !Number.isNaN(Number(row.estimated_hours)) ? Number(row.estimated_hours) : null,
+        execution_dates_json: row.execution_dates_json != null ? String(row.execution_dates_json) : null,
         card_name: String(row.card_name ?? ""),
         card_status: String(row.card_status ?? ""),
         card_extra: row.card_extra != null ? String(row.card_extra) : null,
@@ -339,7 +347,6 @@ export default function MePage() {
           cardId,
           taskType: payloadTaskType,
           taskNote: isCustom ? customText.trim() : "",
-          createSubtask: isCustom && Boolean(customText.trim()),
         }),
       });
       const d = await r.json();

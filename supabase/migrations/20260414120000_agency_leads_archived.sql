@@ -1,3 +1,3 @@
--- Скрытие с канбана: архив. Существующие на момент миграции лиды помечаем archived (исторический сброс).
+-- Лиды: флаг archived (скрытие с канбана). Новые лиды — archived = false.
+-- Массовый UPDATE по всем строкам намеренно не делаем (опасно на проде).
 ALTER TABLE agency_leads ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
-UPDATE agency_leads SET archived = TRUE WHERE archived = FALSE;

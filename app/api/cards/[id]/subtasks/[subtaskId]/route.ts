@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
 import { isMemberRestrictedRole } from "@/lib/roles";
 import { effectiveUserRole } from "@/lib/require-role";
-import { deleteSubtask, getSubtask, updateSubtask } from "@/lib/pm-subtasks";
+import { deleteSubtask, getSubtask, serializeExecutionDates, updateSubtask } from "@/lib/pm-subtasks";
 import { notifySubtaskAssigneesChanged } from "@/lib/subtask-notifications";
 
 type Params = { params: Promise<{ id: string; subtaskId: string }> };
@@ -31,6 +31,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (typeof body.plannedStart === "string" || body.plannedStart === null)
       updates.plannedStart = body.plannedStart;
     if (typeof body.plannedEnd === "string" || body.plannedEnd === null) updates.plannedEnd = body.plannedEnd;
+    if (typeof body.phaseId === "string" || body.phaseId === null) updates.phaseId = body.phaseId;
+    if (typeof body.deadlineAt === "string" || body.deadlineAt === null) updates.deadlineAt = body.deadlineAt;
+    if (Array.isArray(body.executionDates)) {
+      const dates = body.executionDates.filter((x: unknown): x is string => typeof x === "string");
+      updates.executionDatesJson = serializeExecutionDates(dates);
+    }
     if (typeof body.sortOrder === "number") updates.sortOrder = body.sortOrder;
     const prev = getSubtask(cardId, sid);
     const sub = updateSubtask(cardId, sid, updates);

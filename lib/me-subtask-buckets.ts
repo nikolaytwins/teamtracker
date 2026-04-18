@@ -3,6 +3,8 @@ import { getISOWeekInfo } from "@/lib/iso-week";
 export type SubtaskWithPlanned = {
   planned_start: string | null;
   planned_end: string | null;
+  /** Даты выполнения (YYYY-MM-DD) — приоритетнее planned_* для колонок «Сегодня / Неделя». */
+  executionDates?: string[];
 };
 
 function startOfLocalDay(d: Date): Date {
@@ -20,6 +22,26 @@ function parseIsoDate(iso: string | null): Date | null {
 }
 
 function effectiveRange(s: SubtaskWithPlanned): { start: Date | null; end: Date | null } {
+  const dates = s.executionDates?.filter(Boolean) ?? [];
+  if (dates.length > 0) {
+    let minT = Infinity;
+    let maxT = -Infinity;
+    for (const ymd of dates) {
+      const [y, m, d] = ymd.split("-").map(Number);
+      if (!y || !m || !d) continue;
+      const start = new Date(y, m - 1, d, 0, 0, 0, 0);
+      const end = new Date(y, m - 1, d, 23, 59, 59, 999);
+      const t0 = start.getTime();
+      const t1 = end.getTime();
+      if (!Number.isNaN(t0) && !Number.isNaN(t1)) {
+        minT = Math.min(minT, t0);
+        maxT = Math.max(maxT, t1);
+      }
+    }
+    if (minT !== Infinity && maxT !== -Infinity) {
+      return { start: new Date(minT), end: new Date(maxT) };
+    }
+  }
   const ps = parseIsoDate(s.planned_start);
   const pe = parseIsoDate(s.planned_end);
   if (!ps && !pe) return { start: null, end: null };
