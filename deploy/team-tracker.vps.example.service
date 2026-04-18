@@ -15,6 +15,8 @@ User=root
 WorkingDirectory=/opt/team-tracker/.next/standalone
 Environment=NODE_ENV=production
 Environment=PORT=3005
+# Next standalone читает HOSTNAME для bind; на VPS часто задано имя машины → не 127.0.0.1, nginx даёт 502.
+Environment=HOSTNAME=127.0.0.1
 Environment=TEAM_TRACKER_SELF_REGISTER=1
 # Раскомментируйте для tt.example.com без префикса /pm-board:
 Environment=TEAM_TRACKER_ROOT_DOMAIN=1

@@ -89,12 +89,21 @@ jobs:
             tar -xzf /tmp/deploy-standalone.tgz -C .next/standalone
             rm -f /tmp/deploy-standalone.tgz
             UNIT="/etc/systemd/system/${DEPLOY_SYSTEMD_UNIT}.service"
+            NEED_RELOAD=0
             if [[ -f "$UNIT" ]] && grep -q 'npm run start' "$UNIT"; then
               cp -a "$UNIT" "${UNIT}.bak.before-standalone-$(date +%Y%m%d%H%M%S)"
               sed -i \
                 -e "s|^WorkingDirectory=.*|WorkingDirectory=${REAL}/.next/standalone|" \
                 -e "s|^ExecStart=.*|ExecStart=/usr/bin/node server.js|" \
                 "$UNIT"
+              NEED_RELOAD=1
+            fi
+            # Nginx обычно proxy_pass на 127.0.0.1; без явного HOSTNAME listen может уйти на 127.0.1.1 / имя ВМ → 502.
+            if [[ -f "$UNIT" ]] && ! grep -qE '^Environment=HOSTNAME=' "$UNIT"; then
+              sed -i '/^\[Service\]/a Environment=HOSTNAME=127.0.0.1' "$UNIT"
+              NEED_RELOAD=1
+            fi
+            if [[ "$NEED_RELOAD" -eq 1 ]]; then
               systemctl daemon-reload
             fi
             systemctl restart "$DEPLOY_SYSTEMD_UNIT"

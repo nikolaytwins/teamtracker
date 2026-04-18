@@ -86,6 +86,12 @@ sudo mkdir -p /opt && sudo git clone git@github.com:USER/team-tracker.git /opt/t
 
 Проверьте в unit **абсолютные** `AGENCY_SQLITE_PATH` и `PM_BOARD_SQLITE_PATH` на каталог **клона** (родитель `.next/standalone`), не на внутреннюю папку standalone.
 
+### 502 Bad Gateway (nginx), сразу после перехода на standalone
+
+Часто: процесс слушает **не** `127.0.0.1`, а другое (у Next standalone `server.js` bind идёт через `process.env.HOSTNAME`; на Linux оно иногда равно имени хоста). Nginx по примеру ходит на `http://127.0.0.1:3005` — получает отказ.
+
+На сервере: `sudo journalctl -u team-tracker -n 60 --no-pager` и `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3005/` (ожидайте не 000). В unit добавьте строку **`Environment=HOSTNAME=127.0.0.1`** (как в `deploy/team-tracker.vps.example.service`), затем `sudo systemctl daemon-reload && sudo systemctl restart team-tracker`. Следующий деплой из Actions тоже подставит `HOSTNAME`, если строки ещё не было.
+
 ### `git reset --hard` стёр локальные правки на сервере
 
 Так и задумано для предсказуемого CI: на сервере в каталоге приложения **не держите** незакоммиченные изменения; всё — через git.

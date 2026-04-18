@@ -1,6 +1,6 @@
 # Пример для поддомена tt.twinlabs.ru (приложение с корня, без /pm-board).
 # 1) Собрать: TEAM_TRACKER_ROOT_DOMAIN=1 npm run build
-# 2) systemd: Environment=TEAM_TRACKER_ROOT_DOMAIN=1 NODE_ENV=production PORT=3005
+# 2) systemd: TEAM_TRACKER_ROOT_DOMAIN=1 NODE_ENV=production PORT=3005 и HOSTNAME=127.0.0.1 (standalone иначе 502)
 # 3) Выпустить сертификат: certbot certonly --nginx -d tt.twinlabs.ru
 # 4) Включить конфиг ниже (HTTP → редирект на HTTPS, отдельный server на 443).
 #
