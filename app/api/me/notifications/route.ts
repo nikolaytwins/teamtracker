@@ -4,6 +4,7 @@ import { normalizeTtUserRole } from "@/lib/roles";
 import {
   countUnreadForUser,
   ensureApprovalStaleNotifications,
+  ensureTeamWeekLoadNotifications,
   listNotificationsForUser,
   markNotificationsRead,
 } from "@/lib/tt-notifications";
@@ -14,6 +15,7 @@ export async function GET() {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (normalizeTtUserRole(session.role) === "admin") {
       ensureApprovalStaleNotifications();
+      ensureTeamWeekLoadNotifications();
     }
     const items = listNotificationsForUser(session.sub, 40);
     const unreadCount = countUnreadForUser(session.sub);

@@ -1,6 +1,12 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { getDb } from "@/lib/db";
 import { normalizeTtUserRole, type TtUserRole } from "@/lib/roles";
+import {
+  DEFAULT_WORK_DAYS_JSON,
+  effectiveWeeklyCapacityHours,
+  parseWorkDaysJson,
+  serializeWorkDaysJson,
+} from "@/lib/tt-user-schedule";
 
 export interface TtUserRow {
   id: string;
@@ -15,6 +21,10 @@ export interface TtUserRow {
   /** Email для Supabase Auth (signInWithPassword), если отличается от логина. */
   auth_email: string | null;
   weekly_capacity_hours: number;
+  /** Часов в рабочий день (для графика и дневной ёмкости). */
+  work_hours_per_day: number;
+  /** JSON-массив дней недели 0–6 (Date.getDay()). */
+  work_days_json: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +77,16 @@ export function ensureTtUsersSchema() {
   } catch {
     /* ignore */
   }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN work_hours_per_day REAL NOT NULL DEFAULT 8`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN work_days_json TEXT`);
+  } catch {
+    /* exists */
+  }
 }
 
 function hashPassword(password: string, saltHex: string): string {
@@ -88,6 +108,17 @@ export function hashNewPassword(password: string): { password_hash: string; salt
   return { password_hash, salt };
 }
 
+const RANDOM_PW_ALPHABET = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export function generateRandomPassword(length = 14): string {
+  const bytes = randomBytes(length);
+  let s = "";
+  for (let i = 0; i < length; i++) {
+    s += RANDOM_PW_ALPHABET[bytes[i]! % RANDOM_PW_ALPHABET.length];
+  }
+  return s;
+}
+
 function rowToUser(row: Record<string, unknown> | undefined): TtUserRow | null {
   if (!row) return null;
   return {
@@ -106,6 +137,14 @@ function rowToUser(row: Record<string, unknown> | undefined): TtUserRow | null {
       row.weekly_capacity_hours != null && !Number.isNaN(Number(row.weekly_capacity_hours))
         ? Number(row.weekly_capacity_hours)
         : 40,
+    work_hours_per_day:
+      row.work_hours_per_day != null && !Number.isNaN(Number(row.work_hours_per_day))
+        ? Number(row.work_hours_per_day)
+        : 8,
+    work_days_json:
+      row.work_days_json != null && String(row.work_days_json).trim()
+        ? String(row.work_days_json)
+        : null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   };
@@ -135,6 +174,8 @@ export type TtUserPublic = {
   job_title: string;
   role: TtUserRole;
   weekly_capacity_hours: number;
+  work_hours_per_day: number;
+  work_days: number[];
   avatar_url: string | null;
   /** Email для входа через Supabase (если задан). */
   auth_email: string | null;
@@ -142,13 +183,23 @@ export type TtUserPublic = {
 };
 
 export function toTtUserPublic(row: TtUserRow): TtUserPublic {
+  const work_days = parseWorkDaysJson(row.work_days_json);
+  const work_hours_per_day =
+    row.work_hours_per_day != null && !Number.isNaN(row.work_hours_per_day) ? row.work_hours_per_day : 8;
+  const weekly_capacity_hours = effectiveWeeklyCapacityHours({
+    work_hours_per_day,
+    work_days,
+    weekly_capacity_hours: row.weekly_capacity_hours,
+  });
   return {
     id: row.id,
     login: row.login,
     display_name: row.display_name,
     job_title: row.job_title,
     role: row.role,
-    weekly_capacity_hours: row.weekly_capacity_hours,
+    weekly_capacity_hours,
+    work_hours_per_day,
+    work_days,
     avatar_url: row.avatar_url,
     auth_email: row.auth_email,
     created_at: row.created_at,
@@ -292,8 +343,9 @@ export function upsertUserFromPlain(params: {
   }
   const id = `u_${randomBytes(12).toString("hex")}`;
   const insertAuth = nextAuth !== undefined ? nextAuth : null;
+  const insertWeekly = cap ?? 40;
   db.prepare(
-    `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url, role, weekly_capacity_hours, auth_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url, role, weekly_capacity_hours, auth_email, work_hours_per_day, work_days_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     params.login.trim(),
@@ -303,8 +355,10 @@ export function upsertUserFromPlain(params: {
     (params.job_title ?? "").trim(),
     params.avatar_url ?? null,
     role ?? "admin",
-    cap ?? 40,
-    insertAuth
+    insertWeekly,
+    insertAuth,
+    8,
+    DEFAULT_WORK_DAYS_JSON
   );
   return getUserById(id)!;
 }
@@ -344,7 +398,7 @@ export function registerSelfServeMember(params: {
   const db = getDb();
   try {
     db.prepare(
-      `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url, role, weekly_capacity_hours, auth_email) VALUES (?, ?, ?, ?, ?, ?, NULL, 'member', 40, ?)`
+      `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url, role, weekly_capacity_hours, auth_email, work_hours_per_day, work_days_json) VALUES (?, ?, ?, ?, ?, ?, NULL, 'member', 40, ?, ?, ?)`
     ).run(
       id,
       login,
@@ -352,7 +406,9 @@ export function registerSelfServeMember(params: {
       salt,
       display_name,
       (params.job_title ?? "").trim(),
-      authEmail
+      authEmail,
+      8,
+      DEFAULT_WORK_DAYS_JSON
     );
   } catch (e) {
     const msg = String(e);
@@ -396,6 +452,168 @@ export function updateUserAvatar(userId: string, avatar_url: string | null): boo
     userId
   );
   return r.changes > 0;
+}
+
+export function createUserByAdminEmail(params: {
+  email: string;
+  display_name?: string;
+  job_title?: string;
+  role?: TtUserRole;
+}):
+  | { ok: true; user: TtUserPublic; temporaryPassword: string }
+  | { ok: false; error: string } {
+  ensureTtUsersSchema();
+  let normalized: string;
+  try {
+    normalized = normalizeAuthEmailInput(params.email.trim()) as string;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Некорректный email" };
+  }
+  const login = normalized.toLowerCase();
+  if (getUserByLogin(login)) {
+    return { ok: false, error: "Пользователь с таким email уже есть" };
+  }
+  const display_name = (params.display_name?.trim() || login.split("@")[0] || "Сотрудник").slice(0, 200);
+  const temporaryPassword = generateRandomPassword(14);
+  const { password_hash, salt } = hashNewPassword(temporaryPassword);
+  const role = params.role != null ? normalizeTtUserRole(params.role) : "member";
+  const work_hours_per_day = 8;
+  const work_days_json = DEFAULT_WORK_DAYS_JSON;
+  const work_days = parseWorkDaysJson(work_days_json);
+  const weekly_capacity_hours = effectiveWeeklyCapacityHours({
+    work_hours_per_day,
+    work_days,
+    weekly_capacity_hours: 40,
+  });
+  const id = `u_${randomBytes(12).toString("hex")}`;
+  const db = getDb();
+  try {
+    db.prepare(
+      `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url, role, weekly_capacity_hours, auth_email, work_hours_per_day, work_days_json) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`
+    ).run(
+      id,
+      login,
+      password_hash,
+      salt,
+      display_name,
+      (params.job_title ?? "").trim(),
+      role,
+      weekly_capacity_hours,
+      normalized,
+      work_hours_per_day,
+      work_days_json
+    );
+  } catch (e) {
+    const msg = String(e);
+    if (msg.includes("UNIQUE") || msg.includes("unique")) {
+      return { ok: false, error: "Такой логин или email уже занят" };
+    }
+    throw e;
+  }
+  const row = getUserById(id);
+  if (!row) return { ok: false, error: "Не удалось создать учётку" };
+  return { ok: true, user: toTtUserPublic(row), temporaryPassword };
+}
+
+export function updateUserScheduleAndProfile(
+  targetUserId: string,
+  patch: {
+    work_hours_per_day?: number;
+    work_days?: number[] | null;
+    weekly_capacity_hours?: number | null;
+    display_name?: string;
+    job_title?: string | null;
+  }
+): { ok: true; user: TtUserPublic } | { ok: false; error: string } {
+  const target = getUserById(targetUserId);
+  if (!target) return { ok: false, error: "Пользователь не найден" };
+
+  let work_hours_per_day = target.work_hours_per_day;
+  if (patch.work_hours_per_day !== undefined) {
+    const h = Number(patch.work_hours_per_day);
+    if (!Number.isFinite(h) || h < 0.25 || h > 24) {
+      return { ok: false, error: "work_hours_per_day: ожидается число от 0.25 до 24" };
+    }
+    work_hours_per_day = h;
+  }
+
+  let work_days_json = target.work_days_json;
+  if (patch.work_days !== undefined) {
+    if (patch.work_days === null || patch.work_days.length === 0) {
+      work_days_json = DEFAULT_WORK_DAYS_JSON;
+    } else {
+      work_days_json = serializeWorkDaysJson(patch.work_days);
+    }
+  }
+
+  const work_days = parseWorkDaysJson(work_days_json);
+  let weekly_capacity_hours = target.weekly_capacity_hours;
+  if (patch.weekly_capacity_hours !== undefined && patch.weekly_capacity_hours !== null) {
+    const w = Number(patch.weekly_capacity_hours);
+    if (!Number.isFinite(w) || w <= 0 || w > 168) {
+      return { ok: false, error: "weekly_capacity_hours: ожидается число от 1 до 168" };
+    }
+    weekly_capacity_hours = w;
+  } else if (patch.work_hours_per_day !== undefined || patch.work_days !== undefined) {
+    weekly_capacity_hours = effectiveWeeklyCapacityHours({
+      work_hours_per_day,
+      work_days,
+      weekly_capacity_hours: target.weekly_capacity_hours,
+    });
+  }
+
+  const display_name =
+    patch.display_name !== undefined ? patch.display_name.trim() || target.display_name : target.display_name;
+  const job_title =
+    patch.job_title !== undefined ? String(patch.job_title ?? "").trim() : target.job_title;
+
+  const db = getDb();
+  db.prepare(
+    `UPDATE tt_users SET work_hours_per_day = ?, work_days_json = ?, weekly_capacity_hours = ?, display_name = ?, job_title = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(work_hours_per_day, work_days_json, weekly_capacity_hours, display_name, job_title, targetUserId);
+
+  const updated = getUserById(targetUserId);
+  if (!updated) return { ok: false, error: "Ошибка обновления" };
+  return { ok: true, user: toTtUserPublic(updated) };
+}
+
+export function updateUserPasswordSelf(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): { ok: true } | { ok: false; error: string } {
+  if (newPassword.length < 8) {
+    return { ok: false, error: "Новый пароль не короче 8 символов" };
+  }
+  const row = getUserById(userId);
+  if (!row) return { ok: false, error: "Пользователь не найден" };
+  if (!verifyPassword(currentPassword, row)) {
+    return { ok: false, error: "Неверный текущий пароль" };
+  }
+  const { password_hash, salt } = hashNewPassword(newPassword);
+  const db = getDb();
+  db.prepare(`UPDATE tt_users SET password_hash = ?, salt = ?, updated_at = datetime('now') WHERE id = ?`).run(
+    password_hash,
+    salt,
+    userId
+  );
+  return { ok: true };
+}
+
+export function resetUserPasswordByAdmin(
+  targetUserId: string
+): { ok: true; temporaryPassword: string } | { ok: false; error: string } {
+  const row = getUserById(targetUserId);
+  if (!row) return { ok: false, error: "Пользователь не найден" };
+  const temporaryPassword = generateRandomPassword(14);
+  const { password_hash, salt } = hashNewPassword(temporaryPassword);
+  const db = getDb();
+  db.prepare(`UPDATE tt_users SET password_hash = ?, salt = ?, updated_at = datetime('now') WHERE id = ?`).run(
+    password_hash,
+    salt,
+    targetUserId
+  );
+  return { ok: true, temporaryPassword };
 }
 
 /** Синхронизация учёток из env (те же логины/пароли, что в Twinworks — один JSON при деплое). */

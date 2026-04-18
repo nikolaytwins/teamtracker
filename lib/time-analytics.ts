@@ -1,7 +1,9 @@
 import { getDb } from "@/lib/db";
 import { ensurePhasesSchema, type PmTimeEntry } from "@/lib/pm-phases";
-import { listUsersPublic } from "@/lib/tt-auth-db";
+import { listUsersPublic, type TtUserPublic } from "@/lib/tt-auth-db";
 import { parseISOWeekParam } from "@/lib/iso-week";
+import { getPlannedHoursByUserDayForWeek, getTimeSecondsByUserDay } from "@/lib/team-week-plan";
+import { dailyCapacityHours } from "@/lib/tt-user-schedule";
 
 const UNKNOWN_WORKER_LABEL = "(не указан)";
 
@@ -225,6 +227,7 @@ export function getTeamWeekLoad(isoWeek: string): {
   week: string;
   mondayIso: string;
   nextMondayIso: string;
+  monday: Date;
   rows: TeamWeekLoadRow[];
 } {
   ensureTimeSchema();
@@ -234,6 +237,7 @@ export function getTeamWeekLoad(isoWeek: string): {
   }
   const db = getDb();
   const users = listUsersPublic();
+  const monday = parsed.monday;
 
   const mondayIso = parsed.monday.toISOString();
   const nextMondayIso = parsed.nextMonday.toISOString();
@@ -285,5 +289,74 @@ export function getTeamWeekLoad(isoWeek: string): {
     }))
     .sort((a, b) => b.weekSeconds - a.weekSeconds || a.displayName.localeCompare(b.displayName, "ru"));
 
-  return { week: parsed.week, mondayIso, nextMondayIso, rows };
+  return { week: parsed.week, mondayIso, nextMondayIso, monday, rows };
+}
+
+const DAY_SHORT_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+function dayLoadStatus(loadHours: number, capacity: number): "under" | "normal" | "over" {
+  const safe = capacity > 0 ? capacity : 8;
+  const ratio = loadHours / safe;
+  if (capacity <= 0) return loadHours > 0.1 ? "over" : "normal";
+  if (ratio < 0.9) return "under";
+  if (ratio > 1.1) return "over";
+  return "normal";
+}
+
+export type TeamWeekUserDayRow = {
+  date: string;
+  shortLabel: string;
+  capacityHours: number;
+  loggedHours: number;
+  plannedHours: number;
+  loadHours: number;
+  status: "under" | "normal" | "over";
+};
+
+/** Поминутная разбивка недели: факт, план по подзадачам, ёмкость по графику сотрудника. */
+export function buildTeamWeekUserDays(params: {
+  monday: Date;
+  mondayIso: string;
+  nextMondayIso: string;
+  user: TtUserPublic;
+}): TeamWeekUserDayRow[] {
+  const loggedMap = getTimeSecondsByUserDay(params.mondayIso, params.nextMondayIso);
+  const plannedMap = getPlannedHoursByUserDayForWeek(params.monday);
+  const uid = params.user.id;
+  const work_days = params.user.work_days ?? [];
+  const work_hours_per_day = params.user.work_hours_per_day ?? 8;
+
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(params.monday);
+    d.setDate(params.monday.getDate() + i);
+    dates.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    );
+  }
+
+  return dates.map((date) => {
+    const dow = new Date(`${date}T12:00:00`).getDay();
+    const shortLabel = DAY_SHORT_RU[dow] ?? "?";
+    const capacityHours = dailyCapacityHours({
+      work_hours_per_day,
+      work_days: work_days,
+      ymd: date,
+    });
+    const sec = loggedMap.get(`${uid}\t${date}`) ?? 0;
+    const loggedHours = secondsToHours(sec);
+    const plannedRaw = plannedMap.get(`${uid}\t${date}`) ?? 0;
+    const plannedRounded = Math.round(plannedRaw * 10) / 10;
+    const loadHours = Math.round((loggedHours + plannedRounded) * 10) / 10;
+    const status = dayLoadStatus(loadHours, capacityHours);
+    return {
+      date,
+      shortLabel,
+      capacityHours: Math.round(capacityHours * 10) / 10,
+      loggedHours,
+      plannedHours: plannedRounded,
+      loadHours,
+      status,
+    };
+  });
 }

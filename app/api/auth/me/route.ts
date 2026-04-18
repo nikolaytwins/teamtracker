@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
-import { getUserById } from "@/lib/tt-auth-db";
-import { syncUsersFromEnv } from "@/lib/tt-auth-db";
+import { getUserById, syncUsersFromEnv, toTtUserPublic } from "@/lib/tt-auth-db";
 
 export async function GET() {
   try {
@@ -11,6 +10,7 @@ export async function GET() {
       return NextResponse.json({ user: null }, { status: 200 });
     }
     const row = getUserById(session.sub);
+    const pub = row ? toTtUserPublic(row) : null;
     return NextResponse.json({
       user: row
         ? {
@@ -20,6 +20,9 @@ export async function GET() {
             title: row.job_title,
             avatarUrl: row.avatar_url,
             role: row.role,
+            workHoursPerDay: pub!.work_hours_per_day,
+            workDays: pub!.work_days,
+            weeklyCapacityHours: pub!.weekly_capacity_hours,
           }
         : {
             id: session.sub,

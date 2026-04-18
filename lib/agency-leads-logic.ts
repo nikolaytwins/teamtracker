@@ -1,3 +1,10 @@
+/** Источник Profi.ru — без автоматического напоминания при создании лида. */
+export function isProfiRuLeadSource(source: string): boolean {
+  return String(source ?? "")
+    .toLowerCase()
+    .includes("profi");
+}
+
 /** Локальный полдень выбранного календарного дня — как в модалке (T12:00:00), без сдвига даты из‑за UTC. */
 function atLocalNoon(dayStart: Date): Date {
   const d = new Date(dayStart);

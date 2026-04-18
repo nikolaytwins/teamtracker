@@ -36,40 +36,42 @@ export function MeMonthlyByDayChart({ byDay, monthLabel }: { byDay: ByDayPoint[]
           Нет данных по дням
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/30 px-2 pb-2 pt-3 dark:bg-[var(--surface-2)]/15">
-          <div
-            className="mx-auto flex min-w-[280px] items-end justify-stretch gap-px sm:min-w-0 sm:gap-0.5"
-            role="img"
-            aria-label={`Столбчатая диаграмма времени по дням за ${monthLabel}`}
-          >
-            {byDay.map((d) => {
-              const barH =
-                d.seconds <= 0 ? 0 : Math.max(5, Math.round((d.seconds / maxSec) * DAY_CHART_PX));
-              const dayNum = Number(d.date.slice(-2));
-              const title = `${d.date}: ${d.hours} ч (${formatDurShort(d.seconds)})`;
-              return (
-                <div key={d.date} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/30 px-2 pb-3 pt-3 dark:bg-[var(--surface-2)]/15">
+          <div className="overflow-x-auto">
+            <div
+              className="mx-auto flex min-w-[280px] items-end justify-stretch gap-px sm:min-w-0 sm:gap-0.5"
+              role="img"
+              aria-label={`Столбчатая диаграмма времени по дням за ${monthLabel}`}
+            >
+              {byDay.map((d) => {
+                const barH =
+                  d.seconds <= 0 ? 0 : Math.max(5, Math.round((d.seconds / maxSec) * DAY_CHART_PX));
+                const dayNum = Number(d.date.slice(-2));
+                const title = `${d.date}: ${d.hours} ч (${formatDurShort(d.seconds)})`;
+                return (
                   <div
-                    className="group relative w-full max-w-[20px] cursor-default"
-                    style={{ height: DAY_CHART_PX }}
+                    key={d.date}
+                    className="group relative z-0 flex min-w-0 flex-1 flex-col items-center gap-0.5 pb-6"
                     title={title}
                   >
-                    <div className="absolute bottom-0 left-0 right-0 flex flex-col justify-end" style={{ height: DAY_CHART_PX }}>
-                      <div
-                        className="w-full rounded-t-sm bg-[var(--primary)]/85 transition-[filter] duration-150 group-hover:brightness-110 dark:bg-[var(--primary)]/90"
-                        style={{ height: barH }}
-                      />
+                    <div className="relative w-full max-w-[20px] cursor-default" style={{ height: DAY_CHART_PX }}>
+                      <div className="absolute bottom-0 left-0 right-0 flex flex-col justify-end" style={{ height: DAY_CHART_PX }}>
+                        <div
+                          className="w-full rounded-t-sm bg-[var(--primary)]/85 transition-[filter] duration-150 group-hover:brightness-110 dark:bg-[var(--primary)]/90"
+                          style={{ height: barH }}
+                        />
+                      </div>
                     </div>
-                    <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--text)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--bg)] opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+                    <span className="select-none text-[9px] font-medium tabular-nums leading-none text-[var(--muted-foreground)] sm:text-[10px]">
+                      {dayNum}
+                    </span>
+                    <span className="pointer-events-none absolute left-1/2 top-full z-[200] mt-0.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--text)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--bg)] opacity-0 shadow-lg ring-1 ring-black/10 transition-opacity group-hover:opacity-100 dark:ring-white/10">
                       {d.hours} ч
                     </span>
                   </div>
-                  <span className="select-none text-[9px] font-medium tabular-nums leading-none text-[var(--muted-foreground)] sm:text-[10px]">
-                    {dayNum}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

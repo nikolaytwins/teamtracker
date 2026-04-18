@@ -101,7 +101,18 @@ export default function MePage() {
     title: string;
     avatarUrl: string | null;
     role?: string;
+    workHoursPerDay?: number;
+    workDays?: number[];
+    weeklyCapacityHours?: number;
   } | null>(null);
+  const [scheduleHours, setScheduleHours] = useState(8);
+  const [scheduleDays, setScheduleDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleNotice, setScheduleNotice] = useState<string | null>(null);
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwNew2, setPwNew2] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
   const isMemberUser = user?.role === "member";
   const [cards, setCards] = useState<PmCard[]>([]);
   const [cardId, setCardId] = useState("");
@@ -172,9 +183,80 @@ export default function MePage() {
   const loadMe = useCallback(async () => {
     const r = await fetch(apiUrl("/api/auth/me"));
     const d = await r.json();
-    if (d.user)
-      setUser(d.user as { id: string; name: string; title: string; avatarUrl: string | null; role?: string });
+    if (d.user) {
+      const u = d.user as {
+        id: string;
+        name: string;
+        title: string;
+        avatarUrl: string | null;
+        role?: string;
+        workHoursPerDay?: number;
+        workDays?: number[];
+        weeklyCapacityHours?: number;
+      };
+      setUser(u);
+      if (typeof u.workHoursPerDay === "number" && !Number.isNaN(u.workHoursPerDay)) {
+        setScheduleHours(u.workHoursPerDay);
+      }
+      if (Array.isArray(u.workDays) && u.workDays.length > 0) {
+        setScheduleDays([...u.workDays].sort((a, b) => a - b));
+      }
+    }
   }, []);
+
+  async function saveSchedule() {
+    setScheduleSaving(true);
+    setScheduleNotice(null);
+    setErr(null);
+    try {
+      const r = await fetch(apiUrl("/api/me/profile"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workHoursPerDay: scheduleHours,
+          workDays: scheduleDays,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Не удалось сохранить");
+      setScheduleNotice("График сохранён.");
+      await loadMe();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
+
+  async function savePassword() {
+    if (pwNew !== pwNew2) {
+      setErr("Новые пароли не совпадают");
+      return;
+    }
+    setPwBusy(true);
+    setErr(null);
+    setScheduleNotice(null);
+    try {
+      const r = await fetch(apiUrl("/api/me/profile"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: pwCurrent,
+          newPassword: pwNew,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Не удалось сменить пароль");
+      setPwCurrent("");
+      setPwNew("");
+      setPwNew2("");
+      setScheduleNotice("Пароль обновлён.");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setPwBusy(false);
+    }
+  }
 
   const loadMySubtasks = useCallback(async () => {
     const r = await fetch(apiUrl("/api/me/subtasks"));
@@ -545,6 +627,112 @@ export default function MePage() {
           ) : null}
         </div>
       </header>
+
+      <Card className="shadow-[var(--shadow-card)]">
+        <CardHeader className="pb-2">
+          <CardTitle>График работы и пароль</CardTitle>
+          <CardDescription>
+            Часов в рабочий день и дни недели (0 — вс, 6 — сб). Недельная ёмкость пересчитывается автоматически. Смена
+            пароля для входа по логину/паролю в этом приложении.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {scheduleNotice ? <p className="text-sm text-emerald-700">{scheduleNotice}</p> : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Часов в день</label>
+              <Input
+                type="number"
+                step={0.5}
+                min={0.25}
+                max={24}
+                value={scheduleHours}
+                onChange={(e) => setScheduleHours(parseFloat(e.target.value) || 8)}
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <span className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Рабочие дни</span>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { v: 1, l: "Пн" },
+                  { v: 2, l: "Вт" },
+                  { v: 3, l: "Ср" },
+                  { v: 4, l: "Чт" },
+                  { v: 5, l: "Пт" },
+                  { v: 6, l: "Сб" },
+                  { v: 0, l: "Вс" },
+                ].map(({ v, l }) => {
+                  const on = scheduleDays.includes(v);
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => {
+                        setScheduleDays((prev) => {
+                          const next = on ? prev.filter((x) => x !== v) : [...prev, v].sort((a, b) => a - b);
+                          return next.length > 0 ? next : prev;
+                        });
+                      }}
+                      className={`rounded-lg border px-2 py-1 text-xs font-medium ${
+                        on
+                          ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                          : "border-[var(--border)] text-[var(--muted-foreground)]"
+                      }`}
+                    >
+                      {l}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={scheduleSaving}
+            onClick={() => void saveSchedule()}
+          >
+            {scheduleSaving ? "Сохранение…" : "Сохранить график"}
+          </Button>
+          <div className="border-t border-[var(--border)] pt-4 space-y-2">
+            <p className="text-xs font-medium text-[var(--muted-foreground)]">Сменить пароль</p>
+            <Input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Текущий пароль"
+              value={pwCurrent}
+              onChange={(e) => setPwCurrent(e.target.value)}
+              className="text-sm"
+            />
+            <Input
+              type="password"
+              autoComplete="new-password"
+              placeholder="Новый пароль (не короче 8 символов)"
+              value={pwNew}
+              onChange={(e) => setPwNew(e.target.value)}
+              className="text-sm"
+            />
+            <Input
+              type="password"
+              autoComplete="new-password"
+              placeholder="Повтор нового пароля"
+              value={pwNew2}
+              onChange={(e) => setPwNew2(e.target.value)}
+              className="text-sm"
+            />
+            <Button
+              type="button"
+              size="sm"
+              disabled={pwBusy || !pwNew.trim()}
+              onClick={() => void savePassword()}
+            >
+              {pwBusy ? "Сохранение…" : "Обновить пароль"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-[var(--shadow-card)]">
         <CardHeader className="pb-2">

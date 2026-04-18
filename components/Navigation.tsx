@@ -94,6 +94,12 @@ function formatNtfText(n: NtfItem): string {
       const since = p.waitingSince ? new Date(String(p.waitingSince)).toLocaleDateString("ru-RU") : "";
       return since ? `Согласование «${card}» без ответа с ${since}` : `Согласование «${card}» — долго без ответа`;
     }
+    if (n.type === "team_week_load") {
+      const name = String(p.displayName ?? "Сотрудник");
+      const st = p.status === "over" ? "перегружен" : p.status === "under" ? "недогружен" : "в норме";
+      const week = String(p.week ?? "");
+      return week ? `${name}: ${st} (${week})` : `${name}: ${st}`;
+    }
   } catch {
     /* ignore */
   }
@@ -609,7 +615,17 @@ export default function Navigation() {
                               onClick={() => {
                                 if (!n.read_at) void markRead([n.id]);
                                 setNtfOpen(false);
-                                router.push(appPath("/board"));
+                                let path = "/board";
+                                try {
+                                  const p = JSON.parse(n.payload) as Record<string, unknown>;
+                                  if (n.type === "team_week_load") path = "/admin/users";
+                                  else if (n.type === "approval_stale" && typeof p.cardId === "string") {
+                                    path = `/board/${encodeURIComponent(p.cardId)}`;
+                                  }
+                                } catch {
+                                  /* default board */
+                                }
+                                router.push(appPath(path));
                               }}
                             >
                               {formatNtfText(n)}

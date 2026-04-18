@@ -4,7 +4,7 @@ import {
   ensureAgencyProjectsColumns,
   ensureLeadHistoryTable,
 } from "@/lib/agency-leads-schema";
-import { calculateNextContactDateForLead } from "@/lib/agency-leads-logic";
+import { calculateNextContactDateForLead, isProfiRuLeadSource } from "@/lib/agency-leads-logic";
 import { getAgencySqlitePath } from "@/lib/agency-sqlite";
 import {
   computeOutreachStats,
@@ -313,7 +313,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
       ensureAgencyLeadsReady(db);
       ensureAgencyProjectsColumns(db);
       ensureLeadHistoryTable(db);
-      const autoDate = calculateNextContactDateForLead(status);
+      const autoDate = isProfiRuLeadSource(source) ? null : calculateNextContactDateForLead(status);
       const nextContactDate = autoDate ? autoDate.toISOString() : null;
       const id = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 

@@ -1,4 +1,4 @@
-import { calculateNextContactDateForLead } from "@/lib/agency-leads-logic";
+import { calculateNextContactDateForLead, isProfiRuLeadSource } from "@/lib/agency-leads-logic";
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
 import {
   computeOutreachByMonthWithWeeks,
@@ -244,7 +244,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     const taskDescription = (body.taskDescription as string) || null;
     const status = (body.status as string) || "new";
     const recurring = Boolean(body.isRecurring);
-    const autoDate = calculateNextContactDateForLead(status);
+    const autoDate = isProfiRuLeadSource(source) ? null : calculateNextContactDateForLead(status);
     const nextContactDate = autoDate ? autoDate.toISOString() : null;
     const id = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     const now = new Date().toISOString();

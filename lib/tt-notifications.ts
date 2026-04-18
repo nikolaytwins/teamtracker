@@ -1,7 +1,9 @@
+import { formatISOWeekParam } from "@/lib/iso-week";
 import { getDb } from "@/lib/db";
 import { APPROVAL_WAITING_STATUS_SET } from "@/lib/statuses";
-import { listUserIdsWithRole } from "@/lib/tt-auth-db";
 import type { TtUserRole } from "@/lib/roles";
+import { getTeamWeekLoad, secondsToHours } from "@/lib/time-analytics";
+import { listUserIdsWithRole } from "@/lib/tt-auth-db";
 
 export type TtNotificationRow = {
   id: string;
@@ -71,6 +73,61 @@ function hasRecentApprovalStale(userId: string, cardId: string, hours = 24): boo
 }
 
 /** Создаёт уведомления админам о карточках в согласовании дольше 48 ч (не чаще 1 на карточку / пользователя за сутки). */
+function teamWeekLoadStatus(hours: number, capacity: number): "under" | "normal" | "over" {
+  const safeCapacity = capacity > 0 ? capacity : 40;
+  const ratio = hours / safeCapacity;
+  if (ratio < 0.9) return "under";
+  if (ratio > 1.1) return "over";
+  return "normal";
+}
+
+function hasRecentTeamWeekLoadNtf(adminId: string, week: string, userId: string): boolean {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT id FROM tt_notifications
+       WHERE user_id = ? AND type = 'team_week_load'
+         AND json_extract(payload, '$.week') = ?
+         AND json_extract(payload, '$.userId') = ?
+         AND datetime(created_at) > datetime('now', '-36 hours')
+       LIMIT 1`
+    )
+    .get(adminId, week, userId) as { id: string } | undefined;
+  return Boolean(row);
+}
+
+/** Уведомления админам о недогрузе/перегрузе по текущей ISO-неделе (не чаще одного на пару user+week за 36 ч). */
+export function ensureTeamWeekLoadNotifications(): void {
+  const adminIds = listUserIdsWithRole("admin" as TtUserRole);
+  if (adminIds.length === 0) return;
+  let data: ReturnType<typeof getTeamWeekLoad>;
+  try {
+    data = getTeamWeekLoad(formatISOWeekParam());
+  } catch {
+    return;
+  }
+  for (const r of data.rows) {
+    const hours = secondsToHours(r.weekSeconds);
+    const status = teamWeekLoadStatus(hours, r.weeklyCapacityHours);
+    if (status === "normal") continue;
+    for (const uid of adminIds) {
+      if (hasRecentTeamWeekLoadNtf(uid, data.week, r.userId)) continue;
+      createNotification({
+        userId: uid,
+        type: "team_week_load",
+        payload: {
+          week: data.week,
+          userId: r.userId,
+          displayName: r.displayName,
+          status,
+          hours,
+          capacityHours: r.weeklyCapacityHours,
+        },
+      });
+    }
+  }
+}
+
 export function ensureApprovalStaleNotifications(): void {
   const db = getDb();
   const adminIds = listUserIdsWithRole("admin" as TtUserRole);

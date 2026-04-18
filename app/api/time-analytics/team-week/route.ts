@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatISOWeekParam } from "@/lib/iso-week";
 import { requireAgencyAccess } from "@/lib/require-role";
-import { getTeamWeekLoad, secondsToHours } from "@/lib/time-analytics";
+import { listUsersPublic } from "@/lib/tt-auth-db";
+import { buildTeamWeekUserDays, getTeamWeekLoad, secondsToHours } from "@/lib/time-analytics";
 
 function loadStatus(hours: number, capacity: number): "under" | "normal" | "over" {
   const safeCapacity = capacity > 0 ? capacity : 40;
@@ -18,9 +19,20 @@ export async function GET(request: NextRequest) {
   try {
     const week = new URL(request.url).searchParams.get("week")?.trim() || formatISOWeekParam();
     const data = getTeamWeekLoad(week);
+    const usersById = new Map(listUsersPublic().map((u) => [u.id, u]));
     const rows = data.rows.map((r) => {
       const hours = secondsToHours(r.weekSeconds);
       const previousHours = secondsToHours(r.previousWeekSeconds);
+      const pub = usersById.get(r.userId);
+      const days =
+        pub != null
+          ? buildTeamWeekUserDays({
+              monday: data.monday,
+              mondayIso: data.mondayIso,
+              nextMondayIso: data.nextMondayIso,
+              user: pub,
+            })
+          : undefined;
       return {
         userId: r.userId,
         name: r.displayName,
@@ -30,6 +42,7 @@ export async function GET(request: NextRequest) {
         previousHours,
         deltaHours: secondsToHours(r.weekSeconds - r.previousWeekSeconds),
         status: loadStatus(hours, r.weeklyCapacityHours),
+        days,
       };
     });
     const totalHours = rows.reduce((acc, r) => acc + r.hours, 0);

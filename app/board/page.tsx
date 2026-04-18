@@ -94,11 +94,11 @@ function formatDate(s: string | null) {
   }
 }
 
-/** Левая полоска на карточке: согласование — оранж., в работе — зелёная. */
+/** Левая полоска на карточке: согласование — оранж.; остальные — нейтральные акценты. */
 function cardStatusLeftAccent(card: PmCard): string {
   const g = statusToSimpleViewGroup(card.status);
   if (g === "awaiting_approval") return "border-l-4 border-l-orange-500";
-  if (g === "in_progress") return "border-l-4 border-l-emerald-500";
+  if (g === "in_progress") return "border-l-4 border-l-[var(--border)]";
   if (g === "done") return "border-l-4 border-l-slate-400";
   if (g === "pause") return "border-l-4 border-l-amber-500";
   return "border-l-4 border-l-[var(--border)]";
@@ -1206,10 +1206,7 @@ export default function BoardPage() {
             const groupCards = bySimpleGroup(key);
             const subtasksCol = subtasksForSimpleColumn(key);
             const showStageLabel = key === "in_progress" || key === "awaiting_approval";
-            const colTint =
-              key === "in_progress"
-                ? "bg-[var(--primary-soft)]/12 dark:bg-[var(--primary-soft)]/8"
-                : "bg-[var(--surface)]/90 dark:bg-[var(--surface)]/50";
+            const colTint = "bg-[var(--surface)]/90 dark:bg-[var(--surface)]/50";
             const defaultStatus = defaultStatusForSimpleViewGroup(key);
             return (
               <div
@@ -1220,11 +1217,6 @@ export default function BoardPage() {
               >
                 <div className="sticky top-0 z-10 flex min-h-[3.25rem] flex-wrap items-center gap-2 border-b border-[var(--border)]/45 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] dark:border-white/[0.06]">
                   <span className="text-[var(--text)] normal-case tracking-normal">{label}</span>
-                  {key === "in_progress" ? (
-                    <span className="rounded-full bg-[var(--primary)]/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--primary)]">
-                      работа
-                    </span>
-                  ) : null}
                   {key === "awaiting_approval" ? (
                     <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">
                       клиент
@@ -1234,11 +1226,7 @@ export default function BoardPage() {
                     {boardDisplay === "tasks" ? subtasksCol.length : groupCards.length}
                   </span>
                 </div>
-                <div
-                  className={`flex min-h-[min(70vh,560px)] flex-col gap-3 p-3 ${
-                    key === "in_progress" ? "bg-[var(--primary-soft)]/6 dark:bg-transparent" : "bg-[var(--bg)]/30 dark:bg-black/10"
-                  }`}
-                >
+                <div className="flex min-h-[min(70vh,560px)] flex-col gap-3 bg-[var(--bg)]/30 p-3 dark:bg-black/10">
                   <div className="min-h-0 flex-1 space-y-3">
                     {boardDisplay === "tasks" ? (
                       subtasksCol.length === 0 ? (
