@@ -6,4 +6,5 @@ deploy-standalone.tgz
 *.db
 *.db.backup*
 .env*
+!.env.example
 *.tsbuildinfo
