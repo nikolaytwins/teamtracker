@@ -8,8 +8,10 @@ import { getAuthSecret, verifySession } from "@/lib/session-token";
  * Берём явный origin из env или из X-Forwarded-* / Host.
  */
 function publicSiteOrigin(request: NextRequest): string {
-  const explicit = process.env.TEAM_TRACKER_PUBLIC_ORIGIN?.trim().replace(/\/+$/, "");
-  if (explicit) return explicit;
+  /** На VPS с nginx без корректных forwarded-заголовков — задайте в systemd (см. deploy/). */
+  const forced = process.env.TEAM_TRACKER_PUBLIC_ORIGIN?.trim().replace(/\/+$/, "");
+  if (forced) return forced;
+
   const rawXfh = request.headers.get("x-forwarded-host");
   const host = (rawXfh?.split(",")[0]?.trim() ||
     request.headers.get("host")?.split(",")[0]?.trim() ||
