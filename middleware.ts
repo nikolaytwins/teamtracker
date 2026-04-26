@@ -49,6 +49,10 @@ export async function middleware(request: NextRequest) {
 
   /** Машинный доступ из Sophia OS (секрет в env). Без браузерной сессии Teamtracker. */
   if (pathname.startsWith("/api/integrations/sophia/")) {
+    /** CORS preflight: браузер не шлёт кастомные заголовки на OPTIONS — только после успешного preflight. */
+    if (request.method === "OPTIONS") {
+      return NextResponse.next();
+    }
     const envSecret = process.env.TT_INTEGRATION_SECRET ?? "";
     const headerSecret = request.headers.get("x-tt-integration-secret") ?? "";
     if (envSecret.length >= 16 && headerSecret === envSecret) {
