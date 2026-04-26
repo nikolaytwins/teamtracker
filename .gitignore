@@ -8,3 +8,4 @@ deploy-standalone.tgz
 .env*
 !.env.example
 *.tsbuildinfo
+.cursor/
