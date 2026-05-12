@@ -2,11 +2,7 @@
 
 import { apiUrl, appPath } from "@/lib/api-url";
 import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
-import {
-  defaultTimerTaskTypeForCard,
-  TIMER_TASK_OPTIONS_OTHER,
-  TIMER_TASK_OPTIONS_PROJECT,
-} from "@/lib/time-task-types";
+import { TIMER_TASK_OPTIONS_OTHER, TIMER_TASK_OPTIONS_PROJECT } from "@/lib/time-task-types";
 import {
   PRESENTATION_TASK_PRESETS,
   SALES_TASK,
@@ -88,13 +84,16 @@ function formatClock(iso: string): string {
   }
 }
 
-function parseTaskForForm(s: SessionRow): { usePreset: boolean; taskChoice: string; customText: string } {
+/** Значение селекта «свой текст»; не пересекается с ключами пресетов в БД. */
+const TASK_CHOICE_FREE_TEXT = "__free_text__";
+
+function parseTaskForForm(s: SessionRow): { taskChoice: string; manualWork: string } {
   const tt = (s.taskType || "").trim();
   if (tt.startsWith("custom:")) {
-    return { usePreset: false, taskChoice: "custom", customText: tt.slice("custom:".length) };
+    return { taskChoice: TASK_CHOICE_FREE_TEXT, manualWork: tt.slice("custom:".length) };
   }
   if (tt === "custom" || !tt) {
-    return { usePreset: false, taskChoice: "custom", customText: (s.taskNote || "").trim() };
+    return { taskChoice: TASK_CHOICE_FREE_TEXT, manualWork: (s.taskNote || "").trim() };
   }
   const allPresets = [
     ...TIMER_TASK_OPTIONS_PROJECT,
@@ -104,17 +103,15 @@ function parseTaskForForm(s: SessionRow): { usePreset: boolean; taskChoice: stri
     SALES_TASK,
   ];
   const known = allPresets.some((p) => p.key === tt);
-  if (known) return { usePreset: true, taskChoice: tt, customText: (s.taskNote || "").trim() };
-  return { usePreset: false, taskChoice: "custom", customText: tt };
+  if (known) return { taskChoice: tt, manualWork: (s.taskNote || "").trim() };
+  return { taskChoice: TASK_CHOICE_FREE_TEXT, manualWork: (tt || (s.taskNote || "")).trim() };
 }
 
 export default function HomePage() {
   const [projects, setProjects] = useState<PmCard[]>([]);
   const [cardId, setCardId] = useState("");
-  const [usePreset, setUsePreset] = useState(false);
-  const [taskChoice, setTaskChoice] = useState<string>("design_concept");
+  const [taskChoice, setTaskChoice] = useState<string>(TASK_CHOICE_FREE_TEXT);
   const [manualWork, setManualWork] = useState("");
-  const [customPresetText, setCustomPresetText] = useState("");
   const [active, setActive] = useState<ActiveInfo | null>(null);
   const [nowTs, setNowTs] = useState(0);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -124,19 +121,15 @@ export default function HomePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
     cardId: string;
-    usePreset: boolean;
     taskChoice: string;
     manualWork: string;
-    customPresetText: string;
     startedLocal: string;
     endedLocal: string;
   } | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualCardId, setManualCardId] = useState("");
-  const [manualUsePreset, setManualUsePreset] = useState(false);
-  const [manualTaskChoice, setManualTaskChoice] = useState("design_concept");
+  const [manualTaskChoice, setManualTaskChoice] = useState(TASK_CHOICE_FREE_TEXT);
   const [manualWorkText, setManualWorkText] = useState("");
-  const [manualCustomPreset, setManualCustomPreset] = useState("");
   const [manualStart, setManualStart] = useState("");
   const [manualEnd, setManualEnd] = useState("");
   const [homeSubtasks, setHomeSubtasks] = useState<HomeSubtaskRow[]>([]);
@@ -157,9 +150,29 @@ export default function HomePage() {
     return [...TIMER_TASK_OPTIONS_PROJECT];
   }, [projectType, isOtherCard]);
 
+  const quickStartSelectOptions = useMemo(
+    () => [{ key: TASK_CHOICE_FREE_TEXT, label: "Свободное описание" }, ...presetOptions],
+    [presetOptions]
+  );
+
+  const editTaskSelectOptions = useMemo(() => {
+    if (!editForm) return [] as { key: string; label: string }[];
+    const c = projects.find((x) => x.id === editForm.cardId);
+    const pt = parseCardProjectType(c?.extra ?? null);
+    const io = editForm.cardId === VIRTUAL_OTHER_CARD_ID || pt === "other";
+    const opts = io
+      ? [...TIMER_TASK_OPTIONS_OTHER]
+      : pt === "presentation"
+        ? [...PRESENTATION_TASK_PRESETS]
+        : pt === "site"
+          ? [...SITE_TASK_PRESETS]
+          : [...TIMER_TASK_OPTIONS_PROJECT];
+    return [{ key: TASK_CHOICE_FREE_TEXT, label: "Свободное описание" }, ...opts];
+  }, [editForm, projects]);
+
   useEffect(() => {
-    const valid = taskChoice === "custom" || presetOptions.some((p) => p.key === taskChoice);
-    if (!valid) setTaskChoice(presetOptions[0]?.key ?? "sales");
+    if (taskChoice === TASK_CHOICE_FREE_TEXT) return;
+    if (!presetOptions.some((p) => p.key === taskChoice)) setTaskChoice(TASK_CHOICE_FREE_TEXT);
   }, [cardId, presetOptions, taskChoice]);
 
   const loadProjects = useCallback(async () => {
@@ -215,6 +228,7 @@ export default function HomePage() {
               card_name: String(row.card_name ?? ""),
               card_status: isValidStatus(String(row.card_status ?? "")) ? (String(row.card_status) as PmStatusKey) : DEFAULT_STATUS,
               card_extra: row.card_extra != null ? String(row.card_extra) : null,
+              completed_at: row.completed_at != null && String(row.completed_at).trim() ? String(row.completed_at) : null,
             }))
             .filter((x) => x.id && x.card_id)
         );
@@ -272,9 +286,14 @@ export default function HomePage() {
     return [...TIMER_TASK_OPTIONS_PROJECT];
   }, [manualIsOther, manualProjectType]);
 
+  const manualSelectOptions = useMemo(
+    () => [{ key: TASK_CHOICE_FREE_TEXT, label: "Свободное описание" }, ...manualPresetOptions],
+    [manualPresetOptions]
+  );
+
   useEffect(() => {
-    const valid = manualTaskChoice === "custom" || manualPresetOptions.some((p) => p.key === manualTaskChoice);
-    if (!valid) setManualTaskChoice(manualPresetOptions[0]?.key ?? "sales");
+    if (manualTaskChoice === TASK_CHOICE_FREE_TEXT) return;
+    if (!manualPresetOptions.some((p) => p.key === manualTaskChoice)) setManualTaskChoice(TASK_CHOICE_FREE_TEXT);
   }, [manualCardId, manualPresetOptions, manualTaskChoice]);
 
   async function startSession() {
@@ -283,23 +302,19 @@ export default function HomePage() {
       setErr("Выберите проект");
       return;
     }
-    if (!usePreset) {
+    if (taskChoice === TASK_CHOICE_FREE_TEXT) {
       if (!manualWork.trim()) {
-        setErr("Опишите, над чем работали");
+        setErr("Опишите, над чем работаете");
         return;
       }
-    } else if (taskChoice === "custom" && !customPresetText.trim()) {
-      setErr("Опишите задачу");
-      return;
     }
-    const payloadTaskType = !usePreset
-      ? "custom"
-      : taskChoice === "custom"
+    const payloadTaskType =
+      taskChoice === TASK_CHOICE_FREE_TEXT
         ? "custom"
         : taskChoice === "sales"
           ? SALES_TASK.key
           : taskChoice;
-    const taskNote = !usePreset ? manualWork.trim() : taskChoice === "custom" ? customPresetText.trim() : "";
+    const taskNote = taskChoice === TASK_CHOICE_FREE_TEXT ? manualWork.trim() : "";
     setActionBusy(true);
     try {
       const r = await fetch(apiUrl("/api/me/timer/start"), {
@@ -316,7 +331,6 @@ export default function HomePage() {
       await loadActive();
       await loadSessions();
       setManualWork("");
-      setCustomPresetText("");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Ошибка");
     } finally {
@@ -363,10 +377,8 @@ export default function HomePage() {
     setEditingId(s.id);
     setEditForm({
       cardId: s.cardId,
-      usePreset: parsed.usePreset,
       taskChoice: parsed.taskChoice,
-      manualWork: parsed.usePreset ? "" : parsed.customText,
-      customPresetText: parsed.usePreset && parsed.taskChoice === "custom" ? parsed.customText : "",
+      manualWork: parsed.manualWork,
       startedLocal: toDatetimeLocalValue(s.startedAt),
       endedLocal: toDatetimeLocalValue(s.endedAt),
     });
@@ -374,6 +386,10 @@ export default function HomePage() {
 
   async function saveEdit() {
     if (!editingId || !editForm) return;
+    if (editForm.taskChoice === TASK_CHOICE_FREE_TEXT && !editForm.manualWork.trim()) {
+      setErr("Опишите, над чем работали");
+      return;
+    }
     setActionBusy(true);
     setErr(null);
     try {
@@ -382,18 +398,16 @@ export default function HomePage() {
         startedAt: fromDatetimeLocalValue(editForm.startedLocal),
         endedAt: fromDatetimeLocalValue(editForm.endedLocal),
       };
-      if (editForm.usePreset) {
-        const tt =
-          editForm.taskChoice === "custom"
-            ? "custom"
-            : editForm.taskChoice === "sales"
-              ? SALES_TASK.key
-              : editForm.taskChoice;
-        body.taskType = tt;
-        body.taskNote = editForm.taskChoice === "custom" ? editForm.customPresetText.trim() : "";
-      } else {
+      if (editForm.taskChoice === TASK_CHOICE_FREE_TEXT) {
         body.taskType = "custom";
         body.taskNote = editForm.manualWork.trim();
+      } else {
+        const tt =
+          editForm.taskChoice === "sales"
+            ? SALES_TASK.key
+            : editForm.taskChoice;
+        body.taskType = tt;
+        body.taskNote = "";
       }
       const r = await fetch(apiUrl(`/api/me/timer/sessions/${encodeURIComponent(editingId)}`), {
         method: "PATCH",
@@ -438,27 +452,19 @@ export default function HomePage() {
       setErr("Заполните проект и интервал времени");
       return;
     }
-    if (!manualUsePreset) {
+    if (manualTaskChoice === TASK_CHOICE_FREE_TEXT) {
       if (!manualWorkText.trim()) {
         setErr("Опишите задачу");
         return;
       }
-    } else if (manualTaskChoice === "custom" && !manualCustomPreset.trim()) {
-      setErr("Опишите задачу");
-      return;
     }
-    const taskType = !manualUsePreset
-      ? "custom"
-      : manualTaskChoice === "custom"
+    const taskType =
+      manualTaskChoice === TASK_CHOICE_FREE_TEXT
         ? "custom"
         : manualTaskChoice === "sales"
           ? SALES_TASK.key
           : manualTaskChoice;
-    const taskNote = !manualUsePreset
-      ? manualWorkText.trim()
-      : manualTaskChoice === "custom"
-        ? manualCustomPreset.trim()
-        : "";
+    const taskNote = manualTaskChoice === TASK_CHOICE_FREE_TEXT ? manualWorkText.trim() : "";
     setActionBusy(true);
     try {
       const r = await fetch(apiUrl("/api/me/timer/sessions/manual"), {
@@ -476,7 +482,6 @@ export default function HomePage() {
       if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Ошибка");
       setManualOpen(false);
       setManualWorkText("");
-      setManualCustomPreset("");
       await loadSessions();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Ошибка");
@@ -497,8 +502,8 @@ export default function HomePage() {
         <h1 className="text-2xl font-bold tracking-tight text-[var(--text)]">Главная</h1>
         <p className="text-sm text-[var(--muted-foreground)]">
           Быстрый старт учёта времени и последние сессии.{" "}
-          <Link href={appPath("/me")} className="font-semibold text-[var(--primary)] hover:underline">
-            Профиль и график
+          <Link href={appPath("/home/sessions")} className="font-semibold text-[var(--primary)] hover:underline">
+            Месяц сессий
           </Link>
         </p>
       </header>
@@ -507,8 +512,8 @@ export default function HomePage() {
         <CardHeader className="pb-2">
           <CardTitle>Быстрый старт</CardTitle>
           <CardDescription>
-            Выберите проект из доступных (не завершённых; для участников — только с вашим участием в подзадачах). Опишите
-            работу текстом или отметьте «типовая задача» и выберите из списка. Один активный таймер.
+            Выберите проект, затем в списке «Задача» — либо «Свободное описание» и свой текст, либо типовой тип работы. Один
+            активный таймер.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -546,63 +551,37 @@ export default function HomePage() {
                 ))}
               </select>
             </div>
-            <div className="flex items-end">
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text)]">
-                <input
-                  type="checkbox"
-                  checked={usePreset}
-                  onChange={(e) => {
-                    setUsePreset(e.target.checked);
-                    if (e.target.checked && cardId) {
-                      setTaskChoice(defaultTimerTaskTypeForCard(cardId, projects.find((p) => p.id === cardId)?.extra ?? null));
-                    }
-                  }}
-                  className="h-4 w-4 rounded border-[var(--border)]"
-                />
-                Типовая задача из списка
-              </label>
-            </div>
-          </div>
-
-          {usePreset ? (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Тип задачи</label>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Задача</label>
               <select
                 value={taskChoice}
                 onChange={(e) => {
                   setTaskChoice(e.target.value);
-                  setCustomPresetText("");
+                  if (e.target.value !== TASK_CHOICE_FREE_TEXT) setManualWork("");
                 }}
                 className="tt-select w-full text-sm"
               >
-                {presetOptions.map((p) => (
+                {quickStartSelectOptions.map((p) => (
                   <option key={p.key} value={p.key}>
                     {p.label}
                   </option>
                 ))}
-                <option value="custom">Своя задача…</option>
               </select>
-              {taskChoice === "custom" ? (
-                <Input
-                  className="mt-2 text-sm"
-                  value={customPresetText}
-                  onChange={(e) => setCustomPresetText(e.target.value)}
-                  placeholder="Кратко опишите задачу"
-                />
-              ) : null}
             </div>
-          ) : (
+          </div>
+
+          {taskChoice === TASK_CHOICE_FREE_TEXT ? (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Над чем работали</label>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Над чем работаете</label>
               <Input
                 type="text"
                 value={manualWork}
                 onChange={(e) => setManualWork(e.target.value)}
-                placeholder="Свободный текст — что делали в этом проекте"
+                placeholder="Свободный текст — что делаете в этом проекте"
                 className="text-sm"
               />
             </div>
-          )}
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
@@ -625,7 +604,7 @@ export default function HomePage() {
       <Card className="shadow-[var(--shadow-card)]">
         <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <CardTitle>Последние 10 сессий</CardTitle>
+            <CardTitle>Последние сессии</CardTitle>
             <CardDescription>
               Редактирование проекта, задачи и времени; ручное добавление; удаление ошибочных записей.
             </CardDescription>
@@ -641,11 +620,14 @@ export default function HomePage() {
           {sessions.length === 0 ? (
             <p className="text-sm text-[var(--muted-foreground)]">Пока нет завершённых сессий</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-1.5">
               {sessions.map((s) => (
-                <li key={s.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/35 p-4 dark:bg-[var(--surface-2)]/20">
+                <li
+                  key={s.id}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)]/35 px-3 py-2 dark:bg-[var(--surface-2)]/20"
+                >
                   {editingId === s.id && editForm ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Проект</label>
@@ -661,61 +643,39 @@ export default function HomePage() {
                             ))}
                           </select>
                         </div>
-                        <div className="flex items-end">
-                          <label className="flex cursor-pointer items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={editForm.usePreset}
-                              onChange={(e) => setEditForm((f) => (f ? { ...f, usePreset: e.target.checked } : f))}
-                              className="h-4 w-4 rounded"
-                            />
-                            Типовая задача
-                          </label>
-                        </div>
-                      </div>
-                      {editForm.usePreset ? (
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Тип</label>
+                          <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Задача</label>
                           <select
                             value={editForm.taskChoice}
-                            onChange={(e) => setEditForm((f) => (f ? { ...f, taskChoice: e.target.value } : f))}
+                            onChange={(e) =>
+                              setEditForm((f) =>
+                                f
+                                  ? {
+                                      ...f,
+                                      taskChoice: e.target.value,
+                                      manualWork: e.target.value === TASK_CHOICE_FREE_TEXT ? f.manualWork : "",
+                                    }
+                                  : f
+                              )
+                            }
                             className="tt-select w-full text-sm"
                           >
-                            {((): { key: string; label: string }[] => {
-                              const c = projects.find((x) => x.id === editForm.cardId);
-                              const pt = parseCardProjectType(c?.extra ?? null);
-                              const io = editForm.cardId === VIRTUAL_OTHER_CARD_ID || pt === "other";
-                              const opts = io
-                                ? [...TIMER_TASK_OPTIONS_OTHER]
-                                : pt === "presentation"
-                                  ? [...PRESENTATION_TASK_PRESETS]
-                                  : pt === "site"
-                                    ? [...SITE_TASK_PRESETS]
-                                    : [...TIMER_TASK_OPTIONS_PROJECT];
-                              return [...opts, { key: "custom", label: "Своя…" }];
-                            })().map((p) => (
+                            {editTaskSelectOptions.map((p) => (
                               <option key={p.key} value={p.key}>
                                 {p.label}
                               </option>
                             ))}
                           </select>
-                          {editForm.taskChoice === "custom" ? (
-                            <Input
-                              className="mt-2 text-sm"
-                              value={editForm.customPresetText}
-                              onChange={(e) => setEditForm((f) => (f ? { ...f, customPresetText: e.target.value } : f))}
-                              placeholder="Описание"
-                            />
-                          ) : null}
                         </div>
-                      ) : (
+                      </div>
+                      {editForm.taskChoice === TASK_CHOICE_FREE_TEXT ? (
                         <Input
                           value={editForm.manualWork}
                           onChange={(e) => setEditForm((f) => (f ? { ...f, manualWork: e.target.value } : f))}
                           placeholder="Над чем работали"
                           className="text-sm"
                         />
-                      )}
+                      ) : null}
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Начало</label>
@@ -754,21 +714,41 @@ export default function HomePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="font-semibold text-[var(--text)]">{s.cardName}</div>
-                        <div className="text-sm text-[var(--muted-foreground)]">{s.taskLabel}</div>
-                        <div className="text-xs tabular-nums text-[var(--muted-foreground)]">
-                          {formatClock(s.startedAt)} — {formatClock(s.endedAt)} · {formatSessionDurationPrimary(s.durationSeconds)}
+                    <div className="flex items-start justify-between gap-2 sm:gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold leading-tight text-[var(--text)]">{s.cardName}</div>
+                        <div className="truncate text-xs leading-snug text-[var(--muted-foreground)]">{s.taskLabel}</div>
+                        <div className="mt-0.5 text-[11px] tabular-nums text-[var(--muted-foreground)]">
+                          {formatClock(s.startedAt)} — {formatClock(s.endedAt)}
                         </div>
                       </div>
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        <Button type="button" variant="secondary" size="sm" onClick={() => openEdit(s)}>
-                          Изменить
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" className="text-[var(--danger)]" onClick={() => void deleteSession(s.id)}>
-                          Удалить
-                        </Button>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        <span
+                          className="text-xl font-bold tabular-nums leading-none tracking-tight text-[var(--primary)] sm:text-2xl"
+                          title="Длительность сессии"
+                        >
+                          {formatSessionDurationPrimary(s.durationSeconds)}
+                        </span>
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => openEdit(s)}
+                          >
+                            Изменить
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-[var(--danger)]"
+                            onClick={() => void deleteSession(s.id)}
+                          >
+                            Удалить
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -803,63 +783,32 @@ export default function HomePage() {
                       ))}
                     </select>
                   </div>
-                  <div className="flex items-end">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={manualUsePreset}
-                        onChange={(e) => {
-                          setManualUsePreset(e.target.checked);
-                          if (e.target.checked && manualCardId) {
-                            setManualTaskChoice(
-                              defaultTimerTaskTypeForCard(
-                                manualCardId,
-                                projects.find((p) => p.id === manualCardId)?.extra ?? null
-                              )
-                            );
-                          }
-                        }}
-                        className="h-4 w-4 rounded"
-                      />
-                      Типовая задача
-                    </label>
-                  </div>
-                </div>
-                {manualUsePreset ? (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Тип</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Задача</label>
                     <select
                       value={manualTaskChoice}
                       onChange={(e) => {
                         setManualTaskChoice(e.target.value);
-                        setManualCustomPreset("");
+                        if (e.target.value !== TASK_CHOICE_FREE_TEXT) setManualWorkText("");
                       }}
                       className="tt-select w-full text-sm"
                     >
-                      {manualPresetOptions.map((p) => (
+                      {manualSelectOptions.map((p) => (
                         <option key={p.key} value={p.key}>
                           {p.label}
                         </option>
                       ))}
-                      <option value="custom">Своя…</option>
                     </select>
-                    {manualTaskChoice === "custom" ? (
-                      <Input
-                        className="mt-2 text-sm"
-                        value={manualCustomPreset}
-                        onChange={(e) => setManualCustomPreset(e.target.value)}
-                        placeholder="Описание"
-                      />
-                    ) : null}
                   </div>
-                ) : (
+                </div>
+                {manualTaskChoice === TASK_CHOICE_FREE_TEXT ? (
                   <Input
                     value={manualWorkText}
                     onChange={(e) => setManualWorkText(e.target.value)}
                     placeholder="Над чем работали"
                     className="text-sm"
                   />
-                )}
+                ) : null}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">Начало</label>

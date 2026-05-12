@@ -7,6 +7,7 @@
     "build": "next build && bash scripts/sync-standalone-assets.sh",
     "start": "next start",
     "import-agency-to-supabase": "tsx scripts/import-agency-sqlite-to-supabase.ts",
+    "import-team-to-supabase": "tsx scripts/import-team-sqlite-to-supabase.ts",
     "backfill-worker-user-id": "tsx scripts/backfill-worker-user-id.ts"
   },
   "dependencies": {

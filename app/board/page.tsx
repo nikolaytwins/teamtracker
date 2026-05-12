@@ -10,6 +10,7 @@ import {
   ACTIVE_WORK_STAGE_KEYS,
   ACTIVE_WORK_STAGE_SET,
   IMPORTANCE_OPTIONS,
+  PM_STATUSES,
   defaultStatusForSimpleViewGroup,
   statusToSimpleViewGroup,
   type PmStatusKey,
@@ -158,6 +159,14 @@ export default function BoardPage() {
   const [modalPhaseInsightLoading, setModalPhaseInsightLoading] = useState(false);
   const [setupProject, setSetupProject] = useState<{ id: string; name: string; extra: string | null } | null>(null);
   const [filterResponsibleUserId, setFilterResponsibleUserId] = useState("");
+  const [projectsViewMode, setProjectsViewMode] = useState<"kanban" | "list">(() => {
+    if (typeof window === "undefined") return "kanban";
+    try {
+      return localStorage.getItem("pm-board-view") === "list" ? "list" : "kanban";
+    } catch {
+      return "kanban";
+    }
+  });
   const [boardTeamUsers, setBoardTeamUsers] = useState<{ id: string; displayName: string; avatarUrl?: string | null }[]>(
     []
   );
@@ -372,6 +381,14 @@ export default function BoardPage() {
       /* ignore */
     }
   }, [projectScopeTab]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("pm-board-view", projectsViewMode);
+    } catch {
+      /* ignore */
+    }
+  }, [projectsViewMode]);
 
   useEffect(() => {
     void fetch(apiUrl("/api/team/users"))
@@ -756,8 +773,18 @@ export default function BoardPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Проекты</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              Канбан по сводным колонкам: перетаскивайте карточки или меняйте колонку внизу карточки. Подзадачи и календарь — в
-              разделе «Задачи». Показано{" "}
+              {projectsViewMode === "kanban" ? (
+                <>
+                  Канбан по сводным колонкам: перетаскивайте карточки или меняйте колонку внизу карточки. Подзадачи и
+                  календарь — в разделе «Задачи».
+                </>
+              ) : (
+                <>
+                  Список проектов с теми же фильтрами, что и у канбана. Этап меняется в колонке «Этап»; подзадачи и
+                  календарь — в разделе «Задачи».
+                </>
+              )}{" "}
+              Показано{" "}
               <span className="font-semibold text-[var(--text)]">{cardsForBoardView.length}</span>
               {filterQuery.trim() ? (
                 <span className="text-[var(--muted-foreground)]"> из {cards.length}</span>
@@ -961,9 +988,162 @@ export default function BoardPage() {
               </option>
             ))}
           </select>
+          <span className="mx-1 hidden h-4 w-px bg-[var(--border)] sm:inline" aria-hidden />
+          <span className="w-full text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] sm:w-auto">
+            Вид
+          </span>
+          <button
+            type="button"
+            onClick={() => setProjectsViewMode("kanban")}
+            className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
+              projectsViewMode === "kanban"
+                ? "bg-[var(--primary)] text-white shadow-sm"
+                : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+            }`}
+          >
+            Канбан
+          </button>
+          <button
+            type="button"
+            onClick={() => setProjectsViewMode("list")}
+            className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
+              projectsViewMode === "list"
+                ? "bg-[var(--primary)] text-white shadow-sm"
+                : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+            }`}
+          >
+            Список
+          </button>
         </div>
 
-      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
+      {projectsViewMode === "list" ? (
+        <div className="mb-5 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-kanban-column)] ring-1 ring-[var(--border)]/20 dark:ring-0">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="border-b border-[var(--border)]/70 bg-[var(--bg)]/40 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] dark:border-white/[0.06]">
+              <tr>
+                <th className="px-4 py-3">Проект</th>
+                <th className="whitespace-nowrap px-4 py-3">Дедлайн</th>
+                <th className="whitespace-nowrap px-4 py-3">Срок проекта</th>
+                <th className="whitespace-nowrap px-4 py-3">Сводно</th>
+                <th className="min-w-[11rem] px-4 py-3">Этап</th>
+                <th className="w-32 whitespace-nowrap px-4 py-3 text-right">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]/60 dark:divide-white/[0.06]">
+              {cardsForBoardView.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-[var(--muted-foreground)]">
+                    Нет проектов в этом фильтре.
+                  </td>
+                </tr>
+              ) : (
+                cardsForBoardView.map((card) => {
+                  const extra = parseExtra(card.extra);
+                  const projectDeadline = extra.projectDeadline || null;
+                  const gKey = statusToSimpleViewGroup(card.status);
+                  const gLabel = SIMPLE_VIEW_GROUPS.find((x) => x.key === gKey)?.label ?? gKey;
+                  const importanceOpt = IMPORTANCE_OPTIONS.find((o) => o.key === extra.importance);
+                  return (
+                    <tr key={card.id} className="align-top transition-colors hover:bg-[var(--surface-2)]/35">
+                      <td className="px-4 py-3">
+                        {importanceOpt ? (
+                          <span
+                            className={`mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${importanceOpt.className}`}
+                          >
+                            {importanceOpt.label}
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => openModal(card)}
+                          className="block max-w-[min(100vw-6rem,22rem)] text-left font-semibold leading-snug text-[var(--text)] hover:underline sm:max-w-xs"
+                        >
+                          {card.name}
+                        </button>
+                        <Link
+                          href={appPath(`/board/${card.id}`)}
+                          className="mt-1 inline-flex text-xs font-semibold text-[var(--primary)] hover:underline"
+                        >
+                          Страница проекта →
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-[var(--muted-foreground)]">
+                        {card.deadline ? formatDate(card.deadline) : "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-[var(--muted-foreground)]">
+                        {projectDeadline ? formatDate(projectDeadline) : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text)]">{gLabel}</td>
+                      <td className="px-4 py-3">
+                        <select
+                          className="tt-select w-full max-w-xs py-2 text-xs"
+                          value={card.status}
+                          onChange={(e) => void updateStatus(card.id, e.target.value as PmStatusKey)}
+                        >
+                          {PM_STATUSES.map((s) => (
+                            <option key={s.key} value={s.key}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex items-center justify-end gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setSetupProject({ id: card.id, name: card.name, extra: card.extra ?? null })}
+                            className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+                            title="Настройка этапов и подзадач"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                              />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openModal(card)}
+                            className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+                            title="Открыть карточку"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => deleteCardOnly(card.id, e)}
+                            className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
+                            title="Удалить из канбана"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V7m1 14h4" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {projectsViewMode === "kanban" ? (
+        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
           {SIMPLE_VIEW_GROUPS.map(({ key, label }) => {
             const groupCards = bySimpleGroup(key);
             const colTint = "bg-[var(--surface)]/90 dark:bg-[var(--surface)]/50";
@@ -1021,6 +1201,7 @@ export default function BoardPage() {
             );
           })}
         </div>
+      ) : null}
 
       {modalCard && (
         <div

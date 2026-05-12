@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { apiUrl, appPath } from "@/lib/api-url";
 import { bucketMySubtasks, sortSubtasksInColumn } from "@/lib/me-subtask-buckets";
-import { parseExecutionDatesFromJson } from "@/lib/pm-subtasks-shared";
+import { parseExecutionDatesFromJson, effectiveDeadlineMsForSubtask } from "@/lib/pm-subtasks-shared";
 import {
   IMPORTANCE_OPTIONS,
   statusLabel,
@@ -29,6 +29,7 @@ export type HomeSubtaskRow = {
   card_name: string;
   card_status: PmStatusKey;
   card_extra: string | null;
+  completed_at: string | null;
 };
 
 type TeamUser = { id: string; displayName: string; avatarUrl?: string | null };
@@ -63,25 +64,7 @@ function importanceRank(k: ImportanceKey | null): number {
 }
 
 function effectiveDeadlineMs(row: HomeSubtaskRow): number | null {
-  if (row.deadline_at) {
-    const t = new Date(row.deadline_at).getTime();
-    if (!Number.isNaN(t)) return t;
-  }
-  if (row.planned_end) {
-    const t = new Date(row.planned_end).getTime();
-    if (!Number.isNaN(t)) return t;
-  }
-  const dates = parseExecutionDatesFromJson(row.execution_dates_json);
-  if (dates.length > 0) {
-    const sorted = [...dates].sort();
-    const t = new Date(sorted[sorted.length - 1] + "T23:59:59").getTime();
-    if (!Number.isNaN(t)) return t;
-  }
-  if (row.planned_start) {
-    const t = new Date(row.planned_start).getTime();
-    if (!Number.isNaN(t)) return t;
-  }
-  return null;
+  return effectiveDeadlineMsForSubtask(row);
 }
 
 function formatDeadlineHint(deadlineMs: number | null, now: Date): { text: string; tone: "today" | "soon" | "later" | "overdue" | "none" } {
@@ -234,7 +217,7 @@ export function HomeCompactTaskList({ subtasks, teamUsers, loading, onReload }: 
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-[var(--text)]">Мои задачи</h2>
             <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-              По плану и дедлайнам. Отметьте выполненное — задача исчезнет из списка.
+              По плану и дедлайнам. Выполненные зачёркнуты; пропадают после дня дедлайна (без даты — остаются в списке).
             </p>
           </div>
           <Link href={appPath("/tasks")} className="text-xs font-semibold text-[var(--primary)] hover:underline sm:shrink-0">
@@ -287,7 +270,7 @@ export function HomeCompactTaskList({ subtasks, teamUsers, loading, onReload }: 
       <div className="divide-y divide-[var(--border)]/80">
         <BucketSection
           title="Сегодня"
-          hintClass="text-amber-600/90 dark:text-amber-400/90"
+          hintClass="text-[var(--primary)]"
           rows={sortedToday}
           teamUsers={teamUsers}
           busyId={busyId}
@@ -325,6 +308,9 @@ function sortHomeRows(rows: HomeSubtaskRow[]): HomeSubtaskRow[] {
   }));
   const sorted = sortSubtasksInColumn(withExec);
   return [...sorted].sort((a, b) => {
+    const ac = a.completed_at ? 1 : 0;
+    const bc = b.completed_at ? 1 : 0;
+    if (ac !== bc) return ac - bc;
     const ia = importanceRank(parseImportance(a.card_extra));
     const ib = importanceRank(parseImportance(b.card_extra));
     if (ia !== ib) return ia - ib;
@@ -394,6 +380,7 @@ function TaskRow({
   const assigneeId = row.assignee_user_id || row.lead_user_id;
   const u = assigneeId ? teamUsers.find((x) => x.id === assigneeId) : undefined;
   const initial = (u?.displayName || "?").trim().charAt(0).toUpperCase() || "?";
+  const isDone = Boolean(row.completed_at?.trim());
 
   const hintClass =
     hint.tone === "overdue" || hint.tone === "today"
@@ -403,21 +390,43 @@ function TaskRow({
         : "text-[var(--muted-foreground)]";
 
   return (
-    <li className="group flex items-center gap-2 rounded-lg px-1 py-1.5 transition-colors hover:bg-[var(--surface-2)]/50">
+    <li
+      className={`group flex items-center gap-2 rounded-lg px-1 py-1.5 transition-colors hover:bg-[var(--surface-2)]/50 ${isDone ? "opacity-90" : ""}`}
+    >
       <button
         type="button"
-        title="Отметить выполненной"
+        title={isDone ? "Вернуть в работу" : "Отметить выполненной"}
         disabled={busyId === row.id}
-        onClick={() => void onToggleComplete(row, true)}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:border-[var(--primary)]/40 hover:text-[var(--primary)] disabled:opacity-40"
-        aria-label="Выполнено"
+        onClick={() => void onToggleComplete(row, !isDone)}
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-[var(--surface)] text-[var(--muted-foreground)] hover:border-[var(--primary)]/40 hover:text-[var(--primary)] disabled:opacity-40 ${
+          isDone ? "border-[var(--primary)]/45 bg-[var(--primary-soft)]/35 text-[var(--primary)]" : "border-[var(--border)]"
+        }`}
+        aria-label={isDone ? "Вернуть в работу" : "Выполнено"}
       >
-        {busyId === row.id ? <span className="text-[10px]">…</span> : <span className="h-3.5 w-3.5 rounded-sm border border-current opacity-60" />}
+        {busyId === row.id ? (
+          <span className="text-[10px]">…</span>
+        ) : isDone ? (
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+            <path
+              fillRule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+        ) : (
+          <span className="h-3.5 w-3.5 rounded-sm border border-current opacity-60" />
+        )}
       </button>
       <span className={`h-2 w-2 shrink-0 rounded-full ${simpleGroupDotClass(g)}`} title={statusLabel(row.card_status)} aria-hidden />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-[var(--text)]">{row.title}</div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--muted-foreground)]">
+        <div
+          className={`truncate text-sm font-medium ${isDone ? "text-[var(--muted-foreground)] line-through decoration-[var(--muted-foreground)]/80" : "text-[var(--text)]"}`}
+        >
+          {row.title}
+        </div>
+        <div
+          className={`mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] ${isDone ? "text-[var(--muted-foreground)]/75" : "text-[var(--muted-foreground)]"}`}
+        >
           <span className="inline-flex items-center gap-1">
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cat.dotClass}`} aria-hidden />
             <span className="text-[var(--muted-foreground)]">{cat.label}</span>

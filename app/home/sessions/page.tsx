@@ -166,7 +166,7 @@ export default function HomeSessionsHistoryPage() {
       </Card>
 
       <p className="text-center text-xs text-[var(--muted-foreground)]">
-        Редактирование и удаление последних записей — в блоке «Последние 10 сессий» на главной.
+        Редактирование и удаление последних записей — в блоке «Последние сессии» на главной.
       </p>
     </div>
   );

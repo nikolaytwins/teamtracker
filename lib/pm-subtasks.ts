@@ -1,6 +1,7 @@
 import { getCard, getDb, updateCard } from "@/lib/db";
 import { computeSubtaskProgressStats } from "@/lib/subtask-progress";
 import type { PmStatusKey } from "@/lib/statuses";
+import { shouldHideCompletedSubtaskFromHome } from "@/lib/pm-subtasks-shared";
 
 export { parseExecutionDatesFromJson, serializeExecutionDates } from "@/lib/pm-subtasks-shared";
 
@@ -113,6 +114,34 @@ export function listOpenSubtasksForUser(userId: string): PmSubtaskWithCard[] {
       card_extra: row.card_extra != null ? String(row.card_extra) : null,
     };
   });
+}
+
+/** Подзадачи для блока «Мои задачи» на главной: включая недавно выполненные; скрыты только выполненные с прошедшим днём дедлайна. */
+export function listHomeSubtasksForUser(userId: string): PmSubtaskWithCard[] {
+  const uid = userId.trim();
+  if (!uid) return [];
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT s.*, c.name AS card_name, c.status AS card_status, c.extra AS card_extra
+       FROM pm_subtasks s
+       INNER JOIN pm_cards c ON c.id = s.card_id
+       WHERE (s.assignee_user_id = ? OR s.lead_user_id = ?)
+         AND c.status NOT IN ('done', 'pause')
+       ORDER BY c.deadline ASC NULLS LAST, s.sort_order ASC, s.created_at ASC`
+    )
+    .all(uid, uid) as Record<string, unknown>[];
+  const mapped = rows.map((row) => {
+    const sub = rowToSubtask(row);
+    return {
+      ...sub,
+      card_name: String(row.card_name ?? ""),
+      card_status: String(row.card_status) as PmStatusKey,
+      card_extra: row.card_extra != null ? String(row.card_extra) : null,
+    };
+  });
+  const now = new Date();
+  return mapped.filter((r) => !shouldHideCompletedSubtaskFromHome(r, now));
 }
 
 /** Есть ли у пользователя незавершённая подзадача на карточке; проект не в статусе «готов». */

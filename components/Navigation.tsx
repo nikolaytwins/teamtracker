@@ -11,11 +11,9 @@ type MeUser = { name: string; title: string; avatarUrl: string | null; role?: Tt
 
 type NavIconName =
   | "home"
-  | "me"
   | "tasks"
   | "board"
   | "time"
-  | "calendar"
   | "agency"
   | "profi"
   | "sales"
@@ -33,12 +31,6 @@ function NavGlyph({ name }: { name: NavIconName }) {
             strokeLinejoin="round"
             d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125a1.125 1.125 0 001.125 1.125H9.75v-4.875a.375.375 0 01.375-.375h3.75a.375.375 0 01.375.375V21h3.75a1.125 1.125 0 001.125-1.125V9.75M8.25 21h8.25"
           />
-        </svg>
-      );
-    case "me":
-      return (
-        <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
         </svg>
       );
     case "tasks":
@@ -61,12 +53,6 @@ function NavGlyph({ name }: { name: NavIconName }) {
       return (
         <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      );
-    case "calendar":
-      return (
-        <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5a2.25 2.25 0 002.25-2.25m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5a2.25 2.25 0 012.25 2.25v7.5" />
         </svg>
       );
     case "agency":
@@ -249,28 +235,18 @@ export default function Navigation() {
   const navItems: { href: string; label: string; active: boolean; icon: NavIconName }[] = isMemberUser
     ? [
         { href: appPath("/home"), label: "Главная", active: pathname === "/home" || (pathname?.startsWith("/home/") ?? false), icon: "home" },
-        { href: appPath("/me"), label: "Профиль", active: pathname === "/me", icon: "me" },
         { href: appPath("/tasks"), label: "Задачи", active: pathname === "/tasks", icon: "tasks" },
       ]
     : [
         { href: appPath("/home"), label: "Главная", active: pathname === "/home" || (pathname?.startsWith("/home/") ?? false), icon: "home" },
-        { href: appPath("/me"), label: "Профиль", active: pathname === "/me", icon: "me" },
         { href: appPath("/tasks"), label: "Задачи", active: pathname === "/tasks", icon: "tasks" },
         ...(showPmBoardNav
           ? [
               {
                 href: appPath("/board"),
                 label: "Проекты",
-                active:
-                  pathname === "/board" ||
-                  (!!pathname?.startsWith("/board/") && !pathname.startsWith("/board/calendar")),
+                active: pathname === "/board" || !!pathname?.startsWith("/board/"),
                 icon: "board" as const,
-              },
-              {
-                href: appPath("/board/calendar"),
-                label: "Календарь",
-                active: pathname?.startsWith("/board/calendar") ?? false,
-                icon: "calendar" as const,
               },
             ]
           : []),
@@ -458,9 +434,9 @@ export default function Navigation() {
                 {sidebarCollapsed ? (
                   <div className="flex flex-col items-center gap-2">
                     <Link
-                      href={appPath("/me")}
+                      href={appPath("/home")}
                       className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)] hover:ring-2 hover:ring-[var(--primary-soft)]"
-                      title={`${me.name} — профиль`}
+                      title={`${me.name} — главная`}
                     >
                       {me.avatarUrl ? (
                         <img src={me.avatarUrl} alt="" className="h-full w-full object-cover" />

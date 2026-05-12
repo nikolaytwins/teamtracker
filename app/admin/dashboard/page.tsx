@@ -236,8 +236,8 @@ export default function AdminDashboardPage() {
               className="tt-input ml-2 mt-1 block py-2 text-sm"
             />
           </label>
-          <Link href={appPath("/me")} className="text-sm font-semibold text-[var(--primary)] hover:underline">
-            ← Профиль
+          <Link href={appPath("/home")} className="text-sm font-semibold text-[var(--primary)] hover:underline">
+            ← Главная
           </Link>
         </div>
       </div>

@@ -25,3 +25,5 @@ export function isSupabaseAgencyConfigured(): boolean {
 export function shouldUseSupabaseAgency(): boolean {
   return getAgencyDatabaseMode() === "supabase" && isSupabaseAgencyConfigured();
 }
+
+/** Канбан / таймер / tt_users / monthly_history в Postgres — см. `lib/team-postgres-env.ts`, миграцию `supabase/migrations/20260512180000_team_tracker_pm_board_history.sql`, скрипт `npm run import-team-to-supabase`. Runtime пока SQLite. */
