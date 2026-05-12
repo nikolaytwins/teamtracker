@@ -454,6 +454,41 @@ export function updateUserAvatar(userId: string, avatar_url: string | null): boo
   return r.changes > 0;
 }
 
+/** Имя, должность, аватар (ссылка) — сам пользователь. */
+export function updateUserBasicProfile(
+  userId: string,
+  patch: { display_name?: string; job_title?: string | null; avatar_url?: string | null }
+): { ok: true; user: TtUserPublic } | { ok: false; error: string } {
+  const target = getUserById(userId);
+  if (!target) return { ok: false, error: "Пользователь не найден" };
+  const display_name = patch.display_name !== undefined ? patch.display_name.trim() : target.display_name;
+  if (!display_name) return { ok: false, error: "Укажите имя" };
+  const job_title = patch.job_title !== undefined ? String(patch.job_title ?? "").trim() : target.job_title;
+  let avatar_url = target.avatar_url;
+  if (patch.avatar_url !== undefined) {
+    const raw = patch.avatar_url?.trim() || "";
+    if (!raw) {
+      avatar_url = null;
+    } else if (!/^https:\/\//i.test(raw)) {
+      return { ok: false, error: "Аватар: укажите ссылку, начинающуюся с https://" };
+    } else if (raw.length > 2000) {
+      return { ok: false, error: "Ссылка на аватар слишком длинная" };
+    } else {
+      avatar_url = raw;
+    }
+  }
+  const db = getDb();
+  db.prepare(`UPDATE tt_users SET display_name = ?, job_title = ?, avatar_url = ?, updated_at = datetime('now') WHERE id = ?`).run(
+    display_name,
+    job_title,
+    avatar_url,
+    userId
+  );
+  const updated = getUserById(userId);
+  if (!updated) return { ok: false, error: "Ошибка сохранения" };
+  return { ok: true, user: toTtUserPublic(updated) };
+}
+
 export function createUserByAdminEmail(params: {
   email: string;
   display_name?: string;

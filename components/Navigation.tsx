@@ -5,9 +5,20 @@ import { canAccessPmBoard, type TtUserRole } from "@/lib/roles";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { ProfileModal } from "@/components/ProfileModal";
 import { useEffect, useLayoutEffect, useState } from "react";
 
-type MeUser = { name: string; title: string; avatarUrl: string | null; role?: TtUserRole | string };
+type MeUser = {
+  id: string;
+  login: string;
+  name: string;
+  title: string;
+  avatarUrl: string | null;
+  role?: TtUserRole | string;
+  workHoursPerDay?: number;
+  workDays?: number[];
+  weeklyCapacityHours?: number;
+};
 
 type NavIconName =
   | "home"
@@ -92,9 +103,11 @@ function NavGlyph({ name }: { name: NavIconName }) {
 
 function UserAccountOverflowMenu({
   onLogout,
+  onOpenProfile,
   collapsed,
 }: {
   onLogout: () => void | Promise<void>;
+  onOpenProfile: () => void;
   collapsed: boolean;
 }) {
   return (
@@ -121,6 +134,22 @@ function UserAccountOverflowMenu({
           aria-label="Аккаунт"
           className="min-w-[9.5rem] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--shadow-elevated)]"
         >
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]"
+            onClick={() => onOpenProfile()}
+          >
+            <svg className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
+            Профиль
+          </button>
           <button
             type="button"
             role="menuitem"
@@ -161,6 +190,7 @@ export default function Navigation() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useLayoutEffect(() => {
     try {
@@ -210,7 +240,18 @@ export default function Navigation() {
     void fetch(apiUrl("/api/auth/me"))
       .then((r) => r.json())
       .then((d) => {
-        if (d.user) setMe(d.user as MeUser);
+        if (d.user)
+          setMe({
+            id: String((d.user as { id?: string }).id ?? ""),
+            login: String((d.user as { login?: string }).login ?? ""),
+            name: String((d.user as { name?: string }).name ?? ""),
+            title: String((d.user as { title?: string }).title ?? ""),
+            avatarUrl: (d.user as { avatarUrl?: string | null }).avatarUrl ?? null,
+            role: (d.user as { role?: TtUserRole | string }).role,
+            workHoursPerDay: (d.user as { workHoursPerDay?: number }).workHoursPerDay,
+            workDays: (d.user as { workDays?: number[] }).workDays,
+            weeklyCapacityHours: (d.user as { weeklyCapacityHours?: number }).weeklyCapacityHours,
+          });
         else setMe(null);
       })
       .catch(() => setMe(null));
@@ -444,7 +485,7 @@ export default function Navigation() {
                         me.name.charAt(0).toUpperCase()
                       )}
                     </Link>
-                    <UserAccountOverflowMenu onLogout={logout} collapsed />
+                    <UserAccountOverflowMenu onOpenProfile={() => setProfileOpen(true)} onLogout={logout} collapsed />
                   </div>
                 ) : (
                   <div className="mb-0 flex items-center justify-between gap-2">
@@ -462,7 +503,7 @@ export default function Navigation() {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
-                      <UserAccountOverflowMenu onLogout={logout} collapsed={false} />
+                      <UserAccountOverflowMenu onOpenProfile={() => setProfileOpen(true)} onLogout={logout} collapsed={false} />
                     </div>
                   </div>
                 )}
@@ -471,6 +512,27 @@ export default function Navigation() {
           </div>
         </div>
       </aside>
+      {me?.id ? (
+        <ProfileModal
+          open={profileOpen}
+          user={{ id: me.id, login: me.login, name: me.name, title: me.title, avatarUrl: me.avatarUrl }}
+          onClose={() => setProfileOpen(false)}
+          onProfileSaved={(u) => {
+            setMe({
+              id: u.id,
+              login: u.login,
+              name: u.name,
+              title: u.title,
+              avatarUrl: u.avatarUrl,
+              role: u.role as TtUserRole | undefined,
+              workHoursPerDay: u.workHoursPerDay,
+              workDays: u.workDays,
+              weeklyCapacityHours: u.weeklyCapacityHours,
+            });
+            void router.refresh();
+          }}
+        />
+      ) : null}
     </>
   );
 }

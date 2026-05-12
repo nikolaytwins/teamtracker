@@ -1156,6 +1156,7 @@ export default function BoardPage() {
                     <div className="border-t border-[var(--border)] px-4 py-4">
                       <ProjectSubtasksPanel
                         cardId={card.id}
+                        collapseQuickAdds
                         onChanged={() => {
                           void refreshBoardCard(card.id);
                           void loadBoardSubtasks();

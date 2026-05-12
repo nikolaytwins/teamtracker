@@ -1,14 +1,30 @@
 import { getCard, getDb, updateCard } from "@/lib/db";
 import { computeSubtaskProgressStats } from "@/lib/subtask-progress";
-import type { PmStatusKey } from "@/lib/statuses";
+import type { ImportanceKey, PmStatusKey } from "@/lib/statuses";
 import { shouldHideCompletedSubtaskFromHome } from "@/lib/pm-subtasks-shared";
 
 export { parseExecutionDatesFromJson, serializeExecutionDates } from "@/lib/pm-subtasks-shared";
+
+/** Статус подзадачи в разделе «Задачи» (пока не завершена по флагу completed_at). */
+export type SubtaskWorkStatusKey = "not_started" | "in_progress" | "awaiting_approval";
+
+function normalizeSubtaskWorkStatus(raw: unknown): SubtaskWorkStatusKey {
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (s === "in_progress" || s === "awaiting_approval") return s;
+  return "not_started";
+}
+
+function normalizeSubtaskImportance(raw: unknown): ImportanceKey | null {
+  if (raw === "high" || raw === "medium" || raw === "low") return raw;
+  return null;
+}
 
 export interface PmSubtask {
   id: string;
   card_id: string;
   title: string;
+  /** Текстовое описание подзадачи. */
+  description: string | null;
   assignee_user_id: string | null;
   lead_user_id: string | null;
   estimated_hours: number | null;
@@ -21,6 +37,10 @@ export interface PmSubtask {
   deadline_at: string | null;
   /** JSON-массив строк дат YYYY-MM-DD — попадают в личные задачи / календарь. */
   execution_dates_json: string | null;
+  /** Приоритет подзадачи (как важность проекта). */
+  importance: ImportanceKey | null;
+  /** Рабочий статус до завершения; при completed_at игнорируется в UI как «завершено». */
+  work_status: SubtaskWorkStatusKey;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -31,6 +51,7 @@ function rowToSubtask(row: Record<string, unknown>): PmSubtask {
     id: String(row.id),
     card_id: String(row.card_id),
     title: String(row.title),
+    description: row.description != null && String(row.description).trim() ? String(row.description) : null,
     assignee_user_id: row.assignee_user_id != null && String(row.assignee_user_id).trim() ? String(row.assignee_user_id) : null,
     lead_user_id: row.lead_user_id != null && String(row.lead_user_id).trim() ? String(row.lead_user_id) : null,
     estimated_hours:
@@ -44,6 +65,8 @@ function rowToSubtask(row: Record<string, unknown>): PmSubtask {
       row.execution_dates_json != null && String(row.execution_dates_json).trim()
         ? String(row.execution_dates_json)
         : null,
+    importance: normalizeSubtaskImportance(row.importance),
+    work_status: normalizeSubtaskWorkStatus(row.work_status),
     sort_order: Number(row.sort_order) || 0,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
@@ -211,6 +234,7 @@ export function syncDerivedSubtaskProgressToCard(cardId: string): void {
 export function createSubtask(params: {
   cardId: string;
   title: string;
+  description?: string | null;
   assigneeUserId?: string | null;
   leadUserId?: string | null;
   estimatedHours?: number | null;
@@ -219,6 +243,8 @@ export function createSubtask(params: {
   phaseId?: string | null;
   deadlineAt?: string | null;
   executionDatesJson?: string | null;
+  importance?: ImportanceKey | null;
+  workStatus?: SubtaskWorkStatusKey;
 }): PmSubtask | null {
   if (!getCard(params.cardId)) return null;
   const title = params.title.trim();
@@ -229,13 +255,17 @@ export function createSubtask(params: {
   };
   const sortOrder = (maxRow?.m ?? -1) + 1;
   const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const description = params.description?.trim() ? params.description.trim() : null;
+  const importance = params.importance != null ? normalizeSubtaskImportance(params.importance) : null;
+  const workStatus = params.workStatus != null ? normalizeSubtaskWorkStatus(params.workStatus) : "not_started";
   db.prepare(
-    `INSERT INTO pm_subtasks (id, card_id, title, assignee_user_id, lead_user_id, estimated_hours, completed_at, planned_start, planned_end, phase_id, deadline_at, execution_dates_json, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO pm_subtasks (id, card_id, title, description, assignee_user_id, lead_user_id, estimated_hours, completed_at, planned_start, planned_end, phase_id, deadline_at, execution_dates_json, importance, work_status, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     params.cardId,
     title,
+    description,
     params.assigneeUserId?.trim() || null,
     params.leadUserId?.trim() || null,
     params.estimatedHours != null && !Number.isNaN(Number(params.estimatedHours)) ? Number(params.estimatedHours) : null,
@@ -244,6 +274,8 @@ export function createSubtask(params: {
     params.phaseId?.trim() || null,
     params.deadlineAt?.trim() || null,
     params.executionDatesJson?.trim() || null,
+    importance,
+    workStatus,
     sortOrder
   );
   const row = db.prepare(`SELECT * FROM pm_subtasks WHERE id = ?`).get(id) as Record<string, unknown>;
@@ -256,6 +288,7 @@ export function updateSubtask(
   subtaskId: string,
   updates: {
     title?: string;
+    description?: string | null;
     assigneeUserId?: string | null;
     leadUserId?: string | null;
     estimatedHours?: number | null;
@@ -265,6 +298,8 @@ export function updateSubtask(
     phaseId?: string | null;
     deadlineAt?: string | null;
     executionDatesJson?: string | null;
+    importance?: ImportanceKey | null;
+    workStatus?: SubtaskWorkStatusKey;
     sortOrder?: number;
   }
 ): PmSubtask | null {
@@ -275,6 +310,12 @@ export function updateSubtask(
   if (!cur) return null;
   const title = updates.title !== undefined ? updates.title.trim() : String(cur.title);
   if (!title) return null;
+  const description =
+    updates.description !== undefined
+      ? updates.description?.trim()
+        ? updates.description.trim()
+        : null
+      : rowToSubtask(cur).description;
   const assignee_user_id =
     updates.assigneeUserId !== undefined
       ? updates.assigneeUserId?.trim() || null
@@ -303,11 +344,16 @@ export function updateSubtask(
     updates.executionDatesJson !== undefined
       ? updates.executionDatesJson?.trim() || null
       : ((cur.execution_dates_json as string | null) ?? null);
+  const importance =
+    updates.importance !== undefined ? normalizeSubtaskImportance(updates.importance) : rowToSubtask(cur).importance;
+  const work_status =
+    updates.workStatus !== undefined ? normalizeSubtaskWorkStatus(updates.workStatus) : rowToSubtask(cur).work_status;
   const sort_order = updates.sortOrder !== undefined ? updates.sortOrder : Number(cur.sort_order) || 0;
   db.prepare(
-    `UPDATE pm_subtasks SET title = ?, assignee_user_id = ?, lead_user_id = ?, estimated_hours = ?, completed_at = ?, planned_start = ?, planned_end = ?, phase_id = ?, deadline_at = ?, execution_dates_json = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ? AND card_id = ?`
+    `UPDATE pm_subtasks SET title = ?, description = ?, assignee_user_id = ?, lead_user_id = ?, estimated_hours = ?, completed_at = ?, planned_start = ?, planned_end = ?, phase_id = ?, deadline_at = ?, execution_dates_json = ?, importance = ?, work_status = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ? AND card_id = ?`
   ).run(
     title,
+    description,
     assignee_user_id,
     lead_user_id,
     estimated_hours,
@@ -317,6 +363,8 @@ export function updateSubtask(
     phase_id,
     deadline_at,
     execution_dates_json,
+    importance,
+    work_status,
     sort_order,
     subtaskId,
     cardId

@@ -125,6 +125,21 @@ function ensurePmSubtasksTable(db: Database.Database) {
   } catch {
     /* exists */
   }
+  try {
+    db.exec(`ALTER TABLE pm_subtasks ADD COLUMN description TEXT`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE pm_subtasks ADD COLUMN importance TEXT`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE pm_subtasks ADD COLUMN work_status TEXT NOT NULL DEFAULT 'not_started'`);
+  } catch {
+    /* exists */
+  }
 }
 
 function ensureOtherCard(db: Database.Database) {

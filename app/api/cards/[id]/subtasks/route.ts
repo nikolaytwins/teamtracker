@@ -5,7 +5,9 @@ import {
   listSubtasksForCard,
   parseExecutionDatesFromJson,
   serializeExecutionDates,
+  type SubtaskWorkStatusKey,
 } from "@/lib/pm-subtasks";
+import type { ImportanceKey } from "@/lib/statuses";
 import { requirePmBoardAccess } from "@/lib/require-role";
 
 type Params = { params: Promise<{ id: string }> };
@@ -46,9 +48,21 @@ export async function POST(request: NextRequest, { params }: Params) {
     const executionDates = Array.isArray(body.executionDates)
       ? body.executionDates.filter((x: unknown): x is string => typeof x === "string")
       : null;
+    const description = typeof body.description === "string" ? body.description : null;
+    let importance: ImportanceKey | null | undefined;
+    if ("importance" in body) {
+      const k = body.importance;
+      importance = k === "high" || k === "medium" || k === "low" ? k : null;
+    }
+    let workStatus: SubtaskWorkStatusKey | undefined;
+    if (typeof body.workStatus === "string") {
+      const w = body.workStatus.trim();
+      if (w === "in_progress" || w === "awaiting_approval" || w === "not_started") workStatus = w;
+    }
     const sub = createSubtask({
       cardId,
       title,
+      description: description ?? undefined,
       assigneeUserId: typeof body.assigneeUserId === "string" ? body.assigneeUserId : null,
       leadUserId: typeof body.leadUserId === "string" ? body.leadUserId : null,
       estimatedHours: typeof body.estimatedHours === "number" ? body.estimatedHours : null,
@@ -57,6 +71,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       phaseId: typeof body.phaseId === "string" ? body.phaseId : null,
       deadlineAt: typeof body.deadlineAt === "string" ? body.deadlineAt : null,
       executionDatesJson: executionDates ? serializeExecutionDates(executionDates) : null,
+      importance: importance !== undefined ? importance : null,
+      workStatus,
     });
     if (!sub) return NextResponse.json({ error: "Не удалось создать" }, { status: 400 });
     return NextResponse.json({ subtask: sub });

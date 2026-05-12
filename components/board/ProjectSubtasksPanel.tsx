@@ -53,10 +53,13 @@ export function ProjectSubtasksPanel({
   cardId,
   onChanged,
   variant = "full",
+  /** В списке проектов: блоки «Новый этап» и «Подзадача» под иконкой ⚙, чтобы не раздувать карточку. */
+  collapseQuickAdds = false,
 }: {
   cardId: string;
   onChanged?: () => void;
   variant?: "full" | "compact";
+  collapseQuickAdds?: boolean;
 }) {
   const [phases, setPhases] = useState<PhaseLite[]>([]);
   const [subtasks, setSubtasks] = useState<SubtaskDto[]>([]);
@@ -74,6 +77,7 @@ export function ProjectSubtasksPanel({
   const [addSubtaskModalOpen, setAddSubtaskModalOpen] = useState(false);
   const [modalNewTitle, setModalNewTitle] = useState("");
   const [modalNewPhaseId, setModalNewPhaseId] = useState<string>("");
+  const [quickAddsOpen, setQuickAddsOpen] = useState(false);
 
   const toggleExpanded = useCallback((id: string, on: boolean) => {
     setExpandedEditIds((prev) => {
@@ -140,6 +144,10 @@ export function ProjectSubtasksPanel({
   }, [reload]);
 
   const isCompact = variant === "compact";
+
+  useEffect(() => {
+    setQuickAddsOpen(false);
+  }, [cardId]);
 
   useEffect(() => {
     if (!addSubtaskModalOpen) return;
@@ -560,66 +568,101 @@ export function ProjectSubtasksPanel({
 
       {!isCompact ? (
         <>
-          <form
-            onSubmit={(e) => void addProjectPhase(e)}
-            className="flex flex-wrap items-end gap-2 rounded-xl border border-[var(--border)]/80 bg-[var(--surface-2)]/30 p-3"
-          >
-            <label className="min-w-[12rem] flex-1 text-[11px] font-medium text-[var(--muted-foreground)]">
-              Новый этап проекта
-              <input
-                type="text"
-                value={newPhaseTitle}
-                onChange={(e) => setNewPhaseTitle(e.target.value)}
-                placeholder="Например: Согласование макета"
-                className="tt-input mt-0.5 w-full py-2 text-sm"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={phaseAdding || !newPhaseTitle.trim()}
-              className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
-            >
-              {phaseAdding ? "…" : "Добавить этап"}
-            </button>
-          </form>
-
-          <form
-            onSubmit={(e) => void addSubtask(e)}
-            className="flex flex-wrap items-end gap-2 rounded-xl bg-[var(--surface-2)]/40 p-3"
-          >
-            <label className="min-w-[8rem] flex-1 text-[11px] text-[var(--muted-foreground)]">
-              Подзадача
-              <input
-                type="text"
-                value={quickTitle}
-                onChange={(e) => setQuickTitle(e.target.value)}
-                placeholder="Сначала этап — затем подзадача"
-                className="tt-input mt-0.5 w-full py-2 text-sm"
-              />
-            </label>
-            <label className="min-w-[10rem] text-[11px] text-[var(--muted-foreground)]">
-              Этап
-              <select
-                className="tt-select mt-0.5 w-full py-2 text-sm"
-                value={quickPhaseId}
-                onChange={(e) => setQuickPhaseId(e.target.value)}
+          {collapseQuickAdds ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)]/80 bg-[var(--surface-2)]/25 px-3 py-2">
+              <span className="text-[11px] font-medium text-[var(--muted-foreground)]">Этапы и новые подзадачи</span>
+              <button
+                type="button"
+                aria-expanded={quickAddsOpen}
+                aria-label={quickAddsOpen ? "Скрыть формы добавления" : "Показать формы добавления этапа и подзадачи"}
+                title={quickAddsOpen ? "Скрыть" : "Добавить этап или подзадачу"}
+                onClick={() => setQuickAddsOpen((o) => !o)}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] ${
+                  quickAddsOpen
+                    ? "border-[var(--primary)]/50 bg-[var(--primary-soft)]/30 text-[var(--primary)]"
+                    : "border-[var(--border)] bg-[var(--surface)]"
+                }`}
               >
-                <option value="">Без этапа</option>
-                {phases.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="submit"
-              disabled={busy || !quickTitle.trim()}
-              className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
-            >
-              Добавить
-            </button>
-          </form>
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 15a3 3 0 100-6 3 3 0 000 6z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
+                  />
+                </svg>
+              </button>
+            </div>
+          ) : null}
+
+          {(!collapseQuickAdds || quickAddsOpen) ? (
+            <>
+              <form
+                onSubmit={(e) => void addProjectPhase(e)}
+                className="flex flex-wrap items-end gap-2 rounded-xl border border-[var(--border)]/80 bg-[var(--surface-2)]/30 p-3"
+              >
+                <label className="min-w-[12rem] flex-1 text-[11px] font-medium text-[var(--muted-foreground)]">
+                  Новый этап проекта
+                  <input
+                    type="text"
+                    value={newPhaseTitle}
+                    onChange={(e) => setNewPhaseTitle(e.target.value)}
+                    placeholder="Например: Согласование макета"
+                    className="tt-input mt-0.5 w-full py-2 text-sm"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={phaseAdding || !newPhaseTitle.trim()}
+                  className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
+                >
+                  {phaseAdding ? "…" : "Добавить этап"}
+                </button>
+              </form>
+
+              <form
+                onSubmit={(e) => void addSubtask(e)}
+                className="flex flex-wrap items-end gap-2 rounded-xl bg-[var(--surface-2)]/40 p-3"
+              >
+                <label className="min-w-[8rem] flex-1 text-[11px] text-[var(--muted-foreground)]">
+                  Подзадача
+                  <input
+                    type="text"
+                    value={quickTitle}
+                    onChange={(e) => setQuickTitle(e.target.value)}
+                    placeholder="Сначала этап — затем подзадача"
+                    className="tt-input mt-0.5 w-full py-2 text-sm"
+                  />
+                </label>
+                <label className="min-w-[10rem] text-[11px] text-[var(--muted-foreground)]">
+                  Этап
+                  <select
+                    className="tt-select mt-0.5 w-full py-2 text-sm"
+                    value={quickPhaseId}
+                    onChange={(e) => setQuickPhaseId(e.target.value)}
+                  >
+                    <option value="">Без этапа</option>
+                    {phases.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="submit"
+                  disabled={busy || !quickTitle.trim()}
+                  className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
+                >
+                  Добавить
+                </button>
+              </form>
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -627,7 +670,9 @@ export function ProjectSubtasksPanel({
         <p className="text-xs text-[var(--muted-foreground)]">
           {isCompact
             ? "Подзадач пока нет. Добавьте первую или откройте настройки — там этапы и полное редактирование."
-            : "Создайте этап выше, затем добавляйте подзадачи. Без этапа подзадачи останутся в блоке «Без этапа»."}
+            : collapseQuickAdds && !quickAddsOpen
+              ? "Нет этапов и подзадач. Нажмите шестерёнку, чтобы добавить этап или подзадачу."
+              : "Создайте этап выше, затем добавляйте подзадачи. Без этапа подзадачи останутся в блоке «Без этапа»."}
         </p>
       ) : null}
 

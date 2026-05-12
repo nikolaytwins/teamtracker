@@ -26,6 +26,8 @@ type Props = {
   cards: PmCard[];
   teamUsers: TeamUser[];
   canPm: boolean;
+  /** Открыть модальное окно задачи (раздел «Задачи»). */
+  onEditSubtask?: (s: PmSubtaskWithCard) => void;
 };
 
 function pillClasses(imp: ImportanceKey | null, g: SimpleViewGroupKey): string {
@@ -59,7 +61,7 @@ function monthGrid(year: number, monthIndex: number): (Date | null)[][] {
   return rows;
 }
 
-export function TasksCalendarView({ subtasks, cards, teamUsers, canPm }: Props) {
+export function TasksCalendarView({ subtasks, cards, teamUsers, canPm, onEditSubtask }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<"month" | "week">("month");
   const [anchor, setAnchor] = useState(() => new Date());
@@ -284,6 +286,7 @@ export function TasksCalendarView({ subtasks, cards, teamUsers, canPm }: Props) 
           canPm={canPm}
           onClose={() => setDayModal(null)}
           onOpenBoard={(id) => router.push(appPath(`/board/${id}`))}
+          onEditSubtask={onEditSubtask}
         />
       ) : null}
     </div>
@@ -400,6 +403,7 @@ function DayTasksModal({
   canPm,
   onClose,
   onOpenBoard,
+  onEditSubtask,
 }: {
   ymd: string;
   list: PmSubtaskWithCard[];
@@ -407,6 +411,7 @@ function DayTasksModal({
   canPm: boolean;
   onClose: () => void;
   onOpenBoard: (cardId: string) => void;
+  onEditSubtask?: (s: PmSubtaskWithCard) => void;
 }) {
   const [y, m, d] = ymd.split("-").map(Number);
   const label =
@@ -473,18 +478,32 @@ function DayTasksModal({
                         </span>
                       ) : null}
                     </div>
-                    {canPm ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onOpenBoard(s.card_id);
-                        }}
-                        className="mt-3 text-xs font-semibold text-[var(--primary)] hover:underline"
-                      >
-                        Открыть проект →
-                      </button>
-                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {onEditSubtask ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onEditSubtask(s);
+                            onClose();
+                          }}
+                          className="text-xs font-semibold text-[var(--primary)] hover:underline"
+                        >
+                          Карточка задачи
+                        </button>
+                      ) : null}
+                      {canPm ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onOpenBoard(s.card_id);
+                          }}
+                          className="text-xs font-semibold text-[var(--muted-foreground)] hover:underline"
+                        >
+                          Проект на доске →
+                        </button>
+                      ) : null}
+                    </div>
                   </li>
                 );
               })}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiUrl, appPath } from "@/lib/api-url";
 import {
@@ -17,6 +16,7 @@ import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
 import { canAccessPmBoard, normalizeTtUserRole } from "@/lib/roles";
 import { expandSubtaskToDayKeys } from "@/lib/tasks-calendar";
 import { TasksCalendarView } from "@/components/tasks/TasksCalendarView";
+import { TaskEditorModal } from "@/components/tasks/TaskEditorModal";
 
 type PmCard = {
   id: string;
@@ -39,7 +39,6 @@ function importanceOrder(card: PmCard): number {
 }
 
 export default function TasksPage() {
-  const router = useRouter();
   const [meRole, setMeRole] = useState<ReturnType<typeof normalizeTtUserRole> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +50,7 @@ export default function TasksPage() {
   const [quickSubtaskCardId, setQuickSubtaskCardId] = useState<Record<string, string>>({});
   const [quickSubBusy, setQuickSubBusy] = useState<string | null>(null);
   const [view, setView] = useState<"kanban" | "calendar">("kanban");
+  const [editor, setEditor] = useState<{ mode: "create" } | { mode: "edit"; sub: PmSubtaskWithCard } | null>(null);
 
   const canPm = meRole != null && canAccessPmBoard(meRole);
 
@@ -166,10 +166,8 @@ export default function TasksPage() {
     }
   }
 
-  function handleSubtaskActivate(s: PmSubtaskWithCard) {
-    if (canPm) {
-      router.push(appPath(`/board/${s.card_id}`));
-    }
+  function openSubtaskEditor(s: PmSubtaskWithCard) {
+    setEditor({ mode: "edit", sub: s });
   }
 
   function renderSubtaskRow(s: PmSubtaskWithCard) {
@@ -178,18 +176,14 @@ export default function TasksPage() {
         key={s.id}
         role="button"
         tabIndex={0}
-        onClick={() => handleSubtaskActivate(s)}
+        onClick={() => openSubtaskEditor(s)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            handleSubtaskActivate(s);
+            openSubtaskEditor(s);
           }
         }}
-        className={`rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left shadow-sm transition-colors ${
-          canPm
-            ? "cursor-pointer hover:border-[var(--primary)]/35 hover:bg-[var(--surface-2)]/50"
-            : "cursor-default"
-        }`}
+        className="cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left shadow-sm transition-colors hover:border-[var(--primary)]/35 hover:bg-[var(--surface-2)]/50"
       >
         <div className="text-sm font-medium leading-snug text-[var(--text)]">{s.title}</div>
         <div className="mt-1 truncate text-xs text-[var(--muted-foreground)]">{s.card_name}</div>
@@ -255,8 +249,8 @@ export default function TasksPage() {
             <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Задачи</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
               {canPm
-                ? "Все открытые подзадачи команды по статусу родительского проекта. Клик — карточка проекта."
-                : "Ваши открытые подзадачи (исполнитель или лид) по статусу проекта."}{" "}
+                ? "Все открытые подзадачи команды по статусу родительского проекта. Клик по задаче — карточка в окне."
+                : "Ваши открытые подзадачи (исполнитель или лид) по статусу проекта. Клик — просмотр карточки задачи."}{" "}
               <span className="font-semibold text-[var(--text)]">{filteredSubtasks.length}</span> в списке
               {view === "calendar" ? ` · в календаре — ${filteredSubtasks.filter((s) => expandSubtaskToDayKeys(s).length > 0).length} с датами` : null}.
             </p>
@@ -270,6 +264,15 @@ export default function TasksPage() {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {canPm ? (
+              <button
+                type="button"
+                onClick={() => setEditor({ mode: "create" })}
+                className="shrink-0 rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110"
+              >
+                Создать задачу
+              </button>
+            ) : null}
             <div className="flex shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-0.5 text-xs font-semibold shadow-sm dark:border-white/[0.06]">
               <button
                 type="button"
@@ -308,7 +311,13 @@ export default function TasksPage() {
       {error ? <p className="mb-4 text-sm font-medium text-[var(--danger)]">{error}</p> : null}
 
       {view === "calendar" ? (
-        <TasksCalendarView subtasks={filteredSubtasks} cards={cardsMinusVirtual} teamUsers={teamUsers} canPm={canPm} />
+        <TasksCalendarView
+          subtasks={filteredSubtasks}
+          cards={cardsMinusVirtual}
+          teamUsers={teamUsers}
+          canPm={canPm}
+          onEditSubtask={(s) => setEditor({ mode: "edit", sub: s })}
+        />
       ) : (
         <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
           {SIMPLE_VIEW_GROUPS.map(({ key, label }) => {
@@ -394,6 +403,18 @@ export default function TasksPage() {
           })}
         </div>
       )}
+
+      {editor ? (
+        <TaskEditorModal
+          mode={editor.mode}
+          subtask={editor.mode === "edit" ? editor.sub : null}
+          cards={cardsMinusVirtual}
+          teamUsers={teamUsers}
+          canSave={canPm}
+          onClose={() => setEditor(null)}
+          onSaved={() => void loadSubtasks()}
+        />
+      ) : null}
     </div>
   );
 }

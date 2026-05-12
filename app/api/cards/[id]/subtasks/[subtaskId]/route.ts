@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
 import { effectiveUserRole, requirePmBoardAccess } from "@/lib/require-role";
 import { isMemberRestrictedRole } from "@/lib/roles";
-import { deleteSubtask, serializeExecutionDates, updateSubtask } from "@/lib/pm-subtasks";
+import { deleteSubtask, serializeExecutionDates, updateSubtask, type SubtaskWorkStatusKey } from "@/lib/pm-subtasks";
+import type { ImportanceKey } from "@/lib/statuses";
 
 type Params = { params: Promise<{ id: string; subtaskId: string }> };
 
@@ -20,13 +21,34 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const body = await request.json().catch(() => ({}));
     const updates: Parameters<typeof updateSubtask>[2] = {};
     if (typeof body.title === "string") updates.title = body.title;
+    if (typeof body.description === "string") updates.description = body.description;
+    if ("description" in body && body.description === null) updates.description = null;
     if ("assigneeUserId" in body) updates.assigneeUserId = body.assigneeUserId as string | null;
     if ("leadUserId" in body) updates.leadUserId = body.leadUserId as string | null;
     if ("estimatedHours" in body) updates.estimatedHours = body.estimatedHours as number | null;
+    if ("importance" in body) {
+      const k = body.importance;
+      updates.importance = k === "high" || k === "medium" || k === "low" ? (k as ImportanceKey) : null;
+    }
+    if (typeof body.workStatus === "string") {
+      const w = body.workStatus.trim();
+      if (w === "not_started" || w === "in_progress" || w === "awaiting_approval") {
+        updates.workStatus = w as SubtaskWorkStatusKey;
+      }
+    }
     if ("completed" in body) {
       updates.completedAt = body.completed ? new Date().toISOString() : null;
     }
     if ("completedAt" in body) updates.completedAt = body.completedAt as string | null;
+    if (typeof body.taskStatus === "string") {
+      const v = body.taskStatus.trim();
+      if (v === "completed") {
+        updates.completedAt = new Date().toISOString();
+      } else if (v === "not_started" || v === "in_progress" || v === "awaiting_approval") {
+        updates.completedAt = null;
+        updates.workStatus = v;
+      }
+    }
     if (typeof body.plannedStart === "string" || body.plannedStart === null)
       updates.plannedStart = body.plannedStart;
     if (typeof body.plannedEnd === "string" || body.plannedEnd === null) updates.plannedEnd = body.plannedEnd;
