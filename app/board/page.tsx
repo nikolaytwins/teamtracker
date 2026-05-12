@@ -10,7 +10,6 @@ import {
   ACTIVE_WORK_STAGE_KEYS,
   ACTIVE_WORK_STAGE_SET,
   IMPORTANCE_OPTIONS,
-  PM_STATUSES,
   defaultStatusForSimpleViewGroup,
   statusToSimpleViewGroup,
   type PmStatusKey,
@@ -20,6 +19,7 @@ import {
 import type { PmSubtaskWithCard } from "@/lib/pm-subtasks";
 import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
 import { ProjectSetupModal } from "@/components/board/ProjectSetupModal";
+import { ProjectSubtasksPanel } from "@/components/board/ProjectSubtasksPanel";
 
 type TeamMember = { id: string; name: string; avatar?: string };
 
@@ -167,6 +167,7 @@ export default function BoardPage() {
       return "kanban";
     }
   });
+  const [expandedProjectIds, setExpandedProjectIds] = useState<Record<string, boolean>>({});
   const [boardTeamUsers, setBoardTeamUsers] = useState<{ id: string; displayName: string; avatarUrl?: string | null }[]>(
     []
   );
@@ -611,6 +612,16 @@ export default function BoardPage() {
     return [...list].sort((a, b) => importanceOrder(a) - importanceOrder(b));
   };
 
+  function simpleScopeLabel(card: PmCard): string {
+    const g = statusToSimpleViewGroup(card.status);
+    if (g === "in_progress") return "В работе";
+    if (g === "awaiting_approval") return "На согласовании";
+    if (g === "done") return "Завершён";
+    if (g === "not_started") return "Не начат";
+    if (g === "pause") return "Пауза";
+    return g;
+  }
+
   async function quickAddCardInColumn(columnKey: string, status: PmStatusKey) {
     const title = (quickCardTitle[columnKey] || "").trim();
     if (!title) return;
@@ -780,8 +791,8 @@ export default function BoardPage() {
                 </>
               ) : (
                 <>
-                  Список проектов с теми же фильтрами, что и у канбана. Этап меняется в колонке «Этап»; подзадачи и
-                  календарь — в разделе «Задачи».
+                  Список крупных карточек: раскройте строку — этапы и подзадачи прямо здесь. Те же фильтры, что у канбана.
+                  Дополнительно — раздел «Задачи».
                 </>
               )}{" "}
               Показано{" "}
@@ -1017,128 +1028,145 @@ export default function BoardPage() {
         </div>
 
       {projectsViewMode === "list" ? (
-        <div className="mb-5 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-kanban-column)] ring-1 ring-[var(--border)]/20 dark:ring-0">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-[var(--border)]/70 bg-[var(--bg)]/40 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] dark:border-white/[0.06]">
-              <tr>
-                <th className="px-4 py-3">Проект</th>
-                <th className="whitespace-nowrap px-4 py-3">Дедлайн</th>
-                <th className="whitespace-nowrap px-4 py-3">Срок проекта</th>
-                <th className="whitespace-nowrap px-4 py-3">Сводно</th>
-                <th className="min-w-[11rem] px-4 py-3">Этап</th>
-                <th className="w-32 whitespace-nowrap px-4 py-3 text-right">Действия</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]/60 dark:divide-white/[0.06]">
-              {cardsForBoardView.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-[var(--muted-foreground)]">
-                    Нет проектов в этом фильтре.
-                  </td>
-                </tr>
-              ) : (
-                cardsForBoardView.map((card) => {
-                  const extra = parseExtra(card.extra);
-                  const projectDeadline = extra.projectDeadline || null;
-                  const gKey = statusToSimpleViewGroup(card.status);
-                  const gLabel = SIMPLE_VIEW_GROUPS.find((x) => x.key === gKey)?.label ?? gKey;
-                  const importanceOpt = IMPORTANCE_OPTIONS.find((o) => o.key === extra.importance);
-                  return (
-                    <tr key={card.id} className="align-top transition-colors hover:bg-[var(--surface-2)]/35">
-                      <td className="px-4 py-3">
+        <div className="mx-auto w-full max-w-none space-y-4 pb-10">
+          {cardsForBoardView.length === 0 ? (
+            <p className="text-sm text-[var(--muted-foreground)]">Нет проектов в этом фильтре.</p>
+          ) : (
+            cardsForBoardView.map((card) => {
+              const ex = parseExtra(card.extra);
+              const open = Boolean(expandedProjectIds[card.id]);
+              const prog = ex.derivedSubtaskProgress;
+              const importanceOpt = IMPORTANCE_OPTIONS.find((o) => o.key === ex.importance);
+              const projectDeadline = ex.projectDeadline || null;
+              return (
+                <div
+                  key={card.id}
+                  className={`overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] pl-0 shadow-[var(--shadow-kanban-card)] ${cardStatusLeftAccent(card)}`}
+                >
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="flex w-full cursor-pointer items-start gap-3 p-4 text-left transition-colors hover:bg-[var(--surface-2)]/40"
+                    onClick={() =>
+                      setExpandedProjectIds((prev) => ({
+                        ...prev,
+                        [card.id]: !prev[card.id],
+                      }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setExpandedProjectIds((prev) => ({
+                          ...prev,
+                          [card.id]: !prev[card.id],
+                        }));
+                      }
+                    }}
+                  >
+                    <span className="mt-1 shrink-0 text-[var(--muted-foreground)]" aria-hidden>
+                      {open ? "▼" : "▶"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         {importanceOpt ? (
-                          <span
-                            className={`mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${importanceOpt.className}`}
-                          >
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${importanceOpt.className}`}>
                             {importanceOpt.label}
                           </span>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={() => openModal(card)}
-                          className="block max-w-[min(100vw-6rem,22rem)] text-left font-semibold leading-snug text-[var(--text)] hover:underline sm:max-w-xs"
-                        >
-                          {card.name}
-                        </button>
-                        <Link
-                          href={appPath(`/board/${card.id}`)}
-                          className="mt-1 inline-flex text-xs font-semibold text-[var(--primary)] hover:underline"
-                        >
-                          Страница проекта →
-                        </Link>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-[var(--muted-foreground)]">
-                        {card.deadline ? formatDate(card.deadline) : "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-[var(--muted-foreground)]">
-                        {projectDeadline ? formatDate(projectDeadline) : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--text)]">{gLabel}</td>
-                      <td className="px-4 py-3">
-                        <select
-                          className="tt-select w-full max-w-xs py-2 text-xs"
-                          value={card.status}
-                          onChange={(e) => void updateStatus(card.id, e.target.value as PmStatusKey)}
-                        >
-                          {PM_STATUSES.map((s) => (
-                            <option key={s.key} value={s.key}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex items-center justify-end gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => setSetupProject({ id: card.id, name: card.name, extra: card.extra ?? null })}
-                            className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-                            title="Настройка этапов и подзадач"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                              />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openModal(card)}
-                            className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-                            title="Открыть карточку"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => deleteCardOnly(card.id, e)}
-                            className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
-                            title="Удалить из канбана"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V7m1 14h4" />
-                            </svg>
-                          </button>
+                        <span className="text-lg font-semibold leading-snug text-[var(--text)]">{card.name}</span>
+                        <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">
+                          {simpleScopeLabel(card)}
+                        </span>
+                      </div>
+                      {card.deadline ? (
+                        <p className="mt-1 text-xs text-[var(--muted-foreground)]">Дедлайн карточки · {formatDate(card.deadline)}</p>
+                      ) : null}
+                      {projectDeadline ? (
+                        <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">Срок проекта · {formatDate(projectDeadline)}</p>
+                      ) : null}
+                      {prog && prog.total > 0 ? (
+                        <div className="mt-3 space-y-1">
+                          <div className="flex items-center justify-between text-[11px] text-[var(--muted-foreground)]">
+                            <span>
+                              Подзадачи {prog.completed}/{prog.total}
+                              {prog.byHours ? " · по часам" : ""}
+                            </span>
+                            <span className="font-semibold tabular-nums text-[var(--primary)]">{prog.percent}%</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
+                            <div
+                              className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-300"
+                              style={{ width: `${prog.percent}%` }}
+                            />
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      ) : (
+                        <p className="mt-2 text-xs text-[var(--muted-foreground)]">Добавьте подзадачи — появится прогресс.</p>
+                      )}
+                    </div>
+                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <select
+                        className="tt-select max-w-[11rem] py-2 text-xs"
+                        value={statusToSimpleViewGroup(card.status)}
+                        onChange={(e) =>
+                          void updateStatus(card.id, defaultStatusForSimpleViewGroup(e.target.value as SimpleViewGroupKey))
+                        }
+                      >
+                        {SIMPLE_VIEW_GROUPS.map((g) => (
+                          <option key={g.key} value={g.key}>
+                            {g.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div
+                    className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--border)]/60 bg-[var(--bg)]/25 px-4 py-2.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Link
+                      href={appPath(`/board/${card.id}`)}
+                      className="text-xs font-semibold text-[var(--primary)] hover:underline"
+                    >
+                      Страница проекта →
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setSetupProject({ id: card.id, name: card.name, extra: card.extra ?? null })}
+                      className="text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--text)] hover:underline"
+                    >
+                      Настройка этапов
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openModal(card)}
+                      className="text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--text)] hover:underline"
+                    >
+                      Описание
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => deleteCardOnly(card.id, e)}
+                      className="text-xs font-semibold text-[var(--danger)] hover:underline"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                  {open ? (
+                    <div className="border-t border-[var(--border)] px-4 py-4">
+                      <ProjectSubtasksPanel
+                        cardId={card.id}
+                        onChanged={() => {
+                          void refreshBoardCard(card.id);
+                          void loadBoardSubtasks();
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
         </div>
       ) : null}
 
