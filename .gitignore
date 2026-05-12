@@ -8,4 +8,7 @@ deploy-standalone.tgz
 .env*
 !.env.example
 *.tsbuildinfo
-.cursor/
+# Cursor: личные данные IDE игнорируем, но правила репозитория — в Git
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/*.mdc

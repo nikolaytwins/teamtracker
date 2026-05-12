@@ -7,6 +7,8 @@
 - **Канбан:** `data/pm-board.db` — карточки `pm_cards`.
 - **Агентство и история:** `data/agency.db` — те же таблицы, что в Twinworks `prisma/dev.db`.
 
+Схема для **облака (Supabase)** и правило «всё важное через миграции, без потери данных» — в **[docs/SUPABASE-DATA-AND-MIGRATIONS.md](docs/SUPABASE-DATA-AND-MIGRATIONS.md)**.
+
 Подтянуть данные с **продакшена** (после `ssh`):
 
 ```bash
