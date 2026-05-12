@@ -55,9 +55,27 @@ function ensureDb() {
   }
   ensureOtherCard(_db);
   ensurePmSubtasksTable(_db);
+  ensurePmProjectTemplatesTable(_db);
   ensurePmCardCommentsTable(_db);
-  ensureTtNotificationsTable(_db);
   return _db;
+}
+
+function ensurePmProjectTemplatesTable(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pm_project_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS pm_project_template_items (
+      id TEXT PRIMARY KEY,
+      template_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      estimated_hours REAL
+    );
+    CREATE INDEX IF NOT EXISTS idx_pm_project_template_items_tid ON pm_project_template_items(template_id);
+  `);
 }
 
 function ensurePmCardCommentsTable(db: Database.Database) {
@@ -71,20 +89,6 @@ function ensurePmCardCommentsTable(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_pm_card_comments_card_created ON pm_card_comments(card_id, created_at ASC);
-  `);
-}
-
-function ensureTtNotificationsTable(db: Database.Database) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS tt_notifications (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      type TEXT NOT NULL,
-      payload TEXT NOT NULL DEFAULT '{}',
-      read_at TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_tt_notifications_user_created ON tt_notifications(user_id, created_at DESC);
   `);
 }
 

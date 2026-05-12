@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCard, listCards } from "@/lib/db";
+import { createCard, getCard, listCards } from "@/lib/db";
+import { applyProjectTemplateToCard } from "@/lib/pm-project-templates";
 import { filterCardsForMemberRestrictedRole } from "@/lib/member-board-access";
-import { requireAgencyAccess, requireSessionRole } from "@/lib/require-role";
+import { requirePmBoardAccess } from "@/lib/require-role";
 import { isValidStatus, DEFAULT_STATUS, type PmStatusKey } from "@/lib/statuses";
 
 export async function GET() {
   try {
-    const auth = await requireSessionRole();
+    const auth = await requirePmBoardAccess();
     if (!auth.ok) return auth.response;
     const cards = filterCardsForMemberRestrictedRole(auth.role, listCards());
     return NextResponse.json(cards);
@@ -18,7 +19,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAgencyAccess();
+    const auth = await requirePmBoardAccess();
     if (!auth.ok) return auth.response;
     const body = await request.json();
     const name = body.name;
@@ -28,9 +29,10 @@ export async function POST(request: NextRequest) {
     const status: PmStatusKey = isValidStatus(body.status) ? body.status : DEFAULT_STATUS;
     let source_project_id = body.source_project_id ?? null;
     const source_detail_id = body.source_detail_id ?? null;
+    const createFinancialProject = body.createFinancialProject === true;
 
-    // Если карточку создают из канбана (без проекта) — сначала создать проект в Twinworks (без сумм)
-    if (!source_project_id) {
+    // Проект в финансовой отчётности (Twinworks / agency) — только по явному запросу (например с доски «Проекты»).
+    if (!source_project_id && createFinancialProject) {
       const twinworksUrl = process.env.TWINWORKS_AGENCY_URL || "http://127.0.0.1:3001";
       try {
         const r = await fetch(`${twinworksUrl}/api/agency/projects`, {
@@ -66,7 +68,12 @@ export async function POST(request: NextRequest) {
       deadline: body.deadline ?? null,
       status,
     });
-    return NextResponse.json(card);
+    const templateId = typeof body.templateId === "string" ? body.templateId.trim() : "";
+    if (templateId) {
+      applyProjectTemplateToCard(card.id, templateId);
+    }
+    const fresh = getCard(card.id) ?? card;
+    return NextResponse.json(fresh);
   } catch (e) {
     console.error("POST /api/cards", e);
     return NextResponse.json({ error: "Failed to create card" }, { status: 500 });

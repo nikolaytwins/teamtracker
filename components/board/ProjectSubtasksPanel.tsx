@@ -15,6 +15,7 @@ export type SubtaskDto = {
   estimated_hours: number | null;
   completed_at: string | null;
   assignee_user_id: string | null;
+  lead_user_id: string | null;
   phase_id: string | null;
   deadline_at: string | null;
   execution_dates_json: string | null;
@@ -51,9 +52,11 @@ function userInitial(name: string): string {
 export function ProjectSubtasksPanel({
   cardId,
   onChanged,
+  variant = "full",
 }: {
   cardId: string;
   onChanged?: () => void;
+  variant?: "full" | "compact";
 }) {
   const [phases, setPhases] = useState<PhaseLite[]>([]);
   const [subtasks, setSubtasks] = useState<SubtaskDto[]>([]);
@@ -68,6 +71,9 @@ export function ProjectSubtasksPanel({
   const [newPhaseTitle, setNewPhaseTitle] = useState("");
   const [phaseAdding, setPhaseAdding] = useState(false);
   const [expandedEditIds, setExpandedEditIds] = useState<Set<string>>(() => new Set());
+  const [addSubtaskModalOpen, setAddSubtaskModalOpen] = useState(false);
+  const [modalNewTitle, setModalNewTitle] = useState("");
+  const [modalNewPhaseId, setModalNewPhaseId] = useState<string>("");
 
   const toggleExpanded = useCallback((id: string, on: boolean) => {
     setExpandedEditIds((prev) => {
@@ -132,6 +138,44 @@ export function ProjectSubtasksPanel({
     setLoading(true);
     void reload();
   }, [reload]);
+
+  const isCompact = variant === "compact";
+
+  useEffect(() => {
+    if (!addSubtaskModalOpen) return;
+    setModalNewPhaseId((prev) => {
+      if (prev && phases.some((p) => p.id === prev)) return prev;
+      return phases[0]?.id ?? "";
+    });
+  }, [addSubtaskModalOpen, phases]);
+
+  async function addSubtaskFromModal(e: React.FormEvent) {
+    e.preventDefault();
+    const title = modalNewTitle.trim();
+    if (!title || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await fetch(apiUrl(`/api/cards/${cardId}/subtasks`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          phaseId: modalNewPhaseId || null,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Не добавилось");
+      setModalNewTitle("");
+      setAddSubtaskModalOpen(false);
+      await reload();
+      onChanged?.();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function patchSub(id: string, body: Record<string, unknown>) {
     setBusy(true);
@@ -238,10 +282,30 @@ export function ProjectSubtasksPanel({
     const exec = s.executionDates ?? parseExecutionDatesFromJson(s.execution_dates_json);
     const addDateKey = s.id;
     const pendingDate = newExecDate[addDateKey] ?? "";
-    const canDrag = !busy && !s.completed_at;
-    const expanded = expandedEditIds.has(s.id);
+    const canDrag = !busy && !s.completed_at && !isCompact;
+    const expanded = !isCompact && expandedEditIds.has(s.id);
     const assignee = s.assignee_user_id ? users.find((u) => u.id === s.assignee_user_id) : undefined;
+    const lead = s.lead_user_id ? users.find((u) => u.id === s.lead_user_id) : undefined;
     const phaseTitle = s.phase_id ? phases.find((p) => p.id === s.phase_id)?.title : null;
+
+    function avatarChip(u: TeamUser, titleAttr: string) {
+      return u.avatarUrl ? (
+        <img
+          src={u.avatarUrl}
+          alt=""
+          title={titleAttr}
+          className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-[var(--border)]"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span
+          title={titleAttr}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--border)] text-[10px] font-semibold text-[var(--text)] ring-1 ring-[var(--border)]"
+        >
+          {userInitial(u.displayName)}
+        </span>
+      );
+    }
 
     return (
       <div
@@ -250,7 +314,7 @@ export function ProjectSubtasksPanel({
         onDragStart={canDrag ? (e) => handleDragStartSub(e, s.id) : undefined}
         className={`rounded-xl border border-[var(--border)] bg-[var(--surface)]/80 p-3 text-sm shadow-sm ${
           canDrag ? "cursor-grab active:cursor-grabbing" : ""
-        }`}
+        } ${isCompact ? "p-2.5" : ""}`}
       >
         <div className="flex flex-wrap items-center gap-2">
           {canDrag ? (
@@ -297,7 +361,13 @@ export function ProjectSubtasksPanel({
               {s.title}
             </span>
           )}
-          {!expanded && assignee ? (
+          {!expanded && isCompact && (assignee || lead) ? (
+            <span className="flex shrink-0 items-center gap-0.5" title="Исполнитель и лид">
+              {assignee ? avatarChip(assignee, `Исполнитель: ${assignee.displayName}`) : null}
+              {lead ? avatarChip(lead, `Лид: ${lead.displayName}`) : null}
+            </span>
+          ) : null}
+          {!expanded && !isCompact && assignee ? (
             <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--surface-2)] py-0.5 pl-0.5 pr-2">
               {assignee.avatarUrl ? (
                 <img
@@ -314,11 +384,23 @@ export function ProjectSubtasksPanel({
               <span className="max-w-[7rem] truncate text-[11px] text-[var(--muted-foreground)]">{assignee.displayName}</span>
             </span>
           ) : null}
-          {!s.completed_at ? (
+          {!expanded && !isCompact && lead && lead.id !== assignee?.id ? (
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 py-0.5 pl-0.5 pr-2 ring-1 ring-amber-500/25" title={`Лид: ${lead.displayName}`}>
+              {lead.avatarUrl ? (
+                <img src={lead.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/20 text-[10px] font-semibold text-[var(--text)]">
+                  {userInitial(lead.displayName)}
+                </span>
+              )}
+              <span className="max-w-[5rem] truncate text-[10px] font-medium text-amber-900 dark:text-amber-200">Лид</span>
+            </span>
+          ) : null}
+          {!s.completed_at && !isCompact ? (
             <button
               type="button"
               disabled={busy}
-              onClick={() => toggleExpanded(s.id, !expanded)}
+              onClick={() => toggleExpanded(s.id, !expandedEditIds.has(s.id))}
               className="ml-auto shrink-0 rounded-lg border border-[var(--border)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] disabled:opacity-40"
             >
               {expanded ? "Свернуть" : "Детали"}
@@ -327,21 +409,38 @@ export function ProjectSubtasksPanel({
         </div>
         {!expanded ? (
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[var(--muted-foreground)]">
-            {phaseTitle ? <span>Этап: {phaseTitle}</span> : null}
+            {!isCompact && phaseTitle ? <span>Этап: {phaseTitle}</span> : null}
+            {isCompact && phaseTitle ? <span className="text-[10px]">{phaseTitle}</span> : null}
             {s.deadline_at ? <span>До {deadlineInputValue(s.deadline_at)}</span> : null}
             {s.estimated_hours != null ? <span>Оценка {s.estimated_hours} ч</span> : null}
-            <span className="tabular-nums">Факт {formatTracked(s.trackedSeconds ?? 0)}</span>
+            {!isCompact ? <span className="tabular-nums">Факт {formatTracked(s.trackedSeconds ?? 0)}</span> : null}
           </div>
         ) : (
           <div className="mt-3 space-y-3 border-t border-[var(--border)]/70 pt-3">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <label className="block text-[11px] text-[var(--muted-foreground)]">
-                Ответственный
+                Исполнитель
                 <select
                   className="tt-select mt-0.5 w-full py-1.5 text-xs"
                   value={s.assignee_user_id ?? ""}
                   disabled={busy || Boolean(s.completed_at)}
                   onChange={(e) => void patchSub(s.id, { assigneeUserId: e.target.value || null })}
+                >
+                  <option value="">—</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.displayName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-[11px] text-[var(--muted-foreground)]">
+                Лид
+                <select
+                  className="tt-select mt-0.5 w-full py-1.5 text-xs"
+                  value={s.lead_user_id ?? ""}
+                  disabled={busy || Boolean(s.completed_at)}
+                  onChange={(e) => void patchSub(s.id, { leadUserId: e.target.value || null })}
                 >
                   <option value="">—</option>
                   {users.map((u) => (
@@ -453,79 +552,99 @@ export function ProjectSubtasksPanel({
   }
 
   return (
-    <div className="space-y-4 border-t border-[var(--border)] pt-4" onDragEnd={() => setDropHoverKey(null)}>
+    <div
+      className={isCompact ? "space-y-2" : "space-y-4 border-t border-[var(--border)] pt-4"}
+      onDragEnd={() => setDropHoverKey(null)}
+    >
       {err ? <p className="text-sm text-[var(--danger)]">{err}</p> : null}
 
-      <form onSubmit={(e) => void addProjectPhase(e)} className="flex flex-wrap items-end gap-2 rounded-xl border border-[var(--border)]/80 bg-[var(--surface-2)]/30 p-3">
-        <label className="min-w-[12rem] flex-1 text-[11px] font-medium text-[var(--muted-foreground)]">
-          Новый этап проекта
-          <input
-            type="text"
-            value={newPhaseTitle}
-            onChange={(e) => setNewPhaseTitle(e.target.value)}
-            placeholder="Например: Согласование макета"
-            className="tt-input mt-0.5 w-full py-2 text-sm"
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={phaseAdding || !newPhaseTitle.trim()}
-          className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
-        >
-          {phaseAdding ? "…" : "Добавить этап"}
-        </button>
-      </form>
-
-      <form onSubmit={(e) => void addSubtask(e)} className="flex flex-wrap items-end gap-2 rounded-xl bg-[var(--surface-2)]/40 p-3">
-        <label className="min-w-[8rem] flex-1 text-[11px] text-[var(--muted-foreground)]">
-          Подзадача
-          <input
-            type="text"
-            value={quickTitle}
-            onChange={(e) => setQuickTitle(e.target.value)}
-            placeholder="Сначала этап — затем подзадача"
-            className="tt-input mt-0.5 w-full py-2 text-sm"
-          />
-        </label>
-        <label className="min-w-[10rem] text-[11px] text-[var(--muted-foreground)]">
-          Этап
-          <select
-            className="tt-select mt-0.5 w-full py-2 text-sm"
-            value={quickPhaseId}
-            onChange={(e) => setQuickPhaseId(e.target.value)}
+      {!isCompact ? (
+        <>
+          <form
+            onSubmit={(e) => void addProjectPhase(e)}
+            className="flex flex-wrap items-end gap-2 rounded-xl border border-[var(--border)]/80 bg-[var(--surface-2)]/30 p-3"
           >
-            <option value="">Без этапа</option>
-            {phases.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="submit"
-          disabled={busy || !quickTitle.trim()}
-          className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
-        >
-          Добавить
-        </button>
-      </form>
+            <label className="min-w-[12rem] flex-1 text-[11px] font-medium text-[var(--muted-foreground)]">
+              Новый этап проекта
+              <input
+                type="text"
+                value={newPhaseTitle}
+                onChange={(e) => setNewPhaseTitle(e.target.value)}
+                placeholder="Например: Согласование макета"
+                className="tt-input mt-0.5 w-full py-2 text-sm"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={phaseAdding || !newPhaseTitle.trim()}
+              className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
+            >
+              {phaseAdding ? "…" : "Добавить этап"}
+            </button>
+          </form>
+
+          <form
+            onSubmit={(e) => void addSubtask(e)}
+            className="flex flex-wrap items-end gap-2 rounded-xl bg-[var(--surface-2)]/40 p-3"
+          >
+            <label className="min-w-[8rem] flex-1 text-[11px] text-[var(--muted-foreground)]">
+              Подзадача
+              <input
+                type="text"
+                value={quickTitle}
+                onChange={(e) => setQuickTitle(e.target.value)}
+                placeholder="Сначала этап — затем подзадача"
+                className="tt-input mt-0.5 w-full py-2 text-sm"
+              />
+            </label>
+            <label className="min-w-[10rem] text-[11px] text-[var(--muted-foreground)]">
+              Этап
+              <select
+                className="tt-select mt-0.5 w-full py-2 text-sm"
+                value={quickPhaseId}
+                onChange={(e) => setQuickPhaseId(e.target.value)}
+              >
+                <option value="">Без этапа</option>
+                {phases.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              disabled={busy || !quickTitle.trim()}
+              className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
+            >
+              Добавить
+            </button>
+          </form>
+        </>
+      ) : null}
 
       {phases.length === 0 && subsForPhase(null).length === 0 ? (
         <p className="text-xs text-[var(--muted-foreground)]">
-          Создайте этап выше, затем добавляйте подзадачи. Без этапа подзадачи останутся в блоке «Без этапа».
+          {isCompact
+            ? "Подзадач пока нет. Добавьте первую или откройте настройки — там этапы и полное редактирование."
+            : "Создайте этап выше, затем добавляйте подзадачи. Без этапа подзадачи останутся в блоке «Без этапа»."}
         </p>
       ) : null}
 
       {phases.map((p) => {
         const list = subsForPhase(p.id);
         const dk = dropKeyForPhase(p.id);
-        const isHover = dropHoverKey === dk;
+        const isHover = !isCompact && dropHoverKey === dk;
+        const zoneDrag = isCompact
+          ? {}
+          : {
+              onDragOver: (e: React.DragEvent) => handleDragOverZone(e, dk),
+              onDrop: (e: React.DragEvent) => handleDropOnZone(e, p.id),
+            };
         return (
           <div
             key={p.id}
-            onDragOver={(e) => handleDragOverZone(e, dk)}
-            onDrop={(e) => handleDropOnZone(e, p.id)}
+            {...zoneDrag}
             className={`rounded-xl p-2 transition-[box-shadow,background] ${
               isHover ? "bg-[var(--primary-soft)]/15 ring-2 ring-[var(--primary)]/40" : ""
             }`}
@@ -533,7 +652,7 @@ export function ProjectSubtasksPanel({
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{p.title}</h4>
             {list.length === 0 ? (
               <p className="mb-2 min-h-[2.5rem] rounded-lg border border-dashed border-[var(--border)] px-2 py-4 text-center text-xs text-[var(--muted-foreground)]">
-                Нет подзадач — перетащите сюда из другого этапа.
+                {isCompact ? "Нет подзадач в этом этапе." : "Нет подзадач — перетащите сюда из другого этапа."}
               </p>
             ) : (
               <div className="space-y-2">{list.map(renderSubRow)}</div>
@@ -544,16 +663,20 @@ export function ProjectSubtasksPanel({
 
       {subsForPhase(null).length > 0 || phases.length > 0 ? (
         <div
-          onDragOver={(e) => handleDragOverZone(e, DROP_UNASSIGNED)}
-          onDrop={(e) => handleDropOnZone(e, null)}
+          {...(isCompact
+            ? {}
+            : {
+                onDragOver: (e: React.DragEvent) => handleDragOverZone(e, DROP_UNASSIGNED),
+                onDrop: (e: React.DragEvent) => handleDropOnZone(e, null),
+              })}
           className={`rounded-xl p-2 transition-[box-shadow,background] ${
-            dropHoverKey === DROP_UNASSIGNED ? "bg-[var(--primary-soft)]/15 ring-2 ring-[var(--primary)]/40" : ""
+            !isCompact && dropHoverKey === DROP_UNASSIGNED ? "bg-[var(--primary-soft)]/15 ring-2 ring-[var(--primary)]/40" : ""
           }`}
         >
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Без этапа</h4>
           {subsForPhase(null).length === 0 ? (
             <p className="mb-2 min-h-[2.5rem] rounded-lg border border-dashed border-[var(--border)] px-2 py-4 text-center text-xs text-[var(--muted-foreground)]">
-              Подзадачи без этапа — перетащите сюда, чтобы снять привязку к этапу.
+              {isCompact ? "Нет подзадач без этапа." : "Подзадачи без этапа — перетащите сюда, чтобы снять привязку к этапу."}
             </p>
           ) : (
             <div className="space-y-2">{subsForPhase(null).map(renderSubRow)}</div>
@@ -561,7 +684,89 @@ export function ProjectSubtasksPanel({
         </div>
       ) : null}
 
-      {subtasks.length === 0 ? <p className="text-sm text-[var(--muted-foreground)]">Подзадач пока нет.</p> : null}
+      {subtasks.length === 0 && !isCompact ? (
+        <p className="text-sm text-[var(--muted-foreground)]">Подзадач пока нет.</p>
+      ) : null}
+
+      {isCompact ? (
+        <button
+          type="button"
+          onClick={() => {
+            setModalNewTitle("");
+            setAddSubtaskModalOpen(true);
+          }}
+          className="mt-1 flex w-full items-center justify-center gap-1.5 py-2 text-[11px] text-[var(--muted-foreground)]/80 transition-colors hover:text-[var(--primary)]"
+        >
+          <svg className="h-3.5 w-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          добавить подзадачу
+        </button>
+      ) : null}
+
+      {addSubtaskModalOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-3 py-8"
+          role="presentation"
+          onClick={() => setAddSubtaskModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-subtask-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="add-subtask-modal-title" className="text-base font-semibold text-[var(--text)]">
+              Новая подзадача
+            </h3>
+            <form onSubmit={(e) => void addSubtaskFromModal(e)} className="mt-4 space-y-3">
+              <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
+                Название
+                <input
+                  type="text"
+                  value={modalNewTitle}
+                  onChange={(e) => setModalNewTitle(e.target.value)}
+                  className="tt-input mt-1 w-full text-sm"
+                  placeholder="Что сделать"
+                  autoFocus
+                />
+              </label>
+              <label className="block text-[11px] font-medium text-[var(--muted-foreground)]">
+                Этап
+                <select
+                  className="tt-select mt-1 w-full text-sm"
+                  value={modalNewPhaseId}
+                  onChange={(e) => setModalNewPhaseId(e.target.value)}
+                >
+                  <option value="">Без этапа</option>
+                  {phases.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
+                  onClick={() => setAddSubtaskModalOpen(false)}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy || !modalNewTitle.trim()}
+                  className="rounded-lg bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
+                >
+                  {busy ? "…" : "Добавить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

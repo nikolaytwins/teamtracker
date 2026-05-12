@@ -49,7 +49,7 @@ function weekLabelRu(weekKey: string): string {
   return `${startStr}–${endStr}`;
 }
 
-function EconomyPanel({ stats }: { stats: ProfiStatsShape }) {
+export function EconomyPanel({ stats }: { stats: ProfiStatsShape }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
       <h3 className="mb-3 text-lg font-semibold text-[var(--text)]">Экономика</h3>
@@ -95,7 +95,7 @@ function EconomyPanel({ stats }: { stats: ProfiStatsShape }) {
   );
 }
 
-function ConversionsPanel({ stats }: { stats: ProfiStatsShape }) {
+export function ConversionsPanel({ stats }: { stats: ProfiStatsShape }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
       <h3 className="mb-4 text-lg font-semibold text-[var(--text)]">Конверсии</h3>

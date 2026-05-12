@@ -4,13 +4,11 @@ import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { apiUrl, appPath } from "@/lib/api-url";
 import Link from "next/link";
 import {
-  PM_STATUSES,
   SIMPLE_VIEW_GROUPS,
   APPROVAL_WAITING_STATUSES,
   APPROVAL_WAITING_STATUS_SET,
   ACTIVE_WORK_STAGE_KEYS,
   ACTIVE_WORK_STAGE_SET,
-  statusLabel,
   IMPORTANCE_OPTIONS,
   defaultStatusForSimpleViewGroup,
   statusToSimpleViewGroup,
@@ -18,10 +16,9 @@ import {
   type ImportanceKey,
   type SimpleViewGroupKey,
 } from "@/lib/statuses";
-import { computeSubtaskProgressStats } from "@/lib/subtask-progress";
 import type { PmSubtaskWithCard } from "@/lib/pm-subtasks";
 import { VIRTUAL_OTHER_CARD_ID } from "@/lib/pm-constants";
-import { ProjectSubtasksPanel } from "@/components/board/ProjectSubtasksPanel";
+import { ProjectSetupModal } from "@/components/board/ProjectSetupModal";
 
 type TeamMember = { id: string; name: string; avatar?: string };
 
@@ -35,15 +32,6 @@ type PmCard = {
   extra?: string | null;
   created_at: string;
   updated_at: string;
-};
-
-type PmSubtaskRow = {
-  id: string;
-  title: string;
-  estimated_hours: number | null;
-  completed_at: string | null;
-  assignee_user_id: string | null;
-  lead_user_id: string | null;
 };
 
 type CardExtra = {
@@ -72,6 +60,8 @@ type CardExtra = {
     byHours: boolean;
     updatedAt?: string;
   };
+  /** user ids — ответственные на уровне проекта */
+  ownerUserIds?: string[];
 };
 
 function parseExtra(s: string | null | undefined): CardExtra {
@@ -104,8 +94,6 @@ function cardStatusLeftAccent(card: PmCard): string {
   return "border-l-4 border-l-[var(--border)]";
 }
 
-const BOARD_VIEW_LS = "pm-board-view-v1";
-
 function formatPhaseDuration(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec));
   const h = Math.floor(s / 3600);
@@ -119,21 +107,16 @@ export default function BoardPage() {
   const [cards, setCards] = useState<PmCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [boardDisplay, setBoardDisplay] = useState<"list" | "projects" | "tasks" | "stages">(() => {
-    if (typeof window === "undefined") return "list";
-    try {
-      const v = localStorage.getItem(BOARD_VIEW_LS);
-      if (v === "tasks" || v === "stages" || v === "projects" || v === "list") return v;
-    } catch {
-      /* ignore */
-    }
-    return "list";
-  });
-  const [projectScopeTab, setProjectScopeTab] = useState<"active" | "full">(() => {
+  const [projectScopeTab, setProjectScopeTab] = useState<"active" | "pause" | "done">(() => {
     if (typeof window === "undefined") return "active";
-    return localStorage.getItem("pm-board-project-scope") === "full" ? "full" : "active";
+    try {
+      const v = localStorage.getItem("pm-board-project-scope");
+      if (v === "pause" || v === "done") return v;
+      return "active";
+    } catch {
+      return "active";
+    }
   });
-  const [expandedProjectIds, setExpandedProjectIds] = useState<Record<string, boolean>>({});
   const [filterQuery, setFilterQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
@@ -143,9 +126,6 @@ export default function BoardPage() {
   const [boardSubtasks, setBoardSubtasks] = useState<PmSubtaskWithCard[]>([]);
   const [quickCardTitle, setQuickCardTitle] = useState<Record<string, string>>({});
   const [quickCardBusy, setQuickCardBusy] = useState<string | null>(null);
-  const [quickSubtaskTitle, setQuickSubtaskTitle] = useState<Record<string, string>>({});
-  const [quickSubtaskCardId, setQuickSubtaskCardId] = useState<Record<string, string>>({});
-  const [quickSubBusy, setQuickSubBusy] = useState<string | null>(null);
   const [modalCard, setModalCard] = useState<PmCard | null>(null);
   const [modalName, setModalName] = useState("");
   const [modalDescription, setModalDescription] = useState("");
@@ -169,8 +149,6 @@ export default function BoardPage() {
       return [];
     }
   });
-  const [modalSubtasks, setModalSubtasks] = useState<PmSubtaskRow[]>([]);
-  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [modalPhaseInsight, setModalPhaseInsight] = useState<{
     projectTotalSeconds: number;
     phases: { title: string }[];
@@ -178,19 +156,23 @@ export default function BoardPage() {
     economics: { paidAmount: number; effectiveHourlyPaidRub: number | null } | null;
   } | null>(null);
   const [modalPhaseInsightLoading, setModalPhaseInsightLoading] = useState(false);
+  const [setupProject, setSetupProject] = useState<{ id: string; name: string; extra: string | null } | null>(null);
+  const [filterResponsibleUserId, setFilterResponsibleUserId] = useState("");
+  const [boardTeamUsers, setBoardTeamUsers] = useState<{ id: string; displayName: string; avatarUrl?: string | null }[]>(
+    []
+  );
+  const [projectTemplates, setProjectTemplates] = useState<{ id: string; name: string; itemCount: number }[]>([]);
+  const [newProjectTemplateId, setNewProjectTemplateId] = useState("");
+  const [templatesManagerOpen, setTemplatesManagerOpen] = useState(false);
+  const [tplDraftName, setTplDraftName] = useState("");
+  const [tplDraftLines, setTplDraftLines] = useState("");
 
-  useEffect(() => {
-    if (!modalCard?.id) {
-      setModalSubtasks([]);
-      return;
-    }
-    void fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`))
-      .then((r) => r.json())
-      .then((d: { subtasks?: PmSubtaskRow[] }) => {
-        setModalSubtasks(Array.isArray(d.subtasks) ? d.subtasks : []);
-      })
-      .catch(() => setModalSubtasks([]));
-  }, [modalCard?.id]);
+  const loadBoardSubtasks = useCallback(async () => {
+    const r = await fetch(apiUrl("/api/board/open-subtasks"));
+    if (!r.ok) return;
+    const d = (await r.json()) as { subtasks?: PmSubtaskWithCard[] };
+    setBoardSubtasks(Array.isArray(d.subtasks) ? d.subtasks : []);
+  }, []);
 
   useEffect(() => {
     if (!modalCard?.id) {
@@ -241,6 +223,10 @@ export default function BoardPage() {
       if (!r.ok) return;
       const updated = (await r.json()) as PmCard;
       setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
+      setSetupProject((prev) => {
+        if (!prev || prev.id !== cardId) return prev;
+        return { ...prev, extra: updated.extra ?? null, name: updated.name };
+      });
       setModalCard((prev) => {
         if (prev?.id !== cardId) return prev;
         extraRef.current = updated.extra ?? null;
@@ -323,6 +309,7 @@ export default function BoardPage() {
       setError(e instanceof Error ? e.message : "Ошибка");
     } finally {
       setLoading(false);
+      void loadBoardSubtasks();
     }
   }
 
@@ -348,27 +335,35 @@ export default function BoardPage() {
       return o[ex.importance ?? ""] ?? 3;
     };
     const base =
-      projectScopeTab === "full"
-        ? cardsMinusVirtual
-        : cardsMinusVirtual.filter((c) => {
+      projectScopeTab === "active"
+        ? cardsMinusVirtual.filter((c) => {
             const g = statusToSimpleViewGroup(c.status);
-            return g === "in_progress" || g === "awaiting_approval";
-          });
+            return g === "in_progress" || g === "awaiting_approval" || g === "not_started";
+          })
+        : projectScopeTab === "pause"
+          ? cardsMinusVirtual.filter((c) => c.status === "pause")
+          : cardsMinusVirtual.filter((c) => c.status === "done");
     return [...base].sort((a, b) => importanceOrderInner(a) - importanceOrderInner(b));
   }, [cardsMinusVirtual, projectScopeTab]);
 
-  const activeCardIdSet = useMemo(() => {
-    if (projectScopeTab !== "active") return null;
-    return new Set(cardsForSimpleBoard.map((c) => c.id));
-  }, [projectScopeTab, cardsForSimpleBoard]);
+  const cardMatchesResponsibleFilter = useCallback(
+    (cardId: string) => {
+      const uid = filterResponsibleUserId.trim();
+      if (!uid) return true;
+      const card = cards.find((c) => c.id === cardId);
+      const owners = parseExtra(card?.extra).ownerUserIds;
+      if (Array.isArray(owners) && owners.includes(uid)) return true;
+      return boardSubtasks.some(
+        (s) => s.card_id === cardId && (s.assignee_user_id === uid || s.lead_user_id === uid)
+      );
+    },
+    [filterResponsibleUserId, cards, boardSubtasks]
+  );
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(BOARD_VIEW_LS, boardDisplay);
-    } catch {
-      /* ignore */
-    }
-  }, [boardDisplay]);
+  const cardsForBoardView = useMemo(
+    () => cardsForSimpleBoard.filter((c) => cardMatchesResponsibleFilter(c.id)),
+    [cardsForSimpleBoard, cardMatchesResponsibleFilter]
+  );
 
   useEffect(() => {
     try {
@@ -378,16 +373,36 @@ export default function BoardPage() {
     }
   }, [projectScopeTab]);
 
-  const loadBoardSubtasks = useCallback(async () => {
-    const r = await fetch(apiUrl("/api/board/open-subtasks"));
-    if (!r.ok) return;
-    const d = (await r.json()) as { subtasks?: PmSubtaskWithCard[] };
-    setBoardSubtasks(Array.isArray(d.subtasks) ? d.subtasks : []);
+  useEffect(() => {
+    void fetch(apiUrl("/api/team/users"))
+      .then((r) => r.json())
+      .then((d: { users?: { id?: string; displayName?: string; avatarUrl?: string | null }[] }) => {
+        if (!Array.isArray(d.users)) return;
+        setBoardTeamUsers(
+          d.users.map((u) => ({
+            id: String(u.id ?? ""),
+            displayName: String(u.displayName ?? ""),
+            avatarUrl: u.avatarUrl ?? null,
+          }))
+        );
+      })
+      .catch(() => setBoardTeamUsers([]));
   }, []);
 
   useEffect(() => {
-    if (boardDisplay === "tasks") void loadBoardSubtasks();
-  }, [boardDisplay, cards, loadBoardSubtasks]);
+    if (!addProjectOpen && !templatesManagerOpen) return;
+    void fetch(apiUrl("/api/board/project-templates"))
+      .then((r) => r.json())
+      .then((d: { templates?: { id: string; name: string; itemCount: number }[] }) => {
+        setProjectTemplates(Array.isArray(d.templates) ? d.templates : []);
+      })
+      .catch(() => setProjectTemplates([]));
+  }, [addProjectOpen, templatesManagerOpen]);
+
+  useEffect(() => {
+    if (loading) return;
+    void loadBoardSubtasks();
+  }, [loading, cards.length, loadBoardSubtasks]);
 
   async function submitNewProject(e: React.FormEvent) {
     e.preventDefault();
@@ -402,6 +417,8 @@ export default function BoardPage() {
           name: newName.trim(),
           deadline: newDeadline || null,
           status: newProjectStatus,
+          templateId: newProjectTemplateId.trim() || undefined,
+          createFinancialProject: true,
         }),
       });
       const data = await r.json().catch(() => ({}));
@@ -411,8 +428,9 @@ export default function BoardPage() {
       setNewName("");
       setNewDeadline("");
       setNewProjectStatus("not_started");
+      setNewProjectTemplateId("");
       setAddProjectOpen(false);
-      if (boardDisplay === "tasks") await loadBoardSubtasks();
+      await loadBoardSubtasks();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка");
     } finally {
@@ -431,7 +449,7 @@ export default function BoardPage() {
       const updated = await r.json();
       setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
       if (modalCard?.id === cardId) setModalCard(updated);
-      if (boardDisplay === "tasks") void loadBoardSubtasks();
+      void loadBoardSubtasks();
     } catch (e) {
       console.error(e);
     }
@@ -445,17 +463,6 @@ export default function BoardPage() {
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-  }
-
-  function handleDrop(e: React.DragEvent, newStatus: PmStatusKey) {
-    e.preventDefault();
-    try {
-      const raw = e.dataTransfer.getData("application/json");
-      if (!raw) return;
-      const { cardId } = JSON.parse(raw);
-      const card = cards.find((c) => c.id === cardId);
-      if (card && card.status !== newStatus) updateStatus(cardId, newStatus);
-    } catch (_) {}
   }
 
   function handleSimpleDrop(e: React.DragEvent, groupKey: (typeof SIMPLE_VIEW_GROUPS)[number]["key"]) {
@@ -496,7 +503,6 @@ export default function BoardPage() {
       [ex.explanations, ex.wishes].filter(Boolean).join("\n\n") ||
       "";
     setModalDescription(desc);
-    setNewSubtaskTitle("");
   }
 
   async function deleteCardOnly(cardId: string, e: React.MouseEvent) {
@@ -506,7 +512,7 @@ export default function BoardPage() {
       const r = await fetch(apiUrl(`/api/cards/${cardId}`), { method: "DELETE" });
       if (r.ok) {
         setCards((prev) => prev.filter((c) => c.id !== cardId));
-        if (boardDisplay === "tasks") void loadBoardSubtasks();
+        void loadBoardSubtasks();
       }
       if (modalCard?.id === cardId) {
         modalOpenIdRef.current = null;
@@ -517,58 +523,43 @@ export default function BoardPage() {
     }
   }
 
-  async function addModalSubtask(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!modalCard || !newSubtaskTitle.trim()) return;
+  async function createProjectTemplateFromDraft() {
+    const name = tplDraftName.trim();
+    if (!name) {
+      setError("Введите название шаблона");
+      return;
+    }
+    setError(null);
+    const items = tplDraftLines
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((title) => ({ title }));
     try {
-      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`), {
+      const r = await fetch(apiUrl("/api/board/project-templates"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newSubtaskTitle.trim(),
-          estimatedHours: null,
-          leadUserId: null,
-          assigneeUserId: null,
-        }),
+        body: JSON.stringify({ name, items }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "Ошибка");
-      setNewSubtaskTitle("");
-      const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
-      setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
-      await refreshBoardCard(modalCard.id);
-      if (boardDisplay === "tasks") void loadBoardSubtasks();
-    } catch (err) {
-      console.error(err);
+      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Не удалось сохранить шаблон");
+      setTplDraftName("");
+      setTplDraftLines("");
+      const tr = await fetch(apiUrl("/api/board/project-templates")).then((x) => x.json());
+      setProjectTemplates(Array.isArray(tr.templates) ? tr.templates : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка");
     }
   }
 
-  async function toggleModalSubtask(sub: PmSubtaskRow) {
-    if (!modalCard) return;
+  async function deleteProjectTemplateById(id: string) {
+    if (!confirm("Удалить шаблон?")) return;
     try {
-      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks/${sub.id}`), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: !sub.completed_at }),
-      });
+      const r = await fetch(apiUrl(`/api/board/project-templates/${encodeURIComponent(id)}`), { method: "DELETE" });
       if (!r.ok) return;
-      const list = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks`)).then((x) => x.json());
-      setModalSubtasks(Array.isArray(list.subtasks) ? list.subtasks : []);
-      await refreshBoardCard(modalCard.id);
-      if (boardDisplay === "tasks") void loadBoardSubtasks();
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  async function removeModalSubtask(subId: string) {
-    if (!modalCard || !confirm("Удалить подзадачу?")) return;
-    try {
-      const r = await fetch(apiUrl(`/api/cards/${modalCard.id}/subtasks/${subId}`), { method: "DELETE" });
-      if (!r.ok) return;
-      setModalSubtasks((prev) => prev.filter((s) => s.id !== subId));
-      await refreshBoardCard(modalCard.id);
-      if (boardDisplay === "tasks") void loadBoardSubtasks();
+      const tr = await fetch(apiUrl("/api/board/project-templates")).then((x) => x.json());
+      setProjectTemplates(Array.isArray(tr.templates) ? tr.templates : []);
+      setNewProjectTemplateId((cur) => (cur === id ? "" : cur));
     } catch (err) {
       console.error(err);
     }
@@ -580,14 +571,17 @@ export default function BoardPage() {
     );
   if (error) return <div className="p-6 text-sm font-medium text-[var(--danger)]">{error}</div>;
 
-  const byStatus = (status: PmStatusKey) => cardsMinusVirtual.filter((c) => c.status === status);
+  const setupCardExtra = setupProject
+    ? (cards.find((c) => c.id === setupProject.id)?.extra ?? setupProject.extra)
+    : null;
+
   const importanceOrder = (c: PmCard) => {
     const ex = parseExtra(c.extra);
     const o: Record<string, number> = { high: 0, medium: 1, low: 2 };
     return o[ex.importance ?? ""] ?? 3;
   };
   const bySimpleGroup = (groupKey: (typeof SIMPLE_VIEW_GROUPS)[number]["key"]) => {
-    const src = cardsForSimpleBoard;
+    const src = cardsForBoardView;
     let list: PmCard[];
     if (groupKey === "not_started") list = src.filter((c) => c.status === "not_started");
     else if (groupKey === "done") list = src.filter((c) => c.status === "done");
@@ -600,19 +594,6 @@ export default function BoardPage() {
     return [...list].sort((a, b) => importanceOrder(a) - importanceOrder(b));
   };
 
-  function subtasksForSimpleColumn(col: SimpleViewGroupKey): PmSubtaskWithCard[] {
-    const q = filterQuery.trim().toLowerCase();
-    return boardSubtasks.filter((s) => {
-      if (activeCardIdSet && !activeCardIdSet.has(s.card_id)) return false;
-      if (statusToSimpleViewGroup(s.card_status) !== col) return false;
-      if (!q) return true;
-      return (
-        s.title.toLowerCase().includes(q) ||
-        s.card_name.toLowerCase().includes(q)
-      );
-    });
-  }
-
   async function quickAddCardInColumn(columnKey: string, status: PmStatusKey) {
     const title = (quickCardTitle[columnKey] || "").trim();
     if (!title) return;
@@ -622,14 +603,14 @@ export default function BoardPage() {
       const r = await fetch(apiUrl("/api/cards"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: title, deadline: null, status }),
+        body: JSON.stringify({ name: title, deadline: null, status, createFinancialProject: true }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось создать");
       const card = data as PmCard;
       setCards((prev) => [card, ...prev]);
       setQuickCardTitle((prev) => ({ ...prev, [columnKey]: "" }));
-      if (boardDisplay === "tasks") await loadBoardSubtasks();
+      await loadBoardSubtasks();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка");
     } finally {
@@ -637,40 +618,11 @@ export default function BoardPage() {
     }
   }
 
-  async function quickAddSubtaskInColumn(columnKey: SimpleViewGroupKey, groupCards: PmCard[]) {
-    const title = (quickSubtaskTitle[columnKey] || "").trim();
-    const cardId = quickSubtaskCardId[columnKey] || groupCards[0]?.id;
-    if (!title || !cardId) return;
-    setQuickSubBusy(columnKey);
-    setError(null);
-    try {
-      const r = await fetch(apiUrl(`/api/cards/${cardId}/subtasks`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          estimatedHours: null,
-          leadUserId: null,
-          assigneeUserId: null,
-        }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось добавить подзадачу");
-      setQuickSubtaskTitle((prev) => ({ ...prev, [columnKey]: "" }));
-      await loadBoardSubtasks();
-      await refreshBoardCard(cardId);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка");
-    } finally {
-      setQuickSubBusy(null);
-    }
-  }
-
-  function renderCard(card: PmCard, showStageLabel: boolean) {
+  function renderCard(card: PmCard) {
     const extra = parseExtra(card.extra);
     const importanceOpt = IMPORTANCE_OPTIONS.find((o) => o.key === extra.importance);
     const assignees: string[] = extra.assignees ?? (extra.assignee ? [extra.assignee] : []);
-    const stageDeadline = (extra.stageDetails && extra.stageDetails[card.status]?.deadline) || card.deadline;
+    const ownerIds = Array.isArray(extra.ownerUserIds) ? extra.ownerUserIds : [];
     const projectDeadline = extra.projectDeadline || null;
     return (
       <div
@@ -688,45 +640,37 @@ export default function BoardPage() {
               </span>
             )}
             <div className="text-sm font-semibold leading-tight text-[var(--text)]">{card.name}</div>
-            {showStageLabel && (
-              <span className="mt-1.5 inline-block rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--muted-foreground)]">
-                {statusLabel(card.status)}
-              </span>
-            )}
-            {stageDeadline || projectDeadline ? (
-              <p className="mt-2 text-xs leading-relaxed text-[var(--muted-foreground)]">
-                {[
-                  stageDeadline ? `Этап · ${formatDate(stageDeadline)}` : null,
-                  projectDeadline ? `Проект · ${formatDate(projectDeadline)}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            ) : null}
-            {extra.derivedSubtaskProgress && extra.derivedSubtaskProgress.total > 0 ? (
-              <div className="mt-3 space-y-1">
-                <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
-                  <span>
-                    Подзадачи {extra.derivedSubtaskProgress.completed}/{extra.derivedSubtaskProgress.total}
-                    {extra.derivedSubtaskProgress.byHours ? " · по часам" : ""}
-                  </span>
-                  <span className="font-semibold tabular-nums text-[var(--primary)]">{extra.derivedSubtaskProgress.percent}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
-                  <div
-                    className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-300"
-                    style={{ width: `${extra.derivedSubtaskProgress.percent}%` }}
-                  />
-                </div>
-              </div>
+            {projectDeadline ? (
+              <p className="mt-2 text-xs leading-relaxed text-[var(--muted-foreground)]">Срок · {formatDate(projectDeadline)}</p>
             ) : null}
             <Link
               href={appPath(`/board/${card.id}`)}
               onClick={(e) => e.stopPropagation()}
               className="mt-2 inline-flex text-xs font-semibold text-[var(--primary)] hover:underline"
             >
-              Учёт времени и этапы
+              Страница проекта →
             </Link>
+            {ownerIds.length > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1" title="Ответственные за проект">
+                {ownerIds.slice(0, 8).map((uid) => {
+                  const u = boardTeamUsers.find((t) => t.id === uid);
+                  const initial = (u?.displayName || "?").trim().charAt(0).toUpperCase() || "?";
+                  return (
+                    <span
+                      key={uid}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--surface-2)] text-[10px] font-semibold text-[var(--text)] ring-1 ring-[var(--border)]"
+                      title={u?.displayName ?? uid}
+                    >
+                      {u?.avatarUrl ? (
+                        <img src={u.avatarUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        initial
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
             {assignees.length > 0 && (
               <div className="flex items-center gap-1 mt-2 flex-wrap">
                 {assignees.slice(0, 4).map((name, i) => {
@@ -752,6 +696,25 @@ export default function BoardPage() {
           <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSetupProject({ id: card.id, name: card.name, extra: card.extra ?? null });
+              }}
+              className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              title="Настройка этапов и подзадач"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+            <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); openModal(card); }}
               className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
               title="Открыть карточку"
@@ -770,48 +733,18 @@ export default function BoardPage() {
         </div>
         <select
           className="tt-select mt-3 w-full !border-transparent bg-[var(--surface-2)]/55 py-2 text-xs dark:bg-[var(--surface-2)]/35"
-          value={card.status}
-          onChange={(e) => updateStatus(card.id, e.target.value as PmStatusKey)}
+          value={statusToSimpleViewGroup(card.status)}
+          onChange={(e) =>
+            void updateStatus(card.id, defaultStatusForSimpleViewGroup(e.target.value as SimpleViewGroupKey))
+          }
           onClick={(e) => e.stopPropagation()}
         >
-          {PM_STATUSES.map((s) => (
-            <option key={s.key} value={s.key}>{s.label}</option>
+          {SIMPLE_VIEW_GROUPS.map((g) => (
+            <option key={g.key} value={g.key}>
+              {g.label}
+            </option>
           ))}
         </select>
-      </div>
-    );
-  }
-
-  function simpleScopeLabel(card: PmCard): string {
-    const g = statusToSimpleViewGroup(card.status);
-    if (g === "in_progress") return "В работе";
-    if (g === "awaiting_approval") return "На согласовании";
-    if (g === "done") return "Завершён";
-    if (g === "not_started") return "Не начат";
-    if (g === "pause") return "Пауза";
-    return g;
-  }
-
-  function renderBoardSubtaskRow(s: PmSubtaskWithCard) {
-    const parent = cards.find((c) => c.id === s.card_id);
-    return (
-      <div
-        key={s.id}
-        role="button"
-        tabIndex={0}
-        onClick={() => {
-          if (parent) openModal(parent);
-        }}
-        onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && parent) {
-            e.preventDefault();
-            openModal(parent);
-          }
-        }}
-        className="cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left shadow-sm transition-colors hover:border-[var(--primary)]/35 hover:bg-[var(--surface-2)]/50"
-      >
-        <div className="text-sm font-medium leading-snug text-[var(--text)]">{s.title}</div>
-        <div className="mt-1 truncate text-xs text-[var(--muted-foreground)]">{s.card_name}</div>
       </div>
     );
   }
@@ -823,88 +756,37 @@ export default function BoardPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] md:text-3xl">Проекты</h1>
             <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              {boardDisplay === "list"
-                ? "Список крупных карточек: этапы и подзадачи внутри. По умолчанию — только активные и на согласовании."
-                : boardDisplay === "tasks"
-                  ? "Подзадачи по колонкам статуса проекта. Клик — карточка проекта."
-                  : boardDisplay === "projects"
-                    ? "Канбан по сводным колонкам. Перетаскивайте карточки."
-                    : "Все этапы отдельными колонками. Перетаскивайте карточки."}{" "}
-              Показано{" "}
-              <span className="font-semibold text-[var(--text)]">
-                {boardDisplay === "tasks"
-                  ? boardSubtasks.length
-                  : boardDisplay === "list" || boardDisplay === "projects"
-                    ? cardsForSimpleBoard.length
-                    : cardsMinusVirtual.length}
-              </span>
-              {boardDisplay !== "tasks" && filterQuery.trim() ? (
+              Канбан по сводным колонкам: перетаскивайте карточки или меняйте колонку внизу карточки. Подзадачи и календарь — в
+              разделе «Задачи». Показано{" "}
+              <span className="font-semibold text-[var(--text)]">{cardsForBoardView.length}</span>
+              {filterQuery.trim() ? (
                 <span className="text-[var(--muted-foreground)]"> из {cards.length}</span>
               ) : null}
+              .
             </p>
-            <Link
-              href={appPath("/board/time-analytics")}
-              className="mt-2 inline-flex text-sm font-semibold text-[var(--primary)] hover:underline"
-            >
-              Отчёты по времени →
-            </Link>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              <Link
+                href={appPath("/tasks")}
+                className="inline-flex text-sm font-semibold text-[var(--primary)] hover:underline"
+              >
+                Задачи →
+              </Link>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="search"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder={boardDisplay === "tasks" ? "Поиск задачи или проекта…" : "Поиск по названию…"}
+              placeholder="Поиск по названию…"
               className="tt-input w-full text-sm sm:w-56"
             />
-            <span className="hidden text-sm text-[var(--muted-foreground)] sm:inline">Вид:</span>
             <button
               type="button"
-              onClick={() => setBoardDisplay("list")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                boardDisplay === "list"
-                  ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
-                  : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
-              }`}
-              title="Список проектов с раскрытием"
+              onClick={() => setTemplatesManagerOpen(true)}
+              className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
             >
-              Список
-            </button>
-            <button
-              type="button"
-              onClick={() => setBoardDisplay("projects")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                boardDisplay === "projects"
-                  ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
-                  : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
-              }`}
-              title="Карточки проектов по сводным колонкам канбана"
-            >
-              Канбан
-            </button>
-            <button
-              type="button"
-              onClick={() => setBoardDisplay("tasks")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                boardDisplay === "tasks"
-                  ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
-                  : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
-              }`}
-              title="Открытые подзадачи по колонкам статуса родительского проекта"
-            >
-              Задачи
-            </button>
-            <button
-              type="button"
-              onClick={() => setBoardDisplay("stages")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                boardDisplay === "stages"
-                  ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
-                  : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
-              }`}
-              title="Все этапы отдельными колонками"
-            >
-              Этапы
+              Шаблоны
             </button>
             <button
               type="button"
@@ -963,28 +845,47 @@ export default function BoardPage() {
                 />
               </div>
               <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">
+                  Шаблон подзадач (необязательно)
+                </label>
+                <select
+                  className="tt-select w-full text-sm"
+                  value={newProjectTemplateId}
+                  onChange={(e) => setNewProjectTemplateId(e.target.value)}
+                >
+                  <option value="">Без шаблона</option>
+                  {projectTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                      {t.itemCount > 0 ? ` (${t.itemCount})` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="mt-2 text-xs font-semibold text-[var(--primary)] hover:underline"
+                  onClick={() => {
+                    setTemplatesManagerOpen(true);
+                  }}
+                >
+                  Управление шаблонами…
+                </button>
+              </div>
+              <div>
                 <label className="mb-1.5 block text-xs font-medium text-[var(--muted-foreground)]">Стартовая колонка</label>
                 <select
                   className="tt-select w-full text-sm"
                   value={newProjectStatus}
                   onChange={(e) => setNewProjectStatus(e.target.value as PmStatusKey)}
                 >
-                  {boardDisplay === "stages"
-                    ? PM_STATUSES.map((s) => (
-                        <option key={s.key} value={s.key}>
-                          {s.label}
-                        </option>
-                      ))
-                    : SIMPLE_VIEW_GROUPS.map((g) => (
-                        <option key={g.key} value={defaultStatusForSimpleViewGroup(g.key)}>
-                          {g.label}
-                        </option>
-                      ))}
+                  {SIMPLE_VIEW_GROUPS.map((g) => (
+                    <option key={g.key} value={defaultStatusForSimpleViewGroup(g.key)}>
+                      {g.label}
+                    </option>
+                  ))}
                 </select>
                 <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
-                  {boardDisplay === "stages"
-                    ? "Точный этап канбана."
-                    : "Колонка «Проекты» / «Задачи»: выберите сводную колонку — карточка получит подходящий статус."}
+                  Сводная колонка канбана «Проекты» — карточка получит подходящий внутренний статус.
                 </p>
               </div>
               <div className="flex flex-wrap justify-end gap-2 pt-2">
@@ -1008,12 +909,12 @@ export default function BoardPage() {
         </div>
       ) : null}
 
-      {(boardDisplay === "list" || boardDisplay === "projects") && (
-        <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Фильтр:</span>
           <button
             type="button"
             onClick={() => setProjectScopeTab("active")}
+            title="Включает проекты «Не начат», «В работе» и «На согласовании»"
             className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
               projectScopeTab === "active"
                 ? "bg-[var(--primary)] text-white shadow-sm"
@@ -1024,188 +925,47 @@ export default function BoardPage() {
           </button>
           <button
             type="button"
-            onClick={() => setProjectScopeTab("full")}
+            onClick={() => setProjectScopeTab("pause")}
             className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
-              projectScopeTab === "full"
+              projectScopeTab === "pause"
                 ? "bg-[var(--primary)] text-white shadow-sm"
                 : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
             }`}
           >
-            Все проекты
+            На паузе
           </button>
+          <button
+            type="button"
+            onClick={() => setProjectScopeTab("done")}
+            className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
+              projectScopeTab === "done"
+                ? "bg-[var(--primary)] text-white shadow-sm"
+                : "border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+            }`}
+          >
+            Завершённые
+          </button>
+          <span className="mx-1 hidden h-4 w-px bg-[var(--border)] sm:inline" aria-hidden />
+          <span className="w-full text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] sm:w-auto">
+            Ответственный
+          </span>
+          <select
+            className="tt-select max-w-full py-1.5 text-xs sm:max-w-[14rem]"
+            value={filterResponsibleUserId}
+            onChange={(e) => setFilterResponsibleUserId(e.target.value)}
+          >
+            <option value="">Все</option>
+            {boardTeamUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.displayName}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
 
-      {boardDisplay === "list" && (
-        <div className="mx-auto w-full max-w-none space-y-4 pb-10">
-          {cardsForSimpleBoard.length === 0 ? (
-            <p className="text-sm text-[var(--muted-foreground)]">Нет проектов в этом фильтре.</p>
-          ) : (
-            cardsForSimpleBoard.map((card) => {
-              const ex = parseExtra(card.extra);
-              const open = Boolean(expandedProjectIds[card.id]);
-              const prog = ex.derivedSubtaskProgress;
-              return (
-                <div
-                  key={card.id}
-                  className={`overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] pl-0 shadow-[var(--shadow-kanban-card)] ${cardStatusLeftAccent(card)}`}
-                >
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    className="flex w-full cursor-pointer items-start gap-3 p-4 text-left transition-colors hover:bg-[var(--surface-2)]/40"
-                    onClick={() =>
-                      setExpandedProjectIds((prev) => ({
-                        ...prev,
-                        [card.id]: !prev[card.id],
-                      }))
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setExpandedProjectIds((prev) => ({
-                          ...prev,
-                          [card.id]: !prev[card.id],
-                        }));
-                      }
-                    }}
-                  >
-                    <span className="mt-1 shrink-0 text-[var(--muted-foreground)]" aria-hidden>
-                      {open ? "▼" : "▶"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-lg font-semibold leading-snug text-[var(--text)]">{card.name}</span>
-                        <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--muted-foreground)]">
-                          {simpleScopeLabel(card)}
-                        </span>
-                        <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text)] ring-1 ring-[var(--border)]">
-                          {simpleScopeLabel(card)}
-                        </span>
-                      </div>
-                      {prog && prog.total > 0 ? (
-                        <div className="mt-3 space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-[var(--muted-foreground)]">
-                            <span>
-                              Подзадачи {prog.completed}/{prog.total}
-                              {prog.byHours ? " · по часам" : ""}
-                            </span>
-                            <span className="font-semibold tabular-nums text-[var(--primary)]">{prog.percent}%</span>
-                          </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
-                            <div
-                              className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-300"
-                              style={{ width: `${prog.percent}%` }}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-xs text-[var(--muted-foreground)]">Добавьте подзадачи — появится прогресс.</p>
-                      )}
-                    </div>
-                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <select
-                        className="tt-select max-w-[11rem] py-2 text-xs"
-                        value={statusToSimpleViewGroup(card.status)}
-                        onChange={(e) =>
-                          void updateStatus(card.id, defaultStatusForSimpleViewGroup(e.target.value as SimpleViewGroupKey))
-                        }
-                      >
-                        {SIMPLE_VIEW_GROUPS.map((g) => (
-                          <option key={g.key} value={g.key}>
-                            {g.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div
-                    className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--border)]/60 bg-[var(--bg)]/25 px-4 py-2.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Link
-                      href={appPath(`/board/${card.id}`)}
-                      className="text-xs font-semibold text-[var(--primary)] hover:underline"
-                    >
-                      Страница проекта →
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => openModal(card)}
-                      className="text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--text)] hover:underline"
-                    >
-                      Описание и подзадачи
-                    </button>
-                  </div>
-                  {open ? (
-                    <div className="border-t border-[var(--border)] px-4 py-4">
-                      <ProjectSubtasksPanel cardId={card.id} onChanged={() => void refreshBoardCard(card.id)} />
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {boardDisplay === "stages" && (
-        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
-          {PM_STATUSES.map(({ key }) => (
-            <div
-              key={key}
-              className="w-[min(100vw-2rem,20rem)] shrink-0 snap-start overflow-hidden rounded-2xl bg-[var(--surface)]/90 shadow-[var(--shadow-kanban-column)] ring-1 ring-[var(--border)]/20 dark:bg-[var(--surface)]/55 dark:ring-0"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, key)}
-            >
-              <div className="sticky top-0 z-10 flex min-h-[3.25rem] flex-wrap items-center gap-2 border-b border-[var(--border)]/45 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] dark:border-white/[0.06]">
-                <span className="text-[var(--text)] normal-case tracking-normal">{statusLabel(key)}</span>
-                <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--muted-foreground)] normal-case tracking-normal dark:bg-white/[0.06]">
-                  {byStatus(key).length}
-                </span>
-              </div>
-              <div className="min-h-[min(70vh,560px)] space-y-3 bg-[var(--bg)]/35 p-3 dark:bg-black/10">
-                {byStatus(key).map((card) => renderCard(card, false))}
-                <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)]/50 p-2 dark:bg-[var(--surface)]/30">
-                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                    Быстро в колонку
-                  </div>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="text"
-                      value={quickCardTitle[key] ?? ""}
-                      onChange={(e) => setQuickCardTitle((prev) => ({ ...prev, [key]: e.target.value }))}
-                      placeholder="Название карточки"
-                      className="tt-input min-w-0 flex-1 py-1.5 text-xs"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void quickAddCardInColumn(key, key);
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      disabled={!!quickCardBusy || !(quickCardTitle[key] || "").trim()}
-                      onClick={() => void quickAddCardInColumn(key, key)}
-                      className="shrink-0 rounded-lg bg-[var(--primary)] px-2 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40"
-                    >
-                      {quickCardBusy === key ? "…" : "+"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(boardDisplay === "projects" || boardDisplay === "tasks") && (
-        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6">
           {SIMPLE_VIEW_GROUPS.map(({ key, label }) => {
             const groupCards = bySimpleGroup(key);
-            const subtasksCol = subtasksForSimpleColumn(key);
-            const showStageLabel = key === "in_progress" || key === "awaiting_approval";
             const colTint = "bg-[var(--surface)]/90 dark:bg-[var(--surface)]/50";
             const defaultStatus = defaultStatusForSimpleViewGroup(key);
             return (
@@ -1223,104 +983,44 @@ export default function BoardPage() {
                     </span>
                   ) : null}
                   <span className="ml-auto rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--muted-foreground)] normal-case tracking-normal dark:bg-white/[0.06]">
-                    {boardDisplay === "tasks" ? subtasksCol.length : groupCards.length}
+                    {groupCards.length}
                   </span>
                 </div>
                 <div className="flex min-h-[min(70vh,560px)] flex-col gap-3 bg-[var(--bg)]/30 p-3 dark:bg-black/10">
-                  <div className="min-h-0 flex-1 space-y-3">
-                    {boardDisplay === "tasks" ? (
-                      subtasksCol.length === 0 ? (
-                        <p className="px-1 text-xs text-[var(--muted-foreground)]">Нет открытых подзадач</p>
-                      ) : (
-                        subtasksCol.map((s) => renderBoardSubtaskRow(s))
-                      )
-                    ) : (
-                      groupCards.map((card) => renderCard(card, showStageLabel))
-                    )}
-                  </div>
+                  <div className="min-h-0 flex-1 space-y-3">{groupCards.map((card) => renderCard(card))}</div>
                   <div className="mt-auto shrink-0 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)]/60 p-2 dark:bg-[var(--surface)]/35">
                     <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                      {boardDisplay === "tasks" ? "Подзадача" : "Новая карточка"}
+                      Новая карточка
                     </div>
-                    {boardDisplay === "tasks" ? (
-                      groupCards.length === 0 ? (
-                        <p className="text-[11px] leading-snug text-[var(--muted-foreground)]">
-                          Добавьте проект в эту колонку или через «Добавить проект», затем можно вешать подзадачи.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          <select
-                            className="tt-select w-full py-1.5 text-xs"
-                            value={quickSubtaskCardId[key] || groupCards[0]?.id || ""}
-                            onChange={(e) =>
-                              setQuickSubtaskCardId((prev) => ({ ...prev, [key]: e.target.value }))
-                            }
-                          >
-                            {groupCards.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="flex gap-1.5">
-                            <input
-                              type="text"
-                              value={quickSubtaskTitle[key] ?? ""}
-                              onChange={(e) =>
-                                setQuickSubtaskTitle((prev) => ({ ...prev, [key]: e.target.value }))
-                              }
-                              placeholder="Текст подзадачи"
-                              className="tt-input min-w-0 flex-1 py-1.5 text-xs"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  void quickAddSubtaskInColumn(key, groupCards);
-                                }
-                              }}
-                            />
-                            <button
-                              type="button"
-                              disabled={!!quickSubBusy || !(quickSubtaskTitle[key] || "").trim()}
-                              onClick={() => void quickAddSubtaskInColumn(key, groupCards)}
-                              className="shrink-0 rounded-lg bg-[var(--primary)] px-2 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40"
-                            >
-                              {quickSubBusy === key ? "…" : "+"}
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    ) : (
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          value={quickCardTitle[key] ?? ""}
-                          onChange={(e) => setQuickCardTitle((prev) => ({ ...prev, [key]: e.target.value }))}
-                          placeholder="Название"
-                          className="tt-input min-w-0 flex-1 py-1.5 text-xs"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              void quickAddCardInColumn(key, defaultStatus);
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          disabled={!!quickCardBusy || !(quickCardTitle[key] || "").trim()}
-                          onClick={() => void quickAddCardInColumn(key, defaultStatus)}
-                          className="shrink-0 rounded-lg bg-[var(--primary)] px-2 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40"
-                        >
-                          {quickCardBusy === key ? "…" : "+"}
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={quickCardTitle[key] ?? ""}
+                        onChange={(e) => setQuickCardTitle((prev) => ({ ...prev, [key]: e.target.value }))}
+                        placeholder="Название"
+                        className="tt-input min-w-0 flex-1 py-1.5 text-xs"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void quickAddCardInColumn(key, defaultStatus);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={!!quickCardBusy || !(quickCardTitle[key] || "").trim()}
+                        onClick={() => void quickAddCardInColumn(key, defaultStatus)}
+                        className="shrink-0 rounded-lg bg-[var(--primary)] px-2 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40"
+                      >
+                        {quickCardBusy === key ? "…" : "+"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
 
       {modalCard && (
         <div
@@ -1367,45 +1067,21 @@ export default function BoardPage() {
                 {savingDoc ? <span className="text-[var(--muted-foreground)]">Сохранение…</span> : null}
               </div>
               <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/40 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)] mb-2">
-                  Время и этапы
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                  Учёт времени
                 </div>
                 {modalPhaseInsightLoading ? (
                   <p className="text-sm text-[var(--muted-foreground)]">Загрузка…</p>
                 ) : modalPhaseInsight ? (
                   <div className="space-y-2 text-sm">
                     <p className="text-[var(--text)]">
-                      <span className="tabular-nums font-semibold">
+                      <span className="font-semibold tabular-nums">
                         {formatPhaseDuration(modalPhaseInsight.projectTotalSeconds)}
-                      </span>
-                      {" · "}
-                      этапов: {modalPhaseInsight.phases.length}
+                      </span>{" "}
+                      учтённого времени по проекту
                     </p>
-                    {modalPhaseInsight.phases.length > 0 ? (
-                      <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                        {modalPhaseInsight.phases
-                          .slice(0, 4)
-                          .map((p) => p.title)
-                          .join(" · ")}
-                        {modalPhaseInsight.phases.length > 4 ? "…" : ""}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-amber-800">
-                        Этапов пока нет — добавьте на странице учёта времени.
-                      </p>
-                    )}
-                    {modalPhaseInsight.topMatrixRows.length > 0 ? (
-                      <ul className="mt-2 space-y-1 border-t border-[var(--border)] pt-2 text-xs">
-                        {modalPhaseInsight.topMatrixRows.map((row) => (
-                          <li key={row.phaseTitle} className="flex justify-between gap-2 tabular-nums">
-                            <span className="truncate text-[var(--muted-foreground)]">{row.phaseTitle}</span>
-                            <span className="shrink-0 text-[var(--text)]">{row.phaseHours} ч</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
                     {modalPhaseInsight.economics ? (
-                      <div className="mt-2 space-y-0.5 border-t border-[var(--border)] pt-2 text-xs">
+                      <div className="space-y-0.5 border-t border-[var(--border)] pt-2 text-xs">
                         <div className="flex justify-between gap-2 tabular-nums">
                           <span className="text-[var(--muted-foreground)]">Оплачено</span>
                           <span className="font-medium text-emerald-700">
@@ -1427,7 +1103,7 @@ export default function BoardPage() {
                       className="inline-block pt-2 text-xs font-semibold text-[var(--primary)] hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      Полный учёт времени и окупаемость →
+                      Страница проекта и таймер →
                     </Link>
                   </div>
                 ) : (
@@ -1442,83 +1118,139 @@ export default function BoardPage() {
                 className="mt-6 w-full min-w-0 resize-y border-0 bg-transparent text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-0"
               />
               <div className="mt-10 border-t border-[var(--border)] pt-6">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Подзадачи</div>
-                <div className="space-y-2">
-                  {modalSubtasks.length === 0 ? (
-                    <p className="text-sm text-[var(--muted-foreground)]">Пока нет подзадач</p>
-                  ) : null}
-                  {modalSubtasks.map((sub) => (
-                    <div
-                      key={sub.id}
-                      className="group flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/35 px-3 py-2.5 transition-colors hover:border-[var(--primary)]/25 hover:bg-[var(--surface-2)]/60"
-                    >
-                      <button
-                        type="button"
-                        role="checkbox"
-                        aria-checked={Boolean(sub.completed_at)}
-                        onClick={() => void toggleModalSubtask(sub)}
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] font-bold transition-colors ${
-                          sub.completed_at
-                            ? "border-[var(--primary)] bg-[var(--primary)] text-white"
-                            : "border-[var(--border)] bg-[var(--surface)] text-transparent hover:border-[var(--primary)]/50"
-                        }`}
-                      >
-                        ✓
-                      </button>
-                      <span
-                        className={`min-w-0 flex-1 text-sm leading-snug ${
-                          sub.completed_at ? "text-[var(--muted-foreground)] line-through" : "text-[var(--text)]"
-                        }`}
-                      >
-                        {sub.title}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => void removeModalSubtask(sub.id)}
-                        className="shrink-0 rounded p-1 text-[var(--muted-foreground)] opacity-0 transition-opacity hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] group-hover:opacity-100"
-                        aria-label="Удалить подзадачу"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                  Задачи по проекту
                 </div>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <input
-                    type="text"
-                    value={newSubtaskTitle}
-                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void addModalSubtask();
-                      }
-                    }}
-                    placeholder="Новая подзадача…"
-                    className="tt-input min-w-0 flex-1 text-sm"
-                  />
+                <p className="text-sm leading-relaxed text-[var(--muted-foreground)]">
+                  Список подзадач и календарь загрузки — в разделе «Задачи». Шаблон старта, ответственные и карточка проекта — в
+                  настройке.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href={appPath("/tasks")}
+                    className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface-2)]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Задачи →
+                  </Link>
                   <button
                     type="button"
-                    onClick={() => void addModalSubtask()}
-                    className="shrink-0 rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[var(--primary)]/25 hover:brightness-110"
+                    onClick={() =>
+                      modalCard &&
+                      setSetupProject({
+                        id: modalCard.id,
+                        name: modalCard.name,
+                        extra: modalCard.extra ?? null,
+                      })
+                    }
+                    className="rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-[var(--primary)]/25 hover:brightness-110"
                   >
-                    Добавить
+                    Настройка проекта
                   </button>
                 </div>
-              </div>
-              <div className="mt-8 border-t border-[var(--border)] pt-5">
-                <Link
-                  href={appPath(`/board/${modalCard.id}`)}
-                  className="text-sm font-medium text-[var(--primary)] hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Время и этапы →
-                </Link>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {setupProject ? (
+        <ProjectSetupModal
+          open
+          cardId={setupProject.id}
+          cardName={setupProject.name}
+          cardExtra={setupCardExtra}
+          onClose={() => setSetupProject(null)}
+          onChanged={() => {
+            void refreshBoardCard(setupProject.id);
+            void loadBoardSubtasks();
+          }}
+        />
+      ) : null}
+
+      {templatesManagerOpen ? (
+        <div
+          className="fixed inset-0 z-[56] flex items-center justify-center bg-black/45 px-3 py-8"
+          role="presentation"
+          onClick={() => setTemplatesManagerOpen(false)}
+        >
+          <div
+            className="max-h-[min(90vh,640px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-elevated)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-2">
+              <h2 className="text-lg font-semibold text-[var(--text)]">Шаблоны проектов</h2>
+              <button
+                type="button"
+                className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]"
+                onClick={() => setTemplatesManagerOpen(false)}
+                aria-label="Закрыть"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              При создании проекта можно выбрать шаблон — подзадачи появятся автоматически.
+            </p>
+            <ul className="mt-4 space-y-2 border-t border-[var(--border)] pt-4">
+              {projectTemplates.length === 0 ? (
+                <li className="text-sm text-[var(--muted-foreground)]">Пока нет шаблонов.</li>
+              ) : (
+                projectTemplates.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)]/30 px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium text-[var(--text)]">
+                      {t.name}
+                      <span className="ml-2 text-xs font-normal text-[var(--muted-foreground)]">
+                        {t.itemCount} подзадач{t.itemCount === 1 ? "а" : ""}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void deleteProjectTemplateById(t.id)}
+                      className="shrink-0 text-xs font-semibold text-[var(--danger)] hover:underline"
+                    >
+                      Удалить
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+            <div className="mt-6 space-y-3 border-t border-[var(--border)] pt-5">
+              <h3 className="text-sm font-semibold text-[var(--text)]">Новый шаблон</h3>
+              <label className="block text-xs font-medium text-[var(--muted-foreground)]">
+                Название шаблона
+                <input
+                  type="text"
+                  value={tplDraftName}
+                  onChange={(e) => setTplDraftName(e.target.value)}
+                  className="tt-input mt-1 w-full text-sm"
+                  placeholder="Например: Сайт под ключ"
+                />
+              </label>
+              <label className="block text-xs font-medium text-[var(--muted-foreground)]">
+                Подзадачи (по одной строке)
+                <textarea
+                  value={tplDraftLines}
+                  onChange={(e) => setTplDraftLines(e.target.value)}
+                  rows={6}
+                  className="tt-input mt-1 w-full resize-y text-sm"
+                  placeholder={"Макет главной\nВёрстка\nПодключение форм"}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void createProjectTemplateFromDraft()}
+                className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110"
+              >
+                Сохранить шаблон
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

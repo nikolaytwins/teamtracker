@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
-import { canAccessAgencyRoutes, sessionRole, type TtUserRole } from "@/lib/roles";
+import { canAccessAgencyRoutes, canAccessPmBoard, sessionRole, type TtUserRole } from "@/lib/roles";
 import type { SessionPayload } from "@/lib/session-token";
 import { getUserById } from "@/lib/tt-auth-db";
 
@@ -37,6 +37,17 @@ export async function requireAgencyAccess(): Promise<
     return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { ok: true, session: r.session };
+}
+
+export async function requirePmBoardAccess(): Promise<
+  { ok: true; session: SessionPayload; role: TtUserRole } | { ok: false; response: NextResponse }
+> {
+  const r = await requireSessionRole();
+  if (!r.ok) return r;
+  if (!canAccessPmBoard(r.role)) {
+    return { ok: false, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+  return { ok: true, session: r.session, role: r.role };
 }
 
 export function isSessionAgencyAdmin(session: SessionPayload): boolean {

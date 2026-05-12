@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
+import { effectiveUserRole, requirePmBoardAccess } from "@/lib/require-role";
 import { isMemberRestrictedRole } from "@/lib/roles";
-import { effectiveUserRole } from "@/lib/require-role";
-import { deleteSubtask, getSubtask, serializeExecutionDates, updateSubtask } from "@/lib/pm-subtasks";
-import { notifySubtaskAssigneesChanged } from "@/lib/subtask-notifications";
+import { deleteSubtask, serializeExecutionDates, updateSubtask } from "@/lib/pm-subtasks";
 
 type Params = { params: Promise<{ id: string; subtaskId: string }> };
 
@@ -38,10 +37,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       updates.executionDatesJson = serializeExecutionDates(dates);
     }
     if (typeof body.sortOrder === "number") updates.sortOrder = body.sortOrder;
-    const prev = getSubtask(cardId, sid);
     const sub = updateSubtask(cardId, sid, updates);
     if (!sub) return NextResponse.json({ error: "Не найдено" }, { status: 404 });
-    if (prev) notifySubtaskAssigneesChanged({ actorUserId: session.sub, cardId, prev, next: sub });
     return NextResponse.json({ subtask: sub });
   } catch (e) {
     console.error("PATCH subtask", e);
@@ -51,11 +48,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
-    const session = await getServerSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (isMemberRestrictedRole(effectiveUserRole(session))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const auth = await requirePmBoardAccess();
+    if (!auth.ok) return auth.response;
     const { id, subtaskId } = await params;
     const cardId = typeof id === "string" ? id.trim() : "";
     const sid = typeof subtaskId === "string" ? subtaskId.trim() : "";

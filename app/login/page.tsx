@@ -58,7 +58,7 @@ function LoginForm() {
           return;
         }
         const redir = safeRedirectPath(searchParams.get("redirect"));
-        const target = appPath(redir ?? "/me");
+        const target = appPath(redir ?? "/home");
         window.location.assign(target);
         return;
       }
@@ -75,7 +75,7 @@ function LoginForm() {
         return;
       }
       const redir = safeRedirectPath(searchParams.get("redirect"));
-      const target = appPath(redir ?? "/me");
+      const target = appPath(redir ?? "/home");
       window.location.assign(target);
     } catch {
       setError("Сеть недоступна");

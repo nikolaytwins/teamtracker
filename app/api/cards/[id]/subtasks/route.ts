@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "@/lib/get-session";
-import { isMemberRestrictedRole } from "@/lib/roles";
-import { effectiveUserRole } from "@/lib/require-role";
 import { getActiveEntry, sumTrackedSecondsForSubtask } from "@/lib/pm-phases";
 import {
   createSubtask,
@@ -9,17 +6,14 @@ import {
   parseExecutionDatesFromJson,
   serializeExecutionDates,
 } from "@/lib/pm-subtasks";
-import { notifySubtaskCreated } from "@/lib/subtask-notifications";
+import { requirePmBoardAccess } from "@/lib/require-role";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
-    const session = await getServerSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (isMemberRestrictedRole(effectiveUserRole(session))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const auth = await requirePmBoardAccess();
+    if (!auth.ok) return auth.response;
     const { id } = await params;
     const cardId = typeof id === "string" ? id.trim() : "";
     if (!cardId) return NextResponse.json({ error: "id required" }, { status: 400 });
@@ -40,11 +34,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const session = await getServerSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (isMemberRestrictedRole(effectiveUserRole(session))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const auth = await requirePmBoardAccess();
+    if (!auth.ok) return auth.response;
+    const session = auth.session;
     const { id } = await params;
     const cardId = typeof id === "string" ? id.trim() : "";
     if (!cardId) return NextResponse.json({ error: "id required" }, { status: 400 });
@@ -67,7 +59,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       executionDatesJson: executionDates ? serializeExecutionDates(executionDates) : null,
     });
     if (!sub) return NextResponse.json({ error: "Не удалось создать" }, { status: 400 });
-    notifySubtaskCreated({ actorUserId: session.sub, cardId, subtask: sub });
     return NextResponse.json({ subtask: sub });
   } catch (e) {
     console.error("POST subtasks", e);

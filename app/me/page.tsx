@@ -21,6 +21,7 @@ import {
   type MeSubtaskBucket,
 } from "@/lib/me-subtask-buckets";
 import { parseExecutionDatesFromJson } from "@/lib/pm-subtasks-shared";
+import { canAccessAgencyRoutes, canAccessPmBoard, normalizeTtUserRole } from "@/lib/roles";
 import { statusLabel, type PmStatusKey } from "@/lib/statuses";
 import { MeMonthlyBucketsChart, MeMonthlyByDayChart } from "@/components/me/me-monthly-charts";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,9 @@ export default function MePage() {
   const [pwNew2, setPwNew2] = useState("");
   const [pwBusy, setPwBusy] = useState(false);
   const isMemberUser = user?.role === "member";
+  const meRole = normalizeTtUserRole(user?.role);
+  const showAdminDashboard = canAccessAgencyRoutes(meRole);
+  const canPmBoard = canAccessPmBoard(meRole);
   const [cards, setCards] = useState<PmCard[]>([]);
   const [cardId, setCardId] = useState("");
   const [taskChoice, setTaskChoice] = useState<string>("design_concept");
@@ -602,27 +606,32 @@ export default function MePage() {
             <Button type="button" variant="ghost" size="sm" onClick={() => void logout()} className="!px-0 text-[var(--primary)]">
               Выйти
             </Button>
-            {!isMemberUser ? (
-              <>
-                <Link
-                  href={appPath("/board")}
-                  className="inline-flex h-8 items-center rounded-lg px-3 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]"
-                >
-                  Канбан
-                </Link>
-                <Link
-                  href={appPath("/board/time-analytics")}
-                  className="inline-flex h-8 items-center rounded-lg px-3 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]"
-                >
-                  Аналитика времени
-                </Link>
-              </>
+            {canPmBoard ? (
+              <Link
+                href={appPath("/board")}
+                className="inline-flex h-8 items-center rounded-lg px-3 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]"
+              >
+                Канбан
+              </Link>
+            ) : null}
+            {showAdminDashboard ? (
+              <Link
+                href={appPath("/admin/dashboard")}
+                className="inline-flex h-8 items-center rounded-lg px-3 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]"
+              >
+                Дашборд
+              </Link>
             ) : null}
           </div>
           {isMemberUser ? (
             <p className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-sm text-[var(--text)]">
-              У вас пока нет доступа к командной доске и админским разделам. После выдачи роли администратором появятся
-              канбан, календарь и аналитика команды.
+              У вас пока нет доступа к командной доске и админскому дашборду. После выдачи роли администратором появятся канбан,
+              календарь и дашборд.
+            </p>
+          ) : !canPmBoard ? (
+            <p className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-sm text-[var(--text)]">
+              Раздел «Проекты» и канбан доступны администратору и ПМ. Дашборд по команде и времени — только администратору. Личный
+              таймер и назначенные вам подзадачи остаются на этой странице.
             </p>
           ) : null}
         </div>
@@ -781,7 +790,7 @@ export default function MePage() {
                   {projectType === "site" ? "сайт" : projectType === "presentation" ? "презентация" : "другое"}
                 </p>
               ) : null}
-              {!isMemberUser ? (
+              {canPmBoard ? (
                 <form onSubmit={(e) => void quickCreateProject(e)} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch">
                   <Input
                     type="text"
@@ -855,10 +864,12 @@ export default function MePage() {
             <CardDescription className="mt-1">
               {isMemberUser
                 ? "Доступ к командным задачам по роли."
-                : "Мини-канбан по плановым датам подзадач (поля «план» в карточке на канбане). Сегодня — срок сегодня или просрочка; неделя — текущая ISO-неделя; бэклог — без дат или позже."}
+                : canPmBoard
+                  ? "Мини-канбан по плановым датам подзадач (поля «план» в карточке на канбане). Сегодня — срок сегодня или просрочка; неделя — текущая ISO-неделя; бэклог — без дат или позже."
+                  : "Мини-канбан по плановым датам подзадач (поля «план» в карточке проекта). Сегодня — срок сегодня или просрочка; неделя — текущая ISO-неделя; бэклог — без дат или позже."}
             </CardDescription>
           </div>
-          {!isMemberUser ? (
+          {canPmBoard ? (
             <Link href={appPath("/board")} className="text-sm font-semibold text-[var(--primary)] hover:underline">
               Канбан →
             </Link>
@@ -911,12 +922,16 @@ export default function MePage() {
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
-                                <Link
-                                  href={appPath(`/board/${s.card_id}`)}
-                                  className="font-medium text-[var(--text)] hover:text-[var(--primary)] hover:underline"
-                                >
-                                  {s.title}
-                                </Link>
+                                {canPmBoard ? (
+                                  <Link
+                                    href={appPath(`/board/${s.card_id}`)}
+                                    className="font-medium text-[var(--text)] hover:text-[var(--primary)] hover:underline"
+                                  >
+                                    {s.title}
+                                  </Link>
+                                ) : (
+                                  <span className="font-medium text-[var(--text)]">{s.title}</span>
+                                )}
                                 <div className="mt-0.5 truncate text-xs text-[var(--muted-foreground)]">{s.card_name}</div>
                                 {(s.planned_start || s.planned_end) && (
                                   <div className="mt-1 text-[10px] text-[var(--muted-foreground)]">

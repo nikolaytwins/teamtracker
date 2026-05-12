@@ -152,47 +152,67 @@ export function getProjectTimeDetail(
   };
 }
 
-export function getEmployeeMonthly(workerName: string, monthYm: string) {
+export type EmployeeMonthMatch = {
+  /** Если задан — строки с этим worker_user_id и строки без id с тем же worker_name (имя из профиля). */
+  userId?: string | null;
+  workerName: string;
+};
+
+/** Фильтр завершённых записей за месяц по сотруднику (имя и/или user id). */
+export function buildEmployeeMonthEntryWhere(
+  monthYm: string,
+  m: EmployeeMonthMatch
+): { fragment: string; args: unknown[] } {
+  const parts = [
+    `strftime('%Y-%m', e.started_at) = ?`,
+    `e.ended_at IS NOT NULL`,
+    `e.duration_seconds IS NOT NULL`,
+  ];
+  const args: unknown[] = [monthYm.trim()];
+  const name = m.workerName.trim();
+  const uid = m.userId?.trim() || "";
+
+  if (uid) {
+    parts.push(
+      `((TRIM(COALESCE(e.worker_user_id,'')) != '' AND e.worker_user_id = ?) OR ((e.worker_user_id IS NULL OR TRIM(e.worker_user_id) = '') AND TRIM(e.worker_name) = ?))`
+    );
+    args.push(uid, name);
+  } else if (!name) {
+    parts.push("1 = 0");
+  } else if (name === UNKNOWN_WORKER_LABEL) {
+    parts.push(`TRIM(COALESCE(e.worker_name, '')) = ''`);
+  } else {
+    parts.push(`TRIM(e.worker_name) = ?`);
+    args.push(name);
+  }
+  return { fragment: parts.join(" AND "), args };
+}
+
+export function getEmployeeMonthlyMatch(m: EmployeeMonthMatch, monthYm: string) {
   ensureTimeSchema();
   const db = getDb();
-  const name = workerName.trim();
-  if (!name) {
-    return {
-      totalSeconds: 0,
-      byProject: [] as Array<{ cardId: string; name: string; seconds: number }>,
-      byTaskType: [] as Array<{ type: string; seconds: number }>,
-    };
-  }
-
-  const isUnknown = name === UNKNOWN_WORKER_LABEL;
-  const workerSql = isUnknown
-    ? `(TRIM(COALESCE(e.worker_name, '')) = '')`
-    : `TRIM(e.worker_name) = ?`;
+  const { fragment, args } = buildEmployeeMonthEntryWhere(monthYm, m);
 
   const rows = db
     .prepare(
       `SELECT c.id as cardId, c.name, SUM(e.duration_seconds) as s
        FROM pm_time_entries e
        JOIN pm_cards c ON c.id = e.card_id
-       WHERE ${workerSql}
-         AND strftime('%Y-%m', e.started_at) = ?
-         AND e.ended_at IS NOT NULL AND e.duration_seconds IS NOT NULL
+       WHERE ${fragment}
        GROUP BY c.id
        ORDER BY s DESC`
     )
-    .all(...(isUnknown ? [monthYm] : [name, monthYm])) as Array<{ cardId: string; name: string; s: number }>;
+    .all(...args) as Array<{ cardId: string; name: string; s: number }>;
 
   const typeRows = db
     .prepare(
       `SELECT COALESCE(NULLIF(TRIM(e.task_type), ''), '') as t, SUM(e.duration_seconds) as s
        FROM pm_time_entries e
-       WHERE ${workerSql}
-         AND strftime('%Y-%m', e.started_at) = ?
-         AND e.ended_at IS NOT NULL AND e.duration_seconds IS NOT NULL
+       WHERE ${fragment}
        GROUP BY t
        ORDER BY s DESC`
     )
-    .all(...(isUnknown ? [monthYm] : [name, monthYm])) as Array<{ t: string; s: number }>;
+    .all(...args) as Array<{ t: string; s: number }>;
 
   const totalSeconds = rows.reduce((acc, r) => acc + r.s, 0);
   return {
@@ -200,6 +220,92 @@ export function getEmployeeMonthly(workerName: string, monthYm: string) {
     byProject: rows.map((r) => ({ cardId: r.cardId, name: r.name, seconds: r.s })),
     byTaskType: typeRows.map((r) => ({ type: r.t || "", seconds: r.s })),
   };
+}
+
+export function getEmployeeMonthly(workerName: string, monthYm: string) {
+  return getEmployeeMonthlyMatch({ workerName }, monthYm);
+}
+
+export type EmployeeMonthlySessionRow = {
+  id: string;
+  cardId: string;
+  cardName: string;
+  taskType: string | null;
+  taskNote: string | null;
+  startedAt: string;
+  endedAt: string;
+  durationSeconds: number;
+  /** Календарная дата начала (SQLite `strftime` по полю started_at). */
+  workDate: string;
+};
+
+export function getEmployeeMonthlySessions(
+  m: EmployeeMonthMatch,
+  monthYm: string,
+  limit = 2000
+): EmployeeMonthlySessionRow[] {
+  ensureTimeSchema();
+  const db = getDb();
+  const { fragment, args } = buildEmployeeMonthEntryWhere(monthYm, m);
+  const lim = Math.min(5000, Math.max(1, Math.floor(limit)));
+  const rows = db
+    .prepare(
+      `SELECT e.id as id, e.card_id as cardId, c.name as cardName,
+              e.task_type as taskType, e.task_note as taskNote,
+              e.started_at as startedAt, e.ended_at as endedAt, e.duration_seconds as durationSeconds,
+              strftime('%Y-%m-%d', e.started_at) as workDate
+       FROM pm_time_entries e
+       JOIN pm_cards c ON c.id = e.card_id
+       WHERE ${fragment}
+       ORDER BY e.started_at DESC
+       LIMIT ?`
+    )
+    .all(...args, lim) as Array<{
+    id: string;
+    cardId: string;
+    cardName: string;
+    taskType: string | null;
+    taskNote: string | null;
+    startedAt: string;
+    endedAt: string;
+    durationSeconds: number;
+    workDate: string;
+  }>;
+  return rows.map((r) => ({
+    id: String(r.id),
+    cardId: String(r.cardId),
+    cardName: String(r.cardName ?? ""),
+    taskType: r.taskType != null ? String(r.taskType) : null,
+    taskNote: r.taskNote != null ? String(r.taskNote) : null,
+    startedAt: String(r.startedAt),
+    endedAt: String(r.endedAt),
+    durationSeconds: Number(r.durationSeconds) || 0,
+    workDate: String(r.workDate ?? ""),
+  }));
+}
+
+/** Завершённые секунды по календарным дням (YYYY-MM-DD) внутри месяца YYYY-MM. */
+export function getEmployeeMonthlyHoursByDay(
+  m: EmployeeMonthMatch,
+  monthYm: string
+): Array<{ date: string; seconds: number; hours: number }> {
+  ensureTimeSchema();
+  const db = getDb();
+  const { fragment, args } = buildEmployeeMonthEntryWhere(monthYm, m);
+  const rows = db
+    .prepare(
+      `SELECT strftime('%Y-%m-%d', e.started_at) as d, SUM(e.duration_seconds) as s
+       FROM pm_time_entries e
+       WHERE ${fragment}
+       GROUP BY d
+       HAVING d IS NOT NULL AND TRIM(d) != ''
+       ORDER BY d ASC`
+    )
+    .all(...args) as Array<{ d: string; s: number }>;
+  return rows.map((r) => {
+    const s = Number(r.s) || 0;
+    return { date: String(r.d ?? ""), seconds: s, hours: secondsToHours(s) };
+  });
 }
 
 export function listDistinctWorkers() {

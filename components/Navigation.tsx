@@ -1,30 +1,54 @@
 "use client";
 
 import { apiUrl, appPath } from "@/lib/api-url";
+import { canAccessPmBoard, type TtUserRole } from "@/lib/roles";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 
-type MeUser = { name: string; title: string; avatarUrl: string | null; role?: string };
+type MeUser = { name: string; title: string; avatarUrl: string | null; role?: TtUserRole | string };
 
-type NtfItem = {
-  id: string;
-  type: string;
-  payload: string;
-  read_at: string | null;
-  created_at: string;
-};
-
-type NavIconName = "me" | "board" | "time" | "calendar" | "agency" | "profi" | "sales" | "team" | "load";
+type NavIconName =
+  | "home"
+  | "me"
+  | "tasks"
+  | "board"
+  | "time"
+  | "calendar"
+  | "agency"
+  | "profi"
+  | "sales"
+  | "team"
+  | "load";
 
 function NavGlyph({ name }: { name: NavIconName }) {
   const c = "h-[18px] w-[18px] shrink-0 stroke-[1.75]";
   switch (name) {
+    case "home":
+      return (
+        <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125a1.125 1.125 0 001.125 1.125H9.75v-4.875a.375.375 0 01.375-.375h3.75a.375.375 0 01.375.375V21h3.75a1.125 1.125 0 001.125-1.125V9.75M8.25 21h8.25"
+          />
+        </svg>
+      );
     case "me":
       return (
         <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+        </svg>
+      );
+    case "tasks":
+      return (
+        <svg className={c} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
       );
     case "board":
@@ -78,32 +102,6 @@ function NavGlyph({ name }: { name: NavIconName }) {
     default:
       return null;
   }
-}
-
-function formatNtfText(n: NtfItem): string {
-  try {
-    const p = JSON.parse(n.payload) as Record<string, unknown>;
-    if (n.type === "subtask_assigned") {
-      const role = p.role === "lead" ? "лидом" : "исполнителем";
-      const title = String(p.subtaskTitle ?? "подзадача");
-      const card = String(p.cardName ?? "карточка");
-      return `Вы назначены ${role}: «${title}» · ${card}`;
-    }
-    if (n.type === "approval_stale") {
-      const card = String(p.cardName ?? "проект");
-      const since = p.waitingSince ? new Date(String(p.waitingSince)).toLocaleDateString("ru-RU") : "";
-      return since ? `Согласование «${card}» без ответа с ${since}` : `Согласование «${card}» — долго без ответа`;
-    }
-    if (n.type === "team_week_load") {
-      const name = String(p.displayName ?? "Сотрудник");
-      const st = p.status === "over" ? "перегружен" : p.status === "under" ? "недогружен" : "в норме";
-      const week = String(p.week ?? "");
-      return week ? `${name}: ${st} (${week})` : `${name}: ${st}`;
-    }
-  } catch {
-    /* ignore */
-  }
-  return n.type;
 }
 
 function UserAccountOverflowMenu({
@@ -176,10 +174,6 @@ export default function Navigation() {
   const [me, setMe] = useState<MeUser | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [ntfOpen, setNtfOpen] = useState(false);
-  const [ntfItems, setNtfItems] = useState<NtfItem[]>([]);
-  const [ntfUnread, setNtfUnread] = useState(0);
-  const ntfWrapRef = useRef<HTMLDivElement>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useLayoutEffect(() => {
@@ -236,38 +230,6 @@ export default function Navigation() {
       .catch(() => setMe(null));
   }, [pathname]);
 
-  const loadNotifications = useCallback(async () => {
-    if (!me) return;
-    const r = await fetch(apiUrl("/api/me/notifications"));
-    if (!r.ok) return;
-    const d = (await r.json()) as { items?: NtfItem[]; unreadCount?: number };
-    setNtfItems(Array.isArray(d.items) ? d.items : []);
-    setNtfUnread(typeof d.unreadCount === "number" ? d.unreadCount : 0);
-  }, [me]);
-
-  useEffect(() => {
-    void loadNotifications();
-  }, [me, pathname, loadNotifications]);
-
-  useEffect(() => {
-    if (!ntfOpen) return;
-    function onDoc(e: MouseEvent) {
-      if (!ntfWrapRef.current?.contains(e.target as Node)) setNtfOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [ntfOpen]);
-
-  async function markRead(ids: string[]) {
-    if (ids.length === 0) return;
-    await fetch(apiUrl("/api/me/notifications"), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
-    });
-    await loadNotifications();
-  }
-
   async function logout() {
     await fetch(apiUrl("/api/auth/logout"), { method: "POST" });
     router.push(appPath("/login"));
@@ -283,33 +245,35 @@ export default function Navigation() {
 
   const showAgencyNav = me != null && me.role === "admin";
   const isMemberUser = me?.role === "member";
+  const showPmBoardNav = me != null && canAccessPmBoard(me.role as TtUserRole);
   const navItems: { href: string; label: string; active: boolean; icon: NavIconName }[] = isMemberUser
-    ? [{ href: appPath("/me"), label: "Профиль", active: pathname === "/me", icon: "me" }]
-    : [
+    ? [
+        { href: appPath("/home"), label: "Главная", active: pathname === "/home" || (pathname?.startsWith("/home/") ?? false), icon: "home" },
         { href: appPath("/me"), label: "Профиль", active: pathname === "/me", icon: "me" },
-        {
-          href: appPath("/board"),
-          label: "Проекты",
-          active:
-            pathname === "/board" ||
-            (!!pathname?.startsWith("/board/") &&
-              !pathname.startsWith("/board/time-analytics") &&
-              !pathname.startsWith("/board/calendar") &&
-              !pathname.startsWith("/board/team-load")),
-          icon: "board",
-        },
-        {
-          href: appPath("/board/time-analytics"),
-          label: "Время",
-          active: pathname === "/board/time-analytics",
-          icon: "time",
-        },
-        {
-          href: appPath("/board/calendar"),
-          label: "Календарь",
-          active: pathname?.startsWith("/board/calendar") ?? false,
-          icon: "calendar",
-        },
+        { href: appPath("/tasks"), label: "Задачи", active: pathname === "/tasks", icon: "tasks" },
+      ]
+    : [
+        { href: appPath("/home"), label: "Главная", active: pathname === "/home" || (pathname?.startsWith("/home/") ?? false), icon: "home" },
+        { href: appPath("/me"), label: "Профиль", active: pathname === "/me", icon: "me" },
+        { href: appPath("/tasks"), label: "Задачи", active: pathname === "/tasks", icon: "tasks" },
+        ...(showPmBoardNav
+          ? [
+              {
+                href: appPath("/board"),
+                label: "Проекты",
+                active:
+                  pathname === "/board" ||
+                  (!!pathname?.startsWith("/board/") && !pathname.startsWith("/board/calendar")),
+                icon: "board" as const,
+              },
+              {
+                href: appPath("/board/calendar"),
+                label: "Календарь",
+                active: pathname?.startsWith("/board/calendar") ?? false,
+                icon: "calendar" as const,
+              },
+            ]
+          : []),
       ];
 
   const adminItems: { href: string; label: string; active: boolean; icon: NavIconName }[] = showAgencyNav
@@ -322,19 +286,13 @@ export default function Navigation() {
           active: Boolean(pathname?.startsWith("/sales")) && pathname !== "/sales/profi",
           icon: "sales",
         },
-        { href: appPath("/admin/users"), label: "Команда", active: pathname?.startsWith("/admin") ?? false, icon: "team" },
-        {
-          href: appPath("/board/team-load"),
-          label: "Загрузка",
-          active: pathname?.startsWith("/board/team-load") ?? false,
-          icon: "load",
-        },
+        { href: appPath("/admin/dashboard"), label: "Дашборд", active: pathname?.startsWith("/admin") ?? false, icon: "team" },
       ]
     : [];
 
   function BrandMark({ compact }: { compact?: boolean }) {
     return (
-      <Link href={appPath("/me")} className={`flex items-center gap-3 ${compact ? "" : ""}`}>
+      <Link href={appPath("/home")} className={`flex items-center gap-3 ${compact ? "" : ""}`}>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/30">
           <span className="text-sm font-bold tracking-tight">TT</span>
         </div>
@@ -491,7 +449,6 @@ export default function Navigation() {
             )}
             {me ? (
               <div
-                ref={ntfWrapRef}
                 className={
                   sidebarCollapsed
                     ? "flex flex-col items-center gap-2 border-0 bg-transparent p-0 shadow-none"
@@ -500,27 +457,6 @@ export default function Navigation() {
               >
                 {sidebarCollapsed ? (
                   <div className="flex flex-col items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNtfOpen((o) => !o)}
-                      className="relative rounded-xl p-2.5 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface)]"
-                      aria-label="Уведомления"
-                      title="Уведомления"
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                        />
-                      </svg>
-                      {ntfUnread > 0 ? (
-                        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--danger)] px-0.5 text-[10px] font-bold text-white">
-                          {ntfUnread > 9 ? "9+" : ntfUnread}
-                        </span>
-                      ) : null}
-                    </button>
                     <Link
                       href={appPath("/me")}
                       className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)] hover:ring-2 hover:ring-[var(--primary-soft)]"
@@ -535,110 +471,25 @@ export default function Navigation() {
                     <UserAccountOverflowMenu onLogout={logout} collapsed />
                   </div>
                 ) : (
-                  <>
-                    <div className="mb-0 flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)]">
-                          {me.avatarUrl ? (
-                            <img src={me.avatarUrl} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            me.name.charAt(0).toUpperCase()
-                          )}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-[var(--text)]">{me.name}</div>
-                          <div className="truncate text-xs text-[var(--muted-foreground)]">{me.title}</div>
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => setNtfOpen((o) => !o)}
-                          className="relative rounded-xl p-2 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--surface-2)]"
-                          aria-label="Уведомления"
-                        >
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                            />
-                          </svg>
-                          {ntfUnread > 0 ? (
-                            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--danger)] px-0.5 text-[10px] font-bold text-white">
-                              {ntfUnread > 9 ? "9+" : ntfUnread}
-                            </span>
-                          ) : null}
-                        </button>
-                        <UserAccountOverflowMenu onLogout={logout} collapsed={false} />
+                  <div className="mb-0 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-xs font-semibold text-[var(--text)]">
+                        {me.avatarUrl ? (
+                          <img src={me.avatarUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          me.name.charAt(0).toUpperCase()
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-[var(--text)]">{me.name}</div>
+                        <div className="truncate text-xs text-[var(--muted-foreground)]">{me.title}</div>
                       </div>
                     </div>
-                  </>
-                )}
-                {ntfOpen ? (
-                  <div
-                    className={`max-h-72 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-elevated)] ${
-                      sidebarCollapsed
-                        ? "fixed bottom-4 z-[70] w-[min(20rem,calc(100vw-5.5rem))]"
-                        : "mt-2"
-                    }`}
-                    style={
-                      sidebarCollapsed
-                        ? { left: "max(0.5rem, calc(var(--sidebar-w, 4.5rem) + 6px))" }
-                        : undefined
-                    }
-                  >
-                    <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
-                      <span className="text-xs font-semibold text-[var(--text)]">Уведомления</span>
-                      {ntfItems.some((x) => !x.read_at) ? (
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-[var(--primary)] hover:underline"
-                          onClick={() => void markRead(ntfItems.filter((x) => !x.read_at).map((x) => x.id))}
-                        >
-                          Прочитать все
-                        </button>
-                      ) : null}
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <UserAccountOverflowMenu onLogout={logout} collapsed={false} />
                     </div>
-                    {ntfItems.length === 0 ? (
-                      <p className="px-3 py-4 text-center text-sm text-[var(--muted-foreground)]">Пока пусто</p>
-                    ) : (
-                      <ul className="py-1">
-                        {ntfItems.map((n) => (
-                          <li key={n.id}>
-                            <button
-                              type="button"
-                              className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-2)] ${
-                                n.read_at ? "text-[var(--muted-foreground)]" : "font-medium text-[var(--text)]"
-                              }`}
-                              onClick={() => {
-                                if (!n.read_at) void markRead([n.id]);
-                                setNtfOpen(false);
-                                let path = "/board";
-                                try {
-                                  const p = JSON.parse(n.payload) as Record<string, unknown>;
-                                  if (n.type === "team_week_load") path = "/admin/users";
-                                  else if (n.type === "approval_stale" && typeof p.cardId === "string") {
-                                    path = `/board/${encodeURIComponent(p.cardId)}`;
-                                  }
-                                } catch {
-                                  /* default board */
-                                }
-                                router.push(appPath(path));
-                              }}
-                            >
-                              {formatNtfText(n)}
-                              <span className="mt-0.5 block text-[10px] text-[var(--muted-foreground)]">
-                                {new Date(n.created_at).toLocaleString("ru-RU")}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
                   </div>
-                ) : null}
+                )}
               </div>
             ) : null}
           </div>

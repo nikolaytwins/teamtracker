@@ -423,3 +423,197 @@ export function buildCardPhasesPayload(cardId: string): {
     projectTotalSeconds: projectTotal,
   };
 }
+
+function entryBelongsToSessionUser(
+  e: PmTimeEntry,
+  session: { sub: string; name: string }
+): boolean {
+  const uid = session.sub.trim();
+  const name = session.name.trim();
+  if (e.worker_user_id != null && String(e.worker_user_id).trim()) {
+    return String(e.worker_user_id).trim() === uid;
+  }
+  return e.worker_name.trim() === name;
+}
+
+export function getTimeEntryByIdForSessionUser(
+  session: { sub: string; name: string },
+  id: string
+): PmTimeEntry | null {
+  ensurePhasesSchema();
+  const db = getDb();
+  const row = db.prepare(`SELECT * FROM pm_time_entries WHERE id = ?`).get(id) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  const e = rowToTimeEntry(row);
+  return entryBelongsToSessionUser(e, session) ? e : null;
+}
+
+/** Завершённые записи пользователя за календарный месяц `YYYY-MM` (по `started_at`), новые сверху. */
+export function listCompletedEntriesForSessionUserInMonth(
+  session: { sub: string; name: string },
+  monthYm: string
+): PmTimeEntry[] {
+  ensurePhasesSchema();
+  if (!/^\d{4}-\d{2}$/.test(monthYm.trim())) return [];
+  const uid = session.sub.trim();
+  const name = session.name.trim();
+  if (!uid && !name) return [];
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT * FROM pm_time_entries
+       WHERE ended_at IS NOT NULL AND duration_seconds IS NOT NULL
+         AND strftime('%Y-%m', started_at) = ?
+         AND (
+           (worker_user_id IS NOT NULL AND TRIM(worker_user_id) != '' AND worker_user_id = ?)
+           OR ((worker_user_id IS NULL OR TRIM(worker_user_id) = '') AND TRIM(worker_name) = ?)
+         )
+       ORDER BY started_at DESC`
+    )
+    .all(monthYm.trim(), uid, name) as Record<string, unknown>[];
+  return rows.map(rowToTimeEntry);
+}
+
+/** Сессии пользователя, новые сверху. По умолчанию включает открытую; с `completedOnly` — только завершённые. */
+export function listRecentEntriesForSessionUser(
+  session: { sub: string; name: string },
+  limit: number,
+  options?: { completedOnly?: boolean }
+): PmTimeEntry[] {
+  ensurePhasesSchema();
+  const uid = session.sub.trim();
+  const name = session.name.trim();
+  if (!uid && !name) return [];
+  const lim = Math.min(100, Math.max(1, Math.floor(limit)));
+  const db = getDb();
+  const completedOnly = Boolean(options?.completedOnly);
+  const rows = db
+    .prepare(
+      `SELECT * FROM pm_time_entries
+       WHERE (
+         (worker_user_id IS NOT NULL AND TRIM(worker_user_id) != '' AND worker_user_id = ?)
+         OR ((worker_user_id IS NULL OR TRIM(worker_user_id) = '') AND TRIM(worker_name) = ?)
+       )
+       ${completedOnly ? "AND ended_at IS NOT NULL AND duration_seconds IS NOT NULL" : ""}
+       ORDER BY started_at DESC
+       LIMIT ?`
+    )
+    .all(uid, name, lim) as Record<string, unknown>[];
+  return rows.map(rowToTimeEntry);
+}
+
+export function deleteTimeEntryForSessionUser(session: { sub: string; name: string }, id: string): boolean {
+  const e = getTimeEntryByIdForSessionUser(session, id);
+  if (!e) return false;
+  ensurePhasesSchema();
+  const db = getDb();
+  const r = db.prepare(`DELETE FROM pm_time_entries WHERE id = ?`).run(id);
+  return r.changes > 0;
+}
+
+export function updateTimeEntryForSessionUser(
+  session: { sub: string; name: string },
+  id: string,
+  updates: {
+    cardId?: string;
+    taskType?: string | null;
+    taskNote?: string | null;
+    startedAt?: string;
+    endedAt?: string | null;
+  }
+): { ok: true; entry: PmTimeEntry } | { ok: false; error: string } {
+  const e = getTimeEntryByIdForSessionUser(session, id);
+  if (!e) return { ok: false, error: "Запись не найдена" };
+
+  let cardId = updates.cardId !== undefined ? updates.cardId.trim() : e.card_id;
+  let phaseId = e.phase_id;
+  let startedAt = updates.startedAt !== undefined ? updates.startedAt : e.started_at;
+  let endedAt = updates.endedAt !== undefined ? updates.endedAt : e.ended_at;
+  let taskType = updates.taskType !== undefined ? updates.taskType : e.task_type;
+  let taskNote = updates.taskNote !== undefined ? updates.taskNote : e.task_note;
+  let subtaskId = e.subtask_id;
+
+  if (updates.cardId !== undefined && updates.cardId.trim() !== e.card_id) {
+    const card = getCard(cardId);
+    if (!card) return { ok: false, error: "Проект не найден" };
+    const ph = getOrCreatePhaseByTitle(cardId, QUICK_WORK_PHASE_TITLE);
+    if (!ph) return { ok: false, error: "Не удалось подготовить этап" };
+    phaseId = ph.id;
+    subtaskId = null;
+  }
+
+  const st = new Date(startedAt);
+  const en = endedAt != null ? new Date(endedAt) : null;
+  if (Number.isNaN(st.getTime())) return { ok: false, error: "Некорректное время начала" };
+  if (en != null && Number.isNaN(en.getTime())) return { ok: false, error: "Некорректное время окончания" };
+  if (en != null && en <= st) return { ok: false, error: "Окончание должно быть позже начала" };
+
+  let durationSeconds: number | null = null;
+  if (endedAt != null) {
+    durationSeconds = secondsBetween(startedAt, endedAt!);
+  }
+
+  ensurePhasesSchema();
+  const db = getDb();
+  db.prepare(
+    `UPDATE pm_time_entries SET card_id = ?, phase_id = ?, started_at = ?, ended_at = ?, duration_seconds = ?, task_type = ?, task_note = ?, subtask_id = ? WHERE id = ?`
+  ).run(
+    cardId,
+    phaseId,
+    startedAt,
+    endedAt,
+    durationSeconds,
+    taskType != null && String(taskType).trim() ? String(taskType).trim() : null,
+    taskNote != null && String(taskNote).trim() ? String(taskNote).trim() : null,
+    subtaskId,
+    id
+  );
+  const row = db.prepare(`SELECT * FROM pm_time_entries WHERE id = ?`).get(id) as Record<string, unknown>;
+  return { ok: true, entry: rowToTimeEntry(row) };
+}
+
+export function createManualCompletedTimeEntry(
+  session: { sub: string; name: string },
+  params: {
+    cardId: string;
+    taskType: string | null;
+    taskNote: string | null;
+    startedAt: string;
+    endedAt: string;
+  }
+): { ok: true; entry: PmTimeEntry } | { ok: false; error: string } {
+  const cardId = params.cardId.trim();
+  if (!cardId) return { ok: false, error: "Укажите проект" };
+  const card = getCard(cardId);
+  if (!card) return { ok: false, error: "Проект не найден" };
+  const st = new Date(params.startedAt);
+  const en = new Date(params.endedAt);
+  if (Number.isNaN(st.getTime()) || Number.isNaN(en.getTime())) {
+    return { ok: false, error: "Некорректные даты" };
+  }
+  if (en <= st) return { ok: false, error: "Окончание должно быть позже начала" };
+  const phase = getOrCreatePhaseByTitle(cardId, QUICK_WORK_PHASE_TITLE);
+  if (!phase) return { ok: false, error: "Не удалось создать этап" };
+  const duration = secondsBetween(params.startedAt, params.endedAt);
+  const id = `tent_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const workerName = session.name.trim();
+  const workerUserId = session.sub.trim();
+  ensurePhasesSchema();
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO pm_time_entries (id, card_id, phase_id, started_at, ended_at, duration_seconds, worker_name, worker_user_id, task_type, task_note, subtask_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`
+  ).run(
+    id,
+    cardId,
+    phase.id,
+    params.startedAt,
+    params.endedAt,
+    duration,
+    workerName,
+    workerUserId || null,
+    params.taskType != null && String(params.taskType).trim() ? String(params.taskType).trim() : null,
+    params.taskNote != null && String(params.taskNote).trim() ? String(params.taskNote).trim() : null
+  );
+  const row = db.prepare(`SELECT * FROM pm_time_entries WHERE id = ?`).get(id) as Record<string, unknown>;
+  return { ok: true, entry: rowToTimeEntry(row) };
+}

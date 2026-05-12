@@ -230,23 +230,6 @@ export default function SalesLeadsPage() {
     }
   };
 
-  const handleConvertToProject = async (leadId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const res = await fetch(apiUrl(`/api/agency/leads/${leadId}/convert`), {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || "Не удалось создать проект");
-        return;
-      }
-      await fetchLeads();
-    } catch {
-      alert("Не удалось создать проект");
-    }
-  };
-
   async function saveEditModal() {
     if (!editing) return;
     setSavingEdit(true);
@@ -565,15 +548,7 @@ export default function SalesLeadsPage() {
                               ) : null}
                             </div>
                           </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => void handleConvertToProject(lead.id, e)}
-                            className="mb-3 w-full rounded-xl bg-[var(--primary-soft)] px-2 py-2 text-xs font-medium text-[var(--primary)] hover:brightness-95 dark:hover:brightness-110"
-                          >
-                            Создать проект из лида
-                          </button>
-                        )}
+                        ) : null}
                         <div
                           className="flex items-center justify-between border-t border-[var(--border)]/45 pt-3 dark:border-white/[0.06]"
                           onClick={(e) => e.stopPropagation()}

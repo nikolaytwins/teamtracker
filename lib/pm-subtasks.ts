@@ -115,6 +115,26 @@ export function listOpenSubtasksForUser(userId: string): PmSubtaskWithCard[] {
   });
 }
 
+/** Есть ли у пользователя незавершённая подзадача на карточке; проект не в статусе «готов». */
+export function userHasOpenAssignmentOnCard(userId: string, cardId: string): boolean {
+  const uid = userId.trim();
+  if (!uid || !cardId.trim()) return false;
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT 1 AS ok
+       FROM pm_subtasks s
+       INNER JOIN pm_cards c ON c.id = s.card_id
+       WHERE s.card_id = ?
+         AND (s.assignee_user_id = ? OR s.lead_user_id = ?)
+         AND s.completed_at IS NULL
+         AND c.status != 'done'
+       LIMIT 1`
+    )
+    .get(cardId, uid, uid) as { ok: number } | undefined;
+  return Boolean(row);
+}
+
 /** Открытая подзадача с тем же названием (без учёта регистра). */
 export function findOpenSubtaskByTitle(cardId: string, title: string): PmSubtask | null {
   const t = title.trim();

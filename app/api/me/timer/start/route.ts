@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCard } from "@/lib/db";
+import { validateCardForHomeTimer } from "@/lib/home-timer-projects";
 import { getServerSession } from "@/lib/get-session";
 import {
   getOrCreatePhaseByTitle,
@@ -7,7 +8,7 @@ import {
   startTimer,
 } from "@/lib/pm-phases";
 import { createSubtask, findOpenSubtaskByTitle } from "@/lib/pm-subtasks";
-import { notifySubtaskCreated } from "@/lib/subtask-notifications";
+import { effectiveUserRole } from "@/lib/require-role";
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +24,9 @@ export async function POST(request: NextRequest) {
     }
     if (!cardId) return NextResponse.json({ error: "cardId required" }, { status: 400 });
     if (!getCard(cardId)) return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
+    const role = effectiveUserRole(session);
+    const denied = validateCardForHomeTimer(role, session.sub, cardId);
+    if (denied) return NextResponse.json({ error: denied }, { status: 403 });
     const phase = getOrCreatePhaseByTitle(cardId, QUICK_WORK_PHASE_TITLE);
     if (!phase) return NextResponse.json({ error: "Не удалось создать этап" }, { status: 500 });
     let subtaskId: string | null = null;
@@ -37,7 +41,6 @@ export async function POST(request: NextRequest) {
         });
       if (sub) {
         subtaskId = sub.id;
-        if (!existing) notifySubtaskCreated({ actorUserId: session.sub, cardId, subtask: sub });
       }
     }
     const result = startTimer(cardId, phase.id, {

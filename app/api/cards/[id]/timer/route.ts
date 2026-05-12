@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-session";
-import { assertMemberCardAccess } from "@/lib/member-board-access";
 import { extendCardPhasesPayload } from "@/lib/extend-card-phases-payload";
 import { buildCardPhasesPayload, startTimer, stopTimer } from "@/lib/pm-phases";
-import { requireSessionRole } from "@/lib/require-role";
+import { requirePmBoardAccess } from "@/lib/require-role";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const auth = await requireSessionRole();
+    const auth = await requirePmBoardAccess();
     if (!auth.ok) return auth.response;
     const { id } = await params;
-    const denied = assertMemberCardAccess(auth.role, id);
-    if (denied) return denied;
     const body = await request.json();
     const action = body?.action as string;
     if (action === "stop") {

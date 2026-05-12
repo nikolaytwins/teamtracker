@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { canAccessAgencyRoutes, isMemberRestrictedRole, sessionRole } from "@/lib/roles";
+import { canAccessAgencyRoutes, canAccessPmBoard, isMemberRestrictedRole, sessionRole } from "@/lib/roles";
 import { getAuthSecret, verifySession } from "@/lib/session-token";
 
 /**
@@ -77,7 +77,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/login") {
     if (session) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/me"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
     }
     return NextResponse.next();
   }
@@ -95,7 +95,7 @@ export async function middleware(request: NextRequest) {
 
   if (isMemberRestrictedRole(role)) {
     if (pathname.startsWith("/board")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/me"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
     }
     if (pathname.startsWith("/api/board/")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -108,6 +108,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (!canAccessPmBoard(role)) {
+    const isProjectsBoardPath =
+      pathname === "/board" ||
+      (pathname.startsWith("/board/") && !pathname.startsWith("/board/team-load"));
+    if (isProjectsBoardPath) {
+      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
+    }
+    if (pathname.startsWith("/api/board/")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (pathname.startsWith("/api/time-analytics/")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   if (!canAccessAgencyRoutes(role)) {
     if (pathname.startsWith("/api/agency") || pathname.startsWith("/api/admin")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -116,10 +131,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (pathname.startsWith("/agency") || pathname.startsWith("/sales") || pathname.startsWith("/admin")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/me"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
     }
     if (pathname.startsWith("/board/team-load")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/me"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
     }
   }
 

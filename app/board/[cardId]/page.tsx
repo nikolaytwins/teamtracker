@@ -402,12 +402,6 @@ export default function CardPhasesPage() {
         >
           ← Проекты
         </Link>
-        <Link
-          href={appPath("/board/time-analytics")}
-          className="text-sm font-medium text-[var(--primary)] hover:underline"
-        >
-          Аналитика времени
-        </Link>
       </div>
       <h1 className="text-2xl font-bold text-[var(--text)] mb-3">{card.name}</h1>
       <div className="mb-4 flex flex-wrap items-center gap-3">

@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assertMemberCardAccess } from "@/lib/member-board-access";
 import { extendCardPhasesPayload } from "@/lib/extend-card-phases-payload";
 import { buildCardPhasesPayload, createPhase } from "@/lib/pm-phases";
-import { requireSessionRole } from "@/lib/require-role";
+import { requirePmBoardAccess } from "@/lib/require-role";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
-    const auth = await requireSessionRole();
+    const auth = await requirePmBoardAccess();
     if (!auth.ok) return auth.response;
     const { id } = await params;
-    const denied = assertMemberCardAccess(auth.role, id);
-    if (denied) return denied;
     const base = buildCardPhasesPayload(id);
     if (!base.card) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const payload = await extendCardPhasesPayload(id, base);
@@ -25,11 +22,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const auth = await requireSessionRole();
+    const auth = await requirePmBoardAccess();
     if (!auth.ok) return auth.response;
     const { id } = await params;
-    const denied = assertMemberCardAccess(auth.role, id);
-    if (denied) return denied;
     const body = await request.json();
     const title = typeof body.title === "string" ? body.title.trim() : "";
     if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });

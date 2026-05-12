@@ -32,3 +32,8 @@ export function isAdminRole(role: TtUserRole): boolean {
 export function canAccessAgencyRoutes(role: TtUserRole): boolean {
   return role === "admin";
 }
+
+/** Канбан «Проекты» (/board), шаблоны и связанные API — только админ и ПМ. */
+export function canAccessPmBoard(role: TtUserRole): boolean {
+  return role === "admin" || role === "pm";
+}
