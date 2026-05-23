@@ -22,11 +22,13 @@ export type CreateTaskInput = {
   projectId?: string | null;
   assigneeUserId?: string | null;
   deadlineAt?: string | null;
+  plannedAt?: string | null;
   estimateSeconds?: number | null;
   priority?: V2TaskPriority;
   description?: string | null;
   inboxBucket?: V2InboxBucket | null;
   parentId?: string | null;
+  phaseId?: string | null;
   workMonth?: string | null;
 };
 
@@ -36,11 +38,13 @@ export type UpdateTaskInput = Partial<{
   projectId: string | null;
   assigneeUserId: string | null;
   deadlineAt: string | null;
+  plannedAt: string | null;
   estimateSeconds: number | null;
   priority: V2TaskPriority;
   status: V2TaskStatus;
   scope: V2TaskScope;
   inboxBucket: V2InboxBucket | null;
+  phaseId: string | null;
 }>;
 
 async function sumLoggedSeconds(taskIds: string[]): Promise<Map<string, number>> {
@@ -346,6 +350,7 @@ export async function createTask(ctx: V2SessionContext, input: CreateTaskInput):
     id,
     workspace_id: ctx.workspaceId,
     project_id: input.projectId ?? null,
+    phase_id: input.phaseId ?? null,
     parent_id: input.parentId ?? null,
     scope,
     title: input.title.trim(),
@@ -355,6 +360,7 @@ export async function createTask(ctx: V2SessionContext, input: CreateTaskInput):
     assignee_user_id: input.assigneeUserId ?? ctx.userId,
     created_by: ctx.userId,
     deadline_at: input.deadlineAt ?? null,
+    planned_at: input.plannedAt ?? null,
     estimate_seconds: input.estimateSeconds ?? null,
     completed_at: null,
     sort_order: 0,
@@ -406,8 +412,10 @@ export async function updateTask(
   if (input.title !== undefined) patch.title = input.title.trim();
   if (input.description !== undefined) patch.description = input.description;
   if (input.projectId !== undefined) patch.project_id = input.projectId;
+  if (input.phaseId !== undefined) patch.phase_id = input.phaseId;
   if (input.assigneeUserId !== undefined) patch.assignee_user_id = input.assigneeUserId;
   if (input.deadlineAt !== undefined) patch.deadline_at = input.deadlineAt;
+  if (input.plannedAt !== undefined) patch.planned_at = input.plannedAt;
   if (input.estimateSeconds !== undefined) patch.estimate_seconds = input.estimateSeconds;
   if (input.priority !== undefined) patch.priority = input.priority;
   if (input.status !== undefined) patch.status = input.status;

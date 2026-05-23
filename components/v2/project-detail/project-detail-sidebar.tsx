@@ -4,6 +4,9 @@ import type { ProjectDetailPayload } from "@/lib/v2/projects/project-detail-type
 import { fmtRubShort, pluralRu } from "@/lib/v2/projects/portfolio-utils";
 import { MemberAvatar, ProjectBadge } from "@/components/v2/projects/project-atoms";
 import { V2Icons } from "@/components/v2/ui/icons";
+import { V2FileUploadDropzone } from "@/components/v2/ui/file-upload-dropzone";
+import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { useState } from "react";
 
 type BadgeProject = {
   shortName: string | null;
@@ -24,14 +27,43 @@ function linkInitial(url: string): string {
 export function ProjectDetailSidebar({
   detail,
   badgeProject,
+  projectId,
+  onReload,
   onEditMembers,
 }: {
   detail: ProjectDetailPayload;
   badgeProject: BadgeProject;
+  projectId: string;
+  onReload: () => Promise<void>;
   onEditMembers?: () => void;
 }) {
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [showFileForm, setShowFileForm] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkTitle, setLinkTitle] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const totalHours = detail.memberHours.reduce((a, m) => a + m.hours, 0);
   const totalRub = detail.memberHours.reduce((a, m) => a + m.rub, 0);
+
+  async function addLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!linkUrl.trim()) return;
+    setSaving(true);
+    try {
+      await fetchJson(`/api/v2/projects/${projectId}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: linkUrl.trim(), title: linkTitle.trim() || undefined }),
+      });
+      setLinkUrl("");
+      setLinkTitle("");
+      setShowLinkForm(false);
+      await onReload();
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <aside className="sticky top-28 flex max-h-[calc(100vh-7rem)] flex-col gap-4 overflow-y-auto v2-no-scrollbar">
@@ -64,7 +96,21 @@ export function ProjectDetailSidebar({
       <div className="rounded-2xl bg-white p-3 shadow-[var(--v2-shadow-card)]">
         <div className="flex items-center justify-between px-2 py-2">
           <h4 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">Ссылки</h4>
-          <span className="v2-tnum text-[11px] text-[var(--v2-ink-400)]">{detail.links.length}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="v2-tnum text-[11px] text-[var(--v2-ink-400)]">{detail.links.length}</span>
+            <button
+              type="button"
+              title="Добавить ссылку"
+              onClick={() => setShowLinkForm((v) => !v)}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition ${
+                showLinkForm
+                  ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
+                  : "text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+              }`}
+            >
+              <V2Icons.plus className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="space-y-0.5">
           {detail.links.length === 0 ? (
@@ -90,6 +136,30 @@ export function ProjectDetailSidebar({
             ))
           )}
         </div>
+        {showLinkForm ? (
+          <form onSubmit={addLink} className="space-y-2 border-t border-[var(--v2-ink-100)]/70 px-2 py-3">
+            <input
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="URL ссылки"
+              className="v2-input w-full text-[12px]"
+              autoFocus
+            />
+            <input
+              value={linkTitle}
+              onChange={(e) => setLinkTitle(e.target.value)}
+              placeholder="Название (необязательно)"
+              className="v2-input w-full text-[12px]"
+            />
+            <button
+              type="submit"
+              disabled={saving || !linkUrl.trim()}
+              className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--v2-ink-900)] text-[12px] font-medium text-white disabled:opacity-50"
+            >
+              <V2Icons.plus className="h-3.5 w-3.5" /> Добавить
+            </button>
+          </form>
+        ) : null}
       </div>
 
       <div className="rounded-2xl bg-white p-3 shadow-[var(--v2-shadow-card)]">
@@ -97,6 +167,18 @@ export function ProjectDetailSidebar({
           <h4 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
             Файлы <span className="ml-1 normal-case tracking-normal text-[var(--v2-ink-300)]">· {detail.files.length}</span>
           </h4>
+          <button
+            type="button"
+            title="Добавить файл"
+            onClick={() => setShowFileForm((v) => !v)}
+            className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition ${
+              showFileForm
+                ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
+                : "text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+            }`}
+          >
+            <V2Icons.plus className="h-4 w-4" />
+          </button>
         </div>
         <div className="space-y-0.5">
           {detail.files.length === 0 ? (
@@ -124,6 +206,18 @@ export function ProjectDetailSidebar({
             ))
           )}
         </div>
+        {showFileForm ? (
+          <div className="border-t border-[var(--v2-ink-100)]/70 px-2 py-3">
+            <V2FileUploadDropzone
+              compact
+              uploadPath={`/api/v2/projects/${projectId}/files`}
+              onUploaded={async () => {
+                setShowFileForm(false);
+                await onReload();
+              }}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">

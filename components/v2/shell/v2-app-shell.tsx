@@ -1,15 +1,24 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-url";
+import { apiUrl, appPath } from "@/lib/api-url";
 import type { V2ProjectRow, V2TaskWithMeta, V2WorkspaceRow } from "@/lib/v2/types";
 import { V2Icons } from "@/components/v2/ui/icons";
+import { ProfileModal } from "@/components/ProfileModal";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CommandPalette } from "@/components/v2/shell/command-palette";
-import { NewTaskModal } from "@/components/v2/tasks/new-task-modal";
+import { NewTaskModal, type LockedProjectHint } from "@/components/v2/tasks/new-task-modal";
 import { V2ShellSidebar } from "@/components/v2/shell/v2-shell-sidebar";
+import type { V2ShellUser } from "@/components/v2/shell/v2-user-account-menu";
 
-type Me = { id: string; name: string; role: string };
+type Me = V2ShellUser & { role: string };
 type Member = { user_id: string; display_name: string; role: string };
+
+export type TaskCreationContext = {
+  projectId: string;
+  lockedProject: LockedProjectHint;
+  workMonth?: string | null;
+};
 
 type V2Bootstrap = {
   me: Me | null;
@@ -20,6 +29,7 @@ type V2Bootstrap = {
   loading: boolean;
   refresh: () => Promise<void>;
   openNewTask: (projectId?: string | null, title?: string) => void;
+  setTaskCreationContext: (ctx: TaskCreationContext | null) => void;
   openCommandPalette: () => void;
 };
 
@@ -32,6 +42,7 @@ const Ctx = createContext<V2Bootstrap>({
   loading: true,
   refresh: async () => {},
   openNewTask: () => {},
+  setTaskCreationContext: () => {},
   openCommandPalette: () => {},
 });
 
@@ -58,6 +69,7 @@ const NAV: NavItem[] = [
 ];
 
 export function V2AppShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [workspace, setWorkspace] = useState<V2WorkspaceRow | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -69,12 +81,43 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [newTaskProjectId, setNewTaskProjectId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskLockedProject, setNewTaskLockedProject] = useState<LockedProjectHint | null>(null);
+  const [newTaskWorkMonth, setNewTaskWorkMonth] = useState<string | null>(null);
+  const [taskCreationContext, setTaskCreationContext] = useState<TaskCreationContext | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
-  const openNewTask = useCallback((projectId?: string | null, title?: string) => {
-    setNewTaskProjectId(projectId ?? null);
-    setNewTaskTitle(title ?? "");
-    setNewTaskOpen(true);
-  }, []);
+  const openNewTask = useCallback(
+    (projectId?: string | null, title?: string) => {
+      const pid = projectId ?? taskCreationContext?.projectId ?? null;
+      setNewTaskProjectId(pid);
+      setNewTaskTitle(title ?? "");
+
+      if (pid && taskCreationContext?.projectId === pid) {
+        setNewTaskLockedProject(taskCreationContext.lockedProject);
+        setNewTaskWorkMonth(taskCreationContext.workMonth ?? null);
+      } else if (pid) {
+        const p = projects.find((x) => x.id === pid);
+        setNewTaskLockedProject(
+          p
+            ? {
+                name: p.name,
+                shortName: p.short_name,
+                colorBg: p.color_bg,
+                colorTint: p.color_tint,
+                colorInk: p.color_ink,
+              }
+            : null
+        );
+        setNewTaskWorkMonth(null);
+      } else {
+        setNewTaskLockedProject(null);
+        setNewTaskWorkMonth(null);
+      }
+
+      setNewTaskOpen(true);
+    },
+    [taskCreationContext, projects]
+  );
 
   const refresh = useCallback(async () => {
     const [meRes, projRes, taskRes, inboxRes] = await Promise.all([
@@ -145,6 +188,12 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
             ? "ПМ"
             : "Участник";
 
+  const logout = useCallback(async () => {
+    await fetch(apiUrl("/api/auth/logout"), { method: "POST" });
+    router.push(appPath("/login"));
+    router.refresh();
+  }, [router]);
+
   return (
     <Ctx.Provider
       value={{
@@ -156,6 +205,7 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
         loading,
         refresh,
         openNewTask,
+        setTaskCreationContext,
         openCommandPalette: () => setPaletteOpen(true),
       }}
     >
@@ -167,6 +217,8 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
           me={me}
           roleLabel={roleLabel}
           onOpenSearch={() => setPaletteOpen(true)}
+          onOpenProfile={() => setProfileOpen(true)}
+          onLogout={logout}
         />
         <main className="flex min-w-0 flex-1 flex-col">{children}</main>
         <CommandPalette
@@ -176,14 +228,48 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
         />
         <NewTaskModal
           open={newTaskOpen}
-          onClose={() => setNewTaskOpen(false)}
+          onClose={() => {
+            setNewTaskOpen(false);
+            setNewTaskProjectId(null);
+            setNewTaskTitle("");
+            setNewTaskLockedProject(null);
+            setNewTaskWorkMonth(null);
+          }}
           projects={projects}
           members={members}
           defaultProjectId={newTaskProjectId}
+          lockedProject={newTaskLockedProject}
+          workMonth={newTaskWorkMonth}
           initialTitle={newTaskTitle}
           currentUserId={me?.id}
           onCreated={() => void refresh()}
         />
+        {me?.id ? (
+          <ProfileModal
+            open={profileOpen}
+            user={{
+              id: me.id,
+              login: me.login ?? "",
+              name: me.name,
+              title: me.title ?? "",
+              avatarUrl: me.avatarUrl ?? null,
+            }}
+            onClose={() => setProfileOpen(false)}
+            onProfileSaved={(u) => {
+              setMe((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      name: u.name,
+                      title: u.title,
+                      avatarUrl: u.avatarUrl,
+                      login: u.login,
+                    }
+                  : prev
+              );
+            }}
+          />
+        ) : null}
       </div>
     </Ctx.Provider>
   );

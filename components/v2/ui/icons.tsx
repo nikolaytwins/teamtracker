@@ -249,9 +249,19 @@ export const V2Icons = {
       <path d="m8 11 8-4M8 13l8 4" stroke="currentColor" strokeWidth="1.6" />
     </svg>
   ),
+  trash: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M4 7h16M9 7V5h6v2M10 11v6M14 11v6M6 7l1 12h10l1-12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
   download: (p: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  upload: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M12 15V4m0 0-4 4m4-4 4 4M5 19h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
   history: (p: IconProps) => (

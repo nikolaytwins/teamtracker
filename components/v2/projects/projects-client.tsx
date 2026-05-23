@@ -5,7 +5,8 @@ import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PortfolioPayload, PortfolioKanbanStatus, PortfolioProject } from "@/lib/v2/projects/portfolio-types";
 import { kanbanToV2Status } from "@/lib/v2/projects/portfolio-types";
 import { kanbanStatusToV2CreateStatus, STARRED_STORAGE_KEY } from "@/components/v2/projects/portfolio-meta";
-import { NewProjectModal } from "@/components/v2/projects/new-project-modal";
+import { NewProjectModal, type NewProjectModalInput } from "@/components/v2/projects/new-project-modal";
+import { DeleteProjectConfirmModal } from "@/components/v2/projects/delete-project-dialog";
 import { PortfolioHero } from "@/components/v2/projects/portfolio-hero";
 import { ProjectsPageHead } from "@/components/v2/projects/projects-page-head";
 import { ProjectsTopbar } from "@/components/v2/projects/projects-topbar";
@@ -18,6 +19,7 @@ import {
   ViewSwitcher,
 } from "@/components/v2/projects/projects-views";
 import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
+import { canAccessPmBoard, normalizeTtUserRole } from "@/lib/roles";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -49,8 +51,9 @@ function useStarredProjects() {
 
 export function V2ProjectsClient() {
   const router = useRouter();
-  const { refresh: refreshBoot, members: workspaceMembers } = useV2Bootstrap();
+  const { me, refresh: refreshBoot, members: workspaceMembers } = useV2Bootstrap();
   const { starred, toggle: toggleStar } = useStarredProjects();
+  const canDeleteProjects = canAccessPmBoard(normalizeTtUserRole(me?.role));
 
   const [payload, setPayload] = useState<PortfolioPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +63,8 @@ export function V2ProjectsClient() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PortfolioProject | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     const data = await fetchJson<PortfolioPayload>("/api/v2/projects/portfolio");
@@ -171,22 +176,19 @@ export function V2ProjectsClient() {
     await Promise.all([load(), refreshBoot()]);
   }
 
-  async function createProjectFromModal(input: {
-    name: string;
-    engagementType: "one_off" | "retainer";
-    clientAccessEnabled: boolean;
-    teamMemberIds: string[];
-    clientUserIds: string[];
-  }) {
+  async function createProjectFromModal(input: NewProjectModalInput) {
     await fetchJson("/api/v2/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: input.name,
         scope: "team",
-        status: kanbanStatusToV2CreateStatus("in_progress"),
+        status: kanbanStatusToV2CreateStatus(input.status),
         engagementType: input.engagementType,
         clientAccessEnabled: input.clientAccessEnabled,
+        contractRef: input.contractRef,
+        releaseAt: input.releaseAt,
+        budgetRub: input.budgetRub,
         teamMemberUserIds: input.teamMemberIds,
         clientUserIds: input.clientUserIds,
       }),
@@ -197,8 +199,12 @@ export function V2ProjectsClient() {
   async function createProject(name: string, status: PortfolioKanbanStatus) {
     await createProjectFromModal({
       name,
+      status,
       engagementType: "one_off",
       clientAccessEnabled: false,
+      contractRef: null,
+      releaseAt: null,
+      budgetRub: null,
       teamMemberIds: [],
       clientUserIds: [],
     });
@@ -215,6 +221,21 @@ export function V2ProjectsClient() {
 
   function openProject(id: string) {
     router.push(appPath(`/v2/projects/${id}`));
+  }
+
+  async function confirmDeleteProject() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await fetchJson(`/api/v2/projects/${deleteTarget.id}`, { method: "DELETE" });
+      setDeleteTarget(null);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить проект");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (loading) {
@@ -308,6 +329,8 @@ export function V2ProjectsClient() {
                         onAdd={(name, st) => void createProject(name, st)}
                         defaultStatus={s.defaultStatus}
                         allowAdd={s.allowAdd}
+                        canDelete={canDeleteProjects}
+                        onDeleteRequest={setDeleteTarget}
                       />
                     ))}
                   </div>
@@ -369,6 +392,15 @@ export function V2ProjectsClient() {
         members={workspaceMembers}
         onClose={() => setNewProjectOpen(false)}
         onCreate={createProjectFromModal}
+      />
+      <DeleteProjectConfirmModal
+        open={!!deleteTarget}
+        projectName={deleteTarget?.name ?? ""}
+        saving={deleting}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+        onConfirm={confirmDeleteProject}
       />
     </>
   );

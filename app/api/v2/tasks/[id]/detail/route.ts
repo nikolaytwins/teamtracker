@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Session } from "@/lib/v2/auth/require-v2-session";
 import { getTaskById } from "@/lib/v2/tasks/task-repo";
-import { listComments, listLinks, listSubtasks } from "@/lib/v2/tasks/task-detail";
+import { listComments, listLinks, listSubtasks, listFiles } from "@/lib/v2/tasks/task-detail";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -13,11 +13,12 @@ export async function GET(_request: NextRequest, { params }: RouteCtx) {
   const task = await getTaskById(auth.ctx, id);
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const [comments, links, subtasks] = await Promise.all([
+  const [comments, links, subtasks, files] = await Promise.all([
     listComments(id),
     listLinks(id),
     listSubtasks(auth.ctx, id),
+    listFiles(id),
   ]);
 
-  return NextResponse.json({ task, comments, links, subtasks });
+  return NextResponse.json({ task, comments, links, subtasks, files });
 }

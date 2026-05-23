@@ -1,14 +1,19 @@
 "use client";
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { kanbanToV2Status, type PortfolioKanbanStatus } from "@/lib/v2/projects/portfolio-types";
+import { pickSuggestedProjectDetailTask } from "@/lib/v2/tasks/suggest-task";
 import type { ProjectDetailPayload } from "@/lib/v2/projects/project-detail-types";
 import type { V2TaskStatus } from "@/lib/v2/types";
 import { EditProjectMembersModal } from "@/components/v2/projects/edit-project-members-modal";
+import { EditProjectModal } from "@/components/v2/projects/edit-project-modal";
+import { DeleteProjectConfirmModal } from "@/components/v2/projects/delete-project-dialog";
 import { RetainerMonthPicker } from "@/components/v2/project-detail/retainer-month-picker";
 import { ProjectDetailActivity } from "@/components/v2/project-detail/project-detail-activity";
 import { ProjectDetailFilesTab } from "@/components/v2/project-detail/project-detail-files-tab";
 import { ProjectDetailHeader } from "@/components/v2/project-detail/project-detail-header";
 import { ProjectDetailSidebar } from "@/components/v2/project-detail/project-detail-sidebar";
+import { ProjectDetailStages } from "@/components/v2/project-detail/project-detail-stages";
 import { ProjectDetailTasks } from "@/components/v2/project-detail/project-detail-tasks";
 import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
 import { V2NotificationsBell } from "@/components/v2/shell/notifications-bell";
@@ -16,6 +21,7 @@ import { TaskDrawer } from "@/components/v2/tasks/task-drawer";
 import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type TabId = "tasks" | "kanban" | "activity" | "files";
@@ -127,7 +133,9 @@ function ProjectDetailKanban({
 }
 
 export function ProjectDetailClient({ projectId }: { projectId: string }) {
-  const { me, members, projects, openNewTask, openCommandPalette, refresh: refreshBoot } = useV2Bootstrap();
+  const router = useRouter();
+  const { me, members, projects, openNewTask, openCommandPalette, refresh: refreshBoot, setTaskCreationContext } =
+    useV2Bootstrap();
 
   const [detail, setDetail] = useState<ProjectDetailPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,9 +146,17 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
   const [active, setActive] = useState<ActiveTimer | null>(null);
   const [tick, setTick] = useState(0);
   const [membersModalOpen, setMembersModalOpen] = useState(false);
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const runningTaskId = active?.session.task_id ?? null;
   const elapsed = active ? active.elapsedSeconds + tick : 0;
+
+  const suggestedTask = useMemo(
+    () => (detail ? pickSuggestedProjectDetailTask(detail.tasks, me?.id) : null),
+    [detail, me?.id]
+  );
 
   const load = useCallback(async (month?: string | null) => {
     const qs = month ? `?month=${encodeURIComponent(month.slice(0, 7))}` : "";
@@ -159,6 +175,22 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
       .catch((e) => setError(e instanceof Error ? e.message : "Ошибка"))
       .finally(() => setLoading(false));
   }, [load, loadTimer]);
+
+  useEffect(() => {
+    if (!detail) return;
+    setTaskCreationContext({
+      projectId,
+      lockedProject: {
+        name: detail.name,
+        shortName: detail.shortName,
+        colorBg: detail.colorBg,
+        colorTint: detail.colorTint,
+        colorInk: detail.colorInk,
+      },
+      workMonth: detail.workMonth,
+    });
+    return () => setTaskCreationContext(null);
+  }, [projectId, detail, setTaskCreationContext]);
 
   useEffect(() => {
     if (!active) return;
@@ -181,18 +213,64 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
     }
   }
 
-  async function toggleTimer(taskId: string) {
-    if (runningTaskId === taskId) {
-      await fetchJson("/api/v2/timer/stop", { method: "POST" });
-    } else {
-      await fetchJson("/api/v2/timer/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
-      });
+  async function toggleTimer(taskId?: string) {
+    setError(null);
+    try {
+      if (runningTaskId && taskId && runningTaskId !== taskId) {
+        await fetchJson("/api/v2/timer/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId }),
+        });
+      } else if (runningTaskId && (!taskId || runningTaskId === taskId)) {
+        await fetchJson("/api/v2/timer/stop", { method: "POST" });
+      } else {
+        const targetId = taskId ?? suggestedTask?.id;
+        if (!targetId) {
+          setError("Нет открытых задач — создайте задачу или выберите из списка");
+          return;
+        }
+        await fetchJson("/api/v2/timer/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: targetId }),
+        });
+      }
+      setTick(0);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось переключить таймер");
     }
-    setTick(0);
+  }
+
+  async function saveProject(input: {
+    name: string;
+    status: PortfolioKanbanStatus;
+    engagementType: "one_off" | "retainer";
+    clientAccessEnabled: boolean;
+    contractRef: string | null;
+    releaseAt: string | null;
+    budgetRub: number | null;
+    teamMemberUserIds: string[];
+    clientUserIds: string[];
+  }) {
+    await fetchJson(`/api/v2/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: input.name,
+        status: kanbanToV2Status(input.status),
+        engagementType: input.engagementType,
+        clientAccessEnabled: input.clientAccessEnabled,
+        contractRef: input.contractRef,
+        releaseAt: input.releaseAt,
+        budgetRub: input.budgetRub,
+        teamMemberUserIds: input.teamMemberUserIds,
+        clientUserIds: input.clientUserIds,
+      }),
+    });
     await reload();
+    await refreshBoot();
   }
 
   async function saveMembers(input: {
@@ -206,6 +284,19 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
       body: JSON.stringify(input),
     });
     await reload();
+  }
+
+  async function confirmDeleteProject() {
+    setDeleting(true);
+    setError(null);
+    try {
+      await fetchJson(`/api/v2/projects/${projectId}`, { method: "DELETE" });
+      await refreshBoot();
+      router.push(appPath("/v2/projects"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить проект");
+      setDeleting(false);
+    }
   }
 
   if (loading) {
@@ -276,11 +367,14 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
             detail={detail}
             badgeProject={badgeProject}
             runningTaskId={runningTaskId}
+            runningTaskTitle={active?.task.title ?? null}
+            suggestedTask={suggestedTask ? { id: suggestedTask.id, title: suggestedTask.title } : null}
             elapsed={elapsed}
-            onToggleTimer={() => {
-              if (runningTaskId) void toggleTimer(runningTaskId);
-            }}
+            onToggleTimer={() => void toggleTimer()}
+            onEditProject={detail.canManageMembers ? () => setEditProjectOpen(true) : undefined}
             onEditMembers={detail.canManageMembers ? () => setMembersModalOpen(true) : undefined}
+            canDelete={detail.canManageMembers}
+            onDeleteRequest={() => setDeleteOpen(true)}
           />
 
           <div className="mt-6 flex flex-wrap items-end justify-between gap-3 border-b border-[var(--v2-ink-200)] px-1 pb-0">
@@ -322,17 +416,32 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
           <div className="mt-5 grid grid-cols-12 gap-6">
             <div className="col-span-12 min-w-0 xl:col-span-9">
               {tab === "tasks" ? (
-                <ProjectDetailTasks
-                  projectId={projectId}
-                  tasks={detail.tasks}
-                  team={detail.team}
-                  runningTaskId={runningTaskId}
-                  onOpenTask={setDrawerTaskId}
-                  onReload={reload}
-                  onToggleTimer={toggleTimer}
-                  canCreateTasks={detail.canCreateTasks}
-                  workMonth={detail.workMonth}
-                />
+                detail.engagementType === "retainer" ? (
+                  <ProjectDetailTasks
+                    projectId={projectId}
+                    tasks={detail.tasks}
+                    team={detail.team}
+                    runningTaskId={runningTaskId}
+                    onOpenTask={setDrawerTaskId}
+                    onReload={reload}
+                    onToggleTimer={toggleTimer}
+                    canCreateTasks={detail.canCreateTasks}
+                    workMonth={detail.workMonth}
+                  />
+                ) : (
+                  <ProjectDetailStages
+                    projectId={projectId}
+                    phases={detail.phases}
+                    unphasedTasks={detail.unphasedTasks}
+                    team={detail.team}
+                    runningTaskId={runningTaskId}
+                    onOpenTask={setDrawerTaskId}
+                    onReload={reload}
+                    onToggleTimer={toggleTimer}
+                    canCreateTasks={detail.canCreateTasks}
+                    workMonth={detail.workMonth}
+                  />
+                )
               ) : null}
               {tab === "kanban" ? (
                 <ProjectDetailKanban detail={detail} runningTaskId={runningTaskId} onOpenTask={setDrawerTaskId} />
@@ -346,12 +455,33 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
               <ProjectDetailSidebar
                 detail={detail}
                 badgeProject={badgeProject}
+                projectId={projectId}
+                onReload={reload}
                 onEditMembers={detail.canManageMembers ? () => setMembersModalOpen(true) : undefined}
               />
             </div>
           </div>
         </div>
       </div>
+
+      <DeleteProjectConfirmModal
+        open={deleteOpen}
+        projectName={detail.name}
+        saving={deleting}
+        onClose={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+        onConfirm={confirmDeleteProject}
+      />
+
+      <EditProjectModal
+        open={editProjectOpen}
+        detail={detail}
+        members={members}
+        meId={me?.id ?? null}
+        onClose={() => setEditProjectOpen(false)}
+        onSave={saveProject}
+      />
 
       <EditProjectMembersModal
         open={membersModalOpen}
@@ -371,7 +501,22 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
         onClose={() => setDrawerTaskId(null)}
         onUpdated={reload}
         members={members}
-        projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+        projects={projects.map((p) => ({
+          id: p.id,
+          name: p.name,
+          short_name: p.short_name,
+          color_bg: p.color_bg,
+          color_tint: p.color_tint,
+          color_ink: p.color_ink,
+        }))}
+        lockedProjectId={projectId}
+        lockedProject={{
+          name: detail.name,
+          shortName: detail.shortName,
+          colorBg: detail.colorBg,
+          colorTint: detail.colorTint,
+          colorInk: detail.colorInk,
+        }}
         runningTaskId={runningTaskId}
         onToggleTimer={toggleTimer}
       />

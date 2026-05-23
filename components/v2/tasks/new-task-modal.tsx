@@ -2,16 +2,26 @@
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
+  fromDateInputValue,
   fromDatetimeLocalValue,
   todayDatetimeLocal,
   toDatetimeLocalValue,
 } from "@/lib/v2/format";
 import { parseQuickTaskInput } from "@/lib/v2/nlp/parse-task";
 import type { V2ProjectRow, V2TaskPriority, V2TaskWithMeta } from "@/lib/v2/types";
-import { PRIORITY_META } from "@/components/v2/ui/icons";
+import { AssigneeAvatarPicker, PriorityFlagPicker } from "@/components/v2/tasks/task-field-pickers";
+import { ProjectChip } from "@/components/v2/ui/primitives";
 import { useEffect, useMemo, useState } from "react";
 
-type Member = { user_id: string; display_name: string };
+type Member = { user_id: string; display_name: string; role?: string };
+
+export type LockedProjectHint = {
+  name: string;
+  shortName?: string | null;
+  colorBg?: string | null;
+  colorTint?: string | null;
+  colorInk?: string | null;
+};
 
 type DuePreset = "none" | "today_eod" | "today_16" | "tomorrow" | "week";
 
@@ -44,6 +54,8 @@ export function NewTaskModal({
   projects,
   members,
   defaultProjectId,
+  lockedProject,
+  workMonth,
   initialTitle,
   currentUserId,
 }: {
@@ -53,17 +65,49 @@ export function NewTaskModal({
   projects: V2ProjectRow[];
   members: Member[];
   defaultProjectId?: string | null;
+  lockedProject?: LockedProjectHint | null;
+  workMonth?: string | null;
   initialTitle?: string;
   currentUserId?: string;
 }) {
   const teamProjects = useMemo(() => projects.filter((p) => p.scope === "team"), [projects]);
+  const assigneeMembers = useMemo(() => members.filter((m) => m.role !== "client"), [members]);
+  const projectLocked = Boolean(defaultProjectId);
+
+  const lockedProjectOption = useMemo(() => {
+    if (!defaultProjectId) return null;
+    const fromList = teamProjects.find((p) => p.id === defaultProjectId);
+    if (fromList) {
+      return {
+        id: fromList.id,
+        name: fromList.name,
+        short_name: fromList.short_name,
+        color_bg: fromList.color_bg,
+        color_tint: fromList.color_tint,
+        color_ink: fromList.color_ink,
+      };
+    }
+    if (lockedProject) {
+      return {
+        id: defaultProjectId,
+        name: lockedProject.name,
+        short_name: lockedProject.shortName,
+        color_bg: lockedProject.colorBg,
+        color_tint: lockedProject.colorTint,
+        color_ink: lockedProject.colorInk,
+      };
+    }
+    return null;
+  }, [defaultProjectId, teamProjects, lockedProject]);
+
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState<string>("");
+  const [plannedLocal, setPlannedLocal] = useState("");
   const [dueLocal, setDueLocal] = useState("");
   const [duePreset, setDuePreset] = useState<DuePreset>("none");
   const [priority, setPriority] = useState<V2TaskPriority>("medium");
   const [estimateHours, setEstimateHours] = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,13 +115,14 @@ export function NewTaskModal({
     if (!open) return;
     setTitle(initialTitle ?? "");
     setProjectId(defaultProjectId ?? teamProjects[0]?.id ?? "");
+    setPlannedLocal("");
     setDueLocal("");
     setDuePreset("none");
     setPriority("medium");
     setEstimateHours("");
-    setAssigneeId(currentUserId ?? members[0]?.user_id ?? "");
+    setAssigneeId(currentUserId ?? assigneeMembers[0]?.user_id ?? null);
     setError(null);
-  }, [open, defaultProjectId, initialTitle, currentUserId, teamProjects, members]);
+  }, [open, defaultProjectId, initialTitle, currentUserId, teamProjects, assigneeMembers]);
 
   useEffect(() => {
     if (!open) return;
@@ -103,6 +148,8 @@ export function NewTaskModal({
       return;
     }
 
+    const finalProjectId = defaultProjectId ?? (projectId || null);
+
     setSaving(true);
     setError(null);
     try {
@@ -113,6 +160,7 @@ export function NewTaskModal({
         : duePreset !== "none"
           ? fromDatetimeLocalValue(dueFromPreset(duePreset))
           : parsed.deadlineAt;
+      const plannedAt = plannedLocal ? fromDateInputValue(plannedLocal) : null;
 
       const task = await fetchJson<{ task: V2TaskWithMeta }>("/api/v2/tasks", {
         method: "POST",
@@ -120,11 +168,13 @@ export function NewTaskModal({
         body: JSON.stringify({
           title: finalTitle,
           scope: "team",
-          projectId: projectId || null,
+          projectId: finalProjectId,
           assigneeUserId: assigneeId || undefined,
+          plannedAt,
           deadlineAt,
           priority,
           estimateHours: estimateHours ? Number(estimateHours) : undefined,
+          workMonth: workMonth ? workMonth.slice(0, 7) : undefined,
         }),
       });
       onCreated?.(task.task);
@@ -137,29 +187,45 @@ export function NewTaskModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-start justify-center bg-black/35 pt-[12vh]">
+    <div className="fixed inset-0 z-[110] flex items-start justify-center bg-black/35 pt-[10vh] sm:pt-[12vh]">
       <button type="button" className="absolute inset-0" onClick={onClose} aria-label="Закрыть" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-task-title"
-        className="relative w-full max-w-[520px] overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-pop)]"
       >
-        <div className="flex items-center justify-between border-b border-[var(--v2-ink-100)] px-5 py-4">
-          <h2 id="new-task-title" className="v2-tight text-[17px] font-semibold text-[var(--v2-ink-900)]">
-            Новая задача
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
+        <div className="relative border-b border-[var(--v2-ink-100)] px-5 py-4">
+          <div className="v2-dotgrid pointer-events-none absolute inset-0 opacity-40" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 id="new-task-title" className="v2-tight text-[17px] font-semibold text-[var(--v2-ink-900)]">
+                Новая задача
+              </h2>
+              {projectLocked && lockedProjectOption ? (
+                <div className="mt-2">
+                  <ProjectChip
+                    name={lockedProjectOption.name}
+                    short={lockedProjectOption.short_name}
+                    bg={lockedProjectOption.color_bg}
+                    tint={lockedProjectOption.color_tint}
+                    ink={lockedProjectOption.color_ink}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
+              aria-label="Закрыть"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={(e) => void submit(e)} className="space-y-4 px-5 py-4">
+        <form onSubmit={(e) => void submit(e)} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {error ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">{error}</div>
           ) : null}
@@ -178,47 +244,56 @@ export function NewTaskModal({
             </span>
           </label>
 
-          <label className="block">
-            <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Проект</span>
-            <select
-              className="v2-input"
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-            >
-              <option value="">Без проекта</option>
-              {teamProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            {projectId ? (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {teamProjects
-                  .filter((p) => p.id === projectId)
-                  .map((p) => (
-                    <span
-                      key={p.id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2.5 text-[12px] shadow-[var(--v2-shadow-card)]"
-                    >
-                      <span
-                        className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-[10px] font-semibold"
-                        style={{
-                          background: p.color_bg ?? "#eee",
-                          color: p.color_ink ?? p.color_tint ?? "#333",
-                        }}
-                      >
-                        {p.short_name}
-                      </span>
-                      {p.name}
-                    </span>
-                  ))}
-              </div>
-            ) : null}
-          </label>
+          {!projectLocked ? (
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Проект</span>
+              <select className="v2-input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                <option value="">Без проекта</option>
+                {teamProjects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <div>
-            <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Срок</span>
+            <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Ответственный</span>
+            <AssigneeAvatarPicker
+              members={assigneeMembers}
+              value={assigneeId}
+              onChange={setAssigneeId}
+              allowEmpty={false}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block text-[12px]">
+              <span className="text-[var(--v2-ink-600)]">Дата выполнения</span>
+              <input
+                type="date"
+                className="v2-input mt-1.5 w-full"
+                value={plannedLocal}
+                onChange={(e) => setPlannedLocal(e.target.value)}
+              />
+            </label>
+            <label className="block text-[12px]">
+              <span className="text-[var(--v2-ink-600)]">Оценка, ч</span>
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                className="v2-input mt-1.5 w-full"
+                placeholder="4"
+                value={estimateHours}
+                onChange={(e) => setEstimateHours(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <div>
+            <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Срок (дедлайн)</span>
             <div className="mb-2 flex flex-wrap gap-1.5">
               {(
                 [
@@ -254,51 +329,10 @@ export function NewTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Приоритет</span>
-              <select
-                className="v2-input"
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as V2TaskPriority)}
-              >
-                {(Object.keys(PRIORITY_META) as V2TaskPriority[]).map((p) => (
-                  <option key={p} value={p}>
-                    {PRIORITY_META[p].label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Оценка, ч</span>
-              <input
-                type="number"
-                min={0}
-                step={0.5}
-                className="v2-input"
-                placeholder="4"
-                value={estimateHours}
-                onChange={(e) => setEstimateHours(e.target.value)}
-              />
-            </label>
+          <div>
+            <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Приоритет</span>
+            <PriorityFlagPicker value={priority} onChange={setPriority} />
           </div>
-
-          {members.length > 1 ? (
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Исполнитель</span>
-              <select
-                className="v2-input"
-                value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-              >
-                {members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.display_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
 
           <div className="flex items-center justify-end gap-2 border-t border-[var(--v2-ink-100)] pt-4">
             <button type="button" onClick={onClose} className="v2-input px-4 py-2 text-[13px]">

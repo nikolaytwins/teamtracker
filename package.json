@@ -9,6 +9,7 @@
     "import-agency-to-supabase": "tsx scripts/import-agency-sqlite-to-supabase.ts",
     "import-team-to-supabase": "tsx scripts/import-team-sqlite-to-supabase.ts",
     "v2-migrate-from-v1": "tsx scripts/v2-migrate-from-v1.ts",
+    "v2-clear-projects": "tsx scripts/v2-clear-projects.ts",
     "backfill-worker-user-id": "tsx scripts/backfill-worker-user-id.ts"
   },
   "dependencies": {

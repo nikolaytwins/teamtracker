@@ -55,6 +55,11 @@ export async function POST(request: NextRequest) {
       ? body.clientUserIds.filter((x: unknown) => typeof x === "string")
       : undefined;
 
+    const contractRef = typeof body.contractRef === "string" ? body.contractRef.trim() || null : null;
+    const releaseAt = typeof body.releaseAt === "string" && body.releaseAt.trim() ? body.releaseAt.trim() : null;
+    const budgetRub =
+      typeof body.budgetRub === "number" && Number.isFinite(body.budgetRub) ? Math.round(body.budgetRub) : null;
+
     const project = await createProject(auth.ctx, {
       name,
       scope,
@@ -64,6 +69,9 @@ export async function POST(request: NextRequest) {
       status,
       engagementType,
       clientAccessEnabled,
+      contractRef,
+      releaseAt,
+      budgetRub,
     });
     return NextResponse.json({ project });
   } catch (e) {

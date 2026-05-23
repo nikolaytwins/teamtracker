@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
         projectId: typeof body.projectId === "string" ? body.projectId : null,
         assigneeUserId: typeof body.assigneeUserId === "string" ? body.assigneeUserId : auth.ctx.userId,
         deadlineAt: typeof body.deadlineAt === "string" ? body.deadlineAt : null,
+      plannedAt: typeof body.plannedAt === "string" ? body.plannedAt : null,
         estimateSeconds: typeof body.estimateHours === "number" ? Math.round(body.estimateHours * 3600) : null,
         priority: body.priority,
       });
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
       projectId: typeof body.projectId === "string" ? body.projectId : null,
       assigneeUserId: typeof body.assigneeUserId === "string" ? body.assigneeUserId : auth.ctx.userId,
       deadlineAt: typeof body.deadlineAt === "string" ? body.deadlineAt : null,
+      plannedAt: typeof body.plannedAt === "string" ? body.plannedAt : null,
       estimateSeconds:
         typeof body.estimateHours === "number"
           ? Math.round(body.estimateHours * 3600)
@@ -68,6 +70,7 @@ export async function POST(request: NextRequest) {
       description: typeof body.description === "string" ? body.description : null,
       inboxBucket: body.inboxBucket ?? null,
       parentId: typeof body.parentId === "string" ? body.parentId : null,
+      phaseId: typeof body.phaseId === "string" ? body.phaseId : null,
       workMonth: typeof body.workMonth === "string" ? body.workMonth : undefined,
     });
 

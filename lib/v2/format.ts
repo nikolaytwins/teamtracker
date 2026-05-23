@@ -26,6 +26,21 @@ export function fromDatetimeLocalValue(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+export function toDateInputValue(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function fromDateInputValue(value: string): string | null {
+  if (!value.trim()) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 12, 0, 0, 0).toISOString();
+}
+
 export function todayDatetimeLocal(hours = 18, minutes = 0): string {
   const d = new Date();
   d.setHours(hours, minutes, 0, 0);

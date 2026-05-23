@@ -12,8 +12,10 @@ import {
 import type { PortfolioHealth } from "@/lib/v2/projects/portfolio-types";
 import { v2StatusToKanban } from "@/lib/v2/projects/portfolio-types";
 import { listProjectFiles, listProjectLinks } from "@/lib/v2/projects/project-assets-repo";
+import { listProjectPhases } from "@/lib/v2/projects/project-phases-repo";
 import type {
   ProjectDetailActivity,
+  ProjectDetailPhase,
   ProjectDetailPayload,
   ProjectDetailSubtask,
   ProjectDetailTask,
@@ -59,6 +61,11 @@ function formatBytes(n: number | null): string {
 function formatDueLabel(deadlineAt: string | null, now = new Date()): string {
   if (!deadlineAt) return "—";
   return formatDeadlineLabel(deadlineAt, now).label;
+}
+
+function formatPlannedLabel(plannedAt: string | null, now = new Date()): string {
+  if (!plannedAt) return "—";
+  return formatDeadlineLabel(plannedAt, now).label;
 }
 
 function mapTaskStatusToUi(status: V2TaskStatus): string {
@@ -198,7 +205,10 @@ export async function buildProjectDetail(
       priority: t.priority,
       assigneeUserId: t.assignee_user_id,
       assigneeName: t.assignee_user_id ? (users.get(t.assignee_user_id) ?? null) : null,
+      plannedAt: t.planned_at,
+      plannedLabel: formatPlannedLabel(t.planned_at, now),
       deadlineLabel: formatDueLabel(t.deadline_at, now),
+      completedAt: t.completed_at,
       estimateHours: t.estimate_seconds ? t.estimate_seconds / 3600 : 0,
       loggedHours: Math.round(((loggedByTask.get(t.id) ?? 0) / 3600) * 10) / 10,
       commentCount: commentCount.get(t.id) ?? 0,
@@ -214,7 +224,10 @@ export async function buildProjectDetail(
       priority: t.priority,
       assigneeUserId: t.assignee_user_id,
       assigneeName: t.assignee_user_id ? (users.get(t.assignee_user_id) ?? null) : null,
+      plannedAt: t.planned_at,
+      plannedLabel: formatPlannedLabel(t.planned_at, now),
       deadlineLabel: formatDueLabel(t.deadline_at, now),
+      completedAt: t.completed_at,
       estimateHours: t.estimate_seconds ? t.estimate_seconds / 3600 : 0,
       loggedHours: Math.round(((loggedByTask.get(t.id) ?? 0) / 3600) * 10) / 10,
       commentCount: commentCount.get(t.id) ?? 0,
@@ -224,6 +237,63 @@ export async function buildProjectDetail(
   }
 
   const tasks = parentTasks.map(mapTask);
+
+  function buildPhasePayload(
+    phaseId: string,
+    meta: { title: string; description: string | null; sortOrder: number },
+    phaseTasks: ProjectDetailTask[]
+  ): ProjectDetailPhase {
+    const statusCounts = { todo: 0, in_progress: 0, review: 0, done: 0 };
+    let loggedHours = 0;
+    let estimateHours = 0;
+    for (const t of phaseTasks) {
+      statusCounts[t.status]++;
+      loggedHours += t.loggedHours;
+      estimateHours += t.estimateHours;
+      for (const s of t.subtasks) {
+        statusCounts[s.status]++;
+        loggedHours += s.loggedHours;
+        estimateHours += s.estimateHours;
+      }
+    }
+    const tasksDone = phaseTasks.filter((t) => t.status === "done" || t.completedAt).length;
+    const tasksTotal = phaseTasks.length;
+    let status: ProjectDetailPhase["status"] = "todo";
+    if (tasksTotal > 0 && tasksDone === tasksTotal) status = "done";
+    else if (phaseTasks.some((t) => t.status === "in_progress" || t.status === "review" || t.completedAt)) {
+      status = "in_progress";
+    }
+
+    return {
+      id: phaseId,
+      title: meta.title,
+      description: meta.description,
+      sortOrder: meta.sortOrder,
+      status,
+      tasksDone,
+      tasksTotal,
+      statusCounts,
+      loggedHours: Math.round(loggedHours * 10) / 10,
+      estimateHours: Math.round(estimateHours * 10) / 10,
+      tasks: phaseTasks,
+    };
+  }
+
+  const phaseRows = !isRetainer ? await listProjectPhases(projectId) : [];
+  const taskPhaseMap = new Map(parentTasks.map((t) => [t.id, (t as { phase_id?: string | null }).phase_id ?? null]));
+  const tasksByPhaseId = new Map<string | null, ProjectDetailTask[]>();
+  for (const task of tasks) {
+    const pid = taskPhaseMap.get(task.id) ?? null;
+    const list = tasksByPhaseId.get(pid) ?? [];
+    list.push(task);
+    tasksByPhaseId.set(pid, list);
+  }
+
+  const phases: ProjectDetailPhase[] = phaseRows.map((p, index) =>
+    buildPhasePayload(p.id, { title: p.title, description: p.description, sortOrder: p.sort_order ?? index }, tasksByPhaseId.get(p.id) ?? [])
+  );
+  const unphasedTasks = tasksByPhaseId.get(null) ?? [];
+
   const openTasks = allTasks.filter((t) => !t.completed_at);
   const tasksDone = allTasks.filter((t) => t.completed_at).length;
   const tasksTotal = allTasks.length;
@@ -381,6 +451,7 @@ export async function buildProjectDetail(
     startedAt: started.toLocaleDateString("ru-RU", { day: "numeric", month: "long" }),
     durationDays,
     budget,
+    budgetRub: project.budget_rub,
     spent,
     loggedHours: Math.round(loggedHours * 10) / 10,
     hoursToday: Math.round(hoursToday * 10) / 10,
@@ -389,6 +460,8 @@ export async function buildProjectDetail(
     team,
     memberHours,
     tasks,
+    phases,
+    unphasedTasks,
     links,
     files,
     activity,

@@ -10,7 +10,7 @@ import {
   writeNavProjectsExpanded,
   writeSidebarCollapsed,
 } from "@/lib/v2/shell/nav-storage";
-import { userInitials } from "@/lib/v2/format";
+import { V2UserAccountMenu, type V2ShellUser } from "@/components/v2/shell/v2-user-account-menu";
 import { V2Icons } from "@/components/v2/ui/icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -128,13 +128,17 @@ export function V2ShellSidebar({
   me,
   roleLabel,
   onOpenSearch,
+  onOpenProfile,
+  onLogout,
 }: {
   nav: NavItem[];
   teamProjects: V2ProjectRow[];
   taskCounts: { open: number; inbox: number; byProject: Record<string, number> };
-  me: { id: string; name: string } | null;
+  me: V2ShellUser | null;
   roleLabel: string;
   onOpenSearch: () => void;
+  onOpenProfile: () => void;
+  onLogout: () => void | Promise<void>;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -231,6 +235,17 @@ export function V2ShellSidebar({
               );
             })}
           </aside>
+        ) : null}
+        {me ? (
+          <div className="fixed bottom-4 left-3 z-40 rounded-xl bg-white p-1 shadow-[var(--v2-shadow-card)]">
+            <V2UserAccountMenu
+              user={me}
+              roleLabel={roleLabel}
+              compact
+              onOpenProfile={onOpenProfile}
+              onLogout={onLogout}
+            />
+          </div>
         ) : null}
       </>
     );
@@ -342,18 +357,12 @@ export function V2ShellSidebar({
 
       {me ? (
         <div className="mx-1 mt-auto pt-4">
-          <button
-            type="button"
-            className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl bg-[var(--v2-ink-50)] px-2 py-2 transition hover:bg-[var(--v2-ink-100)]/70"
-          >
-            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--v2-brand-400)] to-[var(--v2-brand-600)] text-[12.5px] font-semibold text-white ring-2 ring-white">
-              {userInitials(me.name)}
-            </div>
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="v2-tight truncate text-[13px] font-semibold text-[var(--v2-ink-900)]">{me.name}</div>
-              <div className="truncate text-[11px] text-[var(--v2-ink-500)]">{roleLabel}</div>
-            </div>
-          </button>
+          <V2UserAccountMenu
+            user={me}
+            roleLabel={roleLabel}
+            onOpenProfile={onOpenProfile}
+            onLogout={onLogout}
+          />
         </div>
       ) : null}
     </aside>

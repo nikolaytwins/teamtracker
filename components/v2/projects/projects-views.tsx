@@ -182,6 +182,8 @@ export function ListSection({
   onAdd,
   defaultStatus,
   allowAdd = true,
+  canDelete,
+  onDeleteRequest,
 }: {
   title: string;
   subtitle?: string;
@@ -193,6 +195,8 @@ export function ListSection({
   onAdd: (name: string, status: PortfolioKanbanStatus) => void;
   defaultStatus: PortfolioKanbanStatus;
   allowAdd?: boolean;
+  canDelete?: boolean;
+  onDeleteRequest?: (project: PortfolioProject) => void;
 }) {
   const [open, setOpen] = useState(true);
   if (list.length === 0 && !allowAdd) return null;
@@ -203,7 +207,14 @@ export function ListSection({
         <div className="flex flex-col gap-3">
           {list.map((p, i) => (
             <div key={p.id} className="v2-row-in" style={{ animationDelay: `${i * 30}ms` }}>
-              <ProjectTile project={p} starred={starredIds.has(p.id)} onOpen={onOpen} onToggleStar={onToggleStar} />
+              <ProjectTile
+                project={p}
+                starred={starredIds.has(p.id)}
+                onOpen={onOpen}
+                onToggleStar={onToggleStar}
+                canDelete={canDelete}
+                onDeleteRequest={onDeleteRequest}
+              />
             </div>
           ))}
           {allowAdd ? <QuickAddTile defaultStatus={defaultStatus} onAdd={onAdd} /> : null}

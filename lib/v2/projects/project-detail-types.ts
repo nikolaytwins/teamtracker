@@ -32,7 +32,10 @@ export type ProjectDetailSubtask = {
   priority: V2TaskPriority;
   assigneeUserId: string | null;
   assigneeName: string | null;
+  plannedAt: string | null;
+  plannedLabel: string;
   deadlineLabel: string;
+  completedAt: string | null;
   estimateHours: number;
   loggedHours: number;
   commentCount: number;
@@ -46,7 +49,10 @@ export type ProjectDetailTask = {
   priority: V2TaskPriority;
   assigneeUserId: string | null;
   assigneeName: string | null;
+  plannedAt: string | null;
+  plannedLabel: string;
   deadlineLabel: string;
+  completedAt: string | null;
   estimateHours: number;
   loggedHours: number;
   commentCount: number;
@@ -68,6 +74,20 @@ export type ProjectDetailActivity = {
   note: string | null;
   when: string;
   tone: "edit" | "comment" | "timer" | "attach" | "done" | "review";
+};
+
+export type ProjectDetailPhase = {
+  id: string;
+  title: string;
+  description: string | null;
+  sortOrder: number;
+  status: "done" | "in_progress" | "todo";
+  tasksDone: number;
+  tasksTotal: number;
+  statusCounts: { todo: number; in_progress: number; review: number; done: number };
+  loggedHours: number;
+  estimateHours: number;
+  tasks: ProjectDetailTask[];
 };
 
 export type ProjectDetailPayload = {
@@ -98,6 +118,7 @@ export type ProjectDetailPayload = {
   startedAt: string;
   durationDays: number;
   budget: number;
+  budgetRub: number | null;
   spent: number;
   loggedHours: number;
   hoursToday: number;
@@ -106,6 +127,8 @@ export type ProjectDetailPayload = {
   team: PortfolioMember[];
   memberHours: ProjectDetailMemberHours[];
   tasks: ProjectDetailTask[];
+  phases: ProjectDetailPhase[];
+  unphasedTasks: ProjectDetailTask[];
   links: ProjectDetailLink[];
   files: ProjectDetailFile[];
   activity: ProjectDetailActivity[];

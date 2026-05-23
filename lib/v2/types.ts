@@ -56,10 +56,20 @@ export type V2ProjectRow = {
   updated_at: string;
 };
 
+export type V2ProjectPhaseRow = {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+};
+
 export type V2TaskRow = {
   id: string;
   workspace_id: string;
   project_id: string | null;
+  phase_id: string | null;
   parent_id: string | null;
   scope: V2TaskScope;
   title: string;
@@ -69,6 +79,7 @@ export type V2TaskRow = {
   assignee_user_id: string | null;
   created_by: string;
   deadline_at: string | null;
+  planned_at: string | null;
   estimate_seconds: number | null;
   completed_at: string | null;
   sort_order: number;

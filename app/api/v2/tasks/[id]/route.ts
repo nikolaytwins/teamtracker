@@ -24,8 +24,10 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
       title: typeof body.title === "string" ? body.title : undefined,
       description: body.description !== undefined ? body.description : undefined,
       projectId: body.projectId !== undefined ? body.projectId : undefined,
+      phaseId: body.phaseId !== undefined ? body.phaseId : undefined,
       assigneeUserId: body.assigneeUserId !== undefined ? body.assigneeUserId : undefined,
       deadlineAt: body.deadlineAt !== undefined ? body.deadlineAt : undefined,
+      plannedAt: body.plannedAt !== undefined ? body.plannedAt : undefined,
       estimateSeconds:
         typeof body.estimateHours === "number"
           ? Math.round(body.estimateHours * 3600)

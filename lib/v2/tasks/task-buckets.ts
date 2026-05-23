@@ -35,9 +35,10 @@ export function classifyTaskBucket(task: V2TaskRow, now: Date = new Date()): V2T
     return "later";
   }
 
-  if (!task.deadline_at) return "later";
+  if (!task.planned_at && !task.deadline_at) return "later";
 
-  const deadline = new Date(task.deadline_at);
+  const scheduleAt = task.planned_at ?? task.deadline_at;
+  const deadline = new Date(scheduleAt!);
   if (deadline < todayStart) return "overdue";
   if (deadline >= todayStart && deadline <= todayEnd) return "today";
   if (deadline >= tomorrowStart && deadline <= tomorrowEnd) return "tomorrow";

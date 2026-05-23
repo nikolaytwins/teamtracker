@@ -64,6 +64,8 @@ export function formatActivityMessage(
       return `${row.actor_name} вернул(а) в работу «${p.title ?? ""}»`;
     case "project.created":
       return `${row.actor_name} создал(а) проект «${p.name ?? ""}»`;
+    case "project.deleted":
+      return `${row.actor_name} удалил(а) проект «${p.name ?? ""}»`;
     case "timer.started":
       return `${row.actor_name} запустил(а) таймер на «${p.title ?? ""}»`;
     case "timer.stopped":

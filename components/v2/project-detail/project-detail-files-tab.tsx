@@ -2,6 +2,7 @@
 
 import type { ProjectDetailLink, ProjectDetailFile } from "@/lib/v2/projects/project-detail-types";
 import { V2Icons } from "@/components/v2/ui/icons";
+import { V2FileUploadDropzone } from "@/components/v2/ui/file-upload-dropzone";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { useState } from "react";
 
@@ -40,8 +41,6 @@ export function ProjectDetailFilesTab({
 }) {
   const [linkUrl, setLinkUrl] = useState("");
   const [linkTitle, setLinkTitle] = useState("");
-  const [fileName, setFileName] = useState("");
-  const [fileUrl, setFileUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function addLink(e: React.FormEvent) {
@@ -56,24 +55,6 @@ export function ProjectDetailFilesTab({
       });
       setLinkUrl("");
       setLinkTitle("");
-      await onReload();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function addFile(e: React.FormEvent) {
-    e.preventDefault();
-    if (!fileName.trim() || !fileUrl.trim()) return;
-    setSaving(true);
-    try {
-      await fetchJson(`/api/v2/projects/${projectId}/files`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: fileName.trim(), url: fileUrl.trim() }),
-      });
-      setFileName("");
-      setFileUrl("");
       await onReload();
     } finally {
       setSaving(false);
@@ -209,29 +190,12 @@ export function ProjectDetailFilesTab({
             </tbody>
           </table>
         </div>
-        <form onSubmit={addFile} className="border-t border-[var(--v2-ink-100)] px-5 py-4">
-          <div className="flex flex-wrap gap-2">
-            <input
-              value={fileName}
-              onChange={(e) => setFileName(e.target.value)}
-              placeholder="Имя файла"
-              className="v2-input min-w-[160px] flex-1 text-[13px]"
-            />
-            <input
-              value={fileUrl}
-              onChange={(e) => setFileUrl(e.target.value)}
-              placeholder="URL файла"
-              className="v2-input min-w-[200px] flex-1 text-[13px]"
-            />
-            <button
-              type="submit"
-              disabled={saving || !fileName.trim() || !fileUrl.trim()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white disabled:opacity-50"
-            >
-              <V2Icons.plus className="h-4 w-4" /> Добавить файл
-            </button>
-          </div>
-        </form>
+        <div className="border-t border-[var(--v2-ink-100)] px-5 py-4">
+          <V2FileUploadDropzone
+            uploadPath={`/api/v2/projects/${projectId}/files`}
+            onUploaded={onReload}
+          />
+        </div>
       </section>
     </div>
   );

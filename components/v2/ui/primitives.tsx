@@ -43,7 +43,7 @@ export function PriorityDot({ priority }: { priority: V2TaskPriority }) {
   const m = PRIORITY_META[priority];
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.dot }} />
+      <V2Icons.flag className="h-3.5 w-3.5 shrink-0" style={{ color: m.dot }} />
       <span className="v2-tight text-[12px] text-[var(--v2-ink-600)]">{m.label}</span>
     </span>
   );

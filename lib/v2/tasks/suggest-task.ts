@@ -1,4 +1,5 @@
 import { BUCKET_ORDER } from "@/lib/v2/tasks/task-buckets";
+import type { ProjectDetailTask } from "@/lib/v2/projects/project-detail-types";
 import type { V2TaskPriority, V2TaskWithMeta } from "@/lib/v2/types";
 
 const PRIORITY_RANK: Record<V2TaskPriority, number> = {
@@ -28,4 +29,25 @@ export function pickSuggestedTask(tasks: V2TaskWithMeta[]): V2TaskWithMeta | nul
     if (b.deadline_at) return 1;
     return a.title.localeCompare(b.title, "ru");
   })[0]!;
+}
+
+/** Лучшая открытая задача проекта для кнопки «Запустить таймер». */
+export function pickSuggestedProjectDetailTask(
+  tasks: ProjectDetailTask[],
+  userId?: string | null
+): ProjectDetailTask | null {
+  const open = tasks.filter((t) => t.status !== "done" && !t.completedAt);
+  if (!open.length) return null;
+
+  const score = (t: ProjectDetailTask) => {
+    let s = 0;
+    if (t.status === "in_progress") s += 100;
+    if (userId && t.assigneeUserId === userId) s += 50;
+    if (t.status === "review") s += 20;
+    if (t.status === "todo") s += 10;
+    s -= PRIORITY_RANK[t.priority] * 5;
+    return s;
+  };
+
+  return [...open].sort((a, b) => score(b) - score(a))[0]!;
 }

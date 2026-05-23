@@ -69,6 +69,9 @@ export type CreateProjectInput = {
   status?: V2ProjectStatus;
   engagementType?: V2ProjectEngagementType;
   clientAccessEnabled?: boolean;
+  contractRef?: string | null;
+  releaseAt?: string | null;
+  budgetRub?: number | null;
   teamMemberUserIds?: string[];
   clientUserIds?: string[];
   memberUserIds?: string[];
@@ -111,9 +114,9 @@ export async function createProject(ctx: V2SessionContext, input: CreateProjectI
     color_ink: colors.ink ?? colors.tint,
     status: input.status ?? "in_progress",
     owner_user_id: input.scope === "personal" ? ctx.userId : null,
-    contract_ref: null,
-    release_at: null,
-    budget_rub: null,
+    contract_ref: input.contractRef?.trim() || null,
+    release_at: input.releaseAt ?? null,
+    budget_rub: input.budgetRub ?? null,
     engagement_type: engagementType,
     client_access_enabled: clientAccessEnabled,
     created_by: ctx.userId,
@@ -134,6 +137,9 @@ export async function createProject(ctx: V2SessionContext, input: CreateProjectI
     scope: row.scope,
     engagement_type: row.engagement_type,
     client_access_enabled: row.client_access_enabled,
+    contract_ref: row.contract_ref,
+    release_at: row.release_at,
+    budget_rub: row.budget_rub,
   });
   return row;
 }
@@ -157,10 +163,14 @@ export async function updateProject(
     status: V2ProjectStatus;
     clientAccessEnabled: boolean;
     engagementType: V2ProjectEngagementType;
+    contractRef: string | null;
+    releaseAt: string | null;
+    budgetRub: number | null;
   }>
 ): Promise<V2ProjectRow> {
   const project = await getProjectById(ctx, projectId);
   if (!project) throw new Error("Project not found");
+  if (!canManageProjectMembers(ctx)) throw new Error("Forbidden");
 
   const patch: Record<string, unknown> = { updated_at: nowIso() };
   if (input.name !== undefined) {
@@ -170,6 +180,9 @@ export async function updateProject(
   if (input.status !== undefined) patch.status = input.status;
   if (input.clientAccessEnabled !== undefined) patch.client_access_enabled = input.clientAccessEnabled;
   if (input.engagementType !== undefined) patch.engagement_type = input.engagementType;
+  if (input.contractRef !== undefined) patch.contract_ref = input.contractRef?.trim() || null;
+  if (input.releaseAt !== undefined) patch.release_at = input.releaseAt;
+  if (input.budgetRub !== undefined) patch.budget_rub = input.budgetRub;
 
   const sb = getV2Supabase();
   const { error } = await sb.from("v2_projects").update(patch).eq("id", projectId);
@@ -180,6 +193,9 @@ export async function updateProject(
     name: input.name,
     client_access_enabled: input.clientAccessEnabled,
     engagement_type: input.engagementType,
+    contract_ref: input.contractRef,
+    release_at: input.releaseAt,
+    budget_rub: input.budgetRub,
   });
   const updated = await getProjectById(ctx, projectId);
   if (!updated) throw new Error("Project not found after update");
@@ -196,6 +212,18 @@ export async function updateProjectMembers(
   if (!canManageProjectMembers(ctx)) throw new Error("Forbidden");
 
   await replaceProjectMembers(projectId, members);
+}
+
+export async function deleteProject(ctx: V2SessionContext, projectId: string): Promise<void> {
+  const project = await getProjectById(ctx, projectId);
+  if (!project) throw new Error("Project not found");
+  if (!canManageProjectMembers(ctx)) throw new Error("Forbidden");
+
+  const sb = getV2Supabase();
+  const { error } = await sb.from("v2_projects").delete().eq("id", projectId).eq("workspace_id", ctx.workspaceId);
+  if (error) throw new Error(error.message);
+
+  await logActivity(ctx, "project.deleted", "project", projectId, { name: project.name });
 }
 
 export { getProjectMembers, getProjectMemberIds };

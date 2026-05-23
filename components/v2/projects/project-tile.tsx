@@ -6,7 +6,6 @@ import {
   AvatarStack,
   BudgetBar,
   HealthDot,
-  IconBtn,
   PriorityDot,
   ProgressBar,
   ProjectBadge,
@@ -15,6 +14,7 @@ import {
   StatusBadge,
 } from "@/components/v2/projects/project-atoms";
 import { HEALTH_META } from "@/components/v2/projects/portfolio-meta";
+import { ProjectActionsMenu } from "@/components/v2/projects/delete-project-dialog";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useMemo } from "react";
 
@@ -23,11 +23,15 @@ export function ProjectTile({
   starred,
   onOpen,
   onToggleStar,
+  canDelete,
+  onDeleteRequest,
 }: {
   project: PortfolioProject;
   starred: boolean;
   onOpen: (id: string) => void;
   onToggleStar: (id: string) => void;
+  canDelete?: boolean;
+  onDeleteRequest?: (project: PortfolioProject) => void;
 }) {
   const overdue = p.deadlineDays !== null && p.deadlineDays < 0 && p.status !== "done";
   const soon = p.deadlineDays !== null && p.deadlineDays >= 0 && p.deadlineDays <= 3 && p.status !== "done";
@@ -91,9 +95,13 @@ export function ProjectTile({
             >
               {starred ? <V2Icons.starFill className="h-4 w-4" /> : <V2Icons.star className="h-4 w-4" />}
             </button>
-            <IconBtn title="Ещё" className="opacity-0 group-hover:opacity-100">
-              <V2Icons.more className="h-4 w-4" />
-            </IconBtn>
+            <ProjectActionsMenu
+              projectName={p.name}
+              canDelete={Boolean(canDelete && onDeleteRequest)}
+              onDeleteRequest={() => onDeleteRequest?.(p)}
+              buttonClassName="opacity-0 group-hover:opacity-100"
+              iconSize="sm"
+            />
           </div>
         </div>
 

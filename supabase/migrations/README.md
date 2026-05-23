@@ -15,8 +15,6 @@
 - SQL идемпотентный (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
 - В первой строке файла — комментарий с номером: `-- 001 — …`.
 
-**Следующий свободный номер:** `005`
-
 ## Реестр
 
 | № | Файл | Описание |
@@ -25,6 +23,15 @@
 | 002 | `002_v2_task_comments_links_subtasks.sql` | Комментарии, ссылки, scheduled_days |
 | 003 | `003_v2_calendar_events.sql` | Календарь: события и заготовка интеграций |
 | 004 | `004_v2_notifications_project_ink.sql` | Уведомления v2, color_ink у проектов |
+| 005 | `005_v2_project_detail_assets.sql` | Договор, бюджет, links/files проекта |
+| 006 | `006_v2_project_engagement_client_access.sql` | engagement_type, роли участников |
+| 007 | `007_v2_task_planned_at.sql` | planned_at у задач |
+| 008 | `008_v2_task_files_comment_replies.sql` | Файлы задач, ответы в комментариях |
+| 009 | `009_v2_project_phases.sql` | Этапы проекта, phase_id у задач |
+| 010 | `010_v2_clear_all_projects.sql` | Одноразово: удалить все v2_projects (v1 не трогаем) |
+| 011 | `011_v2_attachments_storage_bucket.sql` | Supabase Storage bucket для файлов проектов и задач v2 |
+
+**Следующий свободный номер:** `012`
 
 ## Legacy (v1, до нумерации)
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Session } from "@/lib/v2/auth/require-v2-session";
 import { uploadAttachmentFiles } from "@/lib/v2/files/attachment-upload";
-import { addProjectFile, listProjectFiles } from "@/lib/v2/projects/project-assets-repo";
+import { addFile, listFiles } from "@/lib/v2/tasks/task-detail";
 
 function filesFromFormData(formData: FormData): File[] {
   return formData
@@ -13,7 +13,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const auth = await requireV2Session();
   if (!auth.ok) return auth.response;
   const { id } = await params;
-  const files = await listProjectFiles(id);
+  const files = await listFiles(id);
   return NextResponse.json({ files });
 }
 
@@ -29,12 +29,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Выберите один или несколько файлов" }, { status: 400 });
     }
 
-    const upload = await uploadAttachmentFiles("projects", id, picked);
+    const upload = await uploadAttachmentFiles("tasks", id, picked);
     if (!upload.ok) return NextResponse.json({ error: upload.error }, { status: 400 });
 
     const files = [];
     for (const item of upload.uploaded) {
-      const file = await addProjectFile(auth.ctx, id, {
+      const file = await addFile(auth.ctx, id, {
         name: item.name,
         url: item.url,
         sizeBytes: item.sizeBytes,
