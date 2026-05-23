@@ -1,32 +1,41 @@
-# Миграция v1 → v2
+# Миграция v1 → v2 (вариант 3)
 
-Скрипт переносит данные из таблиц v1 (`pm_cards`, `pm_subtasks`, `pm_time_entries`) в v2 (`v2_projects`, `v2_tasks`, `v2_time_sessions`).
+Скрипт переносит **только проекты** из v1 (`pm_cards` → `v2_projects`). Задачи в v2 создаются **вручную**; подзадачи — через `parent_id`.
+
+Источник данных (по приоритету):
+
+1. SQLite: `PM_BOARD_SQLITE_PATH` (на проде — `/root/.openclaw/workspace/agency-pm-board/data/pm-board.db`)
+2. Supabase `pm_cards` (если SQLite не задан)
 
 ## Предварительно
 
 1. Примените миграции Supabase **001**, **002**, **003**.
-2. Убедитесь, что v1-данные уже в Supabase (`npm run import-team-to-supabase`).
-3. Задайте переменные окружения:
+2. Задайте переменные окружения:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
-   - опционально `V2_MIGRATE_ADMIN_USER_ID` (по умолчанию `admin`)
+   - опционально `V2_MIGRATE_ADMIN_USER_ID` (по умолчанию admin-пользователь v2)
+   - `PM_BOARD_SQLITE_PATH` — путь к v1 SQLite (рекомендуется на проде)
 
 ## Запуск
 
 ```bash
 # просмотр объёма без записи
-DRY_RUN=1 npm run v2-migrate-from-v1
+DRY_RUN=1 PM_BOARD_SQLITE_PATH=/path/to/pm-board.db npm run v2-migrate-from-v1
 
-# миграция
-npm run v2-migrate-from-v1
+# миграция (по умолчанию удаляет ошибочные v1t-* задачи от старого скрипта)
+PM_BOARD_SQLITE_PATH=/path/to/pm-board.db npm run v2-migrate-from-v1
+
+# не удалять старые v1t-* задачи
+CLEAN_V1_TASKS=0 npm run v2-migrate-from-v1
 ```
 
 ## Идемпотентность
 
-ID записей с префиксами `v1p-`, `v1t-`, `v1s-` — повторный запуск безопасен (`upsert`).
+ID проектов с префиксом `v1p-` — повторный запуск безопасен (`upsert`). Задачи из v1 **не создаются**.
 
 ## Что не переносится
 
-- Комментарии и фазы v1 (можно добавить отдельным шагом).
-- Agency / финансы — остаются в v1 до отдельной фазы.
-- Личные проекты v2 создаются вручную в интерфейсе.
+- `pm_subtasks` → v2 (подзадачи создаются вручную под задачей).
+- `pm_time_entries` (отдельный шаг при необходимости).
+- Комментарии и фазы v1.
+- Agency / финансы — остаются в v1.

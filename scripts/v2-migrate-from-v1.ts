@@ -1,18 +1,29 @@
 /**
- * Миграция v1 → v2: SQLite pm-board (или pm_* в Supabase) → v2_projects / v2_tasks / v2_time_sessions.
+ * Миграция v1 → v2 (вариант 3): pm_card → только проект, задачи создаются вручную.
  *
- * PM_BOARD_SQLITE_PATH=/path/to/pm-board.db  — приоритет над Supabase pm_*
- * NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- *
- * npm run v2-migrate-from-v1
- * DRY_RUN=1 npm run v2-migrate-from-v1
+ * PM_BOARD_SQLITE_PATH — приоритет над Supabase pm_*
+ * CLEAN_V1_TASKS=1 — удалить ошибочные v1t-* задачи перед импортом (по умолчанию да)
  */
 import Database from "better-sqlite3";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
+import { statusToSimpleViewGroup } from "../lib/statuses";
+import type { PmStatusKey } from "../lib/statuses";
+import type { V2ProjectStatus } from "../lib/v2/types";
 
 const WS = "ws-default";
 const ADMIN_USER = process.env.V2_MIGRATE_ADMIN_USER_ID?.trim() || "u_be81c9da3f083fcae9d0d614";
+
+const PROJECT_COLORS = [
+  { tint: "#3B6FF7", bg: "#E6EDFF" },
+  { tint: "#E40521", bg: "#FEEFF0" },
+  { tint: "#005BFF", bg: "#E5EEFF" },
+  { tint: "#FF335F", bg: "#FFE3EA" },
+  { tint: "#00A046", bg: "#E2F5E9" },
+  { tint: "#FC3F1D", bg: "#FFE9E3" },
+  { tint: "#0F4C9C", bg: "#E2EAF6" },
+  { tint: "#FFDD2D", bg: "#FFF7CC" },
+];
 
 type Row = Record<string, unknown>;
 
@@ -22,8 +33,21 @@ function shortName(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-function cardDone(status: string | null): boolean {
-  return status === "done";
+function mapCardStatusToProject(status: string | null): V2ProjectStatus {
+  const key = (status ?? "not_started") as PmStatusKey;
+  const group = statusToSimpleViewGroup(key);
+  switch (group) {
+    case "done":
+      return "completed";
+    case "pause":
+      return "paused";
+    case "not_started":
+      return "not_started";
+    case "awaiting_approval":
+      return "approval";
+    default:
+      return "in_progress";
+  }
 }
 
 function defaultSqlitePath(): string {
@@ -32,28 +56,31 @@ function defaultSqlitePath(): string {
   return path.join(process.cwd(), "data", "pm-board.db");
 }
 
-function loadFromSqlite(dbPath: string): { cards: Row[]; subtasks: Row[]; timeEntries: Row[] } {
+function loadFromSqlite(dbPath: string): Row[] {
   const db = new Database(dbPath, { readonly: true });
-  const all = (sql: string) => db.prepare(sql).all() as Row[];
-  const cards = all("SELECT * FROM pm_cards");
-  const subtasks = all("SELECT * FROM pm_subtasks");
-  let timeEntries: Row[] = [];
-  try {
-    timeEntries = all("SELECT * FROM pm_time_entries");
-  } catch {
-  }
+  const cards = db.prepare("SELECT * FROM pm_cards").all() as Row[];
   db.close();
-  return { cards, subtasks, timeEntries };
+  return cards;
 }
 
-async function loadFromSupabase(sb: ReturnType<typeof createClient>) {
-  const { data: cards, error: cardsErr } = await sb.from("pm_cards").select("*");
-  if (cardsErr) throw cardsErr;
-  const { data: subtasks, error: subErr } = await sb.from("pm_subtasks").select("*");
-  if (subErr) throw subErr;
-  const { data: timeEntries, error: timeErr } = await sb.from("pm_time_entries").select("*");
-  if (timeErr) throw timeErr;
-  return { cards: cards ?? [], subtasks: subtasks ?? [], timeEntries: timeEntries ?? [] };
+async function loadFromSupabase(sb: ReturnType<typeof createClient>): Promise<Row[]> {
+  const { data, error } = await sb.from("pm_cards").select("*");
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function cleanupBadTasks(sb: ReturnType<typeof createClient>, dryRun: boolean): Promise<number> {
+  const { data, error } = await sb.from("v2_tasks").select("id").like("id", "v1t-%");
+  if (error) throw error;
+  const ids = (data ?? []).map((r) => r.id as string);
+  if (!ids.length) return 0;
+  if (dryRun) {
+    console.log(`CLEAN: удалить ${ids.length} ошибочных v1t-* задач`);
+    return ids.length;
+  }
+  const { error: delErr } = await sb.from("v2_tasks").delete().like("id", "v1t-%");
+  if (delErr) throw delErr;
+  return ids.length;
 }
 
 async function main() {
@@ -64,148 +91,57 @@ async function main() {
     process.exit(1);
   }
   const dryRun = process.env.DRY_RUN === "1";
+  const cleanTasks = process.env.CLEAN_V1_TASKS !== "0";
   const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  const sqlitePath = defaultSqlitePath();
-  let source: { cards: Row[]; subtasks: Row[]; timeEntries: Row[] };
-  try {
-    source = loadFromSqlite(sqlitePath);
-    console.log("Источник: SQLite", sqlitePath);
-  } catch {
-    source = await loadFromSupabase(sb);
-    console.log("Источник: Supabase pm_*");
+  if (cleanTasks) {
+    const removed = await cleanupBadTasks(sb, dryRun);
+    console.log(removed ? `Очищено ошибочных задач: ${removed}` : "Ошибочных v1t-* задач нет");
   }
 
-  const { cards, subtasks, timeEntries } = source;
-  console.log(`cards: ${cards.length}, subtasks: ${subtasks.length}, time: ${timeEntries.length}`);
+  const sqlitePath = defaultSqlitePath();
+  let cards: Row[];
+  try {
+    cards = loadFromSqlite(sqlitePath);
+    console.log("Источник: SQLite", sqlitePath);
+  } catch {
+    cards = await loadFromSupabase(sb);
+    console.log("Источник: Supabase pm_cards");
+  }
+
+  console.log(`pm_cards: ${cards.length}`);
   if (dryRun) console.log("DRY_RUN — запись пропущена");
 
-  const cardToProject = new Map<string, string>();
-  const cardToMainTask = new Map<string, string>();
-  const subtaskToTask = new Map<string, string>();
-
+  let idx = 0;
   for (const card of cards) {
     const cardId = card.id as string;
     const name = ((card.name as string) || "Проект").trim();
     const projectId = `v1p-${cardId}`;
-    const mainTaskId = `v1t-card-${cardId}`;
-    cardToProject.set(cardId, projectId);
-    cardToMainTask.set(cardId, mainTaskId);
+    const colors = PROJECT_COLORS[idx % PROJECT_COLORS.length]!;
+    idx++;
 
-    const completed = cardDone(card.status as string | null);
-    const deadline = card.deadline as string | null;
-
-    const projectRow = {
+    const row = {
       id: projectId,
       workspace_id: WS,
       scope: "team",
       name,
       short_name: shortName(name),
-      color_tint: "#27272A",
-      color_bg: "#F4F4F5",
-      status: completed ? "completed" : "in_progress",
+      color_tint: colors.tint,
+      color_bg: colors.bg,
+      status: mapCardStatusToProject(card.status as string | null),
       owner_user_id: null,
       created_by: ADMIN_USER,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    const taskRow = {
-      id: mainTaskId,
-      workspace_id: WS,
-      project_id: projectId,
-      parent_id: null,
-      scope: "team",
-      title: name,
-      description: null,
-      status: completed ? "done" : "todo",
-      priority: "medium",
-      assignee_user_id: ADMIN_USER,
-      created_by: ADMIN_USER,
-      deadline_at: deadline ? new Date(deadline).toISOString() : null,
-      estimate_seconds: null,
-      completed_at: completed ? new Date().toISOString() : null,
-      sort_order: 0,
-      inbox_bucket: null,
-      deleted_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
     if (!dryRun) {
-      const { error: pe } = await sb.from("v2_projects").upsert(projectRow, { onConflict: "id" });
-      if (pe) throw pe;
-      const { error: te } = await sb.from("v2_tasks").upsert(taskRow, { onConflict: "id" });
-      if (te) throw te;
-    }
-  }
-
-  for (const st of subtasks) {
-    const subId = st.id as string;
-    const cardId = st.card_id as string;
-    const projectId = cardToProject.get(cardId);
-    if (!projectId) continue;
-
-    const taskId = `v1t-${subId}`;
-    subtaskToTask.set(subId, taskId);
-
-    const completedAt = st.completed_at as string | null;
-    const deadline = st.deadline_at as string | null;
-    const estimateHours = st.estimated_hours as number | null;
-
-    const row = {
-      id: taskId,
-      workspace_id: WS,
-      project_id: projectId,
-      parent_id: null,
-      scope: "team",
-      title: ((st.title as string) || "Задача").trim(),
-      description: null,
-      status: completedAt ? "done" : "todo",
-      priority: "medium",
-      assignee_user_id: (st.assignee_user_id as string) || ADMIN_USER,
-      created_by: ADMIN_USER,
-      deadline_at: deadline ? new Date(deadline).toISOString() : null,
-      estimate_seconds: estimateHours ? Math.round(estimateHours * 3600) : null,
-      completed_at: completedAt ? new Date(completedAt).toISOString() : null,
-      sort_order: (st.sort_order as number) ?? 0,
-      inbox_bucket: null,
-      deleted_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    if (!dryRun) {
-      const { error } = await sb.from("v2_tasks").upsert(row, { onConflict: "id" });
+      const { error } = await sb.from("v2_projects").upsert(row, { onConflict: "id" });
       if (error) throw error;
     }
   }
 
-  for (const te of timeEntries) {
-    const subId = te.subtask_id as string | null;
-    const cardId = te.card_id as string;
-    const taskId = subId ? subtaskToTask.get(subId) : cardToMainTask.get(cardId);
-    if (!taskId) continue;
-
-    const sessionId = `v1s-${te.id as string}`;
-    const row = {
-      id: sessionId,
-      workspace_id: WS,
-      task_id: taskId,
-      user_id: (te.worker_user_id as string) || ADMIN_USER,
-      started_at: new Date(te.started_at as string).toISOString(),
-      ended_at: te.ended_at ? new Date(te.ended_at as string).toISOString() : null,
-      duration_seconds: (te.duration_seconds as number) ?? null,
-      is_manual: false,
-      note: (te.task_note as string) || null,
-      created_at: new Date().toISOString(),
-    };
-    if (!dryRun) {
-      const { error } = await sb.from("v2_time_sessions").upsert(row, { onConflict: "id" });
-      if (error) throw error;
-    }
-  }
-
-  console.log(`Готово: проектов ${cardToProject.size}, задач ${cardToMainTask.size + subtaskToTask.size}, сессий ${timeEntries.length}`);
+  console.log(`Готово: проектов ${cards.length} (задачи не создаются — только вручную в v2)`);
 }
 
 main().catch((e) => {

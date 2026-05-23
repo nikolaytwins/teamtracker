@@ -8,7 +8,16 @@ export async function GET(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const scope = request.nextUrl.searchParams.get("scope") as V2ProjectScope | null;
-  const projects = await listProjects(auth.ctx, { scope: scope ?? undefined });
+  const statusGroup = request.nextUrl.searchParams.get("statusGroup") as
+    | "active"
+    | "paused"
+    | "completed"
+    | "all"
+    | null;
+  const projects = await listProjects(auth.ctx, {
+    scope: scope ?? undefined,
+    statusGroup: statusGroup ?? "active",
+  });
   return NextResponse.json({ projects });
 }
 

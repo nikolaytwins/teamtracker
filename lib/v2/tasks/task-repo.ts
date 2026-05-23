@@ -82,7 +82,12 @@ function enrichTask(
 
 export async function listTasks(
   ctx: V2SessionContext,
-  opts?: { scope?: V2TaskScope; projectId?: string; includeCompleted?: boolean }
+  opts?: {
+    scope?: V2TaskScope;
+    projectId?: string;
+    includeCompleted?: boolean;
+    activeProjectsOnly?: boolean;
+  }
 ): Promise<V2TaskWithMeta[]> {
   const sb = getV2Supabase();
   let q = sb
@@ -107,17 +112,33 @@ export async function listTasks(
   tasks = tasks.filter((t) => canViewTask(ctx, t));
 
   const projectIds = [...new Set(tasks.map((t) => t.project_id).filter(Boolean))] as string[];
-  const projects = new Map<string, { name: string; short_name: string | null; color_tint: string | null; color_bg: string | null }>();
+  const projects = new Map<
+    string,
+    { name: string; short_name: string | null; color_tint: string | null; color_bg: string | null; status: string }
+  >();
   if (projectIds.length) {
-    const { data: prows } = await sb.from("v2_projects").select("id, name, short_name, color_tint, color_bg").in("id", projectIds);
+    const { data: prows } = await sb
+      .from("v2_projects")
+      .select("id, name, short_name, color_tint, color_bg, status")
+      .in("id", projectIds);
     for (const p of prows ?? []) {
       projects.set(p.id as string, {
         name: p.name as string,
         short_name: p.short_name as string | null,
         color_tint: p.color_tint as string | null,
         color_bg: p.color_bg as string | null,
+        status: p.status as string,
       });
     }
+  }
+
+  if (opts?.activeProjectsOnly) {
+    const active = new Set(["not_started", "in_progress", "approval"]);
+    tasks = tasks.filter((t) => {
+      if (!t.project_id) return true;
+      const st = projects.get(t.project_id)?.status;
+      return st != null && active.has(st);
+    });
   }
 
   const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));

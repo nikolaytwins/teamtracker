@@ -35,14 +35,20 @@ async function getProjectMemberIds(projectId: string): Promise<string[]> {
 
 export async function listProjects(
   ctx: V2SessionContext,
-  opts?: { scope?: V2ProjectScope; activeOnly?: boolean }
+  opts?: { scope?: V2ProjectScope; statusGroup?: "active" | "paused" | "completed" | "all" }
 ): Promise<V2ProjectRow[]> {
   const sb = getV2Supabase();
   let q = sb.from("v2_projects").select("*").eq("workspace_id", ctx.workspaceId).order("name");
 
   if (opts?.scope) q = q.eq("scope", opts.scope);
-  if (opts?.activeOnly !== false) {
+
+  const group = opts?.statusGroup ?? "active";
+  if (group === "active") {
     q = q.in("status", ["not_started", "in_progress", "approval"]);
+  } else if (group === "paused") {
+    q = q.eq("status", "paused");
+  } else if (group === "completed") {
+    q = q.eq("status", "completed");
   }
 
   const { data, error } = await q;
@@ -111,6 +117,31 @@ export async function getProjectById(ctx: V2SessionContext, projectId: string): 
   const members = await getProjectMemberIds(p.id);
   if (!canViewProject(ctx, p, members)) return null;
   return p;
+}
+
+export async function updateProject(
+  ctx: V2SessionContext,
+  projectId: string,
+  input: Partial<{ name: string; status: V2ProjectStatus }>
+): Promise<V2ProjectRow> {
+  const project = await getProjectById(ctx, projectId);
+  if (!project) throw new Error("Project not found");
+
+  const patch: Record<string, unknown> = { updated_at: nowIso() };
+  if (input.name !== undefined) {
+    patch.name = input.name.trim();
+    patch.short_name = shortFromName(input.name);
+  }
+  if (input.status !== undefined) patch.status = input.status;
+
+  const sb = getV2Supabase();
+  const { error } = await sb.from("v2_projects").update(patch).eq("id", projectId);
+  if (error) throw error;
+
+  await logActivity(ctx, "project.updated", "project", projectId, { status: input.status, name: input.name });
+  const updated = await getProjectById(ctx, projectId);
+  if (!updated) throw new Error("Project not found after update");
+  return updated;
 }
 
 export async function updateProjectMembers(

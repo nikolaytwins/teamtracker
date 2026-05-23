@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     scope: scope ?? undefined,
     projectId,
     includeCompleted: true,
+    activeProjectsOnly: grouped,
   });
 
   if (!grouped) return NextResponse.json({ tasks });
