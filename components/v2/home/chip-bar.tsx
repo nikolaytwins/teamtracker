@@ -19,7 +19,7 @@ export function ChipBar({
     label: p.name,
     short: p.short_name,
     bg: p.color_bg,
-    ink: p.color_tint,
+    ink: p.color_ink ?? p.color_tint,
   }))];
 
   return (

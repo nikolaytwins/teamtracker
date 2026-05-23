@@ -208,7 +208,10 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
               >
                 <span
                   className="inline-flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-semibold"
-                  style={{ background: p.color_bg ?? "#eee", color: p.color_tint ?? "#333" }}
+                  style={{
+                    background: p.color_bg ?? "#eee",
+                    color: p.color_ink ?? p.color_tint ?? "#333",
+                  }}
                 >
                   {p.short_name ?? p.name.slice(0, 1)}
                 </span>

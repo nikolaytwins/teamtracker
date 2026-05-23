@@ -41,6 +41,7 @@ export type V2ProjectRow = {
   short_name: string | null;
   color_tint: string | null;
   color_bg: string | null;
+  color_ink: string | null;
   status: V2ProjectStatus;
   owner_user_id: string | null;
   created_by: string;
@@ -100,7 +101,10 @@ export type V2TaskWithMeta = V2TaskRow & {
   project_short_name: string | null;
   project_color_tint: string | null;
   project_color_bg: string | null;
+  project_color_ink: string | null;
   assignee_name: string | null;
+  comment_count: number;
+  link_count: number;
   bucket: V2TaskBucket;
 };
 

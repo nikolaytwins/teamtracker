@@ -1,9 +1,11 @@
 "use client";
 
 import { fmtDuration, fmtTimer, formatDueLabel } from "@/lib/v2/format";
+import { pickSuggestedTask } from "@/lib/v2/tasks/suggest-task";
 import type { V2TaskWithMeta } from "@/lib/v2/types";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { PriorityDot, ProjectChip, Ring, TimerButton } from "@/components/v2/ui/primitives";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type HeroMetricsProps = {
   completedToday: number;
@@ -21,6 +23,8 @@ export function ActiveTrackerHero({
   running,
   onToggleTimer,
   onStop,
+  onStartSuggested,
+  candidateTasks,
   completedToday,
   totalToday,
   focusSecToday,
@@ -33,6 +37,8 @@ export function ActiveTrackerHero({
   running: boolean;
   onToggleTimer: () => void;
   onStop: () => void;
+  onStartSuggested?: (taskId: string) => void;
+  candidateTasks?: V2TaskWithMeta[];
   completedToday: number;
   totalToday: number;
   focusSecToday: number;
@@ -41,7 +47,7 @@ export function ActiveTrackerHero({
   urgentToday: number;
 }) {
   const dayPct = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
-  const metrics = {
+  const metrics: HeroMetricsProps = {
     completedToday,
     totalToday,
     focusSecToday,
@@ -52,17 +58,7 @@ export function ActiveTrackerHero({
   };
 
   if (!task) {
-    return (
-      <div className="relative overflow-hidden rounded-3xl bg-white shadow-[var(--v2-shadow-soft)]">
-        <HeroBackground />
-        <div className="relative grid grid-cols-12 gap-8 p-7">
-          <div className="col-span-12 lg:col-span-7">
-            <p className="text-[14px] text-[var(--v2-ink-500)]">Нет активного таймера. Запустите задачу из списка ниже.</p>
-          </div>
-          <HeroMetrics {...metrics} />
-        </div>
-      </div>
-    );
+    return <IdleHero metrics={metrics} candidates={candidateTasks ?? []} onStart={onStartSuggested} />;
   }
 
   const totalOnTask = task.logged_seconds + (running ? elapsed : 0);
@@ -98,6 +94,7 @@ export function ActiveTrackerHero({
                 short={task.project_short_name}
                 bg={task.project_color_bg}
                 tint={task.project_color_tint}
+                ink={task.project_color_ink}
               />
             ) : null}
             <PriorityDot priority={task.priority} />
@@ -153,6 +150,116 @@ export function ActiveTrackerHero({
   );
 }
 
+function IdleHero({
+  metrics,
+  candidates,
+  onStart,
+}: {
+  metrics: HeroMetricsProps;
+  candidates: V2TaskWithMeta[];
+  onStart?: (taskId: string) => void;
+}) {
+  const autoPick = useMemo(() => pickSuggestedTask(candidates), [candidates]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSelectedId(null);
+  }, [autoPick?.id]);
+
+  const selected = useMemo(() => {
+    if (selectedId) return candidates.find((t) => t.id === selectedId) ?? autoPick;
+    return autoPick;
+  }, [selectedId, candidates, autoPick]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
+
+  return (
+    <div className="relative overflow-hidden rounded-3xl bg-white shadow-[var(--v2-shadow-soft)]">
+      <HeroBackground />
+      <div className="relative grid grid-cols-12 gap-8 p-7">
+        <div className="col-span-12 flex flex-col lg:col-span-7">
+          {selected ? (
+            <>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
+                Чем займёмся?
+              </div>
+              <h2 className="v2-tighter mt-3 max-w-[38ch] text-[26px] font-semibold leading-[1.15] text-[var(--v2-ink-900)]">
+                {selected.title}
+              </h2>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div ref={menuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((v) => !v)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white py-1 pl-1 pr-2 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+                  >
+                    {selected.project_name ? (
+                      <ProjectChip
+                        name={selected.project_name}
+                        short={selected.project_short_name}
+                        bg={selected.project_color_bg}
+                        tint={selected.project_color_tint}
+                        ink={selected.project_color_ink}
+                        size="sm"
+                      />
+                    ) : (
+                      <span className="px-2 text-[12px] text-[var(--v2-ink-600)]">Без проекта</span>
+                    )}
+                    <V2Icons.chev className="h-4 w-4 text-[var(--v2-ink-400)]" />
+                  </button>
+                  {menuOpen && candidates.length > 1 ? (
+                    <div className="absolute left-0 top-full z-20 mt-2 max-h-[280px] min-w-[300px] overflow-y-auto rounded-xl border border-[var(--v2-ink-100)] bg-white py-1 shadow-[var(--v2-shadow-pop)]">
+                      {candidates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedId(t.id);
+                            setMenuOpen(false);
+                          }}
+                          className={`flex w-full flex-col gap-0.5 px-3 py-2.5 text-left transition hover:bg-[var(--v2-ink-50)] ${
+                            t.id === selected.id ? "bg-[var(--v2-brand-50)]/60" : ""
+                          }`}
+                        >
+                          <span className="v2-tight text-[13px] font-medium text-[var(--v2-ink-900)]">{t.title}</span>
+                          <span className="text-[11px] text-[var(--v2-ink-500)]">
+                            {t.project_name ?? "Без проекта"} · {formatDueLabel(t.deadline_at, t.bucket)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <PriorityDot priority={selected.priority} />
+              </div>
+              <div className="mt-8 flex items-center gap-3">
+                <TimerButton running={false} onClick={() => onStart?.(selected.id)} size="lg" />
+                <span className="text-[13px] text-[var(--v2-ink-500)]">Запустить таймер на этой задаче</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">Таймер</div>
+              <p className="mt-3 max-w-[40ch] text-[15px] leading-relaxed text-[var(--v2-ink-500)]">
+                Открытых задач пока нет. Создайте задачу и привяжите к проекту — она появится здесь.
+              </p>
+            </>
+          )}
+        </div>
+        <HeroMetrics {...metrics} />
+      </div>
+    </div>
+  );
+}
 
 function HeroBackground() {
   return (
@@ -162,7 +269,6 @@ function HeroBackground() {
     </>
   );
 }
-
 
 function HeroMetrics({
   completedToday,
@@ -189,33 +295,19 @@ function HeroMetrics({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-white p-4 shadow-[var(--v2-shadow-card)]">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-            Срочно
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <div className="v2-tighter v2-tnum text-[28px] font-semibold leading-none text-[var(--v2-ink-900)]">{urgentCount}</div>
-            <div className="text-[11.5px] text-[var(--v2-ink-500)]">задач</div>
-          </div>
-          <div className="mt-3 text-[11.5px] text-[var(--v2-ink-500)]">
-            {urgentOverdue} просрочены · {urgentToday} — сегодня
-          </div>
+      <div className="rounded-2xl bg-white p-4 shadow-[var(--v2-shadow-card)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+          Срочно
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-[var(--v2-shadow-card)]">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
-            <V2Icons.spark className="h-3.5 w-3.5 text-[var(--v2-brand-500)]" />
-            Серия
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <div className="v2-tighter v2-tnum text-[28px] font-semibold leading-none text-[var(--v2-ink-900)]">—</div>
-            <div className="text-[11.5px] text-[var(--v2-ink-500)]">дней</div>
-          </div>
-          <div className="mt-3 text-[11.5px] text-[var(--v2-ink-500)]">скоро</div>
+        <div className="mt-2 flex items-end justify-between">
+          <div className="v2-tighter v2-tnum text-[28px] font-semibold leading-none text-[var(--v2-ink-900)]">{urgentCount}</div>
+          <div className="text-[11.5px] text-[var(--v2-ink-500)]">задач</div>
+        </div>
+        <div className="mt-3 text-[11.5px] text-[var(--v2-ink-500)]">
+          {urgentOverdue} просрочены · {urgentToday} — сегодня
         </div>
       </div>
     </div>
   );
 }
-

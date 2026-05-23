@@ -8,15 +8,18 @@ export function ProjectChip({
   short,
   bg,
   tint,
+  ink,
   size = "sm",
 }: {
   name: string;
   short?: string | null;
   bg?: string | null;
   tint?: string | null;
+  ink?: string | null;
   size?: "sm" | "md";
 }) {
   const isSm = size === "sm";
+  const letterColor = ink ?? tint ?? "#333";
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full bg-white shadow-[var(--v2-shadow-card)] text-[var(--v2-ink-700)] ${
@@ -27,7 +30,7 @@ export function ProjectChip({
         className={`inline-flex items-center justify-center rounded-full font-semibold ${
           isSm ? "h-[18px] w-[18px] text-[10.5px]" : "h-5 w-5 text-[11px]"
         }`}
-        style={{ background: bg ?? "#eee", color: tint ?? "#333" }}
+        style={{ background: bg ?? "#eee", color: letterColor }}
       >
         {short ?? name.slice(0, 1)}
       </span>

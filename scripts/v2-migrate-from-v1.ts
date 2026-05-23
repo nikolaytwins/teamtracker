@@ -14,17 +14,7 @@ import type { V2ProjectStatus } from "../lib/v2/types";
 const WS = "ws-default";
 const ADMIN_USER = process.env.V2_MIGRATE_ADMIN_USER_ID?.trim() || "u_be81c9da3f083fcae9d0d614";
 
-const PROJECT_COLORS = [
-  { tint: "#3B6FF7", bg: "#E6EDFF" },
-  { tint: "#E40521", bg: "#FEEFF0" },
-  { tint: "#005BFF", bg: "#E5EEFF" },
-  { tint: "#FF335F", bg: "#FFE3EA" },
-  { tint: "#00A046", bg: "#E2F5E9" },
-  { tint: "#FC3F1D", bg: "#FFE9E3" },
-  { tint: "#0F4C9C", bg: "#E2EAF6" },
-  { tint: "#FFDD2D", bg: "#FFF7CC" },
-];
-
+import { pickProjectColor } from "../lib/v2/project-colors";
 type Row = Record<string, unknown>;
 
 function shortName(name: string): string {
@@ -117,7 +107,7 @@ async function main() {
     const cardId = card.id as string;
     const name = ((card.name as string) || "Проект").trim();
     const projectId = `v1p-${cardId}`;
-    const colors = PROJECT_COLORS[idx % PROJECT_COLORS.length]!;
+    const colors = pickProjectColor(idx);
     idx++;
 
     const row = {
@@ -128,6 +118,7 @@ async function main() {
       short_name: shortName(name),
       color_tint: colors.tint,
       color_bg: colors.bg,
+      color_ink: colors.ink ?? colors.tint,
       status: mapCardStatusToProject(card.status as string | null),
       owner_user_id: null,
       created_by: ADMIN_USER,

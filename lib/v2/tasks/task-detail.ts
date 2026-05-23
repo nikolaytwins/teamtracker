@@ -1,5 +1,6 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import { logActivity } from "@/lib/v2/activity/log";
+import { notifyTaskComment } from "@/lib/v2/notifications/notification-repo";
 import { getTaskById } from "@/lib/v2/tasks/task-repo";
 import type { V2SessionContext } from "@/lib/v2/types";
 import { listUsersPublic } from "@/lib/tt-auth-db";
@@ -59,6 +60,19 @@ export async function addComment(
   if (error) throw new Error(error.message);
 
   await logActivity(ctx, "task.comment", "task", taskId, { title: task.title });
+
+  await notifyTaskComment(
+    ctx,
+    {
+      id: task.id,
+      title: task.title,
+      project_id: task.project_id,
+      assignee_user_id: task.assignee_user_id,
+    },
+    task.project_name,
+    row.body
+  ).catch((e) => console.error("notifyTaskComment", e));
+
   return row;
 }
 

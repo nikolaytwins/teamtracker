@@ -1,16 +1,18 @@
 "use client";
 
 import { V2Icons } from "@/components/v2/ui/icons";
-import { IconBtn } from "@/components/v2/ui/primitives";
+import { V2NotificationsBell } from "@/components/v2/shell/notifications-bell";
 
 export function V2Topbar({
   workspaceName,
   onNewTask,
   onOpenCommands,
+  onOpenTask,
 }: {
   workspaceName?: string;
   onNewTask?: () => void;
   onOpenCommands?: () => void;
+  onOpenTask?: (taskId: string) => void;
 }) {
   return (
     <div className="flex h-14 items-center gap-3 px-7">
@@ -30,12 +32,7 @@ export function V2Topbar({
             ⌘
           </span>
         </button>
-        <IconBtn title="Уведомления">
-          <span className="relative">
-            <V2Icons.bell className="h-[18px] w-[18px]" />
-            <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--v2-brand-500)] ring-2 ring-white" />
-          </span>
-        </IconBtn>
+        <V2NotificationsBell onOpenTask={onOpenTask} />
         <button
           type="button"
           onClick={onNewTask}

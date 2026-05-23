@@ -140,6 +140,11 @@ export function V2HomeClient() {
   const urgentOverdue = urgentOpen.filter((t) => t.bucket === "overdue").length;
   const urgentTodayCount = urgentOpen.filter((t) => t.bucket === "today").length;
 
+  const candidateTasks = useMemo(
+    () => tasks.filter((t) => !t.completed_at && !t.inbox_bucket),
+    [tasks]
+  );
+
   if (loading || bootLoading) {
     return (
       <div className="flex min-h-[50vh] flex-1 items-center justify-center text-[var(--v2-ink-500)]">Загрузка…</div>
@@ -152,6 +157,7 @@ export function V2HomeClient() {
         workspaceName={workspace?.name}
         onNewTask={() => setPaletteHint(true)}
         onOpenCommands={() => setPaletteHint(true)}
+        onOpenTask={setDrawerTaskId}
       />
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1180px] px-10 pb-24 pt-8">
@@ -174,6 +180,8 @@ export function V2HomeClient() {
               if (active) void toggleTimer(active.session.task_id);
             }}
             onStop={() => void stopTimer()}
+            onStartSuggested={(taskId) => void toggleTimer(taskId)}
+            candidateTasks={candidateTasks}
             completedToday={completedToday}
             totalToday={totalToday}
             focusSecToday={focusSecToday}

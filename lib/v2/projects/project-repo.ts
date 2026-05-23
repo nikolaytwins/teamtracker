@@ -8,17 +8,7 @@ import type {
   V2SessionContext,
 } from "@/lib/v2/types";
 
-const PROJECT_COLORS = [
-  { tint: "#3B6FF7", bg: "#E6EDFF" },
-  { tint: "#E40521", bg: "#FEEFF0" },
-  { tint: "#005BFF", bg: "#E5EEFF" },
-  { tint: "#FF335F", bg: "#FFE3EA" },
-  { tint: "#00A046", bg: "#E2F5E9" },
-  { tint: "#FC3F1D", bg: "#FFE9E3" },
-  { tint: "#0F4C9C", bg: "#E2EAF6" },
-  { tint: "#FFDD2D", bg: "#FFF7CC" },
-];
-
+import { pickProjectColor, V2_PROJECT_COLORS } from "@/lib/v2/project-colors";
 function shortFromName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return "?";
@@ -73,7 +63,7 @@ export type CreateProjectInput = {
 
 export async function createProject(ctx: V2SessionContext, input: CreateProjectInput): Promise<V2ProjectRow> {
   const sb = getV2Supabase();
-  const colors = PROJECT_COLORS[input.colorIndex ?? Math.floor(Math.random() * PROJECT_COLORS.length)]!;
+  const colors = pickProjectColor(input.colorIndex ?? Math.floor(Math.random() * V2_PROJECT_COLORS.length));
   const id = newV2Id();
   const ts = nowIso();
 
@@ -85,6 +75,7 @@ export async function createProject(ctx: V2SessionContext, input: CreateProjectI
     short_name: shortFromName(input.name),
     color_tint: colors.tint,
     color_bg: colors.bg,
+    color_ink: colors.ink ?? colors.tint,
     status: input.status ?? "in_progress",
     owner_user_id: input.scope === "personal" ? ctx.userId : null,
     created_by: ctx.userId,

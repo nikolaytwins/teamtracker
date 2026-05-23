@@ -129,6 +129,7 @@ function TaskRowMeta({
           short={task.project_short_name}
           bg={task.project_color_bg}
           tint={task.project_color_tint}
+          ink={task.project_color_ink}
         />
       ) : null}
       <span className="text-[var(--v2-ink-300)]">·</span>
@@ -138,6 +139,25 @@ function TaskRowMeta({
       </span>
       <span className="text-[var(--v2-ink-300)]">·</span>
       <PriorityDot priority={priority} />
+      {task.comment_count || task.link_count ? (
+        <>
+          <span className="text-[var(--v2-ink-300)]">·</span>
+          <span className="inline-flex items-center gap-3">
+            {task.comment_count ? (
+              <span className="inline-flex items-center gap-1">
+                <V2Icons.chat className="h-[13px] w-[13px]" />
+                <span className="v2-tnum">{task.comment_count}</span>
+              </span>
+            ) : null}
+            {task.link_count ? (
+              <span className="inline-flex items-center gap-1">
+                <V2Icons.paperclip className="h-[13px] w-[13px]" />
+                <span className="v2-tnum">{task.link_count}</span>
+              </span>
+            ) : null}
+          </span>
+        </>
+      ) : null}
     </div>
   );
 }

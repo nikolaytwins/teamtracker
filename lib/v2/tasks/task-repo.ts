@@ -61,11 +61,45 @@ async function sumLoggedSeconds(taskIds: string[]): Promise<Map<string, number>>
   return map;
 }
 
+async function countCommentsAndLinks(
+  taskIds: string[]
+): Promise<{ comments: Map<string, number>; links: Map<string, number> }> {
+  const comments = new Map<string, number>();
+  const links = new Map<string, number>();
+  if (!taskIds.length) return { comments, links };
+
+  const sb = getV2Supabase();
+  const [{ data: crows }, { data: lrows }] = await Promise.all([
+    sb.from("v2_task_comments").select("task_id").in("task_id", taskIds),
+    sb.from("v2_task_links").select("task_id").in("task_id", taskIds),
+  ]);
+
+  for (const row of crows ?? []) {
+    const id = row.task_id as string;
+    comments.set(id, (comments.get(id) ?? 0) + 1);
+  }
+  for (const row of lrows ?? []) {
+    const id = row.task_id as string;
+    links.set(id, (links.get(id) ?? 0) + 1);
+  }
+  return { comments, links };
+}
+
 function enrichTask(
   task: V2TaskRow,
   logged: Map<string, number>,
-  projects: Map<string, { name: string; short_name: string | null; color_tint: string | null; color_bg: string | null }>,
-  users: Map<string, string>
+  projects: Map<
+    string,
+    {
+      name: string;
+      short_name: string | null;
+      color_tint: string | null;
+      color_bg: string | null;
+      color_ink: string | null;
+    }
+  >,
+  users: Map<string, string>,
+  counts: { comments: Map<string, number>; links: Map<string, number> }
 ): V2TaskWithMeta {
   const p = task.project_id ? projects.get(task.project_id) : null;
   return {
@@ -75,7 +109,10 @@ function enrichTask(
     project_short_name: p?.short_name ?? null,
     project_color_tint: p?.color_tint ?? null,
     project_color_bg: p?.color_bg ?? null,
+    project_color_ink: p?.color_ink ?? p?.color_tint ?? null,
     assignee_name: task.assignee_user_id ? (users.get(task.assignee_user_id) ?? null) : null,
+    comment_count: counts.comments.get(task.id) ?? 0,
+    link_count: counts.links.get(task.id) ?? 0,
     bucket: classifyTaskBucket(task),
   };
 }
@@ -114,12 +151,19 @@ export async function listTasks(
   const projectIds = [...new Set(tasks.map((t) => t.project_id).filter(Boolean))] as string[];
   const projects = new Map<
     string,
-    { name: string; short_name: string | null; color_tint: string | null; color_bg: string | null; status: string }
+    {
+      name: string;
+      short_name: string | null;
+      color_tint: string | null;
+      color_bg: string | null;
+      color_ink: string | null;
+      status: string;
+    }
   >();
   if (projectIds.length) {
     const { data: prows } = await sb
       .from("v2_projects")
-      .select("id, name, short_name, color_tint, color_bg, status")
+      .select("id, name, short_name, color_tint, color_bg, color_ink, status")
       .in("id", projectIds);
     for (const p of prows ?? []) {
       projects.set(p.id as string, {
@@ -127,6 +171,7 @@ export async function listTasks(
         short_name: p.short_name as string | null,
         color_tint: p.color_tint as string | null,
         color_bg: p.color_bg as string | null,
+        color_ink: (p.color_ink as string | null) ?? (p.color_tint as string | null),
         status: p.status as string,
       });
     }
@@ -142,8 +187,9 @@ export async function listTasks(
   }
 
   const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));
-  const logged = await sumLoggedSeconds(tasks.map((t) => t.id));
-  return tasks.map((t) => enrichTask(t, logged, projects, users));
+  const taskIds = tasks.map((t) => t.id);
+  const [logged, counts] = await Promise.all([sumLoggedSeconds(taskIds), countCommentsAndLinks(taskIds)]);
+  return tasks.map((t) => enrichTask(t, logged, projects, users, counts));
 }
 
 export async function getTaskById(ctx: V2SessionContext, taskId: string): Promise<V2TaskWithMeta | null> {
@@ -154,11 +200,20 @@ export async function getTaskById(ctx: V2SessionContext, taskId: string): Promis
   const task = data as V2TaskRow;
   if (!canViewTask(ctx, task)) return null;
 
-  const projects = new Map<string, { name: string; short_name: string | null; color_tint: string | null; color_bg: string | null }>();
+  const projects = new Map<
+    string,
+    {
+      name: string;
+      short_name: string | null;
+      color_tint: string | null;
+      color_bg: string | null;
+      color_ink: string | null;
+    }
+  >();
   if (task.project_id) {
     const { data: p } = await sb
       .from("v2_projects")
-      .select("id, name, short_name, color_tint, color_bg")
+      .select("id, name, short_name, color_tint, color_bg, color_ink")
       .eq("id", task.project_id)
       .maybeSingle();
     if (p) {
@@ -167,12 +222,16 @@ export async function getTaskById(ctx: V2SessionContext, taskId: string): Promis
         short_name: p.short_name as string | null,
         color_tint: p.color_tint as string | null,
         color_bg: p.color_bg as string | null,
+        color_ink: (p.color_ink as string | null) ?? (p.color_tint as string | null),
       });
     }
   }
   const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));
-  const logged = await sumLoggedSeconds([task.id]);
-  return enrichTask(task, logged, projects, users);
+  const [logged, counts] = await Promise.all([
+    sumLoggedSeconds([task.id]),
+    countCommentsAndLinks([task.id]),
+  ]);
+  return enrichTask(task, logged, projects, users, counts);
 }
 
 export async function createTask(ctx: V2SessionContext, input: CreateTaskInput): Promise<V2TaskWithMeta> {
