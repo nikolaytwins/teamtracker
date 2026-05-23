@@ -15,7 +15,7 @@
 - SQL идемпотентный (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
 - В первой строке файла — комментарий с номером: `-- 001 — …`.
 
-**Следующий свободный номер:** `004`
+**Следующий свободный номер:** `005`
 
 ## Реестр
 
@@ -24,6 +24,7 @@
 | 001 | `001_v2_core_schema.sql` | v2: workspace, projects, tasks, timer, activity |
 | 002 | `002_v2_task_comments_links_subtasks.sql` | Комментарии, ссылки, scheduled_days |
 | 003 | `003_v2_calendar_events.sql` | Календарь: события и заготовка интеграций |
+| 004 | `004_v2_notifications_project_ink.sql` | Уведомления v2, color_ink у проектов |
 
 ## Legacy (v1, до нумерации)
 

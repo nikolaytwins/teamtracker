@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { CommandPalette } from "@/components/v2/shell/command-palette";
+import { NewTaskModal } from "@/components/v2/tasks/new-task-modal";
 
 type Me = { id: string; name: string; role: string };
 type Member = { user_id: string; display_name: string; role: string };
@@ -20,6 +21,8 @@ type V2Bootstrap = {
   taskCounts: { open: number; inbox: number; byProject: Record<string, number> };
   loading: boolean;
   refresh: () => Promise<void>;
+  openNewTask: (projectId?: string | null, title?: string) => void;
+  openCommandPalette: () => void;
 };
 
 const Ctx = createContext<V2Bootstrap>({
@@ -30,6 +33,8 @@ const Ctx = createContext<V2Bootstrap>({
   taskCounts: { open: 0, inbox: 0, byProject: {} },
   loading: true,
   refresh: async () => {},
+  openNewTask: () => {},
+  openCommandPalette: () => {},
 });
 
 export function useV2Bootstrap() {
@@ -104,6 +109,15 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
   const [inboxCount, setInboxCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
+  const [newTaskProjectId, setNewTaskProjectId] = useState<string | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+
+  const openNewTask = useCallback((projectId?: string | null, title?: string) => {
+    setNewTaskProjectId(projectId ?? null);
+    setNewTaskTitle(title ?? "");
+    setNewTaskOpen(true);
+  }, []);
 
   const refresh = useCallback(async () => {
     const [meRes, projRes, taskRes, inboxRes] = await Promise.all([
@@ -131,11 +145,18 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setPaletteOpen(true);
+        return;
+      }
+      if (e.key === "n" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        openNewTask();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [openNewTask]);
 
   const isAdmin = me?.role === "admin";
   const nav = NAV.filter((n) => !n.admin || isAdmin);
@@ -154,7 +175,19 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
   const roleLabel = me?.role === "admin" ? "Администратор" : "Участник";
 
   return (
-    <Ctx.Provider value={{ me, workspace, members, projects, taskCounts, loading, refresh }}>
+    <Ctx.Provider
+      value={{
+        me,
+        workspace,
+        members,
+        projects,
+        taskCounts,
+        loading,
+        refresh,
+        openNewTask,
+        openCommandPalette: () => setPaletteOpen(true),
+      }}
+    >
       <div className="flex min-h-screen">
         <aside className="flex w-[244px] shrink-0 flex-col gap-1 bg-white px-3 pb-3 pt-4 shadow-[var(--v2-shadow-soft)]">
           <button
@@ -240,7 +273,21 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </aside>
         <main className="min-w-0 flex-1 flex flex-col">{children}</main>
-        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          onCreateTask={(text) => openNewTask(null, text)}
+        />
+        <NewTaskModal
+          open={newTaskOpen}
+          onClose={() => setNewTaskOpen(false)}
+          projects={projects}
+          members={members}
+          defaultProjectId={newTaskProjectId}
+          initialTitle={newTaskTitle}
+          currentUserId={me?.id}
+          onCreated={() => void refresh()}
+        />
       </div>
     </Ctx.Provider>
   );

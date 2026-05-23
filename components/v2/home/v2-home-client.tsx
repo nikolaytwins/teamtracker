@@ -30,29 +30,36 @@ const SECTION_ACCENTS: Partial<Record<V2TaskBucket, string>> = {
 };
 
 export function V2HomeClient() {
-  const { me, workspace, members, projects, loading: bootLoading, refresh: refreshBoot } = useV2Bootstrap();
+  const { me, workspace, members, projects, loading: bootLoading, refresh: refreshBoot, openNewTask, openCommandPalette } =
+    useV2Bootstrap();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<V2TaskWithMeta[]>([]);
   const [groups, setGroups] = useState<Record<string, V2TaskWithMeta[]>>({});
   const [active, setActive] = useState<ActiveTimer | null>(null);
+  const [focusSecondsToday, setFocusSecondsToday] = useState(0);
+  const [activeElapsedBase, setActiveElapsedBase] = useState(0);
   const [tick, setTick] = useState(0);
   const [projectFilter, setProjectFilter] = useState("all");
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
-  const [paletteHint, setPaletteHint] = useState(false);
 
   const elapsed = active ? active.elapsedSeconds + tick : 0;
   const runningTaskId = active?.session.task_id ?? null;
   const teamProjects = useMemo(() => projects.filter((p) => p.scope === "team"), [projects]);
 
   const loadPage = useCallback(async () => {
-    const [taskRes, timerRes] = await Promise.all([
+    const [taskRes, timerRes, statsRes] = await Promise.all([
       fetchJson<{ tasks: V2TaskWithMeta[]; groups: Record<string, V2TaskWithMeta[]> }>("/api/v2/tasks?grouped=1"),
       fetchJson<{ active: ActiveTimer | null }>("/api/v2/timer/active"),
+      fetchJson<{ focusSecondsToday: number; activeElapsedSeconds: number; hasActiveTimer: boolean }>(
+        "/api/v2/timer/stats"
+      ),
     ]);
     setTasks(taskRes.tasks);
     setGroups(taskRes.groups);
     setActive(timerRes.active);
+    setFocusSecondsToday(statsRes.focusSecondsToday);
+    setActiveElapsedBase(timerRes.active?.elapsedSeconds ?? 0);
   }, []);
 
   useEffect(() => {
@@ -128,13 +135,7 @@ export function V2HomeClient() {
   const completedToday = doneToday.length;
   const totalToday = completedToday + todayOpen.length;
 
-  const focusSecToday = useMemo(() => {
-    const base = [...doneToday, ...todayOpen, ...(filteredGroups.overdue ?? [])].reduce(
-      (sum, t) => sum + t.logged_seconds,
-      0
-    );
-    return base + (active ? elapsed : 0);
-  }, [doneToday, todayOpen, filteredGroups.overdue, active, elapsed]);
+  const focusSecToday = focusSecondsToday + (active ? Math.max(0, elapsed - activeElapsedBase) : 0);
 
   const urgentOpen = useMemo(() => tasks.filter((t) => !t.completed_at && t.priority === "urgent"), [tasks]);
   const urgentOverdue = urgentOpen.filter((t) => t.bucket === "overdue").length;
@@ -155,19 +156,14 @@ export function V2HomeClient() {
     <>
       <V2Topbar
         workspaceName={workspace?.name}
-        onNewTask={() => setPaletteHint(true)}
-        onOpenCommands={() => setPaletteHint(true)}
+        onNewTask={() => openNewTask(projectFilter === "all" ? null : projectFilter)}
+        onOpenCommands={openCommandPalette}
         onOpenTask={setDrawerTaskId}
       />
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1180px] px-10 pb-24 pt-8">
           {error ? (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
-          ) : null}
-          {paletteHint ? (
-            <div className="mb-4 rounded-xl border border-[var(--v2-brand-100)] bg-[var(--v2-brand-50)] px-4 py-3 text-sm text-[var(--v2-brand-800)]">
-              Нажмите ⌘K для команд и быстрого поиска.
-            </div>
           ) : null}
 
           {me ? <PageHead userName={me.name} tasks={tasks} /> : null}

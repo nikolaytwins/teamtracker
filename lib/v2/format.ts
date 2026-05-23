@@ -80,9 +80,20 @@ export function formatBucketSubtitle(bucket: string, now = new Date()): string |
 export function formatDueLabel(
   deadlineAt: string | null,
   bucket: string,
-  now = new Date()
+  now = new Date(),
+  completedAt?: string | null
 ): string {
-  if (!deadlineAt) return "без срока";
+  if (bucket === "done_today" && completedAt) {
+    const c = new Date(completedAt);
+    if (!Number.isNaN(c.getTime())) {
+      return c.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  if (!deadlineAt) {
+    if (bucket === "later") return "без срока";
+    return "без срока";
+  }
   const d = new Date(deadlineAt);
   if (Number.isNaN(d.getTime())) return "без срока";
 
@@ -97,7 +108,7 @@ export function formatDueLabel(
   }
   if (bucket === "today") {
     if (hasTime) return `сегодня · ${time}`;
-    return "сегодня";
+    return "сегодня · до конца дня";
   }
   if (bucket === "tomorrow") {
     if (hasTime) return `завтра · ${time}`;
