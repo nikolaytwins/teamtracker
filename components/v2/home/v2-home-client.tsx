@@ -1,83 +1,66 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-url";
-import { fmtDuration, fromDatetimeLocalValue, todayDatetimeLocal } from "@/lib/v2/format";
-import type { V2TaskPriority, V2TaskWithMeta } from "@/lib/v2/types";
+import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { formatBucketSubtitle } from "@/lib/v2/format";
+import { BUCKET_LABELS, BUCKET_ORDER } from "@/lib/v2/tasks/task-buckets";
+import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
 import { ActiveTrackerHero } from "@/components/v2/hero/active-tracker-hero";
+import { ChipBar } from "@/components/v2/home/chip-bar";
+import { PageHead } from "@/components/v2/home/page-head";
+import { TaskSection } from "@/components/v2/home/task-section";
 import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
+import { V2Topbar } from "@/components/v2/shell/v2-topbar";
 import { TaskDrawer } from "@/components/v2/tasks/task-drawer";
-import { ProjectChip, TimerButton } from "@/components/v2/ui/primitives";
+import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type V2TaskBucket = V2TaskWithMeta["bucket"];
-
-const BUCKET_ORDER: V2TaskBucket[] = ["overdue", "today", "tomorrow", "this_week", "later", "done_today"];
-const BUCKET_LABELS: Record<V2TaskBucket, string> = {
-  overdue: "Просрочено",
-  today: "Сегодня",
-  tomorrow: "Завтра",
-  this_week: "На этой неделе",
-  later: "Позже",
-  done_today: "Готово сегодня",
-  inbox: "Входящие",
-};
-
-type ActivityItem = { id: string; message: string; created_at: string };
 type ActiveTimer = {
   session: { id: string; task_id: string; started_at: string };
   task: V2TaskWithMeta;
   elapsedSeconds: number;
 };
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(apiUrl(path), { ...init, credentials: "include" });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
-  return data as T;
-}
+const SECTION_ACCENTS: Partial<Record<V2TaskBucket, string>> = {
+  overdue: "#EF4444",
+  today: "#3B6FF7",
+  tomorrow: "#A1A1AA",
+  this_week: "#A1A1AA",
+  later: "#D4D4D8",
+  done_today: "#10B981",
+};
 
 export function V2HomeClient() {
-  const { me, members, projects, loading: bootLoading, refresh: refreshBoot } = useV2Bootstrap();
+  const { me, workspace, members, projects, loading: bootLoading, refresh: refreshBoot } = useV2Bootstrap();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<V2TaskWithMeta[]>([]);
   const [groups, setGroups] = useState<Record<string, V2TaskWithMeta[]>>({});
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [active, setActive] = useState<ActiveTimer | null>(null);
   const [tick, setTick] = useState(0);
-  const [quickText, setQuickText] = useState("");
-  const [bulkTitles, setBulkTitles] = useState("");
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskProjectId, setTaskProjectId] = useState("");
-  const [taskAssigneeId, setTaskAssigneeId] = useState("");
-  const [taskDeadline, setTaskDeadline] = useState(todayDatetimeLocal(18));
-  const [taskEstimateHours, setTaskEstimateHours] = useState("2");
-  const [taskPriority, setTaskPriority] = useState<V2TaskPriority>("medium");
-  const [saving, setSaving] = useState(false);
+  const [projectFilter, setProjectFilter] = useState("all");
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
+  const [paletteHint, setPaletteHint] = useState(false);
 
   const elapsed = active ? active.elapsedSeconds + tick : 0;
+  const runningTaskId = active?.session.task_id ?? null;
   const teamProjects = useMemo(() => projects.filter((p) => p.scope === "team"), [projects]);
 
   const loadPage = useCallback(async () => {
-    const [taskRes, actRes, timerRes] = await Promise.all([
+    const [taskRes, timerRes] = await Promise.all([
       fetchJson<{ tasks: V2TaskWithMeta[]; groups: Record<string, V2TaskWithMeta[]> }>("/api/v2/tasks?grouped=1"),
-      fetchJson<{ activity: ActivityItem[] }>("/api/v2/activity?limit=30"),
       fetchJson<{ active: ActiveTimer | null }>("/api/v2/timer/active"),
     ]);
     setTasks(taskRes.tasks);
     setGroups(taskRes.groups);
-    setActivity(actRes.activity);
     setActive(timerRes.active);
   }, []);
 
   useEffect(() => {
     if (bootLoading) return;
-    if (me && !taskAssigneeId) setTaskAssigneeId(me.id);
     loadPage()
       .catch((e) => setError(e instanceof Error ? e.message : "Ошибка"))
       .finally(() => setLoading(false));
-  }, [bootLoading, loadPage, me, taskAssigneeId]);
+  }, [bootLoading, loadPage]);
 
   useEffect(() => {
     if (!active) return;
@@ -86,138 +69,179 @@ export function V2HomeClient() {
   }, [active]);
 
   async function reload() {
+    setTick(0);
     await Promise.all([loadPage(), refreshBoot()]);
   }
 
-  async function toggleComplete(task: V2TaskWithMeta) {
-    await fetchJson(`/api/v2/tasks/${task.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", completed: !task.completed_at }) });
+  async function toggleComplete(taskId: string) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    await fetchJson(`/api/v2/tasks/${taskId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "complete", completed: !task.completed_at }),
+    });
     await reload();
   }
 
   async function toggleTimer(taskId: string) {
-    if (active?.session.task_id === taskId) await fetchJson("/api/v2/timer/stop", { method: "POST" });
-    else await fetchJson("/api/v2/timer/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId }) });
+    if (runningTaskId === taskId) {
+      await fetchJson("/api/v2/timer/stop", { method: "POST" });
+    } else {
+      await fetchJson("/api/v2/timer/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId }),
+      });
+    }
     setTick(0);
     await reload();
   }
 
+  async function stopTimer() {
+    await fetchJson("/api/v2/timer/stop", { method: "POST" });
+    setTick(0);
+    await reload();
+  }
+
+  const filteredGroups = useMemo(() => {
+    const next: Record<string, V2TaskWithMeta[]> = {};
+    for (const bucket of BUCKET_ORDER) {
+      next[bucket] = (groups[bucket] ?? []).filter((t) =>
+        projectFilter === "all" ? true : t.project_id === projectFilter
+      );
+    }
+    return next;
+  }, [groups, projectFilter]);
+
+  const chipCounts = useMemo(() => {
+    const c: Record<string, number> = { all: tasks.filter((t) => !t.completed_at).length };
+    for (const t of tasks) {
+      if (t.completed_at || !t.project_id) continue;
+      c[t.project_id] = (c[t.project_id] ?? 0) + 1;
+    }
+    return c;
+  }, [tasks]);
+
+  const doneToday = filteredGroups.done_today ?? [];
+  const todayOpen = filteredGroups.today ?? [];
+  const completedToday = doneToday.length;
+  const totalToday = completedToday + todayOpen.length;
+
+  const focusSecToday = useMemo(() => {
+    const base = [...doneToday, ...todayOpen, ...(filteredGroups.overdue ?? [])].reduce(
+      (sum, t) => sum + t.logged_seconds,
+      0
+    );
+    return base + (active ? elapsed : 0);
+  }, [doneToday, todayOpen, filteredGroups.overdue, active, elapsed]);
+
+  const urgentOpen = useMemo(() => tasks.filter((t) => !t.completed_at && t.priority === "urgent"), [tasks]);
+  const urgentOverdue = urgentOpen.filter((t) => t.bucket === "overdue").length;
+  const urgentTodayCount = urgentOpen.filter((t) => t.bucket === "today").length;
+
   if (loading || bootLoading) {
-    return <div className="flex min-h-[50vh] items-center justify-center text-[var(--v2-ink-500)]">Загрузка…</div>;
+    return (
+      <div className="flex min-h-[50vh] flex-1 items-center justify-center text-[var(--v2-ink-500)]">Загрузка…</div>
+    );
   }
 
   return (
-    <div className="px-7 py-6">
-      {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
+    <>
+      <V2Topbar
+        workspaceName={workspace?.name}
+        onNewTask={() => setPaletteHint(true)}
+        onOpenCommands={() => setPaletteHint(true)}
+      />
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-[1180px] px-10 pb-24 pt-8">
+          {error ? (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+          ) : null}
+          {paletteHint ? (
+            <div className="mb-4 rounded-xl border border-[var(--v2-brand-100)] bg-[var(--v2-brand-50)] px-4 py-3 text-sm text-[var(--v2-brand-800)]">
+              Нажмите ⌘K для команд и быстрого поиска.
+            </div>
+          ) : null}
 
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-semibold tracking-tight">{me ? `Привет, ${me.name.split(" ")[0]}` : "Мои задачи"}</h1>
-          <p className="mt-1 text-sm text-[var(--v2-ink-500)]">{tasks.filter((t) => !t.completed_at).length} открытых задач</p>
-        </div>
-        <button type="button" className="v2-btn-primary" onClick={() => fetchJson("/api/v2/tasks/postpone", { method: "POST" }).then(reload)}>
-          Перенести на завтра
-        </button>
-      </header>
+          {me ? <PageHead userName={me.name} tasks={tasks} /> : null}
 
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!quickText.trim()) return;
-          await fetchJson("/api/v2/tasks/quick", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: quickText }) });
-          setQuickText("");
-          await reload();
-        }}
-        className="v2-card mb-6 flex gap-2 p-3"
-      >
-        <input className="v2-input flex-1" placeholder="Быстро: Позвонить Пете в пятницу" value={quickText} onChange={(e) => setQuickText(e.target.value)} />
-        <button type="submit" className="v2-btn-primary">NLP</button>
-      </form>
+          <ActiveTrackerHero
+            task={active?.task ?? null}
+            elapsed={elapsed}
+            running={!!active}
+            onToggleTimer={() => {
+              if (active) void toggleTimer(active.session.task_id);
+            }}
+            onStop={() => void stopTimer()}
+            completedToday={completedToday}
+            totalToday={totalToday}
+            focusSecToday={focusSecToday}
+            urgentCount={urgentOpen.length}
+            urgentOverdue={urgentOverdue}
+            urgentToday={urgentTodayCount}
+          />
 
-      {active && (
-        <div className="mb-6">
-          <ActiveTrackerHero task={active.task} elapsed={elapsed} onToggleTimer={() => toggleTimer(active.session.task_id)} onStop={async () => { await fetchJson("/api/v2/timer/stop", { method: "POST" }); setTick(0); await reload(); }} />
-        </div>
-      )}
+          <div className="mt-9">
+            <ChipBar
+              projectFilter={projectFilter}
+              setProjectFilter={setProjectFilter}
+              counts={chipCounts}
+              projects={projects}
+            />
 
-      <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (!taskTitle.trim()) return;
-            await fetchJson("/api/v2/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: taskTitle, scope: "team", projectId: taskProjectId || null, assigneeUserId: taskAssigneeId, deadlineAt: fromDatetimeLocalValue(taskDeadline), estimateHours: Number(taskEstimateHours) || null, priority: taskPriority }) });
-            setTaskTitle("");
-            await reload();
-          }}
-          className="v2-card space-y-3 p-4"
-        >
-          <div className="font-medium">Задача</div>
-          <input className="v2-input" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Название" />
-          <div className="grid grid-cols-2 gap-2">
-            <select className="v2-input" value={taskProjectId} onChange={(e) => setTaskProjectId(e.target.value)}>
-              <option value="">Проект</option>
-              {teamProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <select className="v2-input" value={taskAssigneeId} onChange={(e) => setTaskAssigneeId(e.target.value)}>
-              {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.display_name}</option>)}
-            </select>
+            {BUCKET_ORDER.map((bucket) => {
+              const list = filteredGroups[bucket] ?? [];
+              if (!list.length) return null;
+              return (
+                <TaskSection
+                  key={bucket}
+                  title={BUCKET_LABELS[bucket]}
+                  subtitle={formatBucketSubtitle(bucket)}
+                  accent={SECTION_ACCENTS[bucket] ?? "#A1A1AA"}
+                  tasks={list}
+                  runningId={runningTaskId}
+                  elapsed={elapsed}
+                  onToggleRun={toggleTimer}
+                  onToggleDone={toggleComplete}
+                  onOpenTask={setDrawerTaskId}
+                />
+              );
+            })}
           </div>
-          <button type="submit" className="v2-btn-primary">Добавить</button>
-        </form>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const titles = bulkTitles.split("\n").map((l) => l.trim()).filter(Boolean);
-            if (!titles.length) return;
-            await fetchJson("/api/v2/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ titles, scope: "team", projectId: taskProjectId || null, assigneeUserId: taskAssigneeId, deadlineAt: fromDatetimeLocalValue(taskDeadline), estimateHours: Number(taskEstimateHours) || null, priority: taskPriority }) });
-            setBulkTitles("");
-            await reload();
-          }}
-          className="v2-card space-y-3 p-4"
-        >
-          <div className="font-medium">Список</div>
-          <textarea className="v2-input min-h-[120px]" value={bulkTitles} onChange={(e) => setBulkTitles(e.target.value)} />
-          <button type="submit" className="v2-btn-primary">Добавить список</button>
-        </form>
-      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_280px]">
-        <div className="space-y-6">
-          {BUCKET_ORDER.map((bucket) => {
-            const list = groups[bucket] ?? [];
-            if (!list.length) return null;
-            return (
-              <section key={bucket}>
-                <h2 className="mb-2 text-sm font-semibold">{BUCKET_LABELS[bucket]} ({list.length})</h2>
-                <div className="v2-card divide-y">
-                  {list.map((task) => {
-                    const running = active?.session.task_id === task.id;
-                    const total = task.logged_seconds + (running ? elapsed : 0);
-                    return (
-                      <div key={task.id} className="flex cursor-pointer items-center gap-3 px-4 py-3" onClick={() => setDrawerTaskId(task.id)}>
-                        <input type="checkbox" checked={!!task.completed_at} onChange={(e) => { e.stopPropagation(); void toggleComplete(task); }} />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium">{task.title}</div>
-                          <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--v2-ink-500)]">
-                            {task.project_name && <ProjectChip name={task.project_name} short={task.project_short_name} bg={task.project_color_bg} tint={task.project_color_tint} />}
-                            <span className="v2-tnum">{fmtDuration(total)}</span>
-                          </div>
-                        </div>
-                        <div onClick={(e) => e.stopPropagation()}><TimerButton running={running} onClick={() => toggleTimer(task.id)} /></div>
-                      </div>
-                    );
-                  })}
+          <div className="mt-12 flex items-center justify-between rounded-2xl bg-white/60 p-5 shadow-[var(--v2-shadow-card)] backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--v2-brand-500)] to-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]">
+                <V2Icons.spark className="h-[18px] w-[18px]" />
+              </div>
+              <div>
+                <div className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Спланируем завтра?</div>
+                <div className="text-[12.5px] text-[var(--v2-ink-500)]">
+                  Тим подберёт фокус-блоки и расставит приоритеты на основе ваших дедлайнов.
                 </div>
-              </section>
-            );
-          })}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
+            >
+              Открыть планировщик
+            </button>
+          </div>
         </div>
-        <aside className="v2-card p-4">
-          <h2 className="mb-3 text-sm font-semibold">Активность</h2>
-          <ul className="space-y-2 text-xs">{activity.map((a) => <li key={a.id}>{a.message}</li>)}</ul>
-        </aside>
       </div>
 
-      <TaskDrawer taskId={drawerTaskId} open={!!drawerTaskId} onClose={() => setDrawerTaskId(null)} onUpdated={reload} members={members} projects={teamProjects.map((p) => ({ id: p.id, name: p.name }))} runningTaskId={active?.session.task_id ?? null} onToggleTimer={toggleTimer} />
-    </div>
+      <TaskDrawer
+        taskId={drawerTaskId}
+        open={!!drawerTaskId}
+        onClose={() => setDrawerTaskId(null)}
+        onUpdated={reload}
+        members={members}
+        projects={teamProjects.map((p) => ({ id: p.id, name: p.name }))}
+        runningTaskId={runningTaskId}
+        onToggleTimer={toggleTimer}
+      />
+    </>
   );
 }
