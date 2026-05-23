@@ -67,6 +67,8 @@ export async function POST(request: NextRequest) {
       priority: body.priority,
       description: typeof body.description === "string" ? body.description : null,
       inboxBucket: body.inboxBucket ?? null,
+      parentId: typeof body.parentId === "string" ? body.parentId : null,
+      workMonth: typeof body.workMonth === "string" ? body.workMonth : undefined,
     });
 
     return NextResponse.json({ task });

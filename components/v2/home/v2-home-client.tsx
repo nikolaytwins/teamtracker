@@ -8,6 +8,7 @@ import { ActiveTrackerHero } from "@/components/v2/hero/active-tracker-hero";
 import { ChipBar } from "@/components/v2/home/chip-bar";
 import { PageHead } from "@/components/v2/home/page-head";
 import { TaskSection } from "@/components/v2/home/task-section";
+import { UnassignedTasksSection } from "@/components/v2/home/unassigned-tasks-section";
 import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
 import { V2Topbar } from "@/components/v2/shell/v2-topbar";
 import { TaskDrawer } from "@/components/v2/tasks/task-drawer";
@@ -29,6 +30,16 @@ const SECTION_ACCENTS: Partial<Record<V2TaskBucket, string>> = {
   done_today: "#10B981",
 };
 
+const BUCKET_EMPTY_LABELS: Partial<Record<V2TaskBucket, string>> = {
+  today: "На сегодня задач нет",
+  tomorrow: "На завтра задач нет",
+  this_week: "На этой неделе задач нет",
+  later: "Задач на потом пока нет",
+  done_today: "Сегодня ещё ничего не завершено",
+};
+
+const ALWAYS_VISIBLE_BUCKETS = new Set<V2TaskBucket>(["today", "tomorrow", "this_week", "later", "done_today"]);
+
 export function V2HomeClient() {
   const { me, workspace, members, projects, loading: bootLoading, refresh: refreshBoot, openNewTask, openCommandPalette } =
     useV2Bootstrap();
@@ -42,25 +53,44 @@ export function V2HomeClient() {
   const [tick, setTick] = useState(0);
   const [projectFilter, setProjectFilter] = useState("all");
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
+  const [unassignedTasks, setUnassignedTasks] = useState<V2TaskWithMeta[]>([]);
+
+  const canViewUnassigned = me?.role === "admin" || me?.role === "pm";
 
   const elapsed = active ? active.elapsedSeconds + tick : 0;
   const runningTaskId = active?.session.task_id ?? null;
   const teamProjects = useMemo(() => projects.filter((p) => p.scope === "team"), [projects]);
 
   const loadPage = useCallback(async () => {
-    const [taskRes, timerRes, statsRes] = await Promise.all([
+    const requests: Promise<unknown>[] = [
       fetchJson<{ tasks: V2TaskWithMeta[]; groups: Record<string, V2TaskWithMeta[]> }>("/api/v2/tasks?grouped=1"),
       fetchJson<{ active: ActiveTimer | null }>("/api/v2/timer/active"),
       fetchJson<{ focusSecondsToday: number; activeElapsedSeconds: number; hasActiveTimer: boolean }>(
         "/api/v2/timer/stats"
       ),
-    ]);
+    ];
+    if (canViewUnassigned) {
+      requests.push(fetchJson<{ tasks: V2TaskWithMeta[] }>("/api/v2/tasks/unassigned"));
+    }
+    const results = await Promise.all(requests);
+    const taskRes = results[0] as { tasks: V2TaskWithMeta[]; groups: Record<string, V2TaskWithMeta[]> };
+    const timerRes = results[1] as { active: ActiveTimer | null };
+    const statsRes = results[2] as {
+      focusSecondsToday: number;
+      activeElapsedSeconds: number;
+      hasActiveTimer: boolean;
+    };
     setTasks(taskRes.tasks);
     setGroups(taskRes.groups);
     setActive(timerRes.active);
     setFocusSecondsToday(statsRes.focusSecondsToday);
     setActiveElapsedBase(timerRes.active?.elapsedSeconds ?? 0);
-  }, []);
+    if (canViewUnassigned && results[3]) {
+      setUnassignedTasks((results[3] as { tasks: V2TaskWithMeta[] }).tasks);
+    } else {
+      setUnassignedTasks([]);
+    }
+  }, [canViewUnassigned]);
 
   useEffect(() => {
     if (bootLoading) return;
@@ -112,14 +142,21 @@ export function V2HomeClient() {
   }
 
   const filteredGroups = useMemo(() => {
+    const unassignedIds = canViewUnassigned ? new Set(unassignedTasks.map((t) => t.id)) : new Set<string>();
     const next: Record<string, V2TaskWithMeta[]> = {};
     for (const bucket of BUCKET_ORDER) {
-      next[bucket] = (groups[bucket] ?? []).filter((t) =>
-        projectFilter === "all" ? true : t.project_id === projectFilter
-      );
+      next[bucket] = (groups[bucket] ?? []).filter((t) => {
+        if (unassignedIds.has(t.id)) return false;
+        return projectFilter === "all" ? true : t.project_id === projectFilter;
+      });
     }
     return next;
-  }, [groups, projectFilter]);
+  }, [groups, projectFilter, canViewUnassigned, unassignedTasks]);
+
+  const filteredUnassigned = useMemo(() => {
+    if (!canViewUnassigned) return [];
+    return unassignedTasks.filter((t) => (projectFilter === "all" ? true : t.project_id === projectFilter));
+  }, [unassignedTasks, projectFilter, canViewUnassigned]);
 
   const chipCounts = useMemo(() => {
     const c: Record<string, number> = { all: tasks.filter((t) => !t.completed_at).length };
@@ -155,7 +192,6 @@ export function V2HomeClient() {
   return (
     <>
       <V2Topbar
-        workspaceName={workspace?.name}
         onNewTask={() => openNewTask(projectFilter === "all" ? null : projectFilter)}
         onOpenCommands={openCommandPalette}
         onOpenTask={setDrawerTaskId}
@@ -194,9 +230,13 @@ export function V2HomeClient() {
               projects={projects}
             />
 
+            {canViewUnassigned ? (
+              <UnassignedTasksSection tasks={filteredUnassigned} onOpenTask={setDrawerTaskId} />
+            ) : null}
+
             {BUCKET_ORDER.map((bucket) => {
               const list = filteredGroups[bucket] ?? [];
-              if (!list.length) return null;
+              if (!ALWAYS_VISIBLE_BUCKETS.has(bucket) && !list.length) return null;
               return (
                 <TaskSection
                   key={bucket}
@@ -209,6 +249,8 @@ export function V2HomeClient() {
                   onToggleRun={toggleTimer}
                   onToggleDone={toggleComplete}
                   onOpenTask={setDrawerTaskId}
+                  hideWhenEmpty={bucket === "overdue"}
+                  emptyLabel={BUCKET_EMPTY_LABELS[bucket] ?? "Задач нет"}
                 />
               );
             })}

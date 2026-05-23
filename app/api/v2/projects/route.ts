@@ -35,7 +35,36 @@ export async function POST(request: NextRequest) {
       ? body.memberUserIds.filter((x: unknown) => typeof x === "string")
       : undefined;
 
-    const project = await createProject(auth.ctx, { name, scope, memberUserIds });
+    const status =
+      body.status === "not_started" ||
+      body.status === "in_progress" ||
+      body.status === "approval" ||
+      body.status === "completed" ||
+      body.status === "paused"
+        ? body.status
+        : undefined;
+
+    const engagementType = body.engagementType === "retainer" ? "retainer" : "one_off";
+    const clientAccessEnabled = Boolean(body.clientAccessEnabled);
+
+    const teamMemberUserIds = Array.isArray(body.teamMemberUserIds)
+      ? body.teamMemberUserIds.filter((x: unknown) => typeof x === "string")
+      : memberUserIds;
+
+    const clientUserIds = Array.isArray(body.clientUserIds)
+      ? body.clientUserIds.filter((x: unknown) => typeof x === "string")
+      : undefined;
+
+    const project = await createProject(auth.ctx, {
+      name,
+      scope,
+      memberUserIds,
+      teamMemberUserIds,
+      clientUserIds,
+      status,
+      engagementType,
+      clientAccessEnabled,
+    });
     return NextResponse.json({ project });
   } catch (e) {
     console.error("POST /api/v2/projects", e);

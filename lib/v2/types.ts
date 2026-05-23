@@ -4,6 +4,8 @@ export const V2_DEFAULT_WORKSPACE_ID = "ws-default";
 
 export type V2ProjectScope = "team" | "personal";
 export type V2ProjectStatus = "not_started" | "in_progress" | "approval" | "completed" | "paused";
+export type V2ProjectEngagementType = "one_off" | "retainer";
+export type V2ProjectMemberRole = "team" | "client" | "lead";
 export type V2TaskScope = "team" | "personal";
 export type V2TaskStatus = "todo" | "in_progress" | "review" | "done";
 export type V2TaskPriority = "urgent" | "high" | "medium" | "low";
@@ -44,6 +46,11 @@ export type V2ProjectRow = {
   color_ink: string | null;
   status: V2ProjectStatus;
   owner_user_id: string | null;
+  contract_ref: string | null;
+  release_at: string | null;
+  budget_rub: number | null;
+  engagement_type: V2ProjectEngagementType;
+  client_access_enabled: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -66,6 +73,7 @@ export type V2TaskRow = {
   completed_at: string | null;
   sort_order: number;
   inbox_bucket: V2InboxBucket | null;
+  work_month: string | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;

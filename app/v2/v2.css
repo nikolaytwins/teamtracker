@@ -125,6 +125,44 @@
   scrollbar-width: none;
 }
 
+.v2-stripes {
+  background-image: repeating-linear-gradient(45deg, #d4d4d8 0 6px, transparent 6px 12px);
+}
+
+.v2-tile {
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.v2-tile:hover {
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.05), 0 22px 48px -16px rgba(16, 24, 40, 0.18);
+}
+
+.v2-kcol:hover .v2-kcol-head {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+@keyframes v2-cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.v2-card-in {
+  animation: v2-cardIn 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.v2-dotgrid {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
+  background-position: -1px -1px;
+  mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, #000 30%, transparent 75%);
+}
+
 .v2-ring-focus:focus-visible {
   outline: 2px solid var(--v2-brand-500);
   outline-offset: 2px;

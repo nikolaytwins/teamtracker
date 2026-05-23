@@ -61,6 +61,8 @@ export function TaskSection({
   onToggleRun,
   onToggleDone,
   onOpenTask,
+  hideWhenEmpty = false,
+  emptyLabel = "Задач нет",
 }: {
   title: string;
   subtitle?: string;
@@ -71,11 +73,13 @@ export function TaskSection({
   onToggleRun: (id: string) => void;
   onToggleDone: (id: string) => void;
   onOpenTask: (id: string) => void;
+  hideWhenEmpty?: boolean;
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(true);
   const totalEst = tasks.reduce((a, t) => a + (t.estimate_seconds ?? 0), 0);
 
-  if (!tasks.length) return null;
+  if (hideWhenEmpty && !tasks.length) return null;
 
   return (
     <section className="mt-2">
@@ -89,19 +93,25 @@ export function TaskSection({
         onToggle={() => setOpen((v) => !v)}
       />
       {open ? (
-        <div className="divide-y divide-[var(--v2-ink-100)]/70 overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-soft)]">
-          {tasks.map((t, i) => (
-            <div key={t.id} className="v2-row-in" style={{ animationDelay: `${i * 30}ms` }}>
-              <TaskRow
-                task={t}
-                isRunning={runningId === t.id}
-                elapsed={elapsed}
-                onToggleRun={onToggleRun}
-                onToggleDone={onToggleDone}
-                onOpen={onOpenTask}
-              />
+        <div className="overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-soft)]">
+          {tasks.length ? (
+            <div className="divide-y divide-[var(--v2-ink-100)]/70">
+              {tasks.map((t, i) => (
+                <div key={t.id} className="v2-row-in" style={{ animationDelay: `${i * 30}ms` }}>
+                  <TaskRow
+                    task={t}
+                    isRunning={runningId === t.id}
+                    elapsed={elapsed}
+                    onToggleRun={onToggleRun}
+                    onToggleDone={onToggleDone}
+                    onOpen={onOpenTask}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <p className="v2-tight px-4 py-6 text-center text-[13px] text-[var(--v2-ink-400)]">{emptyLabel}</p>
+          )}
         </div>
       ) : null}
     </section>

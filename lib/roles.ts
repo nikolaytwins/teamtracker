@@ -1,17 +1,18 @@
-export type TtUserRole = "admin" | "designer" | "pm" | "member";
+export type TtUserRole = "admin" | "designer" | "pm" | "member" | "client";
 
-export const TT_USER_ROLES: TtUserRole[] = ["admin", "designer", "pm", "member"];
+export const TT_USER_ROLES: TtUserRole[] = ["admin", "designer", "pm", "member", "client"];
 
 export const TT_ROLE_LABELS: Record<TtUserRole, string> = {
   admin: "Администратор",
   designer: "Дизайнер",
   pm: "ПМ",
   member: "Участник (без доски)",
+  client: "Клиент",
 };
 
 export function normalizeTtUserRole(raw: string | null | undefined): TtUserRole {
   const s = (raw ?? "").trim().toLowerCase();
-  if (s === "designer" || s === "pm" || s === "member") return s;
+  if (s === "designer" || s === "pm" || s === "member" || s === "client") return s;
   return "admin";
 }
 
@@ -27,6 +28,10 @@ export function sessionRole(session: { role?: string | null | undefined }): TtUs
 
 export function isAdminRole(role: TtUserRole): boolean {
   return role === "admin";
+}
+
+export function isClientRole(role: TtUserRole): boolean {
+  return role === "client";
 }
 
 export function canAccessAgencyRoutes(role: TtUserRole): boolean {

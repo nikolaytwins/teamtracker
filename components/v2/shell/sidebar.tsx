@@ -22,8 +22,7 @@ export function V2Sidebar({
           <span className="text-xs font-bold">Т</span>
         </span>
         <span className="flex flex-col leading-tight">
-          <span className="text-[13.5px] font-semibold tracking-tight">Тим</span>
-          <span className="text-[11px] text-[var(--v2-ink-500)]">Студия</span>
+          <span className="text-[13.5px] font-semibold tracking-tight">Тим Трекер</span>
         </span>
       </div>
 
@@ -32,7 +31,7 @@ export function V2Sidebar({
           href={appPath("/v2/home")}
           className="flex h-9 items-center gap-3 rounded-lg bg-[var(--v2-brand-50)] px-3 text-[13.5px] font-medium text-[var(--v2-brand-700)]"
         >
-          Мои задачи
+          Главная
           {taskCount != null && (
             <span className="ml-auto rounded-md bg-white px-1.5 py-0.5 text-[11px] tabular-nums">{taskCount}</span>
           )}

@@ -1,6 +1,9 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import { logActivity } from "@/lib/v2/activity/log";
-import { canEditTask, canViewAllTeamData, canViewTask } from "@/lib/v2/auth/permissions";
+import { canCreateProjectTask, canEditTask, canViewAllTeamData, canViewTask, canViewUnassignedQueue } from "@/lib/v2/auth/permissions";
+import { getProjectById } from "@/lib/v2/projects/project-repo";
+import { fetchMemberProjectIds, getMemberRoleForUser } from "@/lib/v2/projects/project-members-repo";
+import { normalizeWorkMonth } from "@/lib/v2/projects/retainer-utils";
 import { classifyTaskBucket } from "@/lib/v2/tasks/task-buckets";
 import { listUsersPublic } from "@/lib/tt-auth-db";
 import type {
@@ -24,6 +27,7 @@ export type CreateTaskInput = {
   description?: string | null;
   inboxBucket?: V2InboxBucket | null;
   parentId?: string | null;
+  workMonth?: string | null;
 };
 
 export type UpdateTaskInput = Partial<{
@@ -124,6 +128,7 @@ export async function listTasks(
     projectId?: string;
     includeCompleted?: boolean;
     activeProjectsOnly?: boolean;
+    workMonth?: string;
   }
 ): Promise<V2TaskWithMeta[]> {
   const sb = getV2Supabase();
@@ -138,6 +143,7 @@ export async function listTasks(
 
   if (opts?.scope) q = q.eq("scope", opts.scope);
   if (opts?.projectId) q = q.eq("project_id", opts.projectId);
+  if (opts?.workMonth) q = q.eq("work_month", normalizeWorkMonth(opts.workMonth));
   if (!opts?.includeCompleted) {
     q = q.is("completed_at", null);
   }
@@ -146,7 +152,9 @@ export async function listTasks(
   if (error) throw new Error(error.message);
 
   let tasks = (data ?? []) as V2TaskRow[];
-  tasks = tasks.filter((t) => canViewTask(ctx, t));
+  const memberProjectIds =
+    canViewAllTeamData(ctx.role) || ctx.role === "pm" ? undefined : await fetchMemberProjectIds(ctx.userId);
+  tasks = tasks.filter((t) => canViewTask(ctx, t, { memberProjectIds }));
 
   const projectIds = [...new Set(tasks.map((t) => t.project_id).filter(Boolean))] as string[];
   const projects = new Map<
@@ -192,13 +200,83 @@ export async function listTasks(
   return tasks.map((t) => enrichTask(t, logged, projects, users, counts));
 }
 
+const PRIORITY_RANK: Record<V2TaskPriority, number> = {
+  urgent: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+export function isUnassignedTask(task: Pick<V2TaskRow, "assignee_user_id" | "deadline_at" | "completed_at" | "scope">): boolean {
+  if (task.completed_at || task.scope !== "team") return false;
+  return !task.assignee_user_id || !task.deadline_at;
+}
+
+export async function listUnassignedTasks(ctx: V2SessionContext): Promise<V2TaskWithMeta[]> {
+  if (!canViewUnassignedQueue(ctx.role)) return [];
+
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_tasks")
+    .select("*")
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("scope", "team")
+    .is("deleted_at", null)
+    .is("parent_id", null)
+    .is("completed_at", null)
+    .or("assignee_user_id.is.null,deadline_at.is.null")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const tasks = (data ?? []) as V2TaskRow[];
+  const projectIds = [...new Set(tasks.map((t) => t.project_id).filter(Boolean))] as string[];
+  const projects = new Map<
+    string,
+    {
+      name: string;
+      short_name: string | null;
+      color_tint: string | null;
+      color_bg: string | null;
+      color_ink: string | null;
+    }
+  >();
+  if (projectIds.length) {
+    const { data: prows } = await sb
+      .from("v2_projects")
+      .select("id, name, short_name, color_tint, color_bg, color_ink")
+      .in("id", projectIds);
+    for (const p of prows ?? []) {
+      projects.set(p.id as string, {
+        name: p.name as string,
+        short_name: p.short_name as string | null,
+        color_tint: p.color_tint as string | null,
+        color_bg: p.color_bg as string | null,
+        color_ink: (p.color_ink as string | null) ?? (p.color_tint as string | null),
+      });
+    }
+  }
+
+  const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));
+  const taskIds = tasks.map((t) => t.id);
+  const [logged, counts] = await Promise.all([sumLoggedSeconds(taskIds), countCommentsAndLinks(taskIds)]);
+  return tasks
+    .map((t) => enrichTask(t, logged, projects, users, counts))
+    .sort((a, b) => {
+      const pr = PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority];
+      if (pr !== 0) return pr;
+      return a.created_at.localeCompare(b.created_at);
+    });
+}
+
 export async function getTaskById(ctx: V2SessionContext, taskId: string): Promise<V2TaskWithMeta | null> {
   const sb = getV2Supabase();
   const { data, error } = await sb.from("v2_tasks").select("*").eq("id", taskId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
   const task = data as V2TaskRow;
-  if (!canViewTask(ctx, task)) return null;
+  const memberProjectIds =
+    canViewAllTeamData(ctx.role) || ctx.role === "pm" ? undefined : await fetchMemberProjectIds(ctx.userId);
+  if (!canViewTask(ctx, task, { memberProjectIds })) return null;
 
   const projects = new Map<
     string,
@@ -234,11 +312,35 @@ export async function getTaskById(ctx: V2SessionContext, taskId: string): Promis
   return enrichTask(task, logged, projects, users, counts);
 }
 
+async function editPermission(
+  ctx: V2SessionContext,
+  task: V2TaskRow
+): Promise<boolean> {
+  const memberProjectIds =
+    canViewAllTeamData(ctx.role) || ctx.role === "pm" ? undefined : await fetchMemberProjectIds(ctx.userId);
+  let projectMemberRole = null;
+  if (task.project_id && memberProjectIds?.has(task.project_id)) {
+    projectMemberRole = await getMemberRoleForUser(task.project_id, ctx.userId);
+  }
+  return canEditTask(ctx, task, { memberProjectIds, projectMemberRole });
+}
+
 export async function createTask(ctx: V2SessionContext, input: CreateTaskInput): Promise<V2TaskWithMeta> {
   const sb = getV2Supabase();
   const id = newV2Id();
   const ts = nowIso();
   const scope = input.scope ?? "team";
+
+  let workMonth: string | null = input.workMonth ?? null;
+  if (input.projectId) {
+    const project = await getProjectById(ctx, input.projectId);
+    if (!project) throw new Error("Project not found");
+    const memberRole = await getMemberRoleForUser(input.projectId, ctx.userId);
+    if (!canCreateProjectTask(ctx, project, memberRole)) throw new Error("Forbidden");
+    if (project.engagement_type === "retainer") {
+      workMonth = normalizeWorkMonth(input.workMonth ?? undefined);
+    }
+  }
 
   const row: V2TaskRow = {
     id,
@@ -257,6 +359,7 @@ export async function createTask(ctx: V2SessionContext, input: CreateTaskInput):
     completed_at: null,
     sort_order: 0,
     inbox_bucket: input.inboxBucket ?? null,
+    work_month: workMonth,
     deleted_at: null,
     created_at: ts,
     updated_at: ts,
@@ -297,7 +400,7 @@ export async function updateTask(
 ): Promise<V2TaskWithMeta> {
   const existing = await getTaskById(ctx, taskId);
   if (!existing) throw new Error("Task not found");
-  if (!canEditTask(ctx, existing)) throw new Error("Forbidden");
+  if (!(await editPermission(ctx, existing))) throw new Error("Forbidden");
 
   const patch: Record<string, unknown> = { updated_at: nowIso() };
   if (input.title !== undefined) patch.title = input.title.trim();
@@ -324,7 +427,7 @@ export async function updateTask(
 export async function completeTask(ctx: V2SessionContext, taskId: string, completed: boolean): Promise<V2TaskWithMeta> {
   const existing = await getTaskById(ctx, taskId);
   if (!existing) throw new Error("Task not found");
-  if (!canEditTask(ctx, existing)) throw new Error("Forbidden");
+  if (!(await editPermission(ctx, existing))) throw new Error("Forbidden");
 
   const sb = getV2Supabase();
   const patch = {

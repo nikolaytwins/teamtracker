@@ -2,83 +2,219 @@
 
 import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import type { V2ProjectRow, V2ProjectStatus, V2TaskWithMeta } from "@/lib/v2/types";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import type { PortfolioPayload, PortfolioKanbanStatus, PortfolioProject } from "@/lib/v2/projects/portfolio-types";
+import { kanbanToV2Status } from "@/lib/v2/projects/portfolio-types";
+import { kanbanStatusToV2CreateStatus, STARRED_STORAGE_KEY } from "@/components/v2/projects/portfolio-meta";
+import { NewProjectModal } from "@/components/v2/projects/new-project-modal";
+import { PortfolioHero } from "@/components/v2/projects/portfolio-hero";
+import { ProjectsPageHead } from "@/components/v2/projects/projects-page-head";
+import { ProjectsTopbar } from "@/components/v2/projects/projects-topbar";
+import {
+  buildListSections,
+  DoneSection,
+  KanbanBoard,
+  ListSection,
+  StatusChips,
+  ViewSwitcher,
+} from "@/components/v2/projects/projects-views";
+import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
+import { V2Icons } from "@/components/v2/ui/icons";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-const STATUS_LABELS: Record<V2ProjectStatus, string> = {
-  not_started: "Не начат",
-  in_progress: "В работе",
-  approval: "На согласовании",
-  completed: "Завершён",
-  paused: "Пауза",
-};
+function useStarredProjects() {
+  const [starred, setStarred] = useState<Set<string>>(new Set());
 
-type StatusTab = "active" | "paused" | "completed";
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STARRED_STORAGE_KEY);
+      if (raw) setStarred(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-const TABS: { key: StatusTab; label: string }[] = [
-  { key: "active", label: "Активные" },
-  { key: "paused", label: "На паузе" },
-  { key: "completed", label: "Завершённые" },
-];
+  const toggle = useCallback((id: string) => {
+    setStarred((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      localStorage.setItem(STARRED_STORAGE_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  return { starred, toggle };
+}
 
 export function V2ProjectsClient() {
-  const searchParams = useSearchParams();
-  const selectedId = searchParams.get("project") ?? "";
-  const tabParam = searchParams.get("tab") as StatusTab | null;
-  const [tab, setTab] = useState<StatusTab>(tabParam && TABS.some((t) => t.key === tabParam) ? tabParam : "active");
-  const [projects, setProjects] = useState<V2ProjectRow[]>([]);
-  const [tasks, setTasks] = useState<V2TaskWithMeta[]>([]);
+  const router = useRouter();
+  const { refresh: refreshBoot, members: workspaceMembers } = useV2Bootstrap();
+  const { starred, toggle: toggleStar } = useStarredProjects();
+
+  const [payload, setPayload] = useState<PortfolioPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [newName, setNewName] = useState("");
+  const [view, setView] = useState<"list" | "kanban">("list");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
 
-  const selected = projects.find((p) => p.id === selectedId) ?? projects[0];
-
-  const loadProjects = useCallback(async () => {
-    const data = await fetchJson<{ projects: V2ProjectRow[] }>(
-      `/api/v2/projects?statusGroup=${encodeURIComponent(tab)}`
-    );
-    setProjects(data.projects.filter((p) => p.scope === "team"));
-  }, [tab]);
-
-  const loadTasks = useCallback(async () => {
-    if (!selected) {
-      setTasks([]);
-      return;
-    }
-    const data = await fetchJson<{ tasks: V2TaskWithMeta[] }>(
-      `/api/v2/tasks?projectId=${encodeURIComponent(selected.id)}&includeAll=1`
-    );
-    setTasks(data.tasks.filter((t) => !t.inbox_bucket));
-  }, [selected]);
+  const load = useCallback(async () => {
+    const data = await fetchJson<PortfolioPayload>("/api/v2/projects/portfolio");
+    setPayload(data);
+  }, []);
 
   useEffect(() => {
-    setLoading(true);
-    loadProjects()
+    load()
       .catch((e) => setError(e instanceof Error ? e.message : "Ошибка"))
       .finally(() => setLoading(false));
-  }, [loadProjects]);
+  }, [load]);
 
   useEffect(() => {
-    if (!selected) return;
-    loadTasks().catch((e) => setError(e instanceof Error ? e.message : "Ошибка"));
-  }, [loadTasks, selected]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "p" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setNewProjectOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-  const counts = useMemo(() => {
-    const open = tasks.filter((t) => !t.completed_at).length;
-    return { open, total: tasks.length };
-  }, [tasks]);
+  const projects = payload?.projects ?? [];
 
-  async function setProjectStatus(status: V2ProjectStatus) {
-    if (!selected) return;
-    await fetchJson(`/api/v2/projects/${selected.id}`, {
+  const active = useMemo(() => projects.filter((p) => p.status !== "done"), [projects]);
+  const doneAll = useMemo(() => projects.filter((p) => p.status === "done"), [projects]);
+  const doneThisMonth = useMemo(() => {
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    return doneAll.filter((p) => p.completedAt && new Date(p.completedAt) >= monthStart);
+  }, [doneAll]);
+
+  const categories = useMemo(() => [...new Set(projects.map((p) => p.category))].sort(), [projects]);
+
+  const filteredActive = useMemo(() => {
+    let r = active;
+    if (statusFilter !== "all") r = r.filter((p) => p.status === statusFilter);
+    if (categoryFilter !== "all") r = r.filter((p) => p.category === categoryFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      r = r.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          p.team.some((m) => m.name.toLowerCase().includes(q))
+      );
+    }
+    return r;
+  }, [active, statusFilter, categoryFilter, search]);
+
+  const statusCounts = useMemo(() => {
+    const base = active.filter((p) => {
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        if (
+          !(
+            p.name.toLowerCase().includes(q) ||
+            p.category.toLowerCase().includes(q) ||
+            p.team.some((m) => m.name.toLowerCase().includes(q))
+          )
+        )
+          return false;
+      }
+      return true;
+    });
+    const c: Record<string, number> = {};
+    for (const s of ["not_started", "in_progress", "review", "paused", "done"] as const) c[s] = 0;
+    base.forEach((p) => {
+      c[p.status] = (c[p.status] ?? 0) + 1;
+    });
+    return c;
+  }, [active, categoryFilter, search]);
+
+  const totalActiveCount = useMemo(
+    () =>
+      active.filter((p) => {
+        if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+        return true;
+      }).length,
+    [active, categoryFilter]
+  );
+
+  const sectionsForList = useMemo(
+    () => buildListSections(filteredActive, statusFilter),
+    [filteredActive, statusFilter]
+  );
+
+  const filteredForKanban = useMemo(() => {
+    let r = projects;
+    if (categoryFilter !== "all") r = r.filter((p) => p.category === categoryFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      r = r.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          p.team.some((m) => m.name.toLowerCase().includes(q))
+      );
+    }
+    return r;
+  }, [projects, categoryFilter, search]);
+
+  const criticalProject = projects.find((p) => p.health === "critical" && p.status !== "done");
+
+  async function reload() {
+    await Promise.all([load(), refreshBoot()]);
+  }
+
+  async function createProjectFromModal(input: {
+    name: string;
+    engagementType: "one_off" | "retainer";
+    clientAccessEnabled: boolean;
+    teamMemberIds: string[];
+    clientUserIds: string[];
+  }) {
+    await fetchJson("/api/v2/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: input.name,
+        scope: "team",
+        status: kanbanStatusToV2CreateStatus("in_progress"),
+        engagementType: input.engagementType,
+        clientAccessEnabled: input.clientAccessEnabled,
+        teamMemberUserIds: input.teamMemberIds,
+        clientUserIds: input.clientUserIds,
+      }),
+    });
+    await reload();
+  }
+
+  async function createProject(name: string, status: PortfolioKanbanStatus) {
+    await createProjectFromModal({
+      name,
+      engagementType: "one_off",
+      clientAccessEnabled: false,
+      teamMemberIds: [],
+      clientUserIds: [],
+    });
+  }
+
+  async function moveProject(id: string, status: PortfolioKanbanStatus) {
+    await fetchJson(`/api/v2/projects/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status: kanbanToV2Status(status) }),
     });
-    await loadProjects();
+    await reload();
+  }
+
+  function openProject(id: string) {
+    router.push(appPath(`/v2/projects/${id}`));
   }
 
   if (loading) {
@@ -86,126 +222,154 @@ export function V2ProjectsClient() {
   }
 
   return (
-    <div className="px-7 py-6">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Проекты</h1>
-          <p className="mt-1 text-sm text-[var(--v2-ink-500)]">Проект → задачи → подзадачи (опционально)</p>
-        </div>
-        <form
-          className="flex gap-2"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (!newName.trim()) return;
-            await fetchJson("/api/v2/projects", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name: newName.trim(), scope: "team" }),
-            });
-            setNewName("");
-            await loadProjects();
-          }}
-        >
-          <input className="v2-input" placeholder="Новый проект" value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <button type="submit" className="v2-btn-primary">Создать</button>
-        </form>
-      </header>
+    <>
+      <ProjectsTopbar onNewProject={() => setNewProjectOpen(true)} />
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-[1320px] px-10 pb-24 pt-8">
+          {error ? (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+          ) : null}
 
-      {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
-
-      <div className="mb-4 flex gap-1 rounded-xl bg-white/80 p-1 shadow-[var(--v2-shadow-card)]">
-        {TABS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={`rounded-lg px-4 py-2 text-[13px] font-medium transition ${
-              tab === key ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
-        <aside className="v2-card divide-y max-h-[70vh] overflow-y-auto">
-          {projects.length === 0 && (
-            <p className="px-4 py-6 text-sm text-[var(--v2-ink-500)]">Нет проектов в этой группе</p>
-          )}
-          {projects.map((p) => (
-            <Link
-              key={p.id}
-              href={appPath(`/v2/projects?project=${p.id}&tab=${tab}`)}
-              className={`flex items-center gap-2 px-4 py-3 text-[13px] ${
-                selected?.id === p.id ? "bg-[var(--v2-brand-50)] font-medium" : "hover:bg-[var(--v2-ink-50)]"
-              }`}
-            >
-              <span
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
-                style={{
-                  background: p.color_bg ?? "#eee",
-                  color: p.color_ink ?? p.color_tint ?? "#333",
-                }}
-              >
-                {p.short_name}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{p.name}</span>
-              <span className="text-[11px] text-[var(--v2-ink-400)]">{STATUS_LABELS[p.status]}</span>
-            </Link>
-          ))}
-        </aside>
-
-        <section className="v2-card p-4">
-          {selected ? (
+          {payload ? (
             <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">{selected.name}</h2>
-                  <p className="text-sm text-[var(--v2-ink-500)]">
-                    {counts.open} открытых · {counts.total} всего задач
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {tab !== "active" && (
-                    <button type="button" className="v2-btn-primary text-xs" onClick={() => void setProjectStatus("in_progress")}>
-                      В активные
-                    </button>
-                  )}
-                  {tab !== "paused" && (
-                    <button type="button" className="v2-input text-xs" onClick={() => void setProjectStatus("paused")}>
-                      На паузу
-                    </button>
-                  )}
-                  {tab !== "completed" && (
-                    <button type="button" className="v2-input text-xs" onClick={() => void setProjectStatus("completed")}>
-                      Завершить
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-2">
-                {tasks.length === 0 && (
-                  <p className="text-sm text-[var(--v2-ink-500)]">
-                    Задач пока нет. Создайте задачу на главной (⌘K или «Новая задача») и привяжите к этому проекту.
-                  </p>
-                )}
-                {tasks.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between rounded-lg border border-[var(--v2-ink-100)] px-3 py-2 text-[13px]"
-                  >
-                    <span className={t.completed_at ? "text-[var(--v2-ink-400)] line-through" : ""}>{t.title}</span>
-                    <span className="text-[11px] text-[var(--v2-ink-500)]">{t.assignee_name ?? "—"}</span>
+              <ProjectsPageHead
+                activeCount={payload.kpis.active}
+                doneThisMonth={payload.kpis.doneThisMonth}
+                projects={projects}
+              />
+              <PortfolioHero {...payload} />
+
+              <div className="mt-8 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <ViewSwitcher view={view} setView={setView} />
+                  <div className="mx-1 h-7 w-px bg-[var(--v2-ink-200)]" />
+                  <div className="inline-flex h-9 min-w-[260px] items-center gap-2 rounded-xl bg-white px-3 shadow-[var(--v2-shadow-card)]">
+                    <V2Icons.search className="h-[15px] w-[15px] text-[var(--v2-ink-400)]" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Поиск проекта, категории, участника…"
+                      className="v2-tight flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--v2-ink-400)]"
+                    />
+                    {search ? (
+                      <button type="button" onClick={() => setSearch("")} className="text-[12px] text-[var(--v2-ink-400)] hover:text-[var(--v2-ink-700)]">
+                        ×
+                      </button>
+                    ) : null}
                   </div>
-                ))}
+                  <div className="ml-auto flex items-center gap-2">
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="v2-tight h-9 cursor-pointer rounded-xl bg-white px-3 text-[12.5px] text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] outline-none hover:shadow-[var(--v2-shadow-cardHv)]"
+                    >
+                      <option value="all">Все категории</option>
+                      {categories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-[12.5px] text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+                    >
+                      <V2Icons.sort className="h-4 w-4 text-[var(--v2-ink-500)]" /> Срок
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-[12.5px] text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+                    >
+                      <V2Icons.filter className="h-4 w-4 text-[var(--v2-ink-500)]" /> Ещё фильтры
+                    </button>
+                  </div>
+                </div>
+                <StatusChips
+                  filter={statusFilter}
+                  setFilter={setStatusFilter}
+                  counts={statusCounts}
+                  totalActive={totalActiveCount}
+                />
               </div>
+
+              {view === "list" ? (
+                <>
+                  <div className="mt-2">
+                    {sectionsForList.map((s) => (
+                      <ListSection
+                        key={s.id}
+                        title={s.title}
+                        subtitle={s.subtitle}
+                        accent={s.accent}
+                        projects={s.list}
+                        starredIds={starred}
+                        onOpen={openProject}
+                        onToggleStar={toggleStar}
+                        onAdd={(name, st) => void createProject(name, st)}
+                        defaultStatus={s.defaultStatus}
+                        allowAdd={s.allowAdd}
+                      />
+                    ))}
+                  </div>
+                  <DoneSection projects={doneThisMonth} onOpen={openProject} />
+                </>
+              ) : (
+                <div className="mt-6">
+                  <KanbanBoard
+                    projects={filteredForKanban}
+                    starredIds={starred}
+                    onOpen={openProject}
+                    onToggleStar={toggleStar}
+                    onMove={(id, st) => void moveProject(id, st)}
+                    onAdd={(name, st) => void createProject(name, st)}
+                  />
+                </div>
+              )}
+
+              {criticalProject ? (
+                <div className="mt-12 flex items-center justify-between rounded-2xl bg-white/60 p-5 shadow-[var(--v2-shadow-card)] backdrop-blur">
+                  <div className="flex items-center gap-3">
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--v2-brand-500)] to-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]">
+                      <V2Icons.spark className="h-[18px] w-[18px]" />
+                    </div>
+                    <div>
+                      <div className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">
+                        Обратить внимание на «{criticalProject.name}»?
+                      </div>
+                      <div className="text-[12.5px] text-[var(--v2-ink-500)]">
+                        {criticalProject.tasksDone} из {criticalProject.tasksTotal} задач закрыты
+                        {criticalProject.deadlineDays !== null && criticalProject.deadlineDays >= 0
+                          ? ` · дедлайн ${criticalProject.deadline}`
+                          : ""}
+                        .
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="v2-tight h-9 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]">
+                      Не сейчас
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openProject(criticalProject.id)}
+                      className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
+                    >
+                      Открыть
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </>
-          ) : (
-            <p className="text-sm text-[var(--v2-ink-500)]">Выберите проект или создайте новый</p>
-          )}
-        </section>
+          ) : null}
+        </div>
       </div>
-    </div>
+
+      <NewProjectModal
+        open={newProjectOpen}
+        members={workspaceMembers}
+        onClose={() => setNewProjectOpen(false)}
+        onCreate={createProjectFromModal}
+      />
+    </>
   );
 }
