@@ -275,10 +275,12 @@ export default function Navigation() {
   const showPmBoardNav = me != null && canAccessPmBoard(me.role as TtUserRole);
   const navItems: { href: string; label: string; active: boolean; icon: NavIconName }[] = isMemberUser
     ? [
+        { href: appPath("/v2/home"), label: "Тим v2", active: pathname?.startsWith("/v2") ?? false, icon: "home" },
         { href: appPath("/home"), label: "Главная", active: pathname === "/home" || (pathname?.startsWith("/home/") ?? false), icon: "home" },
         { href: appPath("/tasks"), label: "Задачи", active: pathname === "/tasks", icon: "tasks" },
       ]
     : [
+        { href: appPath("/v2/home"), label: "Тим v2", active: pathname?.startsWith("/v2") ?? false, icon: "home" },
         { href: appPath("/home"), label: "Главная", active: pathname === "/home" || (pathname?.startsWith("/home/") ?? false), icon: "home" },
         { href: appPath("/tasks"), label: "Задачи", active: pathname === "/tasks", icon: "tasks" },
         ...(showPmBoardNav

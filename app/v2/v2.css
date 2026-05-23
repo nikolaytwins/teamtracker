@@ -1,0 +1,85 @@
+.v2-root {
+  --v2-ink-900: #0a0a0b;
+  --v2-ink-800: #18181b;
+  --v2-ink-700: #27272a;
+  --v2-ink-600: #52525b;
+  --v2-ink-500: #71717a;
+  --v2-ink-400: #a1a1aa;
+  --v2-ink-300: #d4d4d8;
+  --v2-ink-100: #f4f4f5;
+  --v2-ink-50: #fafafa;
+  --v2-brand-50: #eff4ff;
+  --v2-brand-500: #3b6ff7;
+  --v2-brand-600: #2a56eb;
+  --v2-brand-700: #2244d8;
+  --v2-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -12px rgba(16, 24, 40, 0.08);
+  --v2-shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.03), 0 12px 36px -16px rgba(30, 52, 120, 0.12);
+  --v2-shadow-glow: 0 0 0 4px rgba(59, 111, 247, 0.1), 0 6px 22px -8px rgba(59, 111, 247, 0.45);
+  background:
+    radial-gradient(1000px 520px at 88% -10%, rgba(59, 111, 247, 0.1), transparent 60%),
+    radial-gradient(700px 420px at -10% 22%, rgba(99, 140, 255, 0.06), transparent 55%),
+    linear-gradient(180deg, #f6f8fc 0%, #eef2f9 100%);
+  color: var(--v2-ink-900);
+  font-feature-settings: "ss01", "cv11";
+}
+
+.v2-dotgrid {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, #000 30%, transparent 75%);
+}
+
+.v2-card {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: var(--v2-shadow-card);
+}
+
+.v2-btn-primary {
+  background: var(--v2-ink-900);
+  color: #fff;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.v2-btn-primary:hover {
+  background: var(--v2-ink-800);
+}
+
+.v2-btn-primary:disabled {
+  opacity: 0.6;
+}
+
+.v2-input {
+  border: 1px solid var(--v2-ink-300);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background: #fff;
+  width: 100%;
+}
+
+.v2-input:focus {
+  outline: 2px solid var(--v2-brand-500);
+  outline-offset: 1px;
+}
+
+.v2-tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes v2-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 111, 247, 0.3), 0 0 0 0 rgba(59, 111, 247, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(59, 111, 247, 0.1), 0 0 0 14px rgba(59, 111, 247, 0.05);
+  }
+}
+
+.v2-timer-running {
+  animation: v2-breathe 2.6s ease-in-out infinite;
+}

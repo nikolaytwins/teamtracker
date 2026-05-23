@@ -8,12 +8,16 @@
     "start": "next start",
     "import-agency-to-supabase": "tsx scripts/import-agency-sqlite-to-supabase.ts",
     "import-team-to-supabase": "tsx scripts/import-team-sqlite-to-supabase.ts",
+    "v2-migrate-from-v1": "tsx scripts/v2-migrate-from-v1.ts",
     "backfill-worker-user-id": "tsx scripts/backfill-worker-user-id.ts"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/utilities": "^3.2.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
     "better-sqlite3": "^12.6.0",
+    "chrono-node": "^2.9.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^11.18.2",

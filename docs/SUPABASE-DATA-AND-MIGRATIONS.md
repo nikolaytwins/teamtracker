@@ -25,15 +25,15 @@
 ## Как назвать и оформить файл
 
 - Каталог: `supabase/migrations/`.
-- Имя: `YYYYMMDDHHMMSS_kratkoe_opisanie_latinitsey.sql`  
-  Пример: `20260512180000_team_tracker_pm_board_history.sql`
+- **Нумерация (v2 и далее):** `001_kratkoe_opisanie.sql`, `002_...`, `003_...` — трёхзначный порядковый номер, подчёркивание, описание латиницей. Реестр: `supabase/migrations/README.md`.
+- **Legacy (v1):** файлы `YYYYMMDDHHMMSS_...` — не переименовывать после применения на проде.
 - SQL по возможности **идемпотентный**: `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, аккуратные `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` (если версия Postgres поддерживает), явные комментарии к неочевидным шагам.
 - Язык комментариев в файле — русский или английский, но единообразно внутри одной миграции.
 
 ## Порядок работы (чеклист для разработчика и ИИ)
 
 1. Спроектировать изменение схемы (таблица/колонки/индексы).
-2. Создать файл миграции в `supabase/migrations/` с осмысленным префиксом времени.
+2. Создать файл миграции `supabase/migrations/NNN_opisanie.sql` (следующий номер — в `supabase/migrations/README.md`).
 3. Проверить SQL в панели Supabase (SQL Editor) или через CLI на копии проекта.
 4. Внести изменения в код приложения (API, `lib/*`), согласованные со схемой.
 5. Закоммитить миграцию и код вместе; в описании PR/коммита указать, что затронута БД.
@@ -41,8 +41,7 @@
 
 ## Где смотреть пример
 
-Актуальный пример структуры канбана и связанных сущностей:  
-`supabase/migrations/20260512180000_team_tracker_pm_board_history.sql`.
+Актуальный пример v2: `supabase/migrations/001_v2_core_schema.sql`. Legacy v1: `20260512180000_team_tracker_pm_board_history.sql`.
 
 ## Напоминание для ИИ-агентов
 
