@@ -87,3 +87,42 @@ export function groupTasksByBucket<T extends V2TaskRow>(
   }
   return groups;
 }
+
+/** Бакеты, на которые можно перетащить задачу с главной. */
+export const HOME_DROP_BUCKETS: V2TaskBucket[] = ["today", "tomorrow", "this_week", "later"];
+
+export function canDropTaskOnHomeBucket(bucket: V2TaskBucket): boolean {
+  return HOME_DROP_BUCKETS.includes(bucket);
+}
+
+function scheduleEndOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 18, 0, 0, 0);
+}
+
+/** ISO для planned_at / deadline_at, чтобы задача попала в нужный бакет. */
+export function isoScheduleForBucket(bucket: V2TaskBucket, now: Date = new Date()): string | null {
+  if (!canDropTaskOnHomeBucket(bucket)) return null;
+
+  const todayStart = startOfLocalDay(now);
+  const tomorrow = addDays(todayStart, 1);
+  const weekEnd = endOfWeekSunday(now);
+  const tomorrowEnd = scheduleEndOfDay(tomorrow);
+
+  switch (bucket) {
+    case "today":
+      return scheduleEndOfDay(now).toISOString();
+    case "tomorrow":
+      return tomorrowEnd.toISOString();
+    case "this_week": {
+      let target = weekEnd;
+      if (target.getTime() <= tomorrowEnd.getTime()) {
+        target = scheduleEndOfDay(addDays(todayStart, 2));
+      }
+      return target.toISOString();
+    }
+    case "later":
+      return scheduleEndOfDay(addDays(weekEnd, 1)).toISOString();
+    default:
+      return null;
+  }
+}

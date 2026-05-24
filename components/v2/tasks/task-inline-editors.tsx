@@ -1,7 +1,8 @@
 "use client";
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import { gradientForUser, initialsFromName } from "@/lib/v2/projects/portfolio-utils";
+import { MemberAvatar } from "@/components/v2/projects/project-atoms";
+import { toPortfolioMember } from "@/lib/v2/projects/portfolio-utils";
 import type { PortfolioMember } from "@/lib/v2/projects/portfolio-types";
 import { fromDateInputValue, toDateInputValue } from "@/lib/v2/format";
 import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
@@ -157,12 +158,7 @@ export function InlineAssigneeEditor({
             onClick={() => void pick(m.userId)}
             className={`v2-tight flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition hover:bg-[var(--v2-ink-50)] ${active ? "bg-[var(--v2-brand-50)]" : ""}`}
           >
-            <span
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
-              style={{ background: m.gradient }}
-            >
-              {m.initials}
-            </span>
+            <MemberAvatar member={m} size={28} />
             <span className="truncate text-[12px] font-medium text-[var(--v2-ink-800)]">{m.name}</span>
           </button>
         );
@@ -296,16 +292,12 @@ export function InlineTitleEditor({
 export function memberFromTeam(
   assigneeUserId: string | null,
   assigneeName: string | null,
-  team: PortfolioMember[]
+  team: PortfolioMember[],
+  avatarByUserId?: Record<string, string | null>
 ): PortfolioMember | null {
   if (!assigneeUserId) return null;
   const found = team.find((m) => m.userId === assigneeUserId);
   if (found) return found;
   if (!assigneeName) return null;
-  return {
-    userId: assigneeUserId,
-    name: assigneeName,
-    initials: initialsFromName(assigneeName),
-    gradient: gradientForUser(assigneeUserId),
-  };
+  return toPortfolioMember(assigneeUserId, assigneeName, avatarByUserId?.[assigneeUserId] ?? null);
 }

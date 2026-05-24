@@ -1,5 +1,5 @@
 import type { PortfolioHealth, PortfolioMember } from "@/lib/v2/projects/portfolio-types";
-import type { V2ProjectEngagementType, V2ProjectStatus, V2TaskPriority, V2TaskStatus } from "@/lib/v2/types";
+import type { V2ProjectEngagementType, V2ProjectKind, V2ProjectStatus, V2TaskPriority, V2TaskStatus } from "@/lib/v2/types";
 
 export type ProjectDetailLink = {
   id: string;
@@ -109,6 +109,9 @@ export type ProjectDetailPayload = {
   status: V2ProjectStatus;
   kanbanStatus: string;
   engagementType: V2ProjectEngagementType;
+  projectKind: V2ProjectKind | null;
+  clientId: string | null;
+  clientName: string | null;
   clientAccessEnabled: boolean;
   workMonth: string | null;
   workMonthLabel: string | null;

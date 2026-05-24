@@ -2,10 +2,11 @@
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { formatBucketSubtitle } from "@/lib/v2/format";
-import { BUCKET_LABELS, BUCKET_ORDER } from "@/lib/v2/tasks/task-buckets";
+import { BUCKET_LABELS, BUCKET_ORDER, canDropTaskOnHomeBucket } from "@/lib/v2/tasks/task-buckets";
 import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
 import { ActiveTrackerHero } from "@/components/v2/hero/active-tracker-hero";
 import { ChipBar } from "@/components/v2/home/chip-bar";
+import { moveHomeTaskToBucket } from "@/components/v2/home/home-task-dnd";
 import { PageHead } from "@/components/v2/home/page-head";
 import { TaskSection } from "@/components/v2/home/task-section";
 import { UnassignedTasksSection } from "@/components/v2/home/unassigned-tasks-section";
@@ -54,6 +55,9 @@ export function V2HomeClient() {
   const [projectFilter, setProjectFilter] = useState("all");
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
   const [unassignedTasks, setUnassignedTasks] = useState<V2TaskWithMeta[]>([]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverBucket, setDragOverBucket] = useState<V2TaskBucket | null>(null);
+  const [movingTask, setMovingTask] = useState(false);
 
   const canViewUnassigned = me?.role === "admin" || me?.role === "pm";
 
@@ -151,6 +155,31 @@ export function V2HomeClient() {
     await reload();
   }
 
+  const findTaskById = useCallback(
+    (id: string) => tasks.find((t) => t.id === id) ?? unassignedTasks.find((t) => t.id === id),
+    [tasks, unassignedTasks]
+  );
+
+  const handleDropOnBucket = useCallback(
+    async (bucket: V2TaskBucket) => {
+      if (!dragId || movingTask || !canDropTaskOnHomeBucket(bucket)) return;
+      const taskId = dragId;
+      setDragId(null);
+      setDragOverBucket(null);
+      setMovingTask(true);
+      setError(null);
+      try {
+        await moveHomeTaskToBucket(taskId, bucket, findTaskById);
+        await reloadRef.current();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Не удалось перенести задачу");
+      } finally {
+        setMovingTask(false);
+      }
+    },
+    [dragId, movingTask, findTaskById]
+  );
+
   const filteredGroups = useMemo(() => {
     const unassignedIds = canViewUnassigned ? new Set(unassignedTasks.map((t) => t.id)) : new Set<string>();
     const next: Record<string, V2TaskWithMeta[]> = {};
@@ -241,15 +270,26 @@ export function V2HomeClient() {
             />
 
             {canViewUnassigned ? (
-              <UnassignedTasksSection tasks={filteredUnassigned} onOpenTask={setDrawerTaskId} />
+              <UnassignedTasksSection
+                tasks={filteredUnassigned}
+                onOpenTask={setDrawerTaskId}
+                dragId={dragId}
+                onDragStart={setDragId}
+                onDragEnd={() => {
+                  setDragId(null);
+                  setDragOverBucket(null);
+                }}
+              />
             ) : null}
 
             {BUCKET_ORDER.map((bucket) => {
               const list = filteredGroups[bucket] ?? [];
-              if (!ALWAYS_VISIBLE_BUCKETS.has(bucket) && !list.length) return null;
+              const showWhileDragging = !!dragId && canDropTaskOnHomeBucket(bucket);
+              if (!ALWAYS_VISIBLE_BUCKETS.has(bucket) && !list.length && !showWhileDragging) return null;
               return (
                 <TaskSection
                   key={bucket}
+                  bucket={bucket}
                   title={BUCKET_LABELS[bucket]}
                   subtitle={formatBucketSubtitle(bucket)}
                   accent={SECTION_ACCENTS[bucket] ?? "#A1A1AA"}
@@ -261,6 +301,15 @@ export function V2HomeClient() {
                   onOpenTask={setDrawerTaskId}
                   hideWhenEmpty={bucket === "overdue"}
                   emptyLabel={BUCKET_EMPTY_LABELS[bucket] ?? "Задач нет"}
+                  dragId={dragId}
+                  dragOverBucket={dragOverBucket}
+                  onDragStart={setDragId}
+                  onDragEnd={() => {
+                    setDragId(null);
+                    setDragOverBucket(null);
+                  }}
+                  onDragOverBucket={setDragOverBucket}
+                  onDropOnBucket={(b) => void handleDropOnBucket(b)}
                 />
               );
             })}

@@ -1,6 +1,7 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import { logActivity } from "@/lib/v2/activity/log";
 import { findOrCreateClient } from "@/lib/v2/clients/client-repo";
+import { isV2ProjectKind } from "@/lib/v2/projects/project-kind";
 import { canManageProjectMembers, canViewProject } from "@/lib/v2/auth/permissions";
 import {
   getProjectMemberIds,
@@ -17,8 +18,6 @@ import type {
   V2SessionContext,
   V2TaskPriority,
 } from "@/lib/v2/types";
-import { isV2ProjectKind } from "@/lib/v2/projects/project-kind";
-
 import { pickProjectColor, V2_PROJECT_COLORS } from "@/lib/v2/project-colors";
 
 function shortFromName(name: string): string {
@@ -207,6 +206,10 @@ export async function updateProject(
     releaseAt: string | null;
     budgetRub: number | null;
     paidRub: number | null;
+    projectKind: V2ProjectKind | null;
+    priority: V2TaskPriority;
+    clientId: string | null;
+    clientName: string | null;
   }>
 ): Promise<V2ProjectRow> {
   const project = await getProjectById(ctx, projectId);
@@ -225,6 +228,19 @@ export async function updateProject(
   if (input.releaseAt !== undefined) patch.release_at = input.releaseAt;
   if (input.budgetRub !== undefined) patch.budget_rub = input.budgetRub;
   if (input.paidRub !== undefined) patch.paid_rub = input.paidRub;
+  if (input.priority !== undefined) patch.priority = input.priority;
+  if (input.projectKind !== undefined) patch.project_kind = input.projectKind;
+    if (input.clientId !== undefined || input.clientName !== undefined) {
+      let resolvedClientId: string | null =
+        input.clientId !== undefined ? input.clientId?.trim() || null : project.client_id;
+      if (!resolvedClientId && input.clientName?.trim()) {
+        resolvedClientId = await findOrCreateClient(ctx, input.clientName);
+      }
+      if (input.clientName !== undefined && !input.clientName?.trim() && input.clientId === null) {
+        resolvedClientId = null;
+      }
+      patch.client_id = resolvedClientId;
+    }
 
   const sb = getV2Supabase();
   const { error } = await sb.from("v2_projects").update(patch).eq("id", projectId);
@@ -239,6 +255,9 @@ export async function updateProject(
     release_at: input.releaseAt,
     budget_rub: input.budgetRub,
     paid_rub: input.paidRub,
+    priority: input.priority,
+    project_kind: input.projectKind,
+    client_id: patch.client_id,
   });
   const updated = await getProjectById(ctx, projectId);
   if (!updated) throw new Error("Project not found after update");

@@ -4,9 +4,8 @@ import { listUsersPublic } from "@/lib/tt-auth-db";
 import {
   formatDeadlineLabel,
   formatRelativeActivity,
-  gradientForUser,
-  initialsFromName,
   pluralRu,
+  toPortfolioMember,
 } from "@/lib/v2/projects/portfolio-utils";
 import { computeSpentRub, hourlyRateByUserId, projectSumRub } from "@/lib/v2/projects/project-finance";
 import type { PortfolioHealth } from "@/lib/v2/projects/portfolio-types";
@@ -119,6 +118,7 @@ export async function buildProjectDetail(
   const now = new Date();
   const publicUsers = listUsersPublic();
   const users = new Map(publicUsers.map((u) => [u.id, u.display_name]));
+  const avatarByUser = new Map(publicUsers.map((u) => [u.id, u.avatar_url ?? null]));
   const rateByUser = hourlyRateByUserId(publicUsers);
   const isRetainer = project.engagement_type === "retainer";
   const selectedWorkMonth = isRetainer
@@ -309,17 +309,23 @@ export async function buildProjectDetail(
   const canCreateTasks = canCreateProjectTask(ctx, project, myMemberRole);
   const canManageMembers = canManageProjectMembers(ctx);
 
-  const team = memberIds
-    .filter((userId) => !clientMembers.includes(userId))
-    .map((userId) => {
-    const name = users.get(userId) ?? userId;
-    return { userId, name, initials: initialsFromName(name), gradient: gradientForUser(userId) };
-  });
+  const taskAssigneeIds = [
+    ...new Set(allTasks.map((t) => t.assignee_user_id).filter((id): id is string => !!id)),
+  ];
+  const teamUserIds = [
+    ...new Set([
+      ...memberIds.filter((userId) => !clientMembers.includes(userId)),
+      ...taskAssigneeIds,
+    ]),
+  ];
 
-  const clients = clientMembers.map((userId) => {
-    const name = users.get(userId) ?? userId;
-    return { userId, name, initials: initialsFromName(name), gradient: gradientForUser(userId) };
-  });
+  const team = teamUserIds.map((userId) =>
+    toPortfolioMember(userId, users.get(userId) ?? userId, avatarByUser.get(userId))
+  );
+
+  const clients = clientMembers.map((userId) =>
+    toPortfolioMember(userId, users.get(userId) ?? userId, avatarByUser.get(userId))
+  );
 
   const memberHours = team
     .map((member) => {
@@ -335,6 +341,17 @@ export async function buildProjectDetail(
     .sort((a, b) => b.hours - a.hours);
 
   const releaseAt = project.release_at;
+  let clientName: string | null = null;
+  const clientId = project.client_id;
+  if (clientId) {
+    const { data: clientRow } = await sb
+      .from("v2_clients")
+      .select("display_name")
+      .eq("id", clientId)
+      .maybeSingle();
+    clientName = (clientRow?.display_name as string | undefined) ?? null;
+  }
+
   const nearestDeadline = openTasks
     .filter((t) => t.deadline_at)
     .map((t) => t.deadline_at!)
@@ -492,6 +509,9 @@ export async function buildProjectDetail(
     status: project.status,
     kanbanStatus: v2StatusToKanban(project.status),
     engagementType: project.engagement_type,
+    projectKind: project.project_kind,
+    clientId,
+    clientName,
     clientAccessEnabled: project.client_access_enabled,
     workMonth: selectedWorkMonth,
     workMonthLabel: selectedWorkMonth ? formatWorkMonthLabel(selectedWorkMonth) : null,

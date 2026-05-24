@@ -5,7 +5,7 @@ import { MemberAvatar } from "@/components/v2/projects/project-atoms";
 import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { fmtDuration } from "@/lib/v2/format";
-import { gradientForUser, initialsFromName, pluralRu } from "@/lib/v2/projects/portfolio-utils";
+import { pluralRu, toPortfolioMember } from "@/lib/v2/projects/portfolio-utils";
 import { fmtLoadSeconds } from "@/lib/v2/team/daily-team-load";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -172,12 +172,7 @@ export function V2AdminPeopleClient() {
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {rows.map((r) => {
-          const member = {
-            userId: r.userId,
-            name: r.displayName,
-            initials: initialsFromName(r.displayName),
-            gradient: gradientForUser(r.userId),
-          };
+          const member = toPortfolioMember(r.userId, r.displayName, null);
           const saving = savingId === r.userId;
 
           return (

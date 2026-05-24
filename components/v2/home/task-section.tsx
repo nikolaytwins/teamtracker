@@ -1,7 +1,9 @@
 "use client";
 
 import { fmtDuration } from "@/lib/v2/format";
-import type { V2TaskWithMeta } from "@/lib/v2/types";
+import { canDropTaskOnHomeBucket } from "@/lib/v2/tasks/task-buckets";
+import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
+import { homeDropZoneClass, isHomeTaskDraggable } from "@/components/v2/home/home-task-dnd";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { TaskRow } from "@/components/v2/home/task-row";
 import { useState } from "react";
@@ -52,6 +54,7 @@ function SectionHeader({
 }
 
 export function TaskSection({
+  bucket,
   title,
   subtitle,
   accent,
@@ -63,7 +66,14 @@ export function TaskSection({
   onOpenTask,
   hideWhenEmpty = false,
   emptyLabel = "Задач нет",
+  dragId,
+  dragOverBucket,
+  onDragStart,
+  onDragEnd,
+  onDragOverBucket,
+  onDropOnBucket,
 }: {
+  bucket: V2TaskBucket;
   title: string;
   subtitle?: string;
   accent: string;
@@ -75,11 +85,19 @@ export function TaskSection({
   onOpenTask: (id: string) => void;
   hideWhenEmpty?: boolean;
   emptyLabel?: string;
+  dragId: string | null;
+  dragOverBucket: V2TaskBucket | null;
+  onDragStart: (taskId: string) => void;
+  onDragEnd: () => void;
+  onDragOverBucket: (bucket: V2TaskBucket | null) => void;
+  onDropOnBucket: (bucket: V2TaskBucket) => void;
 }) {
   const [open, setOpen] = useState(true);
   const totalEst = tasks.reduce((a, t) => a + (t.estimate_seconds ?? 0), 0);
+  const droppable = canDropTaskOnHomeBucket(bucket);
+  const isDragOver = dragOverBucket === bucket && droppable;
 
-  if (hideWhenEmpty && !tasks.length) return null;
+  if (hideWhenEmpty && !tasks.length && !dragId) return null;
 
   return (
     <section className="mt-2">
@@ -93,7 +111,22 @@ export function TaskSection({
         onToggle={() => setOpen((v) => !v)}
       />
       {open ? (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-soft)]">
+        <div
+          className={`overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-soft)] transition ${homeDropZoneClass(isDragOver)}`}
+          onDragOver={(e) => {
+            if (!droppable || !dragId) return;
+            e.preventDefault();
+            onDragOverBucket(bucket);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) onDragOverBucket(null);
+          }}
+          onDrop={(e) => {
+            if (!droppable || !dragId) return;
+            e.preventDefault();
+            onDropOnBucket(bucket);
+          }}
+        >
           {tasks.length ? (
             <div className="divide-y divide-[var(--v2-ink-100)]/70">
               {tasks.map((t, i) => (
@@ -105,12 +138,18 @@ export function TaskSection({
                     onToggleRun={onToggleRun}
                     onToggleDone={onToggleDone}
                     onOpen={onOpenTask}
+                    draggable={isHomeTaskDraggable(t)}
+                    isDragging={dragId === t.id}
+                    onDragStart={() => onDragStart(t.id)}
+                    onDragEnd={onDragEnd}
                   />
                 </div>
               ))}
             </div>
           ) : (
-            <p className="v2-tight px-4 py-6 text-center text-[13px] text-[var(--v2-ink-400)]">{emptyLabel}</p>
+            <p className="v2-tight px-4 py-6 text-center text-[13px] text-[var(--v2-ink-400)]">
+              {dragId && droppable ? "Отпустите, чтобы перенести сюда" : emptyLabel}
+            </p>
           )}
         </div>
       ) : null}

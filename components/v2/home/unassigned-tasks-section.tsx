@@ -1,6 +1,7 @@
 "use client";
 
 import type { V2TaskWithMeta } from "@/lib/v2/types";
+import { isHomeTaskDraggable } from "@/components/v2/home/home-task-dnd";
 import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 import { ProjectChip } from "@/components/v2/ui/primitives";
 import { useState } from "react";
@@ -32,9 +33,15 @@ function unassignedKind(task: V2TaskWithMeta): "assignee" | "deadline" | "both" 
 export function UnassignedTasksSection({
   tasks,
   onOpenTask,
+  dragId,
+  onDragStart,
+  onDragEnd,
 }: {
   tasks: V2TaskWithMeta[];
   onOpenTask: (id: string) => void;
+  dragId: string | null;
+  onDragStart: (taskId: string) => void;
+  onDragEnd: () => void;
 }) {
   const [open, setOpen] = useState(true);
 
@@ -61,18 +68,36 @@ export function UnassignedTasksSection({
       {open ? (
         <div className="overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-b from-amber-50/40 to-white shadow-[var(--v2-shadow-soft)]">
           <div className="border-b border-amber-100/80 px-4 py-2.5 text-[12px] text-[var(--v2-ink-500)]">
-            Нажмите на задачу, чтобы назначить исполнителя и дату в карточке
+            Перетащите задачу в «Сегодня», «Завтра» или другой раздел — или откройте карточку для деталей
           </div>
           <div className="divide-y divide-[var(--v2-ink-100)]/70">
             {tasks.map((task) => {
               const pm = PRIORITY_META[task.priority];
               const kind = unassignedKind(task);
+              const canDrag = isHomeTaskDraggable(task);
               return (
-                <button
+                <div
                   key={task.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
+                  draggable={canDrag}
+                  onDragStart={(e) => {
+                    if (!canDrag) return;
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", task.id);
+                    onDragStart(task.id);
+                  }}
+                  onDragEnd={onDragEnd}
                   onClick={() => onOpenTask(task.id)}
-                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-[var(--v2-ink-50)]/70"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onOpenTask(task.id);
+                    }
+                  }}
+                  className={`flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left transition hover:bg-[var(--v2-ink-50)]/70 ${
+                    canDrag ? "cursor-grab active:cursor-grabbing" : ""
+                  } ${dragId === task.id ? "opacity-40" : ""}`}
                 >
                   <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: pm.dot }} />
                   <div className="min-w-0 flex-1">
@@ -107,7 +132,7 @@ export function UnassignedTasksSection({
                     </div>
                   </div>
                   <V2Icons.arrowR className="mt-1 h-4 w-4 shrink-0 text-[var(--v2-ink-300)]" />
-                </button>
+                </div>
               );
             })}
           </div>

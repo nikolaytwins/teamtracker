@@ -1,3 +1,5 @@
+import type { PortfolioMember } from "@/lib/v2/projects/portfolio-types";
+
 const RU_MONTHS = [
   "января",
   "февраля",
@@ -53,6 +55,16 @@ export function gradientForUser(userId: string): string {
   let h = 0;
   for (let i = 0; i < userId.length; i++) h = (h + userId.charCodeAt(i)) % AVATAR_GRADIENTS.length;
   return AVATAR_GRADIENTS[h]!;
+}
+
+export function toPortfolioMember(userId: string, name: string, avatarUrl?: string | null): PortfolioMember {
+  return {
+    userId,
+    name,
+    initials: initialsFromName(name),
+    gradient: gradientForUser(userId),
+    avatarUrl: avatarUrl?.trim() ? avatarUrl.trim() : null,
+  };
 }
 
 export function formatDeadlineLabel(deadlineAt: string | null, now = new Date()): { label: string; days: number | null } {

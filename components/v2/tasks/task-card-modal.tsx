@@ -11,7 +11,7 @@ import {
   toDateInputValue,
   toDatetimeLocalValue,
 } from "@/lib/v2/format";
-import { gradientForUser, initialsFromName } from "@/lib/v2/projects/portfolio-utils";
+import { toPortfolioMember } from "@/lib/v2/projects/portfolio-utils";
 import type { PortfolioMember } from "@/lib/v2/projects/portfolio-types";
 import type { V2TaskLinkRow, V2TaskFileRow } from "@/lib/v2/tasks/task-detail";
 import type { V2TaskRow, V2TaskWithMeta } from "@/lib/v2/types";
@@ -65,7 +65,7 @@ export function TaskCardModal({
   open: boolean;
   onClose: () => void;
   onUpdated: () => void;
-  members: Array<{ user_id: string; display_name: string; role?: string }>;
+  members: Array<{ user_id: string; display_name: string; role?: string; avatar_url?: string | null }>;
   projects: ProjectOption[];
   runningTaskId: string | null;
   onToggleTimer: (id: string) => void;
@@ -119,12 +119,7 @@ export function TaskCardModal({
   const assigneeMembers = useMemo(() => members.filter((m) => m.role !== "client"), [members]);
 
   const teamForInline = useMemo((): PortfolioMember[] => {
-    return assigneeMembers.map((m) => ({
-      userId: m.user_id,
-      name: m.display_name,
-      initials: initialsFromName(m.display_name),
-      gradient: gradientForUser(m.user_id),
-    }));
+    return assigneeMembers.map((m) => toPortfolioMember(m.user_id, m.display_name, m.avatar_url ?? null));
   }, [assigneeMembers]);
 
   const projectOptions = useMemo(() => {

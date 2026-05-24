@@ -116,6 +116,19 @@ export function MemberAvatar({
   ring?: string;
 }) {
   const fontSize = Math.round(size * 0.42);
+  if (member.avatarUrl?.trim()) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={member.avatarUrl}
+        alt=""
+        className={`inline-flex shrink-0 rounded-full object-cover ring-2 ${ring}`}
+        style={{ width: size, height: size }}
+        referrerPolicy="no-referrer"
+        title={member.name}
+      />
+    );
+  }
   return (
     <span
       className={`inline-flex items-center justify-center rounded-full font-semibold text-white ring-2 ${ring}`}

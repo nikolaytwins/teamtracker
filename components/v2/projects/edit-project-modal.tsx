@@ -1,16 +1,31 @@
 "use client";
 
 import { fromDateInputValue, toDateInputValue } from "@/lib/v2/format";
-import type { ProjectDetailPayload } from "@/lib/v2/projects/project-detail-types";
-import { v2StatusToKanban } from "@/lib/v2/projects/portfolio-types";
-import type { PortfolioKanbanStatus } from "@/lib/v2/projects/portfolio-types";
-import { STATUS_META, STATUS_ORDER } from "@/components/v2/projects/portfolio-meta";
-import { ProjectMembersPicker } from "@/components/v2/projects/project-members-picker";
-import { MoneyRubInput } from "@/components/v2/ui/money-rub-input";
 import { formatRubWithSpaces } from "@/lib/v2/format-money";
-import { useEffect, useState } from "react";
+import type { ProjectDetailPayload } from "@/lib/v2/projects/project-detail-types";
+import { STATUS_META, STATUS_ORDER } from "@/components/v2/projects/portfolio-meta";
+import { v2StatusToKanban, type PortfolioKanbanStatus } from "@/lib/v2/projects/portfolio-types";
+import { ClientNameInput } from "@/components/v2/projects/client-name-input";
+import { PROJECT_KIND_OPTIONS } from "@/lib/v2/projects/project-kind";
+import { TeamMembersPicker, type TeamMemberOption } from "@/components/v2/projects/team-members-picker";
+import { PriorityFlagPicker } from "@/components/v2/tasks/task-field-pickers";
+import { MoneyRubInput } from "@/components/v2/ui/money-rub-input";
+import type { V2ProjectKind, V2TaskPriority } from "@/lib/v2/types";
+import { useEffect, useMemo, useState } from "react";
 
-type Member = { user_id: string; display_name: string; role: string };
+export type EditProjectModalInput = {
+  name: string;
+  status: PortfolioKanbanStatus;
+  engagementType: "one_off" | "retainer";
+  projectKind: V2ProjectKind | null;
+  priority: V2TaskPriority;
+  clientName: string | null;
+  clientId: string | null;
+  releaseAt: string | null;
+  projectSumRub: number | null;
+  paidRub: number | null;
+  teamMemberIds: string[];
+};
 
 export function EditProjectModal({
   open,
@@ -22,50 +37,45 @@ export function EditProjectModal({
 }: {
   open: boolean;
   detail: ProjectDetailPayload;
-  members: Member[];
+  members: TeamMemberOption[];
   meId: string | null;
   onClose: () => void;
-  onSave: (input: {
-    name: string;
-    status: PortfolioKanbanStatus;
-    engagementType: "one_off" | "retainer";
-    clientAccessEnabled: boolean;
-    contractRef: string | null;
-    releaseAt: string | null;
-    budgetRub: number | null;
-    paidRub: number | null;
-    teamMemberUserIds: string[];
-    clientUserIds: string[];
-  }) => Promise<void>;
+  onSave: (input: EditProjectModalInput) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [status, setStatus] = useState<PortfolioKanbanStatus>("in_progress");
   const [engagementType, setEngagementType] = useState<"one_off" | "retainer">("one_off");
-  const [clientAccessEnabled, setClientAccessEnabled] = useState(false);
-  const [contractRef, setContractRef] = useState("");
+  const [projectKind, setProjectKind] = useState<V2ProjectKind>("site");
+  const [priority, setPriority] = useState<V2TaskPriority>("medium");
+  const [clientName, setClientName] = useState("");
+  const [clientId, setClientId] = useState<string | null>(null);
   const [releaseLocal, setReleaseLocal] = useState("");
-  const [budgetDisplay, setBudgetDisplay] = useState("");
-  const [budgetRub, setBudgetRub] = useState<number | null>(null);
+  const [noReleaseDate, setNoReleaseDate] = useState(false);
+  const [projectSumDisplay, setProjectSumDisplay] = useState("");
+  const [projectSumRub, setProjectSumRub] = useState<number | null>(null);
   const [paidDisplay, setPaidDisplay] = useState("");
   const [paidRub, setPaidRub] = useState<number | null>(null);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
-  const [clientUserIds, setClientUserIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const teamOptions = useMemo(() => members.filter((m) => m.role !== "client"), [members]);
 
   useEffect(() => {
     if (!open) return;
     setName(detail.name);
     setStatus(v2StatusToKanban(detail.status));
     setEngagementType(detail.engagementType);
-    setClientAccessEnabled(detail.clientAccessEnabled);
-    setContractRef(detail.contractRef ?? "");
-    setReleaseLocal(toDateInputValue(detail.releaseAt));
-    setBudgetRub(detail.budgetRub);
-    setBudgetDisplay(detail.budgetRub != null ? formatRubWithSpaces(detail.budgetRub) : "");
+    setProjectKind(detail.projectKind ?? "site");
+    setPriority(detail.priority);
+    setClientName(detail.clientName ?? "");
+    setClientId(detail.clientId);
+    setReleaseLocal(detail.releaseAt ? toDateInputValue(detail.releaseAt) : "");
+    setNoReleaseDate(!detail.releaseAt);
+    setProjectSumRub(detail.budgetRub);
+    setProjectSumDisplay(detail.budgetRub != null ? formatRubWithSpaces(detail.budgetRub) : "");
     setPaidRub(detail.paidRub);
     setPaidDisplay(detail.paidRub != null ? formatRubWithSpaces(detail.paidRub) : "");
     setTeamMemberIds(detail.team.map((m) => m.userId).filter((id) => id !== meId));
-    setClientUserIds(detail.clients.map((m) => m.userId));
   }, [open, detail, meId]);
 
   if (!open) return null;
@@ -83,13 +93,14 @@ export function EditProjectModal({
               name: name.trim(),
               status,
               engagementType,
-              clientAccessEnabled,
-              contractRef: contractRef.trim() || null,
-              releaseAt: releaseLocal ? fromDateInputValue(releaseLocal) : null,
-              budgetRub,
+              projectKind: engagementType === "one_off" ? projectKind : null,
+              priority,
+              clientName: clientName.trim() || null,
+              clientId,
+              releaseAt: noReleaseDate ? null : releaseLocal ? fromDateInputValue(releaseLocal) : null,
+              projectSumRub,
               paidRub,
-              teamMemberUserIds: teamMemberIds,
-              clientUserIds: clientAccessEnabled ? clientUserIds : [],
+              teamMemberIds,
             });
             onClose();
           } finally {
@@ -98,7 +109,7 @@ export function EditProjectModal({
         }}
       >
         <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Редактировать проект</h2>
-        <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-500)]">Название, статус, бюджет и участники</p>
+        <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-500)]">Те же поля, что при создании проекта</p>
 
         <label className="mt-4 block">
           <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Название</span>
@@ -120,8 +131,13 @@ export function EditProjectModal({
           </select>
         </label>
 
+        <label className="mt-4 block">
+          <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Клиент</span>
+          <ClientNameInput value={clientName} onChange={setClientName} onClientIdChange={setClientId} />
+        </label>
+
         <div className="mt-4">
-          <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Тип проекта</p>
+          <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Формат</p>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -142,6 +158,30 @@ export function EditProjectModal({
           </div>
         </div>
 
+        {engagementType === "one_off" ? (
+          <div className="mt-4">
+            <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Вид проекта</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {PROJECT_KIND_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setProjectKind(opt.value)}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition ${projectKind === opt.value ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)]" : "border-[var(--v2-ink-200)] hover:border-[var(--v2-ink-300)]"}`}
+                >
+                  <div className="v2-tight text-[13px] font-semibold text-[var(--v2-ink-900)]">{opt.label}</div>
+                  <div className="v2-tight mt-0.5 text-[10.5px] leading-snug text-[var(--v2-ink-500)]">{opt.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-4">
+          <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Приоритет</p>
+          <PriorityFlagPicker value={priority} onChange={setPriority} />
+        </div>
+
         <div className="mt-4">
           <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Финансы</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -149,11 +189,11 @@ export function EditProjectModal({
               <span className="text-[var(--v2-ink-600)]">Сумма проекта, ₽</span>
               <span className="mt-0.5 block text-[11px] text-[var(--v2-ink-400)]">100% стоимости по договору</span>
               <MoneyRubInput
-                value={budgetDisplay}
+                value={projectSumDisplay}
                 placeholder="100 000"
                 onChange={(display, amount) => {
-                  setBudgetDisplay(display);
-                  setBudgetRub(amount);
+                  setProjectSumDisplay(display);
+                  setProjectSumRub(amount);
                 }}
               />
             </label>
@@ -172,26 +212,31 @@ export function EditProjectModal({
           </div>
         </div>
 
-        <label className="mt-4 block text-[12px]">
-          <span className="text-[var(--v2-ink-600)]">Договор / реф.</span>
-          <input className="v2-input mt-1.5 w-full" value={contractRef} onChange={(e) => setContractRef(e.target.value)} placeholder="№ договора" />
-        </label>
-
-        <label className="mt-4 block text-[12px]">
-          <span className="text-[var(--v2-ink-600)]">Дата релиза</span>
-          <input type="date" className="v2-input mt-1.5 w-full" value={releaseLocal} onChange={(e) => setReleaseLocal(e.target.value)} />
-        </label>
+        <div className="mt-4">
+          <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Дата релиза</span>
+          {!noReleaseDate ? (
+            <input
+              type="date"
+              className="v2-input mb-2 w-full"
+              value={releaseLocal}
+              onChange={(e) => setReleaseLocal(e.target.value)}
+            />
+          ) : null}
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={noReleaseDate}
+              onChange={(e) => {
+                setNoReleaseDate(e.target.checked);
+                if (e.target.checked) setReleaseLocal("");
+              }}
+            />
+            <span className="v2-tight text-[13px] text-[var(--v2-ink-700)]">Без даты</span>
+          </label>
+        </div>
 
         <div className="mt-4">
-          <ProjectMembersPicker
-            members={members}
-            teamMemberIds={teamMemberIds}
-            onTeamMemberIdsChange={setTeamMemberIds}
-            clientAccessEnabled={clientAccessEnabled}
-            onClientAccessEnabledChange={setClientAccessEnabled}
-            clientUserIds={clientUserIds}
-            onClientUserIdsChange={setClientUserIds}
-          />
+          <TeamMembersPicker members={teamOptions} selectedIds={teamMemberIds} onChange={setTeamMemberIds} />
         </div>
 
         <div className="mt-5 flex justify-end gap-2 border-t border-[var(--v2-ink-100)] pt-4">

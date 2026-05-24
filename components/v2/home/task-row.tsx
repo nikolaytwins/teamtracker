@@ -12,6 +12,10 @@ export function TaskRow({
   onToggleRun,
   onToggleDone,
   onOpen,
+  draggable = false,
+  isDragging = false,
+  onDragStart,
+  onDragEnd,
 }: {
   task: V2TaskWithMeta;
   isRunning: boolean;
@@ -19,6 +23,10 @@ export function TaskRow({
   onToggleRun: (id: string) => void;
   onToggleDone: (id: string) => void;
   onOpen: (id: string) => void;
+  draggable?: boolean;
+  isDragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }) {
   const completed = !!task.completed_at;
   const live = isRunning ? elapsed : 0;
@@ -34,6 +42,14 @@ export function TaskRow({
     <div
       role="button"
       tabIndex={0}
+      draggable={draggable}
+      onDragStart={(e) => {
+        if (!draggable) return;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", task.id);
+        onDragStart?.();
+      }}
+      onDragEnd={() => onDragEnd?.()}
       onClick={() => onOpen(task.id)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -43,7 +59,9 @@ export function TaskRow({
       }}
       className={`group relative flex cursor-pointer items-center gap-4 py-3 pl-4 pr-3 transition-colors duration-200 ${
         isRunning ? "bg-[var(--v2-brand-50)]/50" : "hover:bg-[var(--v2-ink-50)]/70"
-      } ${completed ? "opacity-60" : ""}`}
+      } ${completed ? "opacity-60" : ""} ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
+        isDragging ? "opacity-40" : ""
+      }`}
     >
       <span
         aria-hidden
@@ -53,7 +71,9 @@ export function TaskRow({
         style={{ background: isRunning ? "#3B6FF7" : priority.dot }}
       />
 
-      <TaskCheckbox checked={completed} onChange={() => onToggleDone(task.id)} />
+      <span onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+        <TaskCheckbox checked={completed} onChange={() => onToggleDone(task.id)} />
+      </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -100,7 +120,7 @@ export function TaskRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
         <TimerButton running={isRunning} onClick={() => onToggleRun(task.id)} />
         <IconBtn title="Ещё" className="opacity-0 transition group-hover:opacity-100">
           <V2Icons.more className="h-4 w-4" />

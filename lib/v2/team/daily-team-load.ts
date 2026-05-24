@@ -8,6 +8,7 @@ export type TeamMemberSchedule = {
   name: string;
   workHoursPerDay: number;
   workDays: number[];
+  avatarUrl?: string | null;
 };
 
 export type DailyTeamLoadRow = {
@@ -15,6 +16,7 @@ export type DailyTeamLoadRow = {
   name: string;
   initials: string;
   gradient: string;
+  avatarUrl: string | null;
   /** 0…1+ (может быть >1 при перегрузе) */
   load: number;
   taskCount: number;
@@ -69,6 +71,7 @@ export function computeDailyTeamLoad(
         name: m.name,
         initials: initialsFromName(m.name),
         gradient: gradientForUser(m.userId),
+        avatarUrl: m.avatarUrl?.trim() ? m.avatarUrl.trim() : null,
         load,
         taskCount: stats.taskCount,
         estimatedSeconds: stats.estimatedSeconds,

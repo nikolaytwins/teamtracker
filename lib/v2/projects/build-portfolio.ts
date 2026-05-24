@@ -8,6 +8,7 @@ import {
   formatRelativeActivity,
   gradientForUser,
   initialsFromName,
+  toPortfolioMember,
 } from "@/lib/v2/projects/portfolio-utils";
 import { computeSpentRub, hourlyRateByUserId, projectSumRub } from "@/lib/v2/projects/project-finance";
 import type {
@@ -99,6 +100,7 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
 
   const publicUsers = listUsersPublic();
   const users = new Map(publicUsers.map((u) => [u.id, u.display_name]));
+  const avatarByUser = new Map(publicUsers.map((u) => [u.id, u.avatar_url ?? null]));
   const rateByUser = hourlyRateByUserId(publicUsers);
 
   const emptyTasks: V2TaskRow[] = [];
@@ -192,15 +194,9 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
     const spent = computeSpentRub(hoursByMember, rateByUser);
 
     const memberIds = membersByProject.get(p.id) ?? [];
-    const team = memberIds.map((userId) => {
-      const name = users.get(userId) ?? userId;
-      return {
-        userId,
-        name,
-        initials: initialsFromName(name),
-        gradient: gradientForUser(userId),
-      };
-    });
+    const team = memberIds.map((userId) =>
+      toPortfolioMember(userId, users.get(userId) ?? userId, avatarByUser.get(userId))
+    );
 
     let lastActivityAt = p.updated_at;
     for (const t of tasks) {
@@ -283,6 +279,7 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
         name: m.display_name,
         workHoursPerDay: u?.work_hours_per_day ?? 8,
         workDays: u?.work_days ?? [1, 2, 3, 4, 5],
+        avatarUrl: u?.avatar_url ?? null,
       };
     });
 

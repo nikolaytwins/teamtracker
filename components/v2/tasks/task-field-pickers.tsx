@@ -4,7 +4,7 @@ import { gradientForUser, initialsFromName } from "@/lib/v2/projects/portfolio-u
 import type { V2TaskPriority } from "@/lib/v2/types";
 import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 
-type MemberOption = { user_id: string; display_name: string };
+type MemberOption = { user_id: string; display_name: string; avatar_url?: string | null };
 
 export function AssigneeAvatarPicker({
   members,
@@ -36,6 +36,7 @@ export function AssigneeAvatarPicker({
         const active = value === m.user_id;
         const initials = initialsFromName(m.display_name);
         const gradient = gradientForUser(m.user_id);
+        const avatar = m.avatar_url?.trim();
         return (
           <button
             key={m.user_id}
@@ -48,12 +49,22 @@ export function AssigneeAvatarPicker({
                 : "border-[var(--v2-ink-200)] hover:border-[var(--v2-ink-300)] hover:bg-[var(--v2-ink-50)]"
             }`}
           >
-            <span
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
-              style={{ background: gradient }}
-            >
-              {initials}
-            </span>
+            {avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatar}
+                alt=""
+                className="inline-flex h-8 w-8 shrink-0 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                style={{ background: gradient }}
+              >
+                {initials}
+              </span>
+            )}
             <span className="v2-tight max-w-[88px] truncate text-[12px] font-medium text-[var(--v2-ink-800)]">
               {m.display_name.split(" ")[0]}
             </span>

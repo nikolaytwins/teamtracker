@@ -6,7 +6,7 @@ import { pickSuggestedProjectDetailTask } from "@/lib/v2/tasks/suggest-task";
 import type { ProjectDetailPayload } from "@/lib/v2/projects/project-detail-types";
 import type { V2TaskStatus } from "@/lib/v2/types";
 import { EditProjectMembersModal } from "@/components/v2/projects/edit-project-members-modal";
-import { EditProjectModal } from "@/components/v2/projects/edit-project-modal";
+import { EditProjectModal, type EditProjectModalInput } from "@/components/v2/projects/edit-project-modal";
 import { DeleteProjectConfirmModal } from "@/components/v2/projects/delete-project-dialog";
 import { RetainerMonthPicker } from "@/components/v2/project-detail/retainer-month-picker";
 import { ProjectDetailActivity } from "@/components/v2/project-detail/project-detail-activity";
@@ -153,6 +153,17 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
   const runningTaskId = active?.session.task_id ?? null;
   const elapsed = active ? active.elapsedSeconds + tick : 0;
 
+  const workspaceMembers = useMemo(
+    () =>
+      members.map((m) => ({
+        user_id: m.user_id,
+        display_name: m.display_name,
+        role: m.role,
+        avatar_url: m.avatar_url ?? null,
+      })),
+    [members]
+  );
+
   const suggestedTask = useMemo(
     () => (detail ? pickSuggestedProjectDetailTask(detail.tasks, me?.id) : null),
     [detail, me?.id]
@@ -253,18 +264,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
     }
   }
 
-  async function saveProject(input: {
-    name: string;
-    status: PortfolioKanbanStatus;
-    engagementType: "one_off" | "retainer";
-    clientAccessEnabled: boolean;
-    contractRef: string | null;
-    releaseAt: string | null;
-    budgetRub: number | null;
-    paidRub: number | null;
-    teamMemberUserIds: string[];
-    clientUserIds: string[];
-  }) {
+  async function saveProject(input: EditProjectModalInput) {
     await fetchJson(`/api/v2/projects/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -272,13 +272,15 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
         name: input.name,
         status: kanbanToV2Status(input.status),
         engagementType: input.engagementType,
-        clientAccessEnabled: input.clientAccessEnabled,
-        contractRef: input.contractRef,
+        projectKind: input.projectKind,
+        priority: input.priority,
+        clientName: input.clientName,
+        clientId: input.clientId,
         releaseAt: input.releaseAt,
-        budgetRub: input.budgetRub,
+        budgetRub: input.projectSumRub,
         paidRub: input.paidRub,
-        teamMemberUserIds: input.teamMemberUserIds,
-        clientUserIds: input.clientUserIds,
+        teamMemberUserIds: input.teamMemberIds,
+        clientUserIds: detail?.clients.map((c) => c.userId) ?? [],
       }),
     });
     await reload();
@@ -489,7 +491,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
       <EditProjectModal
         open={editProjectOpen}
         detail={detail}
-        members={members}
+        members={workspaceMembers}
         meId={me?.id ?? null}
         onClose={() => setEditProjectOpen(false)}
         onSave={saveProject}

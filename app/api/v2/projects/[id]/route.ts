@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Session } from "@/lib/v2/auth/require-v2-session";
 import { getProjectById, updateProject, updateProjectMembers, deleteProject } from "@/lib/v2/projects/project-repo";
-import type { V2ProjectEngagementType, V2ProjectMemberRole, V2ProjectStatus } from "@/lib/v2/types";
+import { isV2ProjectKind } from "@/lib/v2/projects/project-kind";
+import type { V2ProjectEngagementType, V2ProjectMemberRole, V2ProjectStatus, V2TaskPriority } from "@/lib/v2/types";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -51,6 +52,29 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
           ? Math.round(body.paidRub)
           : undefined;
 
+    const projectKind =
+      body.projectKind === null
+        ? null
+        : isV2ProjectKind(body.projectKind)
+          ? body.projectKind
+          : undefined;
+
+    const priority =
+      body.priority === "urgent" ||
+      body.priority === "high" ||
+      body.priority === "medium" ||
+      body.priority === "low"
+        ? body.priority
+        : undefined;
+
+    const clientName = typeof body.clientName === "string" ? body.clientName.trim() || null : undefined;
+    const clientId =
+      body.clientId === null
+        ? null
+        : typeof body.clientId === "string"
+          ? body.clientId.trim() || null
+          : undefined;
+
     const project = await updateProject(auth.ctx, id, {
       status,
       name,
@@ -60,6 +84,10 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
       releaseAt,
       budgetRub,
       paidRub,
+      projectKind,
+      priority,
+      clientName,
+      clientId,
     });
 
     if (Array.isArray(body.teamMemberUserIds) || Array.isArray(body.clientUserIds)) {

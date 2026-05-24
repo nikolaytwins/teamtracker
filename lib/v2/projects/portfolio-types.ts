@@ -19,6 +19,7 @@ export type PortfolioMember = {
   name: string;
   initials: string;
   gradient: string;
+  avatarUrl: string | null;
 };
 
 export type PortfolioProject = {
@@ -57,6 +58,7 @@ export type PortfolioTeamLoadRow = {
   name: string;
   initials: string;
   gradient: string;
+  avatarUrl: string | null;
   load: number;
   taskCount: number;
   estimatedSeconds: number;
