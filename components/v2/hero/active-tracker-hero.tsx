@@ -68,8 +68,10 @@ export function ActiveTrackerHero({
   const dueLabel = formatDueLabel(task.deadline_at, task.bucket);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-white shadow-[var(--v2-shadow-soft)]">
-      <HeroBackground />
+    <div className="relative rounded-3xl bg-white shadow-[var(--v2-shadow-soft)]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+        <HeroBackground />
+      </div>
       <div className="relative grid grid-cols-12 gap-8 p-7">
         <div className="col-span-12 flex flex-col lg:col-span-7">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
@@ -183,8 +185,10 @@ function IdleHero({
   }, [menuOpen]);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-white shadow-[var(--v2-shadow-soft)]">
-      <HeroBackground />
+    <div className="relative rounded-3xl bg-white shadow-[var(--v2-shadow-soft)]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+        <HeroBackground />
+      </div>
       <div className="relative grid grid-cols-12 gap-8 p-7">
         <div className="col-span-12 flex flex-col lg:col-span-7">
           {selected ? (
