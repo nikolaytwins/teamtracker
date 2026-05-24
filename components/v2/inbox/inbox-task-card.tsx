@@ -15,6 +15,7 @@ export function InboxTaskCard({
   onDragStart,
   onDragEnd,
   onPromote,
+  onOpen,
   compact = false,
 }: {
   task: V2TaskWithMeta;
@@ -24,6 +25,7 @@ export function InboxTaskCard({
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onPromote?: () => void;
+  onOpen?: () => void;
   compact?: boolean;
 }) {
   const project = projectForTask(task, projectsById);
@@ -37,9 +39,23 @@ export function InboxTaskCard({
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onClick={onOpen}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onKeyDown={
+        onOpen
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
       className={`group relative overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-card)] transition-all duration-200 hover:shadow-[var(--v2-shadow-cardHv)] ${
-        draggable ? "cursor-grab active:cursor-grabbing" : ""
-      } ${dragging ? "scale-[0.98] opacity-50" : ""} ${
+        onOpen ? "cursor-pointer" : ""
+      } ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
+        dragging ? "scale-[0.98] opacity-50" : ""} ${
         burning && project?.health === "critical" ? "ring-1 ring-red-200/80" : ""
       } ${burning && project?.health === "at_risk" ? "ring-1 ring-amber-200/80" : ""}`}
     >

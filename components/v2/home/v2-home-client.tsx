@@ -1,14 +1,16 @@
 "use client";
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import { formatBucketSubtitle } from "@/lib/v2/format";
-import { BUCKET_LABELS, BUCKET_ORDER, canDropTaskOnHomeBucket, hasHomeSchedule } from "@/lib/v2/tasks/task-buckets";
-import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
+import { BUCKET_ORDER, canDropTaskOnHomeBucket, hasHomeSchedule } from "@/lib/v2/tasks/task-buckets";
+import type { V2TaskBucket, V2TaskStatus, V2TaskWithMeta } from "@/lib/v2/types";
+import { readHomeView, writeHomeView } from "@/lib/v2/home/home-storage";
+import type { PortfolioPayload } from "@/lib/v2/projects/portfolio-types";
+import type { TaskViewMode } from "@/lib/v2/task-view-mode";
 import { ActiveTrackerHero } from "@/components/v2/hero/active-tracker-hero";
 import { ChipBar } from "@/components/v2/home/chip-bar";
+import { HomeDayView, HomeKanbanView, HomeWeekView } from "@/components/v2/home/home-views";
 import { moveHomeTaskToBucket } from "@/components/v2/home/home-task-dnd";
 import { PageHead } from "@/components/v2/home/page-head";
-import { TaskSection } from "@/components/v2/home/task-section";
 import { UnassignedTasksSection } from "@/components/v2/home/unassigned-tasks-section";
 import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
 import { V2Topbar } from "@/components/v2/shell/v2-topbar";
@@ -21,25 +23,6 @@ type ActiveTimer = {
   task: V2TaskWithMeta;
   elapsedSeconds: number;
 };
-
-const SECTION_ACCENTS: Partial<Record<V2TaskBucket, string>> = {
-  overdue: "#EF4444",
-  today: "#3B6FF7",
-  tomorrow: "#A1A1AA",
-  this_week: "#A1A1AA",
-  later: "#D4D4D8",
-  done_today: "#10B981",
-};
-
-const BUCKET_EMPTY_LABELS: Partial<Record<V2TaskBucket, string>> = {
-  today: "На сегодня задач нет",
-  tomorrow: "На завтра задач нет",
-  this_week: "На этой неделе задач нет",
-  later: "Задач на потом пока нет",
-  done_today: "Сегодня ещё ничего не завершено",
-};
-
-const ALWAYS_VISIBLE_BUCKETS = new Set<V2TaskBucket>(["today", "tomorrow", "this_week", "later", "done_today"]);
 
 export function V2HomeClient() {
   const { me, workspace, members, projects, loading: bootLoading, refresh: refreshBoot, openNewTask, openCommandPalette } =
@@ -58,12 +41,26 @@ export function V2HomeClient() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverBucket, setDragOverBucket] = useState<V2TaskBucket | null>(null);
   const [movingTask, setMovingTask] = useState(false);
+  const [view, setViewState] = useState<TaskViewMode>("day");
+  const [viewHydrated, setViewHydrated] = useState(false);
+  const [projectsById, setProjectsById] = useState<Map<string, PortfolioPayload["projects"][number]>>(new Map());
+  const [kanbanDragId, setKanbanDragId] = useState<string | null>(null);
 
   const canViewUnassigned = me?.role === "admin" || me?.role === "pm";
 
   const elapsed = active ? active.elapsedSeconds + tick : 0;
   const runningTaskId = active?.session.task_id ?? null;
   const teamProjects = useMemo(() => projects.filter((p) => p.scope === "team"), [projects]);
+
+  useEffect(() => {
+    setViewState(readHomeView());
+    setViewHydrated(true);
+  }, []);
+
+  const setView = useCallback((next: TaskViewMode) => {
+    setViewState(next);
+    writeHomeView(next);
+  }, []);
 
   const loadPage = useCallback(async () => {
     const requests: Promise<unknown>[] = [
@@ -72,6 +69,7 @@ export function V2HomeClient() {
       fetchJson<{ focusSecondsToday: number; activeElapsedSeconds: number; hasActiveTimer: boolean }>(
         "/api/v2/timer/stats"
       ),
+      fetchJson<PortfolioPayload>("/api/v2/projects/portfolio"),
     ];
     if (canViewUnassigned) {
       requests.push(fetchJson<{ tasks: V2TaskWithMeta[] }>("/api/v2/tasks/unassigned"));
@@ -84,13 +82,15 @@ export function V2HomeClient() {
       activeElapsedSeconds: number;
       hasActiveTimer: boolean;
     };
+    const portfolioRes = results[3] as PortfolioPayload;
     setTasks(taskRes.tasks);
     setGroups(taskRes.groups);
     setActive(timerRes.active);
     setFocusSecondsToday(statsRes.focusSecondsToday);
     setActiveElapsedBase(timerRes.active?.elapsedSeconds ?? 0);
-    if (canViewUnassigned && results[3]) {
-      setUnassignedTasks((results[3] as { tasks: V2TaskWithMeta[] }).tasks);
+    setProjectsById(new Map(portfolioRes.projects.map((p) => [p.id, p])));
+    if (canViewUnassigned && results[4]) {
+      setUnassignedTasks((results[4] as { tasks: V2TaskWithMeta[] }).tasks);
     } else {
       setUnassignedTasks([]);
     }
@@ -222,7 +222,45 @@ export function V2HomeClient() {
     [tasks]
   );
 
-  if (loading || bootLoading) {
+  const kanbanTasks = useMemo(() => {
+    const unassignedIds = canViewUnassigned ? new Set(unassignedTasks.map((t) => t.id)) : new Set<string>();
+    return tasks.filter((t) => {
+      if (t.completed_at || t.inbox_bucket) return false;
+      if (unassignedIds.has(t.id) && !hasHomeSchedule(t)) return false;
+      return projectFilter === "all" ? true : t.project_id === projectFilter;
+    });
+  }, [tasks, projectFilter, canViewUnassigned, unassignedTasks]);
+
+  async function setTaskStatus(taskId: string, status: V2TaskStatus) {
+    await fetchJson(`/api/v2/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    await reload();
+  }
+
+  const homeDnd = {
+    dragId,
+    dragOverBucket,
+    onDragStart: setDragId,
+    onDragEnd: () => {
+      setDragId(null);
+      setDragOverBucket(null);
+    },
+    onDragOverBucket: setDragOverBucket,
+    onDropOnBucket: (bucket: V2TaskBucket) => void handleDropOnBucket(bucket),
+  };
+
+  const homeActions = {
+    runningId: runningTaskId,
+    elapsed,
+    onToggleRun: toggleTimer,
+    onToggleDone: toggleComplete,
+    onOpenTask: setDrawerTaskId,
+  };
+
+  if (loading || bootLoading || !viewHydrated) {
     return (
       <div className="flex min-h-[50vh] flex-1 items-center justify-center text-[var(--v2-ink-500)]">Загрузка…</div>
     );
@@ -241,7 +279,7 @@ export function V2HomeClient() {
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
           ) : null}
 
-          {me ? <PageHead userName={me.name} tasks={tasks} /> : null}
+          {me ? <PageHead userName={me.name} tasks={tasks} view={view} setView={setView} /> : null}
 
           <ActiveTrackerHero
             task={active?.task ?? null}
@@ -282,37 +320,38 @@ export function V2HomeClient() {
               />
             ) : null}
 
-            {BUCKET_ORDER.map((bucket) => {
-              const list = filteredGroups[bucket] ?? [];
-              const showWhileDragging = !!dragId && canDropTaskOnHomeBucket(bucket);
-              if (!ALWAYS_VISIBLE_BUCKETS.has(bucket) && !list.length && !showWhileDragging) return null;
-              return (
-                <TaskSection
-                  key={bucket}
-                  bucket={bucket}
-                  title={BUCKET_LABELS[bucket]}
-                  subtitle={formatBucketSubtitle(bucket)}
-                  accent={SECTION_ACCENTS[bucket] ?? "#A1A1AA"}
-                  tasks={list}
-                  runningId={runningTaskId}
-                  elapsed={elapsed}
-                  onToggleRun={toggleTimer}
-                  onToggleDone={toggleComplete}
-                  onOpenTask={setDrawerTaskId}
-                  hideWhenEmpty={bucket === "overdue"}
-                  emptyLabel={BUCKET_EMPTY_LABELS[bucket] ?? "Задач нет"}
-                  dragId={dragId}
-                  dragOverBucket={dragOverBucket}
-                  onDragStart={setDragId}
-                  onDragEnd={() => {
+            {view === "day" ? (
+              <HomeDayView filteredGroups={filteredGroups} dnd={homeDnd} actions={homeActions} />
+            ) : view === "week" ? (
+              <HomeWeekView
+                filteredGroups={filteredGroups}
+                projectsById={projectsById}
+                dnd={{
+                  dragId,
+                  onDragStart: setDragId,
+                  onDragEnd: () => {
                     setDragId(null);
                     setDragOverBucket(null);
-                  }}
-                  onDragOverBucket={setDragOverBucket}
-                  onDropOnBucket={(b) => void handleDropOnBucket(b)}
-                />
-              );
-            })}
+                  },
+                  onDrop: (bucket) => void handleDropOnBucket(bucket),
+                }}
+                onOpenTask={setDrawerTaskId}
+              />
+            ) : (
+              <HomeKanbanView
+                tasks={kanbanTasks}
+                doneToday={doneToday}
+                projectsById={projectsById}
+                dragId={kanbanDragId}
+                onDragStart={setKanbanDragId}
+                onDragEnd={() => setKanbanDragId(null)}
+                onDropStatus={(status) => {
+                  if (kanbanDragId) void setTaskStatus(kanbanDragId, status);
+                  setKanbanDragId(null);
+                }}
+                onOpenTask={setDrawerTaskId}
+              />
+            )}
           </div>
 
           <div className="mt-12 flex items-center justify-between rounded-2xl bg-white/60 p-5 shadow-[var(--v2-shadow-card)] backdrop-blur">
