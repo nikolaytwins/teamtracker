@@ -266,7 +266,7 @@ export async function buildProjectDetail(
       tasksTotal,
       statusCounts,
       loggedHours: Math.round(loggedHours * 10) / 10,
-      estimateHours: Math.round(estimateHours * 10) / 10,
+      estimateHours,
       tasks: phaseTasks,
     };
   }

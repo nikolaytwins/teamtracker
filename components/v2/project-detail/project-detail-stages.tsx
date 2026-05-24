@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtHoursMinutes } from "@/lib/v2/format";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { ProjectDetailPhase, ProjectDetailTask } from "@/lib/v2/projects/project-detail-types";
 import type { PortfolioMember } from "@/lib/v2/projects/portfolio-types";
@@ -7,14 +8,7 @@ import { TaskRow, hasDefaultExpanded } from "@/components/v2/project-detail/proj
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useMemo, useState } from "react";
 
-function fmtHours(h: number): string {
-  if (!h) return "0ч";
-  const hi = Math.floor(h);
-  const mm = Math.round((h - hi) * 60);
-  if (hi && mm) return `${hi}ч ${mm}м`;
-  if (hi) return `${hi}ч`;
-  return `${mm}м`;
-}
+const fmtHours = fmtHoursMinutes;
 
 const STATUS_LABEL: Record<ProjectDetailPhase["status"], { label: string; bg: string; ink: string }> = {
   done: { label: "Готово", bg: "#D1FAE5", ink: "#065F46" },
@@ -221,8 +215,11 @@ export function ProjectDetailStages({
 
   const defaultExpanded = useMemo(() => {
     const map: Record<string, boolean> = {};
+    const sorted = [...phases].sort((a, b) => a.sortOrder - b.sortOrder);
+    const current =
+      sorted.find((p) => p.status === "in_progress") ?? sorted.find((p) => p.status !== "done");
     for (const p of phases) {
-      map[p.id] = p.status === "in_progress" || p.tasks.some((t) => t.subtasks.some((s) => s.status !== "done"));
+      map[p.id] = current?.id === p.id;
     }
     return map;
   }, [phases]);

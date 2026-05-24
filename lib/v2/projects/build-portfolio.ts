@@ -49,15 +49,33 @@ function deadlineForHealth(t: V2TaskRow): string | null {
   return t.deadline_at;
 }
 
+function daysUntilDeadline(deadlineAt: string, dayStartMs: number): number {
+  const d = new Date(deadlineAt);
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.round((target - dayStartMs) / 86400000);
+}
+
+function healthFromReleaseAt(releaseAt: string | null, dayStartMs: number): PortfolioHealth | null {
+  if (!releaseAt) return null;
+  const diff = daysUntilDeadline(releaseAt, dayStartMs);
+  if (diff < 0) return "critical";
+  if (diff <= 2) return "at_risk";
+  return null;
+}
+
 function computeHealth(
   kanbanStatus: ReturnType<typeof v2StatusToKanban>,
   openTasks: V2TaskRow[],
+  releaseAt: string | null,
   now: Date
 ): PortfolioHealth {
   if (kanbanStatus === "done" || kanbanStatus === "done_unpaid") return "done";
   if (kanbanStatus === "paused") return "paused";
 
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const fromRelease = healthFromReleaseAt(releaseAt, dayStart);
+  if (fromRelease) return fromRelease;
+
   let hasOverdue = false;
   let urgentSoon = false;
   let deadlineSoon = false;
@@ -67,9 +85,7 @@ function computeHealth(
     openCount++;
     const dlRaw = deadlineForHealth(t);
     if (!dlRaw) continue;
-    const d = new Date(dlRaw);
-    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const diff = Math.round((target - dayStart) / 86400000);
+    const diff = daysUntilDeadline(dlRaw, dayStart);
     if (diff < 0) hasOverdue = true;
     if (diff <= 2 && (t.priority === "urgent" || t.priority === "high")) urgentSoon = true;
     if (diff <= 5) deadlineSoon = true;
@@ -187,7 +203,7 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
     const tasksDone = tasks.filter((t) => t.completed_at).length;
     const tasksTotal = tasks.length;
     const kanbanStatus = v2StatusToKanban(p.status);
-    const health = computeHealth(kanbanStatus, openTasks, now);
+    const health = computeHealth(kanbanStatus, openTasks, p.release_at, now);
     const priority = p.priority ?? maxPriorityFromTasks(tasks);
     const deadlineAt = p.release_at;
     const { label: deadline, days: deadlineDays } = formatDeadlineLabel(deadlineAt, now);

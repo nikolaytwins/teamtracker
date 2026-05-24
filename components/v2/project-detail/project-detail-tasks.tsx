@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtHoursMinutes } from "@/lib/v2/format";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PortfolioMember } from "@/lib/v2/projects/portfolio-types";
 import type { ProjectDetailSubtask, ProjectDetailTask } from "@/lib/v2/projects/project-detail-types";
@@ -18,14 +19,7 @@ import { useState } from "react";
 
 type InlineField = "priority" | "assignee" | "deadline" | null;
 
-function fmtHours(h: number): string {
-  if (!h) return "0ч";
-  const hi = Math.floor(h);
-  const mm = Math.round((h - hi) * 60);
-  if (hi && mm) return `${hi}ч ${mm}м`;
-  if (hi) return `${hi}ч`;
-  return `${mm}м`;
-}
+const fmtHours = fmtHoursMinutes;
 
 function stopRowClick(e: React.MouseEvent) {
   e.stopPropagation();
