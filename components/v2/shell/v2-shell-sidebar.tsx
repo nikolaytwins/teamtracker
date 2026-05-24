@@ -252,7 +252,7 @@ export function V2ShellSidebar({
   }
 
   return (
-    <aside className="flex w-[244px] shrink-0 flex-col gap-1 bg-white px-3 pb-3 pt-4 shadow-[var(--v2-shadow-soft)]">
+    <aside className="sticky top-0 flex h-screen w-[244px] shrink-0 flex-col gap-1 overflow-y-auto bg-white px-3 pb-3 pt-4 shadow-[var(--v2-shadow-soft)]">
       <div className="mb-2 flex items-center gap-1">
         <Link
           href={appPath("/v2/home")}
@@ -319,14 +319,15 @@ export function V2ShellSidebar({
       ) : null}
 
       {teamProjects.length > 0 ? (
-        <div className="mt-3 min-h-0 flex flex-1 flex-col">
+        <div className="mt-3">
           <button
             type="button"
             onClick={toggleProjectsExpanded}
             className="mb-1 flex w-full items-center gap-1 px-3 py-1 text-left transition hover:text-[var(--v2-ink-800)]"
+            aria-expanded={projectsExpanded}
           >
             <V2Icons.chev
-              className={`h-3.5 w-3.5 text-[var(--v2-ink-400)] transition-transform ${projectsExpanded ? "" : "-rotate-90"}`}
+              className={`h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-400)] transition-transform ${projectsExpanded ? "" : "-rotate-90"}`}
             />
             <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
               Проекты
@@ -336,7 +337,7 @@ export function V2ShellSidebar({
             ) : null}
           </button>
           {showOtherProjects ? (
-            <div className="max-h-48 space-y-0.5 overflow-y-auto px-1">
+            <div className="space-y-0.5 px-1">
               {otherProjects.map((p) => (
                 <ProjectNavLink
                   key={p.id}

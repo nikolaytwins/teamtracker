@@ -128,6 +128,43 @@ function enrichTask(
   };
 }
 
+export async function enrichTaskRows(ctx: V2SessionContext, tasks: V2TaskRow[]): Promise<V2TaskWithMeta[]> {
+  if (tasks.length === 0) return [];
+
+  const sb = getV2Supabase();
+  const projectIds = [...new Set(tasks.map((t) => t.project_id).filter(Boolean))] as string[];
+  const projects = new Map<
+    string,
+    {
+      name: string;
+      short_name: string | null;
+      color_tint: string | null;
+      color_bg: string | null;
+      color_ink: string | null;
+    }
+  >();
+  if (projectIds.length) {
+    const { data: prows } = await sb
+      .from("v2_projects")
+      .select("id, name, short_name, color_tint, color_bg, color_ink")
+      .in("id", projectIds);
+    for (const p of prows ?? []) {
+      projects.set(p.id as string, {
+        name: p.name as string,
+        short_name: p.short_name as string | null,
+        color_tint: p.color_tint as string | null,
+        color_bg: p.color_bg as string | null,
+        color_ink: (p.color_ink as string | null) ?? (p.color_tint as string | null),
+      });
+    }
+  }
+
+  const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));
+  const taskIds = tasks.map((t) => t.id);
+  const [logged, counts] = await Promise.all([sumLoggedSeconds(taskIds), countCommentsAndLinks(taskIds)]);
+  return tasks.map((t) => enrichTask(t, logged, projects, users, counts));
+}
+
 export async function listTasks(
   ctx: V2SessionContext,
   opts?: {
@@ -163,48 +200,23 @@ export async function listTasks(
     canViewAllTeamData(ctx.role) || ctx.role === "pm" ? undefined : await fetchMemberProjectIds(ctx.userId);
   tasks = tasks.filter((t) => canViewTask(ctx, t, { memberProjectIds }));
 
-  const projectIds = [...new Set(tasks.map((t) => t.project_id).filter(Boolean))] as string[];
-  const projects = new Map<
-    string,
-    {
-      name: string;
-      short_name: string | null;
-      color_tint: string | null;
-      color_bg: string | null;
-      color_ink: string | null;
-      status: string;
-    }
-  >();
-  if (projectIds.length) {
-    const { data: prows } = await sb
-      .from("v2_projects")
-      .select("id, name, short_name, color_tint, color_bg, color_ink, status")
-      .in("id", projectIds);
-    for (const p of prows ?? []) {
-      projects.set(p.id as string, {
-        name: p.name as string,
-        short_name: p.short_name as string | null,
-        color_tint: p.color_tint as string | null,
-        color_bg: p.color_bg as string | null,
-        color_ink: (p.color_ink as string | null) ?? (p.color_tint as string | null),
-        status: p.status as string,
-      });
-    }
-  }
-
   if (opts?.activeProjectsOnly) {
+    const sb2 = getV2Supabase();
+    const projectIds = [...new Set(tasks.map((t) => t.project_id).filter(Boolean))] as string[];
+    const statusByProject = new Map<string, string>();
+    if (projectIds.length) {
+      const { data: prows } = await sb2.from("v2_projects").select("id, status").in("id", projectIds);
+      for (const p of prows ?? []) statusByProject.set(p.id as string, p.status as string);
+    }
     const active = new Set(["not_started", "in_progress", "approval"]);
     tasks = tasks.filter((t) => {
       if (!t.project_id) return true;
-      const st = projects.get(t.project_id)?.status;
+      const st = statusByProject.get(t.project_id);
       return st != null && active.has(st);
     });
   }
 
-  const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));
-  const taskIds = tasks.map((t) => t.id);
-  const [logged, counts] = await Promise.all([sumLoggedSeconds(taskIds), countCommentsAndLinks(taskIds)]);
-  return tasks.map((t) => enrichTask(t, logged, projects, users, counts));
+  return enrichTaskRows(ctx, tasks);
 }
 
 const PRIORITY_RANK: Record<V2TaskPriority, number> = {
