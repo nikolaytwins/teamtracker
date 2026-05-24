@@ -2,7 +2,7 @@
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { BUCKET_ORDER, canDropTaskOnHomeBucket, hasHomeSchedule } from "@/lib/v2/tasks/task-buckets";
-import type { V2TaskBucket, V2TaskStatus, V2TaskWithMeta } from "@/lib/v2/types";
+import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
 import { readHomeView, writeHomeView } from "@/lib/v2/home/home-storage";
 import type { PortfolioPayload } from "@/lib/v2/projects/portfolio-types";
 import type { TaskViewMode } from "@/lib/v2/task-view-mode";
@@ -44,7 +44,6 @@ export function V2HomeClient() {
   const [view, setViewState] = useState<TaskViewMode>("day");
   const [viewHydrated, setViewHydrated] = useState(false);
   const [projectsById, setProjectsById] = useState<Map<string, PortfolioPayload["projects"][number]>>(new Map());
-  const [kanbanDragId, setKanbanDragId] = useState<string | null>(null);
 
   const canViewUnassigned = me?.role === "admin" || me?.role === "pm";
 
@@ -222,24 +221,6 @@ export function V2HomeClient() {
     [tasks]
   );
 
-  const kanbanTasks = useMemo(() => {
-    const unassignedIds = canViewUnassigned ? new Set(unassignedTasks.map((t) => t.id)) : new Set<string>();
-    return tasks.filter((t) => {
-      if (t.completed_at || t.inbox_bucket) return false;
-      if (unassignedIds.has(t.id) && !hasHomeSchedule(t)) return false;
-      return projectFilter === "all" ? true : t.project_id === projectFilter;
-    });
-  }, [tasks, projectFilter, canViewUnassigned, unassignedTasks]);
-
-  async function setTaskStatus(taskId: string, status: V2TaskStatus) {
-    await fetchJson(`/api/v2/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    await reload();
-  }
-
   const homeDnd = {
     dragId,
     dragOverBucket,
@@ -307,7 +288,7 @@ export function V2HomeClient() {
               projects={projects}
             />
 
-            {canViewUnassigned ? (
+            {canViewUnassigned && view !== "kanban" ? (
               <UnassignedTasksSection
                 tasks={filteredUnassigned}
                 onOpenTask={setDrawerTaskId}
@@ -339,16 +320,19 @@ export function V2HomeClient() {
               />
             ) : (
               <HomeKanbanView
-                tasks={kanbanTasks}
-                doneToday={doneToday}
+                filteredGroups={filteredGroups}
+                unassignedTasks={filteredUnassigned}
+                showUnassigned={canViewUnassigned}
                 projectsById={projectsById}
-                dragId={kanbanDragId}
-                onDragStart={setKanbanDragId}
-                onDragEnd={() => setKanbanDragId(null)}
-                onDropStatus={(status) => {
-                  if (kanbanDragId) void setTaskStatus(kanbanDragId, status);
-                  setKanbanDragId(null);
+                dragId={dragId}
+                dragOverBucket={dragOverBucket}
+                onDragStart={setDragId}
+                onDragEnd={() => {
+                  setDragId(null);
+                  setDragOverBucket(null);
                 }}
+                onDropBucket={(bucket) => void handleDropOnBucket(bucket)}
+                onDragOverBucket={setDragOverBucket}
                 onOpenTask={setDrawerTaskId}
               />
             )}
