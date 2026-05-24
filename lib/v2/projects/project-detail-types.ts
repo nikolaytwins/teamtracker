@@ -10,6 +10,9 @@ export type ProjectDetailLink = {
   createdByName: string;
   createdAt: string;
   updatedLabel: string;
+  source: "project" | "task";
+  taskId?: string | null;
+  taskTitle?: string | null;
 };
 
 export type ProjectDetailFile = {
@@ -23,6 +26,9 @@ export type ProjectDetailFile = {
   createdByName: string;
   createdAt: string;
   dateLabel: string;
+  source: "project" | "task";
+  taskId?: string | null;
+  taskTitle?: string | null;
 };
 
 export type ProjectDetailSubtask = {
@@ -34,6 +40,7 @@ export type ProjectDetailSubtask = {
   assigneeName: string | null;
   plannedAt: string | null;
   plannedLabel: string;
+  deadlineAt: string | null;
   deadlineLabel: string;
   completedAt: string | null;
   estimateHours: number;
@@ -51,6 +58,7 @@ export type ProjectDetailTask = {
   assigneeName: string | null;
   plannedAt: string | null;
   plannedLabel: string;
+  deadlineAt: string | null;
   deadlineLabel: string;
   completedAt: string | null;
   estimateHours: number;
@@ -119,6 +127,7 @@ export type ProjectDetailPayload = {
   durationDays: number;
   budget: number;
   budgetRub: number | null;
+  paidRub: number | null;
   spent: number;
   loggedHours: number;
   hoursToday: number;

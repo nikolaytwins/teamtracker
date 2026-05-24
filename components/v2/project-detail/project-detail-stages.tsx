@@ -63,6 +63,7 @@ function PhaseRow({
   onOpenTask,
   onToggleTimer,
   onToggleDone,
+  onReload,
   canCreateTasks,
   onAddTask,
   adding,
@@ -78,6 +79,7 @@ function PhaseRow({
   onOpenTask: (id: string) => void;
   onToggleTimer: (id: string) => void;
   onToggleDone: (id: string, completed: boolean) => void;
+  onReload: () => Promise<void>;
   canCreateTasks: boolean;
   onAddTask: (e: React.FormEvent) => void;
   adding: boolean;
@@ -155,6 +157,7 @@ function PhaseRow({
                   onOpenTask={onOpenTask}
                   onToggleTimer={onToggleTimer}
                   onToggleDone={onToggleDone}
+                  onReload={onReload}
                 />
               ))
             )}
@@ -287,6 +290,7 @@ export function ProjectDetailStages({
           onOpenTask={onOpenTask}
           onToggleTimer={onToggleTimer}
           onToggleDone={toggleDone}
+          onReload={onReload}
           canCreateTasks={canCreateTasks}
           draft={phaseDrafts[phase.id] ?? ""}
           onDraftChange={(v) => setPhaseDrafts((prev) => ({ ...prev, [phase.id]: v }))}
@@ -325,6 +329,7 @@ export function ProjectDetailStages({
                   onOpenTask={onOpenTask}
                   onToggleTimer={onToggleTimer}
                   onToggleDone={toggleDone}
+                  onReload={onReload}
                 />
               ))
             )}

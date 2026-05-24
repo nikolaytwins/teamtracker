@@ -97,6 +97,7 @@ export function TaskCardChat({
   onCancelReply,
   onSubmit,
   saving,
+  error,
   onReply,
 }: {
   comments: TaskComment[];
@@ -106,6 +107,7 @@ export function TaskCardChat({
   onCancelReply: () => void;
   onSubmit: (e: React.FormEvent) => void;
   saving: boolean;
+  error?: string | null;
   onReply: (comment: TaskComment) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -133,6 +135,7 @@ export function TaskCardChat({
       </div>
 
       <form onSubmit={onSubmit} className="border-t border-[var(--v2-ink-100)] bg-white p-4">
+        {error ? <p className="mb-2 text-[12px] text-red-600">{error}</p> : null}
         {replyTo ? (
           <div className="mb-2 flex items-center justify-between rounded-lg bg-[var(--v2-brand-50)] px-3 py-1.5 text-[12px] text-[var(--v2-brand-700)]">
             <span>

@@ -3,8 +3,15 @@ import type { TtUserRole } from "@/lib/roles";
 export const V2_DEFAULT_WORKSPACE_ID = "ws-default";
 
 export type V2ProjectScope = "team" | "personal";
-export type V2ProjectStatus = "not_started" | "in_progress" | "approval" | "completed" | "paused";
+export type V2ProjectStatus =
+  | "not_started"
+  | "in_progress"
+  | "approval"
+  | "completed_unpaid"
+  | "completed"
+  | "paused";
 export type V2ProjectEngagementType = "one_off" | "retainer";
+export type V2ProjectKind = "site" | "presentation" | "small_task";
 export type V2ProjectMemberRole = "team" | "client" | "lead";
 export type V2TaskScope = "team" | "personal";
 export type V2TaskStatus = "todo" | "in_progress" | "review" | "done";
@@ -49,6 +56,9 @@ export type V2ProjectRow = {
   contract_ref: string | null;
   release_at: string | null;
   budget_rub: number | null;
+  paid_rub: number | null;
+  project_kind: V2ProjectKind | null;
+  priority: V2TaskPriority;
   engagement_type: V2ProjectEngagementType;
   client_access_enabled: boolean;
   client_id: string | null;

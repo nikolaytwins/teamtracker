@@ -58,7 +58,7 @@ export async function addComment(
   taskId: string,
   body: string,
   parentCommentId?: string | null
-): Promise<V2TaskCommentRow> {
+): Promise<V2TaskCommentRow & { author_name: string }> {
   const task = await getTaskById(ctx, taskId);
   if (!task) throw new Error("Task not found");
 
@@ -88,7 +88,11 @@ export async function addComment(
     row.body
   ).catch((e) => console.error("notifyTaskComment", e));
 
-  return row;
+  const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));
+  return {
+    ...row,
+    author_name: users.get(ctx.userId) ?? "Пользователь",
+  };
 }
 
 export async function listLinks(taskId: string): Promise<V2TaskLinkRow[]> {

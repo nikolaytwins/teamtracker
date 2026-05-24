@@ -32,8 +32,9 @@
 | 011 | `011_v2_attachments_storage_bucket.sql` | Supabase Storage bucket для файлов проектов и задач v2 |
 | 012 | `012_avatars_storage_bucket.sql` | Supabase Storage bucket для аватаров |
 | 013 | `013_v2_clients.sql` | CRM-клиенты v2 и привязка к проектам |
+| 014 | `014_v2_project_kind_priority_paid.sql` | Вид проекта, приоритет, оплаченная сумма |
 
-**Следующий свободный номер:** `014`
+**Следующий свободный номер:** `015`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

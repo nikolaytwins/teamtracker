@@ -76,7 +76,7 @@ export function formatDeadlineLabel(deadlineAt: string | null, now = new Date())
 }
 
 export function deadlineCopy(days: number | null, status: string): string {
-  if (status === "done") return "сдан";
+  if (status === "done" || status === "done_unpaid") return "сдан";
   if (days === null) return "—";
   if (days < 0) return `${-days} ${pluralRu(-days, ["день", "дня", "дней"])} назад`;
   if (days === 0) return "сегодня";

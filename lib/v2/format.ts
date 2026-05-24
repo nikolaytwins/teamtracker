@@ -7,6 +7,30 @@ export function fmtDuration(seconds: number): string {
   return `${m}м`;
 }
 
+/** Часы (дробные) → «4ч», «10м», «1ч 30м». */
+export function fmtHoursMinutes(hours: number): string {
+  if (!hours || hours <= 0) return "0ч";
+  const totalMin = Math.round(hours * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h && m) return `${h}ч ${m}м`;
+  if (h) return `${h}ч`;
+  return `${m}м`;
+}
+
+export function secondsToHoursMinutes(seconds: number | null | undefined): { hours: number; minutes: number } {
+  if (!seconds || seconds <= 0) return { hours: 0, minutes: 0 };
+  const totalMin = Math.round(seconds / 60);
+  return { hours: Math.floor(totalMin / 60), minutes: totalMin % 60 };
+}
+
+export function hoursMinutesToSeconds(hours: number, minutes: number): number | null {
+  const h = Math.max(0, Math.floor(hours));
+  const m = Math.max(0, Math.min(59, Math.floor(minutes)));
+  const total = h * 3600 + m * 60;
+  return total > 0 ? total : null;
+}
+
 export function fmtTimer(seconds: number): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor((seconds % 3600) / 60))}:${pad(seconds % 60)}`;

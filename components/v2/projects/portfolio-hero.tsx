@@ -2,6 +2,7 @@
 
 import { appPath } from "@/lib/api-url";
 import type { PortfolioPayload } from "@/lib/v2/projects/portfolio-types";
+import { fmtLoadSeconds } from "@/lib/v2/team/daily-team-load";
 import { pluralRu } from "@/lib/v2/projects/portfolio-utils";
 import { MemberAvatar } from "@/components/v2/projects/project-atoms";
 import { V2Icons } from "@/components/v2/ui/icons";
@@ -41,33 +42,46 @@ function TeamLoadCard({ rows }: { rows: PortfolioPayload["teamLoad"] }) {
       </div>
       <div className="space-y-2.5">
         {rows.length === 0 ? (
-          <p className="text-[12px] text-[var(--v2-ink-400)]">Нет активных проектов с командой</p>
+          <p className="text-[12px] text-[var(--v2-ink-400)]">Нет задач на сегодня</p>
         ) : (
           rows.map((r) => (
             <div key={r.userId} className="flex items-center gap-3">
               <MemberAvatar member={r} size={26} />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="v2-tight truncate text-[12.5px] font-medium text-[var(--v2-ink-800)]">{r.name}</span>
                   <span className="text-[11px] text-[var(--v2-ink-400)]">
-                    · {r.projects} {pluralRu(r.projects, ["проект", "проекта", "проектов"])}
+                    {r.taskCount} {pluralRu(r.taskCount, ["задача", "задачи", "задач"])}
+                    {r.isWorkDay ? (
+                      <> · {fmtLoadSeconds(r.estimatedSeconds)} / {fmtLoadSeconds(r.capacitySeconds)}</>
+                    ) : (
+                      <> · выходной</>
+                    )}
                   </span>
                 </div>
                 <div className="mt-1 h-[5px] w-full overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: `${Math.min(r.load, 1) * 100}%`,
-                      background: r.load > 0.95 ? "#EF4444" : r.load > 0.85 ? "#F59E0B" : "#3B6FF7",
+                      width: `${Math.min(r.isWorkDay ? r.load : 0, 1) * 100}%`,
+                      background: !r.isWorkDay ? "#A1A1AA" : r.load > 0.95 ? "#EF4444" : r.load > 0.85 ? "#F59E0B" : "#3B6FF7",
                       transition: "width .9s cubic-bezier(.2,.7,.2,1)",
                     }}
                   />
                 </div>
               </div>
               <span
-                className={`v2-tnum w-9 text-right text-[11.5px] font-medium ${r.load > 0.95 ? "text-red-600" : r.load > 0.85 ? "text-amber-700" : "text-[var(--v2-ink-600)]"}`}
+                className={`v2-tnum w-9 text-right text-[11.5px] font-medium ${
+                  !r.isWorkDay
+                    ? "text-[var(--v2-ink-400)]"
+                    : r.load > 0.95
+                      ? "text-red-600"
+                      : r.load > 0.85
+                        ? "text-amber-700"
+                        : "text-[var(--v2-ink-600)]"
+                }`}
               >
-                {Math.round(r.load * 100)}%
+                {r.isWorkDay ? `${Math.round(r.load * 100)}%` : "—"}
               </span>
             </div>
           ))
@@ -77,7 +91,7 @@ function TeamLoadCard({ rows }: { rows: PortfolioPayload["teamLoad"] }) {
         href={appPath("/v2/admin/people")}
         className="v2-tight mt-4 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--v2-brand-700)] hover:text-[var(--v2-brand-800)]"
       >
-        Открыть планировщик <V2Icons.arrowR className="h-[14px] w-[14px]" />
+        Открыть команду <V2Icons.arrowR className="h-[14px] w-[14px]" />
       </Link>
     </div>
   );

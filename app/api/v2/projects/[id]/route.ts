@@ -44,6 +44,13 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
           ? Math.round(body.budgetRub)
           : undefined;
 
+    const paidRub =
+      body.paidRub === null
+        ? null
+        : typeof body.paidRub === "number" && Number.isFinite(body.paidRub)
+          ? Math.round(body.paidRub)
+          : undefined;
+
     const project = await updateProject(auth.ctx, id, {
       status,
       name,
@@ -52,6 +59,7 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
       contractRef,
       releaseAt,
       budgetRub,
+      paidRub,
     });
 
     if (Array.isArray(body.teamMemberUserIds) || Array.isArray(body.clientUserIds)) {

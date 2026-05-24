@@ -1,6 +1,8 @@
 import { getV2Supabase } from "@/lib/v2/db/client";
+import { listUsersPublic } from "@/lib/tt-auth-db";
+import { computeDailyTeamLoad } from "@/lib/v2/team/daily-team-load";
 import { listWorkspaceMembers } from "@/lib/v2/workspace/bootstrap";
-import type { V2SessionContext } from "@/lib/v2/types";
+import type { V2SessionContext, V2TaskRow } from "@/lib/v2/types";
 
 export type WeekSegment = {
   weekStart: string;
@@ -14,6 +16,14 @@ export type PeopleOverviewRow = {
   displayName: string;
   jobTitle: string;
   weeklyHoursNorm: number;
+  hourlyRateRub: number | null;
+  workHoursPerDay: number;
+  workDays: number[];
+  todayLoad: number;
+  todayTaskCount: number;
+  todayEstimatedSeconds: number;
+  todayCapacitySeconds: number;
+  isWorkDayToday: boolean;
   weeks: WeekSegment[];
   totalLoggedSeconds: number;
 };
@@ -37,6 +47,8 @@ function mondayOf(d: Date): Date {
 
 export async function getPeopleOverview(ctx: V2SessionContext, weeksCount = 6): Promise<PeopleOverviewRow[]> {
   const members = await listWorkspaceMembers();
+  const publicUsers = listUsersPublic();
+  const userById = new Map(publicUsers.map((u) => [u.id, u]));
   const sb = getV2Supabase();
 
   const now = new Date();
@@ -48,17 +60,45 @@ export async function getPeopleOverview(ctx: V2SessionContext, weeksCount = 6): 
   const rangeStart = weekStarts[0]!;
   const rangeEnd = addDays(weekStarts[weekStarts.length - 1]!, 7);
 
-  const { data: sessions, error } = await sb
-    .from("v2_time_sessions")
-    .select("user_id, duration_seconds, started_at, ended_at")
-    .eq("workspace_id", ctx.workspaceId)
-    .gte("started_at", rangeStart.toISOString())
-    .lt("started_at", rangeEnd.toISOString());
+  const [{ data: sessions, error }, { data: taskRows, error: taskErr }] = await Promise.all([
+    sb
+      .from("v2_time_sessions")
+      .select("user_id, duration_seconds, started_at, ended_at")
+      .eq("workspace_id", ctx.workspaceId)
+      .gte("started_at", rangeStart.toISOString())
+      .lt("started_at", rangeEnd.toISOString()),
+    sb
+      .from("v2_tasks")
+      .select("id, assignee_user_id, estimate_seconds, completed_at, planned_at, deadline_at, inbox_bucket")
+      .eq("workspace_id", ctx.workspaceId)
+      .eq("scope", "team")
+      .is("deleted_at", null)
+      .is("completed_at", null)
+      .not("assignee_user_id", "is", null),
+  ]);
   if (error) throw new Error(error.message);
+  if (taskErr) throw new Error(taskErr.message);
+
+  const teamMembers = members
+    .filter((m) => m.role !== "client")
+    .map((m) => {
+      const u = userById.get(m.user_id);
+      return {
+        userId: m.user_id,
+        name: m.display_name,
+        workHoursPerDay: u?.work_hours_per_day ?? 8,
+        workDays: u?.work_days ?? [1, 2, 3, 4, 5],
+      };
+    });
+
+  const loadByUser = new Map(
+    computeDailyTeamLoad(teamMembers, (taskRows ?? []) as V2TaskRow[], now).map((r) => [r.userId, r])
+  );
 
   const rows: PeopleOverviewRow[] = [];
 
-  for (const m of members) {
+  for (const m of members.filter((x) => x.role !== "client")) {
+    const u = userById.get(m.user_id);
     const normSec = (m.weekly_hours_norm ?? 40) * 3600;
     const weeks: WeekSegment[] = weekStarts.map((ws) => {
       const we = addDays(ws, 7);
@@ -77,15 +117,29 @@ export async function getPeopleOverview(ctx: V2SessionContext, weeksCount = 6): 
     });
 
     const totalLoggedSeconds = weeks.reduce((a, w) => a + w.loggedSeconds, 0);
+    const load = loadByUser.get(m.user_id);
     rows.push({
       userId: m.user_id,
       displayName: m.display_name,
       jobTitle: m.job_title,
       weeklyHoursNorm: m.weekly_hours_norm,
+      hourlyRateRub: u?.hourly_rate_rub ?? null,
+      workHoursPerDay: u?.work_hours_per_day ?? 8,
+      workDays: u?.work_days ?? [1, 2, 3, 4, 5],
+      todayLoad: load?.load ?? 0,
+      todayTaskCount: load?.taskCount ?? 0,
+      todayEstimatedSeconds: load?.estimatedSeconds ?? 0,
+      todayCapacitySeconds: load?.capacitySeconds ?? 0,
+      isWorkDayToday: load?.isWorkDay ?? false,
       weeks,
       totalLoggedSeconds,
     });
   }
+
+  rows.sort((a, b) => {
+    if (a.isWorkDayToday !== b.isWorkDayToday) return a.isWorkDayToday ? -1 : 1;
+    return b.todayLoad - a.todayLoad;
+  });
 
   return rows;
 }

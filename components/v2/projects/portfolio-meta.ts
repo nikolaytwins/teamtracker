@@ -8,7 +8,8 @@ export const STATUS_META: Record<
   not_started: { label: "Не начат", dot: "#A1A1AA", soft: "#F1F1F4", ink: "#52525B" },
   in_progress: { label: "В работе", dot: "#3B6FF7", soft: "#E6EDFF", ink: "#1F3AAF" },
   review: { label: "На согласовании", dot: "#F59E0B", soft: "#FEF3D1", ink: "#915E0B" },
-  done: { label: "Готов", dot: "#10B981", soft: "#D1FAE5", ink: "#065F46" },
+  done_unpaid: { label: "Завершён, не оплачен", dot: "#EA580C", soft: "#FFEDD5", ink: "#9A3412" },
+  done: { label: "Завершён", dot: "#10B981", soft: "#D1FAE5", ink: "#065F46" },
   paused: { label: "Пауза", dot: "#7C3AED", soft: "#EDE9FE", ink: "#5B21B6" },
 };
 
@@ -16,7 +17,17 @@ export const STATUS_ORDER: PortfolioKanbanStatus[] = [
   "not_started",
   "in_progress",
   "review",
+  "done_unpaid",
   "done",
+  "paused",
+];
+
+/** Статусы для фильтров-вкладок на странице проектов (без полностью закрытых). */
+export const STATUS_FILTER_ORDER: PortfolioKanbanStatus[] = [
+  "not_started",
+  "in_progress",
+  "review",
+  "done_unpaid",
   "paused",
 ];
 
@@ -39,6 +50,8 @@ export function kanbanStatusToV2CreateStatus(status: PortfolioKanbanStatus): V2P
   switch (status) {
     case "review":
       return "approval";
+    case "done_unpaid":
+      return "completed_unpaid";
     case "done":
       return "completed";
     default:

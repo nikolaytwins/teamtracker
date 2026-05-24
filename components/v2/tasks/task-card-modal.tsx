@@ -1,18 +1,23 @@
 "use client";
 
 import { V2FileUploadDropzone } from "@/components/v2/ui/file-upload-dropzone";
+import { EstimateTimeInput } from "@/components/v2/ui/estimate-time-input";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
   fmtDuration,
+  fmtHoursMinutes,
   fromDateInputValue,
   fromDatetimeLocalValue,
   toDateInputValue,
   toDatetimeLocalValue,
 } from "@/lib/v2/format";
+import { gradientForUser, initialsFromName } from "@/lib/v2/projects/portfolio-utils";
+import type { PortfolioMember } from "@/lib/v2/projects/portfolio-types";
 import type { V2TaskLinkRow, V2TaskFileRow } from "@/lib/v2/tasks/task-detail";
 import type { V2TaskRow, V2TaskWithMeta } from "@/lib/v2/types";
 import { AssigneeAvatarPicker, PriorityFlagPicker } from "@/components/v2/tasks/task-field-pickers";
 import { TaskCardChat, type TaskComment } from "@/components/v2/tasks/task-card-chat";
+import { TaskModalSubtaskRow } from "@/components/v2/tasks/task-modal-subtask-row";
 import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 import { PriorityDot, ProjectChip, TaskCheckbox, TimerButton } from "@/components/v2/ui/primitives";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -53,6 +58,8 @@ export function TaskCardModal({
   onToggleTimer,
   lockedProjectId,
   lockedProject,
+  currentUserId,
+  currentUserName,
 }: {
   taskId: string | null;
   open: boolean;
@@ -70,6 +77,8 @@ export function TaskCardModal({
     colorTint?: string | null;
     colorInk?: string | null;
   };
+  currentUserId?: string | null;
+  currentUserName?: string | null;
 }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -78,7 +87,11 @@ export function TaskCardModal({
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkTitle, setLinkTitle] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [linkFormOpen, setLinkFormOpen] = useState(false);
+  const [fileFormOpen, setFileFormOpen] = useState(false);
+  const [commentSaving, setCommentSaving] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadDetail = useCallback(async () => {
     if (!taskId) return;
@@ -104,6 +117,15 @@ export function TaskCardModal({
   }, [open, taskId, loadDetail]);
 
   const assigneeMembers = useMemo(() => members.filter((m) => m.role !== "client"), [members]);
+
+  const teamForInline = useMemo((): PortfolioMember[] => {
+    return assigneeMembers.map((m) => ({
+      userId: m.user_id,
+      name: m.display_name,
+      initials: initialsFromName(m.display_name),
+      gradient: gradientForUser(m.user_id),
+    }));
+  }, [assigneeMembers]);
 
   const projectOptions = useMemo(() => {
     const map = new Map(projects.map((p) => [p.id, p]));
@@ -138,55 +160,45 @@ export function TaskCardModal({
   const lockedProjectOption =
     lockedProjectId && projectOptions.find((p) => p.id === lockedProjectId);
 
-  async function patch(fields: Record<string, unknown>) {
-    if (!taskId) return;
-    setSaving(true);
+  async function patch(fields: Record<string, unknown>, syncParent = false) {
+    if (!taskId || !detail) return;
+    setActionError(null);
     try {
-      await fetchJson(`/api/v2/tasks/${taskId}`, {
+      const res = await fetchJson<{ task: V2TaskWithMeta }>(`/api/v2/tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fields),
       });
-      onUpdated();
-      await loadDetail();
-    } finally {
-      setSaving(false);
+      setDetail((prev) => (prev && res.task ? { ...prev, task: res.task } : prev));
+      if (syncParent) onUpdated();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Не удалось сохранить");
     }
   }
 
   async function toggleComplete() {
     if (!taskId || !t) return;
-    setSaving(true);
+    setActionError(null);
     try {
       await fetchJson(`/api/v2/tasks/${taskId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "complete", completed: !completed }),
       });
-      onUpdated();
       await loadDetail();
-    } finally {
-      setSaving(false);
+      onUpdated();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Ошибка");
     }
-  }
-
-  async function toggleSubtaskComplete(sub: V2TaskRow) {
-    const done = !!sub.completed_at;
-    await fetchJson(`/api/v2/tasks/${sub.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "complete", completed: !done }),
-    });
-    onUpdated();
-    await loadDetail();
   }
 
   async function sendComment(e: React.FormEvent) {
     e.preventDefault();
     if (!commentDraft.trim() || !taskId) return;
-    setSaving(true);
+    setCommentSaving(true);
+    setCommentError(null);
     try {
-      await fetchJson(`/api/v2/tasks/${taskId}/comments`, {
+      const res = await fetchJson<{ comment: TaskComment }>(`/api/v2/tasks/${taskId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -194,19 +206,27 @@ export function TaskCardModal({
           parentCommentId: replyTo?.id ?? null,
         }),
       });
+      const authorName =
+        currentUserName ??
+        members.find((m) => m.user_id === currentUserId)?.display_name ??
+        "Вы";
+      const newComment: TaskComment = {
+        ...res.comment,
+        author_name: res.comment.author_name ?? authorName,
+      };
+      setDetail((prev) => (prev ? { ...prev, comments: [...prev.comments, newComment] } : prev));
       setCommentDraft("");
       setReplyTo(null);
-      onUpdated();
-      await loadDetail();
+    } catch (e) {
+      setCommentError(e instanceof Error ? e.message : "Не удалось отправить комментарий");
     } finally {
-      setSaving(false);
+      setCommentSaving(false);
     }
   }
 
   async function addSubtask(e: React.FormEvent) {
     e.preventDefault();
     if (!subtaskTitle.trim() || !taskId) return;
-    setSaving(true);
     try {
       await fetchJson(`/api/v2/tasks/${taskId}/subtasks`, {
         method: "POST",
@@ -214,17 +234,16 @@ export function TaskCardModal({
         body: JSON.stringify({ title: subtaskTitle.trim() }),
       });
       setSubtaskTitle("");
-      onUpdated();
       await loadDetail();
-    } finally {
-      setSaving(false);
+      onUpdated();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Не удалось добавить подзадачу");
     }
   }
 
   async function addLink(e: React.FormEvent) {
     e.preventDefault();
     if (!linkUrl.trim() || !taskId) return;
-    setSaving(true);
     try {
       await fetchJson(`/api/v2/tasks/${taskId}/links`, {
         method: "POST",
@@ -233,9 +252,10 @@ export function TaskCardModal({
       });
       setLinkUrl("");
       setLinkTitle("");
+      setLinkFormOpen(false);
       await loadDetail();
-    } finally {
-      setSaving(false);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Не удалось добавить ссылку");
     }
   }
 
@@ -299,7 +319,7 @@ export function TaskCardModal({
                   <TimerButton running={runningTaskId === t.id} onClick={() => onToggleTimer(t.id)} />
                   <span className="v2-tnum hidden text-[12px] text-[var(--v2-ink-500)] sm:inline">
                     {fmtDuration(t.logged_seconds)}
-                    {t.estimate_seconds ? ` / ${fmtDuration(t.estimate_seconds)}` : ""}
+                    {t.estimate_seconds ? ` / ${fmtHoursMinutes(t.estimate_seconds / 3600)}` : ""}
                   </span>
                 </>
               ) : null}
@@ -316,6 +336,9 @@ export function TaskCardModal({
 
         {t && detail ? (
           <>
+            {actionError ? (
+              <div className="border-b border-red-200 bg-red-50 px-6 py-2 text-[13px] text-red-800">{actionError}</div>
+            ) : null}
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
               {/* Main column */}
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -347,21 +370,13 @@ export function TaskCardModal({
                       <p className="px-2 py-3 text-[13px] text-[var(--v2-ink-400)]">Нет подзадач</p>
                     ) : (
                       detail.subtasks.map((s) => (
-                        <div key={s.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[var(--v2-ink-50)]">
-                          <TaskCheckbox
-                            checked={!!s.completed_at}
-                            onChange={() => void toggleSubtaskComplete(s)}
-                          />
-                          <span
-                            className={`v2-tight flex-1 text-[13px] ${s.completed_at ? "text-[var(--v2-ink-400)] line-through" : "text-[var(--v2-ink-800)]"}`}
-                          >
-                            {s.title}
-                          </span>
-                          <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-full"
-                            style={{ background: PRIORITY_META[s.priority].dot }}
-                          />
-                        </div>
+                        <TaskModalSubtaskRow
+                          key={s.id}
+                          sub={s}
+                          team={teamForInline}
+                          onReload={loadDetail}
+                          onParentReload={onUpdated}
+                        />
                       ))
                     )}
                     <form onSubmit={addSubtask} className="mt-1 flex gap-2 border-t border-[var(--v2-ink-100)] pt-2">
@@ -379,10 +394,20 @@ export function TaskCardModal({
                 </section>
 
                 <section className="mb-6">
-                  <h4 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
-                    <V2Icons.link className="h-3.5 w-3.5" />
-                    Ссылки
-                  </h4>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
+                      <V2Icons.link className="h-3.5 w-3.5" />
+                      Ссылки
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setLinkFormOpen((v) => !v)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+                      title="Добавить ссылку"
+                    >
+                      <V2Icons.plus className="h-4 w-4" />
+                    </button>
+                  </div>
                   <div className="rounded-xl border border-[var(--v2-ink-100)]">
                     {detail.links.length === 0 ? (
                       <p className="px-4 py-3 text-[13px] text-[var(--v2-ink-400)]">Нет ссылок</p>
@@ -405,21 +430,33 @@ export function TaskCardModal({
                         </a>
                       ))
                     )}
-                    <form onSubmit={addLink} className="flex flex-wrap gap-2 border-t border-[var(--v2-ink-100)] p-3">
-                      <input className="v2-input min-w-[140px] flex-1 text-[13px]" placeholder="URL" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
-                      <input className="v2-input min-w-[100px] flex-1 text-[13px]" placeholder="Название" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
-                      <button type="submit" disabled={!linkUrl.trim()} className="v2-btn-primary shrink-0 px-3 disabled:opacity-40">
-                        Добавить
-                      </button>
-                    </form>
+                    {linkFormOpen ? (
+                      <form onSubmit={addLink} className="space-y-2 border-t border-[var(--v2-ink-100)] p-3">
+                        <input className="v2-input w-full text-[13px]" placeholder="URL" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} autoFocus />
+                        <input className="v2-input w-full text-[13px]" placeholder="Название (необязательно)" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
+                        <button type="submit" disabled={!linkUrl.trim()} className="v2-btn-primary w-full disabled:opacity-40">
+                          Добавить
+                        </button>
+                      </form>
+                    ) : null}
                   </div>
                 </section>
 
                 <section>
-                  <h4 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
-                    <V2Icons.folder className="h-3.5 w-3.5" />
-                    Файлы
-                  </h4>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
+                      <V2Icons.folder className="h-3.5 w-3.5" />
+                      Файлы
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setFileFormOpen((v) => !v)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+                      title="Добавить файл"
+                    >
+                      <V2Icons.plus className="h-4 w-4" />
+                    </button>
+                  </div>
                   <div className="rounded-xl border border-[var(--v2-ink-100)]">
                     {detail.files.length === 0 ? (
                       <p className="px-4 py-3 text-[13px] text-[var(--v2-ink-400)]">Нет файлов</p>
@@ -442,12 +479,15 @@ export function TaskCardModal({
                         </a>
                       ))
                     )}
-                    {taskId ? (
+                    {fileFormOpen && taskId ? (
                       <div className="border-t border-[var(--v2-ink-100)] p-3">
                         <V2FileUploadDropzone
                           compact
                           uploadPath={`/api/v2/tasks/${taskId}/files`}
-                          onUploaded={loadDetail}
+                          onUploaded={async () => {
+                            setFileFormOpen(false);
+                            await loadDetail();
+                          }}
                         />
                       </div>
                     ) : null}
@@ -513,13 +553,13 @@ export function TaskCardModal({
                       />
                     </label>
                     <label className="text-[12px]">
-                      <span className="text-[var(--v2-ink-500)]">Оценка (ч)</span>
-                      <input
-                        type="number"
-                        step="0.5"
-                        className="v2-input mt-1 w-full"
-                        defaultValue={t.estimate_seconds ? t.estimate_seconds / 3600 : ""}
-                        onBlur={(e) => void patch({ estimateHours: Number(e.target.value) || null })}
+                      <span className="text-[var(--v2-ink-500)]">Плановое время</span>
+                      <EstimateTimeInput
+                        estimateSeconds={t.estimate_seconds}
+                        onChange={(seconds) => {
+                          const cur = t.estimate_seconds;
+                          if (seconds !== cur) void patch({ estimateSeconds: seconds });
+                        }}
                       />
                     </label>
                   </div>
@@ -548,7 +588,8 @@ export function TaskCardModal({
               onCancelReply={() => setReplyTo(null)}
               onReply={setReplyTo}
               onSubmit={sendComment}
-              saving={saving}
+              saving={commentSaving}
+              error={commentError}
             />
           </>
         ) : null}

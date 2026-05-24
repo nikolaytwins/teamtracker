@@ -94,6 +94,7 @@ export function ProjectDetailFilesTab({
                     ) : null}
                   </div>
                   <div className="truncate text-[11px] text-[var(--v2-ink-500)]">
+                    {l.source === "task" && l.taskTitle ? `задача · ${l.taskTitle} · ` : ""}
                     {l.createdByName.split(" ")[0]} · {l.updatedLabel}
                   </div>
                 </div>
@@ -170,7 +171,12 @@ export function ProjectDetailFilesTab({
                         </div>
                       </td>
                       <td className="v2-tnum text-[var(--v2-ink-500)]">{f.sizeLabel}</td>
-                      <td className="text-[var(--v2-ink-700)]">{f.createdByName.split(" ")[0]}</td>
+                      <td className="text-[var(--v2-ink-700)]">
+                        {f.createdByName.split(" ")[0]}
+                        {f.source === "task" && f.taskTitle ? (
+                          <span className="block truncate text-[10.5px] font-normal text-[var(--v2-ink-400)]">{f.taskTitle}</span>
+                        ) : null}
+                      </td>
                       <td className="text-[var(--v2-ink-500)]">{f.dateLabel}</td>
                       <td className="pr-5">
                         <a

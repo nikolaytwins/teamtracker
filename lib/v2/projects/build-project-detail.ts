@@ -2,13 +2,13 @@ import { getV2Supabase } from "@/lib/v2/db/client";
 import { formatActivityMessage, listRecentActivity } from "@/lib/v2/activity/log";
 import { listUsersPublic } from "@/lib/tt-auth-db";
 import {
-  DEFAULT_HOURLY_RATE,
   formatDeadlineLabel,
   formatRelativeActivity,
   gradientForUser,
   initialsFromName,
   pluralRu,
 } from "@/lib/v2/projects/portfolio-utils";
+import { computeSpentRub, hourlyRateByUserId, projectSumRub } from "@/lib/v2/projects/project-finance";
 import type { PortfolioHealth } from "@/lib/v2/projects/portfolio-types";
 import { v2StatusToKanban } from "@/lib/v2/projects/portfolio-types";
 import { listProjectFiles, listProjectLinks } from "@/lib/v2/projects/project-assets-repo";
@@ -37,19 +37,7 @@ const PRIORITY_RANK: Record<V2TaskPriority, number> = {
   low: 1,
 };
 
-const CATEGORY_KEYWORDS: [RegExp, string][] = [
-  [/лендинг/i, "Лендинг"],
-  [/бренд/i, "Брендинг"],
-  [/моушн|анимац/i, "Моушн"],
-  [/продукт|onboarding|чек.?аут/i, "Продукт"],
-];
-
-function inferCategory(name: string): string {
-  for (const [re, label] of CATEGORY_KEYWORDS) {
-    if (re.test(name)) return label;
-  }
-  return "Проект";
-}
+import { resolveProjectCategoryLabel } from "@/lib/v2/projects/project-kind";
 
 function formatBytes(n: number | null): string {
   if (n == null || n <= 0) return "—";
@@ -78,7 +66,7 @@ function computeHealth(
   openTasks: V2TaskRow[],
   now: Date
 ): PortfolioHealth {
-  if (projectStatus === "completed") return "done";
+  if (projectStatus === "completed" || projectStatus === "completed_unpaid") return "done";
   if (projectStatus === "paused") return "paused";
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   for (const t of openTasks) {
@@ -129,7 +117,9 @@ export async function buildProjectDetail(
 
   const sb = getV2Supabase();
   const now = new Date();
-  const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));
+  const publicUsers = listUsersPublic();
+  const users = new Map(publicUsers.map((u) => [u.id, u.display_name]));
+  const rateByUser = hourlyRateByUserId(publicUsers);
   const isRetainer = project.engagement_type === "retainer";
   const selectedWorkMonth = isRetainer
     ? normalizeWorkMonth(opts?.workMonth ?? currentWorkMonth(now))
@@ -207,6 +197,7 @@ export async function buildProjectDetail(
       assigneeName: t.assignee_user_id ? (users.get(t.assignee_user_id) ?? null) : null,
       plannedAt: t.planned_at,
       plannedLabel: formatPlannedLabel(t.planned_at, now),
+      deadlineAt: t.deadline_at,
       deadlineLabel: formatDueLabel(t.deadline_at, now),
       completedAt: t.completed_at,
       estimateHours: t.estimate_seconds ? t.estimate_seconds / 3600 : 0,
@@ -226,6 +217,7 @@ export async function buildProjectDetail(
       assigneeName: t.assignee_user_id ? (users.get(t.assignee_user_id) ?? null) : null,
       plannedAt: t.planned_at,
       plannedLabel: formatPlannedLabel(t.planned_at, now),
+      deadlineAt: t.deadline_at,
       deadlineLabel: formatDueLabel(t.deadline_at, now),
       completedAt: t.completed_at,
       estimateHours: t.estimate_seconds ? t.estimate_seconds / 3600 : 0,
@@ -298,17 +290,11 @@ export async function buildProjectDetail(
   const tasksDone = allTasks.filter((t) => t.completed_at).length;
   const tasksTotal = allTasks.length;
 
-  let estimateSeconds = 0;
-  for (const t of allTasks) {
-    if (t.estimate_seconds) estimateSeconds += t.estimate_seconds;
-  }
-  const budget =
-    project.budget_rub ??
-    (estimateSeconds > 0 ? Math.round((estimateSeconds / 3600) * DEFAULT_HOURLY_RATE) : Math.max(tasksTotal, 1) * 8 * DEFAULT_HOURLY_RATE);
+  const budget = projectSumRub(project.budget_rub);
 
   let loggedHours = 0;
   for (const h of hoursByUser.values()) loggedHours += h;
-  const spent = Math.round(loggedHours * DEFAULT_HOURLY_RATE);
+  const spent = computeSpentRub(Object.fromEntries(hoursByUser), rateByUser);
   let hoursToday = 0;
   for (const h of hoursTodayByUser.values()) hoursToday += h;
 
@@ -338,10 +324,11 @@ export async function buildProjectDetail(
   const memberHours = team
     .map((member) => {
       const hours = Math.round((hoursByUser.get(member.userId) ?? 0) * 10) / 10;
+      const rate = rateByUser.get(member.userId) ?? 0;
       return {
         member,
         hours,
-        rub: Math.round(hours * DEFAULT_HOURLY_RATE),
+        rub: Math.round(hours * rate),
         hoursToday: Math.round((hoursTodayByUser.get(member.userId) ?? 0) * 10) / 10,
       };
     })
@@ -357,31 +344,102 @@ export async function buildProjectDetail(
   const started = new Date(project.created_at);
   const durationDays = Math.max(1, Math.round((now.getTime() - started.getTime()) / 86400000));
 
-  const [projectLinks, projectFiles] = await Promise.all([listProjectLinks(projectId), listProjectFiles(projectId)]);
+  const [projectLinks, projectFiles, taskLinksRows, taskFilesRows] = await Promise.all([
+    listProjectLinks(projectId),
+    listProjectFiles(projectId),
+    taskIds.length
+      ? sb.from("v2_task_links").select("*").in("task_id", taskIds).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    taskIds.length
+      ? sb.from("v2_task_files").select("*").in("task_id", taskIds).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
-  const links = projectLinks.map((l) => ({
-    id: l.id,
-    url: l.url,
-    title: l.title || l.url,
-    isPrimary: l.is_primary,
-    createdBy: l.created_by,
-    createdByName: users.get(l.created_by) ?? "Пользователь",
-    createdAt: l.created_at,
-    updatedLabel: formatRelativeActivity(l.created_at, now),
-  }));
+  if (taskLinksRows.error) throw new Error(taskLinksRows.error.message);
+  if (taskFilesRows.error) throw new Error(taskFilesRows.error.message);
 
-  const files = projectFiles.map((f) => ({
-    id: f.id,
-    name: f.name,
-    url: f.url,
-    sizeBytes: f.size_bytes,
-    sizeLabel: formatBytes(f.size_bytes),
-    kind: f.kind ?? f.name.split(".").pop()?.toLowerCase() ?? "file",
-    createdBy: f.created_by,
-    createdByName: users.get(f.created_by) ?? "Пользователь",
-    createdAt: f.created_at,
-    dateLabel: formatRelativeActivity(f.created_at, now),
-  }));
+  const taskTitleById = new Map(allTasks.map((t) => [t.id, t.title]));
+
+  const links: ProjectDetailPayload["links"] = [
+    ...projectLinks.map((l) => ({
+      id: l.id,
+      url: l.url,
+      title: l.title || l.url,
+      isPrimary: l.is_primary,
+      createdBy: l.created_by,
+      createdByName: users.get(l.created_by) ?? "Пользователь",
+      createdAt: l.created_at,
+      updatedLabel: formatRelativeActivity(l.created_at, now),
+      source: "project" as const,
+      taskId: null,
+      taskTitle: null,
+    })),
+    ...((taskLinksRows.data ?? []) as Array<{
+      id: string;
+      task_id: string;
+      url: string;
+      title: string | null;
+      created_by: string;
+      created_at: string;
+    }>).map((l) => ({
+      id: l.id,
+      url: l.url,
+      title: l.title || l.url,
+      isPrimary: false,
+      createdBy: l.created_by,
+      createdByName: users.get(l.created_by) ?? "Пользователь",
+      createdAt: l.created_at,
+      updatedLabel: formatRelativeActivity(l.created_at, now),
+      source: "task" as const,
+      taskId: l.task_id,
+      taskTitle: taskTitleById.get(l.task_id) ?? null,
+    })),
+  ].sort((a, b) => {
+    if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+
+  const files: ProjectDetailPayload["files"] = [
+    ...projectFiles.map((f) => ({
+      id: f.id,
+      name: f.name,
+      url: f.url,
+      sizeBytes: f.size_bytes,
+      sizeLabel: formatBytes(f.size_bytes),
+      kind: f.kind ?? f.name.split(".").pop()?.toLowerCase() ?? "file",
+      createdBy: f.created_by,
+      createdByName: users.get(f.created_by) ?? "Пользователь",
+      createdAt: f.created_at,
+      dateLabel: formatRelativeActivity(f.created_at, now),
+      source: "project" as const,
+      taskId: null,
+      taskTitle: null,
+    })),
+    ...((taskFilesRows.data ?? []) as Array<{
+      id: string;
+      task_id: string;
+      name: string;
+      url: string;
+      size_bytes: number | null;
+      kind: string | null;
+      created_by: string;
+      created_at: string;
+    }>).map((f) => ({
+      id: f.id,
+      name: f.name,
+      url: f.url,
+      sizeBytes: f.size_bytes,
+      sizeLabel: formatBytes(f.size_bytes),
+      kind: f.kind ?? f.name.split(".").pop()?.toLowerCase() ?? "file",
+      createdBy: f.created_by,
+      createdByName: users.get(f.created_by) ?? "Пользователь",
+      createdAt: f.created_at,
+      dateLabel: formatRelativeActivity(f.created_at, now),
+      source: "task" as const,
+      taskId: f.task_id,
+      taskTitle: taskTitleById.get(f.task_id) ?? null,
+    })),
+  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const taskIdSet = new Set(taskIds);
   const recent = await listRecentActivity(ctx, 80);
@@ -402,7 +460,7 @@ export async function buildProjectDetail(
     }));
 
   const health = computeHealth(project.status, openTasks, now);
-  const priority = maxPriority(allTasks);
+  const priority = project.priority ?? maxPriority(allTasks);
 
   let availableMonths: string[] = [];
   if (isRetainer) {
@@ -430,7 +488,7 @@ export async function buildProjectDetail(
     colorTint: project.color_tint,
     colorBg: project.color_bg,
     colorInk: project.color_ink ?? project.color_tint,
-    category: inferCategory(project.name),
+    category: resolveProjectCategoryLabel(project),
     status: project.status,
     kanbanStatus: v2StatusToKanban(project.status),
     engagementType: project.engagement_type,
@@ -452,6 +510,7 @@ export async function buildProjectDetail(
     durationDays,
     budget,
     budgetRub: project.budget_rub,
+    paidRub: project.paid_rub,
     spent,
     loggedHours: Math.round(loggedHours * 10) / 10,
     hoursToday: Math.round(hoursToday * 10) / 10,

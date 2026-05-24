@@ -25,6 +25,8 @@ export interface TtUserRow {
   work_hours_per_day: number;
   /** JSON-массив дней недели 0–6 (Date.getDay()). */
   work_days_json: string | null;
+  /** Стоимость часа для расчёта себестоимости проектов, ₽. */
+  hourly_rate_rub: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -87,6 +89,11 @@ export function ensureTtUsersSchema() {
   } catch {
     /* exists */
   }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN hourly_rate_rub INTEGER`);
+  } catch {
+    /* exists */
+  }
 }
 
 function hashPassword(password: string, saltHex: string): string {
@@ -145,6 +152,10 @@ function rowToUser(row: Record<string, unknown> | undefined): TtUserRow | null {
       row.work_days_json != null && String(row.work_days_json).trim()
         ? String(row.work_days_json)
         : null,
+    hourly_rate_rub:
+      row.hourly_rate_rub != null && !Number.isNaN(Number(row.hourly_rate_rub))
+        ? Math.round(Number(row.hourly_rate_rub))
+        : null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   };
@@ -179,6 +190,8 @@ export type TtUserPublic = {
   avatar_url: string | null;
   /** Email для входа через Supabase (если задан). */
   auth_email: string | null;
+  /** Стоимость часа, ₽ (null — используется ставка по умолчанию в расчётах). */
+  hourly_rate_rub: number | null;
   created_at: string;
 };
 
@@ -202,6 +215,7 @@ export function toTtUserPublic(row: TtUserRow): TtUserPublic {
     work_days,
     avatar_url: row.avatar_url,
     auth_email: row.auth_email,
+    hourly_rate_rub: row.hourly_rate_rub,
     created_at: row.created_at,
   };
 }
@@ -558,6 +572,7 @@ export function updateUserScheduleAndProfile(
     weekly_capacity_hours?: number | null;
     display_name?: string;
     job_title?: string | null;
+    hourly_rate_rub?: number | null;
   }
 ): { ok: true; user: TtUserPublic } | { ok: false; error: string } {
   const target = getUserById(targetUserId);
@@ -602,10 +617,31 @@ export function updateUserScheduleAndProfile(
   const job_title =
     patch.job_title !== undefined ? String(patch.job_title ?? "").trim() : target.job_title;
 
+  let hourly_rate_rub = target.hourly_rate_rub;
+  if (patch.hourly_rate_rub !== undefined) {
+    if (patch.hourly_rate_rub === null) {
+      hourly_rate_rub = null;
+    } else {
+      const r = Math.round(Number(patch.hourly_rate_rub));
+      if (!Number.isFinite(r) || r < 0 || r > 1_000_000) {
+        return { ok: false, error: "hourly_rate_rub: ожидается число от 0 до 1 000 000" };
+      }
+      hourly_rate_rub = r > 0 ? r : null;
+    }
+  }
+
   const db = getDb();
   db.prepare(
-    `UPDATE tt_users SET work_hours_per_day = ?, work_days_json = ?, weekly_capacity_hours = ?, display_name = ?, job_title = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(work_hours_per_day, work_days_json, weekly_capacity_hours, display_name, job_title, targetUserId);
+    `UPDATE tt_users SET work_hours_per_day = ?, work_days_json = ?, weekly_capacity_hours = ?, display_name = ?, job_title = ?, hourly_rate_rub = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(
+    work_hours_per_day,
+    work_days_json,
+    weekly_capacity_hours,
+    display_name,
+    job_title,
+    hourly_rate_rub,
+    targetUserId
+  );
 
   const updated = getUserById(targetUserId);
   if (!updated) return { ok: false, error: "Ошибка обновления" };

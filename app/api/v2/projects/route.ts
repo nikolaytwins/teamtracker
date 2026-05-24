@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Session } from "@/lib/v2/auth/require-v2-session";
 import { createProject, listProjects } from "@/lib/v2/projects/project-repo";
-import type { V2ProjectScope } from "@/lib/v2/types";
+import { isV2ProjectKind } from "@/lib/v2/projects/project-kind";
+import type { V2ProjectScope, V2TaskPriority } from "@/lib/v2/types";
 
 export async function GET(request: NextRequest) {
   const auth = await requireV2Session();
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
       body.status === "not_started" ||
       body.status === "in_progress" ||
       body.status === "approval" ||
+      body.status === "completed_unpaid" ||
       body.status === "completed" ||
       body.status === "paused"
         ? body.status
@@ -67,6 +69,19 @@ export async function POST(request: NextRequest) {
     const clientName = typeof body.clientName === "string" ? body.clientName.trim() || null : null;
     const clientId = typeof body.clientId === "string" ? body.clientId.trim() || null : null;
 
+    const paidRub =
+      typeof body.paidRub === "number" && Number.isFinite(body.paidRub) ? Math.round(body.paidRub) : null;
+
+    const projectKind = isV2ProjectKind(body.projectKind) ? body.projectKind : null;
+
+    const priority =
+      body.priority === "urgent" ||
+      body.priority === "high" ||
+      body.priority === "medium" ||
+      body.priority === "low"
+        ? (body.priority as V2TaskPriority)
+        : undefined;
+
     const project = await createProject(auth.ctx, {
       name,
       scope,
@@ -79,6 +94,9 @@ export async function POST(request: NextRequest) {
       contractRef,
       releaseAt,
       projectSumRub,
+      paidRub,
+      projectKind,
+      priority,
       clientName,
       clientId,
     });

@@ -35,11 +35,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     body.weekly_capacity_hours !== undefined ||
     body.display_name !== undefined ||
     body.job_title !== undefined;
+  const hasHourlyRate = Object.prototype.hasOwnProperty.call(body, "hourly_rate_rub");
   const regeneratePassword = body.regeneratePassword === true;
 
-  if (!hasRole && !hasAuthEmail && !hasSchedule && !regeneratePassword) {
+  if (!hasRole && !hasAuthEmail && !hasSchedule && !hasHourlyRate && !regeneratePassword) {
     return NextResponse.json(
-      { error: "Укажите role, auth_email, график (work_hours_per_day / work_days / weekly_capacity_hours), имя или regeneratePassword" },
+      {
+        error:
+          "Укажите role, auth_email, график, hourly_rate_rub, имя или regeneratePassword",
+      },
       { status: 400 }
     );
   }
@@ -95,7 +99,29 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (Object.prototype.hasOwnProperty.call(body, "job_title")) {
       patch.job_title = typeof body.job_title === "string" ? body.job_title : "";
     }
+    if (hasHourlyRate) {
+      if (body.hourly_rate_rub === null || body.hourly_rate_rub === "") {
+        patch.hourly_rate_rub = null;
+      } else if (typeof body.hourly_rate_rub === "number" && Number.isFinite(body.hourly_rate_rub)) {
+        patch.hourly_rate_rub = Math.round(body.hourly_rate_rub);
+      } else {
+        return NextResponse.json({ error: "hourly_rate_rub: число или null" }, { status: 400 });
+      }
+    }
     const result = updateUserScheduleAndProfile(userId, patch);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+  } else if (hasHourlyRate) {
+    let hourly_rate_rub: number | null;
+    if (body.hourly_rate_rub === null || body.hourly_rate_rub === "") {
+      hourly_rate_rub = null;
+    } else if (typeof body.hourly_rate_rub === "number" && Number.isFinite(body.hourly_rate_rub)) {
+      hourly_rate_rub = Math.round(body.hourly_rate_rub);
+    } else {
+      return NextResponse.json({ error: "hourly_rate_rub: число или null" }, { status: 400 });
+    }
+    const result = updateUserScheduleAndProfile(userId, { hourly_rate_rub });
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

@@ -6,6 +6,8 @@ import { v2StatusToKanban } from "@/lib/v2/projects/portfolio-types";
 import type { PortfolioKanbanStatus } from "@/lib/v2/projects/portfolio-types";
 import { STATUS_META, STATUS_ORDER } from "@/components/v2/projects/portfolio-meta";
 import { ProjectMembersPicker } from "@/components/v2/projects/project-members-picker";
+import { MoneyRubInput } from "@/components/v2/ui/money-rub-input";
+import { formatRubWithSpaces } from "@/lib/v2/format-money";
 import { useEffect, useState } from "react";
 
 type Member = { user_id: string; display_name: string; role: string };
@@ -31,6 +33,7 @@ export function EditProjectModal({
     contractRef: string | null;
     releaseAt: string | null;
     budgetRub: number | null;
+    paidRub: number | null;
     teamMemberUserIds: string[];
     clientUserIds: string[];
   }) => Promise<void>;
@@ -41,7 +44,10 @@ export function EditProjectModal({
   const [clientAccessEnabled, setClientAccessEnabled] = useState(false);
   const [contractRef, setContractRef] = useState("");
   const [releaseLocal, setReleaseLocal] = useState("");
-  const [budgetRub, setBudgetRub] = useState("");
+  const [budgetDisplay, setBudgetDisplay] = useState("");
+  const [budgetRub, setBudgetRub] = useState<number | null>(null);
+  const [paidDisplay, setPaidDisplay] = useState("");
+  const [paidRub, setPaidRub] = useState<number | null>(null);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
   const [clientUserIds, setClientUserIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -54,7 +60,10 @@ export function EditProjectModal({
     setClientAccessEnabled(detail.clientAccessEnabled);
     setContractRef(detail.contractRef ?? "");
     setReleaseLocal(toDateInputValue(detail.releaseAt));
-    setBudgetRub(detail.budgetRub != null ? String(detail.budgetRub) : "");
+    setBudgetRub(detail.budgetRub);
+    setBudgetDisplay(detail.budgetRub != null ? formatRubWithSpaces(detail.budgetRub) : "");
+    setPaidRub(detail.paidRub);
+    setPaidDisplay(detail.paidRub != null ? formatRubWithSpaces(detail.paidRub) : "");
     setTeamMemberIds(detail.team.map((m) => m.userId).filter((id) => id !== meId));
     setClientUserIds(detail.clients.map((m) => m.userId));
   }, [open, detail, meId]);
@@ -77,7 +86,8 @@ export function EditProjectModal({
               clientAccessEnabled,
               contractRef: contractRef.trim() || null,
               releaseAt: releaseLocal ? fromDateInputValue(releaseLocal) : null,
-              budgetRub: budgetRub.trim() ? Math.round(Number(budgetRub)) : null,
+              budgetRub,
+              paidRub,
               teamMemberUserIds: teamMemberIds,
               clientUserIds: clientAccessEnabled ? clientUserIds : [],
             });
@@ -132,24 +142,40 @@ export function EditProjectModal({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="block text-[12px]">
-            <span className="text-[var(--v2-ink-600)]">Договор / реф.</span>
-            <input className="v2-input mt-1.5 w-full" value={contractRef} onChange={(e) => setContractRef(e.target.value)} placeholder="№ договора" />
-          </label>
-          <label className="block text-[12px]">
-            <span className="text-[var(--v2-ink-600)]">Бюджет, ₽</span>
-            <input
-              type="number"
-              min={0}
-              step={1000}
-              className="v2-input mt-1.5 w-full"
-              value={budgetRub}
-              onChange={(e) => setBudgetRub(e.target.value)}
-              placeholder="500000"
-            />
-          </label>
+        <div className="mt-4">
+          <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Финансы</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block text-[12px]">
+              <span className="text-[var(--v2-ink-600)]">Сумма проекта, ₽</span>
+              <span className="mt-0.5 block text-[11px] text-[var(--v2-ink-400)]">100% стоимости по договору</span>
+              <MoneyRubInput
+                value={budgetDisplay}
+                placeholder="100 000"
+                onChange={(display, amount) => {
+                  setBudgetDisplay(display);
+                  setBudgetRub(amount);
+                }}
+              />
+            </label>
+            <label className="block text-[12px]">
+              <span className="text-[var(--v2-ink-600)]">Оплачено клиентом, ₽</span>
+              <span className="mt-0.5 block text-[11px] text-[var(--v2-ink-400)]">Предоплата или частичная оплата</span>
+              <MoneyRubInput
+                value={paidDisplay}
+                placeholder="20 000"
+                onChange={(display, amount) => {
+                  setPaidDisplay(display);
+                  setPaidRub(amount);
+                }}
+              />
+            </label>
+          </div>
         </div>
+
+        <label className="mt-4 block text-[12px]">
+          <span className="text-[var(--v2-ink-600)]">Договор / реф.</span>
+          <input className="v2-input mt-1.5 w-full" value={contractRef} onChange={(e) => setContractRef(e.target.value)} placeholder="№ договора" />
+        </label>
 
         <label className="mt-4 block text-[12px]">
           <span className="text-[var(--v2-ink-600)]">Дата релиза</span>

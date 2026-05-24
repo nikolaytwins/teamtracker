@@ -1,6 +1,7 @@
 "use client";
 
 import type { PortfolioProject } from "@/lib/v2/projects/portfolio-types";
+import { isFinishedKanbanStatus } from "@/lib/v2/projects/portfolio-types";
 import { deadlineCopy, fmtRubShort, pluralRu } from "@/lib/v2/projects/portfolio-utils";
 import {
   AvatarStack,
@@ -33,8 +34,8 @@ export function ProjectTile({
   canDelete?: boolean;
   onDeleteRequest?: (project: PortfolioProject) => void;
 }) {
-  const overdue = p.deadlineDays !== null && p.deadlineDays < 0 && p.status !== "done";
-  const soon = p.deadlineDays !== null && p.deadlineDays >= 0 && p.deadlineDays <= 3 && p.status !== "done";
+  const overdue = p.deadlineDays !== null && p.deadlineDays < 0 && !isFinishedKanbanStatus(p.status);
+  const soon = p.deadlineDays !== null && p.deadlineDays >= 0 && p.deadlineDays <= 3 && !isFinishedKanbanStatus(p.status);
   const spent = p.spent;
   const budgetPct = p.budget > 0 ? Math.min(spent / p.budget, 1.2) : 0;
   const overBudget = spent > p.budget;
@@ -141,7 +142,7 @@ export function ProjectTile({
 
           <div className="col-span-12 md:col-span-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">Бюджет</span>
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">Финансы</span>
               <span className={`v2-tnum text-[11.5px] ${overBudget ? "font-semibold text-red-600" : "text-[var(--v2-ink-500)]"}`}>
                 {Math.round(budgetPct * 100)}%
               </span>

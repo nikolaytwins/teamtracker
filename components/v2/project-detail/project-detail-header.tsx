@@ -232,7 +232,7 @@ export function ProjectDetailHeader({
 
           <div className="col-span-12 rounded-2xl bg-white/70 p-4 shadow-[var(--v2-shadow-card)] backdrop-blur md:col-span-3">
             <div className="flex items-center justify-between">
-              <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">Бюджет</div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">Финансы</div>
               <span className={`v2-tnum text-[10.5px] ${overBudget ? "font-semibold text-red-600" : "text-[var(--v2-ink-400)]"}`}>
                 {Math.round(budgetPct * 100)}%
               </span>

@@ -13,7 +13,7 @@ import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
 import { V2Topbar } from "@/components/v2/shell/v2-topbar";
 import { TaskDrawer } from "@/components/v2/tasks/task-drawer";
 import { V2Icons } from "@/components/v2/ui/icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ActiveTimer = {
   session: { id: string; task_id: string; started_at: string };
@@ -105,10 +105,20 @@ export function V2HomeClient() {
     return () => clearInterval(id);
   }, [active]);
 
+  const reloadRef = useRef<() => Promise<void>>(async () => {});
   async function reload() {
     setTick(0);
     await Promise.all([loadPage(), refreshBoot()]);
   }
+  reloadRef.current = reload;
+
+  const drawerReloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDrawerUpdated = useCallback(() => {
+    if (drawerReloadTimer.current) clearTimeout(drawerReloadTimer.current);
+    drawerReloadTimer.current = setTimeout(() => {
+      void reloadRef.current();
+    }, 700);
+  }, []);
 
   async function toggleComplete(taskId: string) {
     const task = tasks.find((t) => t.id === taskId);
@@ -281,8 +291,13 @@ export function V2HomeClient() {
       <TaskDrawer
         taskId={drawerTaskId}
         open={!!drawerTaskId}
-        onClose={() => setDrawerTaskId(null)}
-        onUpdated={reload}
+        onClose={() => {
+          setDrawerTaskId(null);
+          void reload();
+        }}
+        onUpdated={onDrawerUpdated}
+        currentUserId={me?.id ?? null}
+        currentUserName={me?.name ?? null}
         members={members}
         projects={teamProjects.map((p) => ({ id: p.id, name: p.name }))}
         runningTaskId={runningTaskId}

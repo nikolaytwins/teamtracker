@@ -1,13 +1,15 @@
 import { getV2Supabase } from "@/lib/v2/db/client";
 import { listUsersPublic } from "@/lib/tt-auth-db";
+import { computeDailyTeamLoad } from "@/lib/v2/team/daily-team-load";
+import { listWorkspaceMembers } from "@/lib/v2/workspace/bootstrap";
 import { listProjects } from "@/lib/v2/projects/project-repo";
 import {
-  DEFAULT_HOURLY_RATE,
   formatDeadlineLabel,
   formatRelativeActivity,
   gradientForUser,
   initialsFromName,
 } from "@/lib/v2/projects/portfolio-utils";
+import { computeSpentRub, hourlyRateByUserId, projectSumRub } from "@/lib/v2/projects/project-finance";
 import type {
   PortfolioHealth,
   PortfolioPayload,
@@ -24,29 +26,9 @@ const PRIORITY_RANK: Record<V2TaskPriority, number> = {
   low: 1,
 };
 
-const CATEGORY_KEYWORDS: [RegExp, string][] = [
-  [/лендинг/i, "Лендинг"],
-  [/бренд/i, "Брендинг"],
-  [/айдент/i, "Брендинг"],
-  [/лого/i, "Брендинг"],
-  [/моушн|анимац/i, "Моушн"],
-  [/иллюстр/i, "Иллюстрации"],
-  [/икон|ui.?кит|дизайн.?систем/i, "UI-кит"],
-  [/мобил|mobile/i, "Мобайл"],
-  [/кампан/i, "Кампания"],
-  [/маркет/i, "Маркетинг"],
-  [/студ/i, "Внутреннее"],
-  [/onboarding|продукт|кабинет|чек.?аут/i, "Продукт"],
-];
+import { resolveProjectCategoryLabel } from "@/lib/v2/projects/project-kind";
 
-function inferCategory(name: string): string {
-  for (const [re, label] of CATEGORY_KEYWORDS) {
-    if (re.test(name)) return label;
-  }
-  return "Проект";
-}
-
-function maxPriority(tasks: V2TaskRow[]): V2TaskPriority {
+function maxPriorityFromTasks(tasks: V2TaskRow[]): V2TaskPriority {
   let best: V2TaskPriority = "low";
   let rank = 0;
   for (const t of tasks) {
@@ -65,7 +47,7 @@ function computeHealth(
   openTasks: V2TaskRow[],
   now: Date
 ): PortfolioHealth {
-  if (kanbanStatus === "done") return "done";
+  if (kanbanStatus === "done" || kanbanStatus === "done_unpaid") return "done";
   if (kanbanStatus === "paused") return "paused";
 
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -115,7 +97,9 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
   const projects = await listProjects(ctx, { scope: "team", statusGroup: "all" });
   const projectIds = projects.map((p) => p.id);
 
-  const users = new Map(listUsersPublic().map((u) => [u.id, u.display_name]));
+  const publicUsers = listUsersPublic();
+  const users = new Map(publicUsers.map((u) => [u.id, u.display_name]));
+  const rateByUser = hourlyRateByUserId(publicUsers);
 
   const emptyTasks: V2TaskRow[] = [];
   let allTasks: V2TaskRow[] = emptyTasks;
@@ -196,20 +180,16 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
     const tasksTotal = tasks.length;
     const kanbanStatus = v2StatusToKanban(p.status);
     const health = computeHealth(kanbanStatus, openTasks, now);
-    const priority = maxPriority(tasks);
+    const priority = p.priority ?? maxPriorityFromTasks(tasks);
     const deadlineAt = nearestDeadline(openTasks);
     const { label: deadline, days: deadlineDays } = formatDeadlineLabel(deadlineAt, now);
 
-    let estimateSeconds = 0;
-    for (const t of tasks) {
-      if (t.estimate_seconds) estimateSeconds += t.estimate_seconds;
-    }
-    const budget = estimateSeconds > 0 ? (estimateSeconds / 3600) * DEFAULT_HOURLY_RATE : Math.max(tasksTotal, 1) * 8 * DEFAULT_HOURLY_RATE;
+    const budget = projectSumRub(p.budget_rub);
 
     const hoursByMember = loggedByProjectUser.get(p.id) ?? {};
     let loggedHours = 0;
     for (const h of Object.values(hoursByMember)) loggedHours += h;
-    const spent = loggedHours * DEFAULT_HOURLY_RATE;
+    const spent = computeSpentRub(hoursByMember, rateByUser);
 
     const memberIds = membersByProject.get(p.id) ?? [];
     const team = memberIds.map((userId) => {
@@ -228,7 +208,7 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
     }
 
     const completedAt =
-      p.status === "completed"
+      p.status === "completed" || p.status === "completed_unpaid"
         ? tasks.reduce<string | null>((best, t) => {
             if (!t.completed_at) return best;
             if (!best || t.completed_at > best) return t.completed_at;
@@ -243,7 +223,7 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
       colorTint: p.color_tint,
       colorBg: p.color_bg,
       colorInk: p.color_ink ?? p.color_tint,
-      category: inferCategory(p.name),
+      category: resolveProjectCategoryLabel(p),
       engagementType: p.engagement_type,
       status: kanbanStatus,
       v2Status: p.status,
@@ -278,29 +258,36 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
       new Date(p.completedAt) >= monthStart
   ).length;
 
-  const loadByUser = new Map<string, { projects: number; load: number }>();
-  for (const p of active.filter((x) => x.status !== "paused")) {
-    for (const m of p.team) {
-      const cur = loadByUser.get(m.userId) ?? { projects: 0, load: 0 };
-      cur.projects += 1;
-      loadByUser.set(m.userId, cur);
-    }
+  let loadTasks: V2TaskRow[] = [];
+  {
+    const { data, error } = await sb
+      .from("v2_tasks")
+      .select("id, assignee_user_id, estimate_seconds, completed_at, planned_at, deadline_at, inbox_bucket")
+      .eq("workspace_id", ctx.workspaceId)
+      .eq("scope", "team")
+      .is("deleted_at", null)
+      .is("completed_at", null)
+      .not("assignee_user_id", "is", null);
+    if (error) throw new Error(error.message);
+    loadTasks = (data ?? []) as V2TaskRow[];
   }
-  const MAX_PROJECTS = 4;
-  const teamLoad: PortfolioTeamLoadRow[] = [...loadByUser.entries()]
-    .map(([userId, { projects: count }]) => {
-      const name = users.get(userId) ?? userId;
-      const load = Math.min(count / MAX_PROJECTS, 1);
+
+  const scheduleById = new Map(publicUsers.map((u) => [u.id, u]));
+  const wsMembers = await listWorkspaceMembers();
+  const teamMembers = wsMembers
+    .filter((m) => m.role !== "client")
+    .map((m) => {
+      const u = scheduleById.get(m.user_id);
       return {
-        userId,
-        name,
-        initials: initialsFromName(name),
-        gradient: gradientForUser(userId),
-        load,
-        projects: count,
+        userId: m.user_id,
+        name: m.display_name,
+        workHoursPerDay: u?.work_hours_per_day ?? 8,
+        workDays: u?.work_days ?? [1, 2, 3, 4, 5],
       };
-    })
-    .sort((a, b) => b.load - a.load)
+    });
+
+  const teamLoad: PortfolioTeamLoadRow[] = computeDailyTeamLoad(teamMembers, loadTasks, now)
+    .filter((r) => r.isWorkDay || r.taskCount > 0)
     .slice(0, 6);
 
   const kpis = {

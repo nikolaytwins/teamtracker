@@ -1,6 +1,7 @@
 "use client";
 
 import type { PortfolioKanbanStatus, PortfolioProject } from "@/lib/v2/projects/portfolio-types";
+import { isFinishedKanbanStatus } from "@/lib/v2/projects/portfolio-types";
 import { currentMonthLabelPrep, fmtRubShort, pluralRu } from "@/lib/v2/projects/portfolio-utils";
 import { ProjectTile } from "@/components/v2/projects/project-tile";
 import {
@@ -10,7 +11,7 @@ import {
   ProjectBadge,
   EngagementBadge,
 } from "@/components/v2/projects/project-atoms";
-import { STATUS_META, STATUS_ORDER } from "@/components/v2/projects/portfolio-meta";
+import { STATUS_META, STATUS_FILTER_ORDER, STATUS_ORDER } from "@/components/v2/projects/portfolio-meta";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -51,7 +52,7 @@ export function StatusChips({
 }) {
   const items = [
     { id: "all", label: "Все", dot: "#0A0A0B", count: totalActive },
-    ...STATUS_ORDER.filter((s) => s !== "done").map((s) => ({
+    ...STATUS_FILTER_ORDER.map((s) => ({
       id: s,
       label: STATUS_META[s].label,
       dot: STATUS_META[s].dot,
@@ -255,6 +256,53 @@ function DoneRow({ p, onOpen }: { p: PortfolioProject; onOpen: (id: string) => v
   );
 }
 
+export function DoneUnpaidSection({
+  projects: list,
+  onOpen,
+}: {
+  projects: PortfolioProject[];
+  onOpen: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (list.length === 0) return null;
+  const totalBudget = list.reduce((a, p) => a + p.budget, 0);
+  const totalSpent = list.reduce((a, p) => a + p.spent, 0);
+  return (
+    <section className="mt-8">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-card)]">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center gap-3 px-5 py-3.5 transition hover:bg-[var(--v2-ink-50)]/70"
+        >
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
+            <V2Icons.ruble className="h-[14px] w-[14px]" />
+          </span>
+          <div className="flex items-baseline gap-2">
+            <h3 className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Завершены, не оплачены</h3>
+            <span className="text-[12.5px] text-[var(--v2-ink-500)]">
+              — {list.length} {pluralRu(list.length, ["проект", "проекта", "проектов"])} ждут оплату
+            </span>
+          </div>
+          <div className="ml-auto flex items-center gap-4 text-[12px] text-[var(--v2-ink-500)]">
+            <span className="v2-tnum">
+              сумма {fmtRubShort(totalSpent)} / {fmtRubShort(totalBudget)} ₽
+            </span>
+            <V2Icons.chev className={`h-4 w-4 text-[var(--v2-ink-400)] transition-transform ${open ? "" : "-rotate-90"}`} />
+          </div>
+        </button>
+        {open ? (
+          <div className="divide-y divide-[var(--v2-ink-100)]/70 border-t border-[var(--v2-ink-100)]/70">
+            {list.map((p) => (
+              <DoneRow key={p.id} p={p} onOpen={onOpen} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export function DoneSection({ projects: list, onOpen }: { projects: PortfolioProject[]; onOpen: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   if (list.length === 0) return null;
@@ -314,9 +362,10 @@ function KanbanCard({
   onDragStart: (id: string, e: React.DragEvent) => void;
   onDragEnd: () => void;
 }) {
-  const overdue = p.deadlineDays !== null && p.deadlineDays < 0 && p.status !== "done";
-  const soon = p.deadlineDays !== null && p.deadlineDays >= 0 && p.deadlineDays <= 3 && p.status !== "done";
+  const overdue = p.deadlineDays !== null && p.deadlineDays < 0 && !isFinishedKanbanStatus(p.status);
+  const soon = p.deadlineDays !== null && p.deadlineDays >= 0 && p.deadlineDays <= 3 && !isFinishedKanbanStatus(p.status);
   const tasksPct = p.tasksTotal > 0 ? p.tasksDone / p.tasksTotal : 0;
+  const overBudget = p.budget > 0 && p.spent > p.budget;
   return (
     <div
       draggable
@@ -367,11 +416,11 @@ function KanbanCard({
       <div className="mt-2.5 flex items-center justify-between text-[11px]">
         <span className="inline-flex items-center gap-1 text-[var(--v2-ink-500)]">
           <V2Icons.ruble className="h-[12px] w-[12px]" />
-          Бюджет
+          Финансы
         </span>
-        <span className="v2-tnum font-medium text-[var(--v2-ink-700)]">
+        <span className={`v2-tnum font-medium ${overBudget ? "text-red-600" : "text-[var(--v2-ink-700)]"}`}>
           {fmtRubShort(p.spent)}
-          <span className="font-normal text-[var(--v2-ink-400)]">/{fmtRubShort(p.budget)} ₽</span>
+          <span className={`font-normal ${overBudget ? "text-red-400" : "text-[var(--v2-ink-400)]"}`}>/{fmtRubShort(p.budget)} ₽</span>
         </span>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--v2-ink-100)]/70 pt-3">
@@ -488,6 +537,7 @@ export function KanbanBoard({
   onToggleStar,
   onMove,
   onAdd,
+  onAddRetainer,
 }: {
   projects: PortfolioProject[];
   starredIds: Set<string>;
@@ -495,19 +545,27 @@ export function KanbanBoard({
   onToggleStar: (id: string) => void;
   onMove: (id: string, status: PortfolioKanbanStatus) => void;
   onAdd: (name: string, status: PortfolioKanbanStatus) => void;
+  onAddRetainer: (name: string) => void;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<PortfolioKanbanStatus | null>(null);
+
+  const oneOffProjects = useMemo(() => list.filter((p) => p.engagementType !== "retainer"), [list]);
+  const retainerProjects = useMemo(
+    () => list.filter((p) => p.engagementType === "retainer" && !isFinishedKanbanStatus(p.status)),
+    [list]
+  );
+
   const grouped = useMemo(() => {
     const g: Record<string, PortfolioProject[]> = {};
     STATUS_ORDER.forEach((s) => {
       g[s] = [];
     });
-    list.forEach((p) => {
+    oneOffProjects.forEach((p) => {
       g[p.status]?.push(p);
     });
     return g as Record<PortfolioKanbanStatus, PortfolioProject[]>;
-  }, [list]);
+  }, [oneOffProjects]);
 
   return (
     <div className="overflow-x-auto pb-4">
@@ -537,6 +595,13 @@ export function KanbanBoard({
             onAddInColumn={(st) => onAdd("Новый проект", st)}
           />
         ))}
+        <RetainerKanbanColumn
+          projects={retainerProjects}
+          starredIds={starredIds}
+          onOpen={onOpen}
+          onToggleStar={onToggleStar}
+          onAdd={() => onAddRetainer("Новый постоянный проект")}
+        />
       </div>
     </div>
   );
@@ -554,13 +619,15 @@ export function buildListSections(
   defaultStatus: PortfolioKanbanStatus;
   allowAdd: boolean;
 }> {
+  const oneOff = filteredActive.filter((p) => p.engagementType !== "retainer");
+
   if (statusFilter === "all") {
-    const burning = filteredActive.filter((p) => p.health === "critical" || p.health === "at_risk");
-    const inwork = filteredActive.filter(
+    const burning = oneOff.filter((p) => p.health === "critical" || p.health === "at_risk");
+    const inwork = oneOff.filter(
       (p) => (p.status === "in_progress" || p.status === "review") && p.health !== "critical" && p.health !== "at_risk"
     );
-    const upcoming = filteredActive.filter((p) => p.status === "not_started");
-    const paused = filteredActive.filter((p) => p.status === "paused");
+    const upcoming = oneOff.filter((p) => p.status === "not_started");
+    const paused = oneOff.filter((p) => p.status === "paused");
     return [
       { id: "burning", title: "Горят и под угрозой", subtitle: "нужна помощь / решения", accent: "#EF4444", list: burning, defaultStatus: "in_progress", allowAdd: false },
       { id: "in_progress", title: "В работе", subtitle: "идёт ежедневная активность", accent: "#3B6FF7", list: inwork, defaultStatus: "in_progress", allowAdd: true },
@@ -575,9 +642,102 @@ export function buildListSections(
       title: meta?.label ?? statusFilter,
       subtitle: "",
       accent: meta?.dot ?? "#0A0A0B",
-      list: filteredActive,
+      list: oneOff,
       defaultStatus: statusFilter as PortfolioKanbanStatus,
       allowAdd: true,
     },
   ];
+}
+
+export function RetainerListSection({
+  projects: list,
+  starredIds,
+  onOpen,
+  onToggleStar,
+  onAdd,
+  canDelete,
+  onDeleteRequest,
+}: {
+  projects: PortfolioProject[];
+  starredIds: Set<string>;
+  onOpen: (id: string) => void;
+  onToggleStar: (id: string) => void;
+  onAdd: (name: string) => void;
+  canDelete?: boolean;
+  onDeleteRequest?: (project: PortfolioProject) => void;
+}) {
+  return (
+    <ListSection
+      title="Постоянные проекты"
+      subtitle="ежемесячная работа с клиентами"
+      accent="#7C3AED"
+      projects={list}
+      starredIds={starredIds}
+      onOpen={onOpen}
+      onToggleStar={onToggleStar}
+      onAdd={(name) => onAdd(name)}
+      defaultStatus="in_progress"
+      allowAdd
+      canDelete={canDelete}
+      onDeleteRequest={onDeleteRequest}
+    />
+  );
+}
+
+function RetainerKanbanColumn({
+  projects: list,
+  starredIds,
+  onOpen,
+  onToggleStar,
+  onAdd,
+}: {
+  projects: PortfolioProject[];
+  starredIds: Set<string>;
+  onOpen: (id: string) => void;
+  onToggleStar: (id: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="v2-kcol flex w-[300px] shrink-0 flex-col rounded-2xl bg-violet-50/40 backdrop-blur-sm">
+      <div className="v2-kcol-head sticky top-0 z-10 flex items-center gap-2 rounded-t-2xl border-b border-violet-100/80 bg-white/70 px-3.5 py-3 backdrop-blur">
+        <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+        <h3 className="v2-tight text-[13px] font-semibold text-[var(--v2-ink-900)]">Постоянные</h3>
+        <span className="v2-tnum text-[11.5px] text-[var(--v2-ink-500)]">{list.length}</span>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] hover:bg-violet-100 hover:text-violet-800"
+          title="Добавить постоянный проект"
+        >
+          <V2Icons.plus className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="flex min-h-[120px] flex-col gap-2.5 p-2.5">
+        {list.length === 0 ? (
+          <div className="v2-tight py-6 text-center text-[12px] italic text-[var(--v2-ink-400)]">Пока пусто</div>
+        ) : (
+          list.map((p, i) => (
+            <div key={p.id} className="v2-card-in" style={{ animationDelay: `${i * 40}ms` }}>
+              <KanbanCard
+                p={p}
+                starred={starredIds.has(p.id)}
+                dragging={false}
+                onDragStart={() => {}}
+                onDragEnd={() => {}}
+                onOpen={onOpen}
+                onToggleStar={onToggleStar}
+              />
+            </div>
+          ))
+        )}
+        <button
+          type="button"
+          onClick={onAdd}
+          className="v2-tight mt-1 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-violet-300 text-[12.5px] text-violet-700 transition hover:border-violet-400 hover:bg-white"
+        >
+          <V2Icons.plus className="h-[14px] w-[14px]" /> Добавить
+        </button>
+      </div>
+    </div>
+  );
 }

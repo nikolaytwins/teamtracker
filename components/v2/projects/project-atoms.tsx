@@ -166,7 +166,7 @@ export function ProgressBar({
   height?: number;
 }) {
   const isPaused = status === "paused";
-  const isDone = status === "done";
+  const isDone = status === "done" || status === "done_unpaid";
   return (
     <div
       className={`relative w-full overflow-hidden rounded-full ${isPaused ? "bg-[var(--v2-ink-100)]/60" : "bg-[var(--v2-ink-100)]"}`}

@@ -1,5 +1,6 @@
 import { currentMonthLabelPrep } from "@/lib/v2/projects/portfolio-utils";
 import type { PortfolioProject } from "@/lib/v2/projects/portfolio-types";
+import { isFinishedKanbanStatus } from "@/lib/v2/projects/portfolio-types";
 import { pluralRu } from "@/lib/v2/projects/portfolio-utils";
 
 export function ProjectsPageHead({
@@ -29,8 +30,8 @@ export function ProjectsPageHead({
   ];
   const dateLabel = `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
 
-  const critical = projects.filter((p) => p.health === "critical" && p.status !== "done");
-  const atRisk = projects.filter((p) => p.health === "at_risk" && p.status !== "done");
+  const critical = projects.filter((p) => p.health === "critical" && !isFinishedKanbanStatus(p.status));
+  const atRisk = projects.filter((p) => p.health === "at_risk" && !isFinishedKanbanStatus(p.status));
   let insight = "";
   if (critical.length > 0) {
     insight = `${critical.length === 1 ? "Один проект горит" : `${critical.length} проекта горят`} — ${critical[0]!.name}.`;

@@ -3,7 +3,7 @@
 import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PortfolioPayload, PortfolioKanbanStatus, PortfolioProject } from "@/lib/v2/projects/portfolio-types";
-import { kanbanToV2Status } from "@/lib/v2/projects/portfolio-types";
+import { isFinishedKanbanStatus, kanbanToV2Status } from "@/lib/v2/projects/portfolio-types";
 import { STARRED_STORAGE_KEY, kanbanStatusToV2CreateStatus } from "@/components/v2/projects/portfolio-meta";
 import { NewProjectModal, type NewProjectModalInput } from "@/components/v2/projects/new-project-modal";
 import { DeleteProjectConfirmModal } from "@/components/v2/projects/delete-project-dialog";
@@ -13,8 +13,10 @@ import { ProjectsTopbar } from "@/components/v2/projects/projects-topbar";
 import {
   buildListSections,
   DoneSection,
+  DoneUnpaidSection,
   KanbanBoard,
   ListSection,
+  RetainerListSection,
   StatusChips,
   ViewSwitcher,
 } from "@/components/v2/projects/projects-views";
@@ -92,7 +94,8 @@ export function V2ProjectsClient() {
 
   const projects = payload?.projects ?? [];
 
-  const active = useMemo(() => projects.filter((p) => p.status !== "done"), [projects]);
+  const active = useMemo(() => projects.filter((p) => !isFinishedKanbanStatus(p.status)), [projects]);
+  const doneUnpaidAll = useMemo(() => projects.filter((p) => p.status === "done_unpaid"), [projects]);
   const doneAll = useMemo(() => projects.filter((p) => p.status === "done"), [projects]);
   const doneThisMonth = useMemo(() => {
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -102,8 +105,14 @@ export function V2ProjectsClient() {
   const categories = useMemo(() => [...new Set(projects.map((p) => p.category))].sort(), [projects]);
 
   const filteredActive = useMemo(() => {
-    let r = active;
-    if (statusFilter !== "all") r = r.filter((p) => p.status === statusFilter);
+    let r = projects.filter((p) => p.engagementType !== "retainer");
+    if (statusFilter === "all") {
+      r = r.filter((p) => !isFinishedKanbanStatus(p.status));
+    } else if (statusFilter === "done_unpaid") {
+      r = r.filter((p) => p.status === "done_unpaid");
+    } else {
+      r = r.filter((p) => p.status === statusFilter);
+    }
     if (categoryFilter !== "all") r = r.filter((p) => p.category === categoryFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -115,10 +124,27 @@ export function V2ProjectsClient() {
       );
     }
     return r;
-  }, [active, statusFilter, categoryFilter, search]);
+  }, [projects, statusFilter, categoryFilter, search]);
+
+  const filteredRetainers = useMemo(() => {
+    let r = active.filter((p) => p.engagementType === "retainer");
+    if (categoryFilter !== "all") r = r.filter((p) => p.category === categoryFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      r = r.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          p.team.some((m) => m.name.toLowerCase().includes(q))
+      );
+    }
+    return r;
+  }, [active, categoryFilter, search]);
 
   const statusCounts = useMemo(() => {
-    const base = active.filter((p) => {
+    const base = projects.filter((p) => {
+      if (p.engagementType === "retainer") return false;
+      if (isFinishedKanbanStatus(p.status) && p.status !== "done_unpaid") return false;
       if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -134,16 +160,17 @@ export function V2ProjectsClient() {
       return true;
     });
     const c: Record<string, number> = {};
-    for (const s of ["not_started", "in_progress", "review", "paused", "done"] as const) c[s] = 0;
+    for (const s of ["not_started", "in_progress", "review", "done_unpaid", "paused"] as const) c[s] = 0;
     base.forEach((p) => {
       c[p.status] = (c[p.status] ?? 0) + 1;
     });
     return c;
-  }, [active, categoryFilter, search]);
+  }, [projects, categoryFilter, search]);
 
   const totalActiveCount = useMemo(
     () =>
       active.filter((p) => {
+        if (p.engagementType === "retainer") return false;
         if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
         return true;
       }).length,
@@ -170,7 +197,7 @@ export function V2ProjectsClient() {
     return r;
   }, [projects, categoryFilter, search]);
 
-  const criticalProject = projects.find((p) => p.health === "critical" && p.status !== "done");
+  const criticalProject = projects.find((p) => p.health === "critical" && !isFinishedKanbanStatus(p.status));
 
   async function reload() {
     await Promise.all([load(), refreshBoot()]);
@@ -185,17 +212,24 @@ export function V2ProjectsClient() {
         scope: "team",
         status: "not_started",
         engagementType: input.engagementType,
+        projectKind: input.projectKind,
+        priority: input.priority,
         clientName: input.clientName,
         clientId: input.clientId,
         releaseAt: input.releaseAt,
         projectSumRub: input.projectSumRub,
+        paidRub: input.paidRub,
         teamMemberUserIds: input.teamMemberIds,
       }),
     });
     await reload();
   }
 
-  async function createProject(name: string, status: PortfolioKanbanStatus) {
+  async function createProject(
+    name: string,
+    status: PortfolioKanbanStatus,
+    engagementType: "one_off" | "retainer" = "one_off"
+  ) {
     await fetchJson("/api/v2/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -203,7 +237,7 @@ export function V2ProjectsClient() {
         name,
         scope: "team",
         status: kanbanStatusToV2CreateStatus(status),
-        engagementType: "one_off",
+        engagementType,
       }),
     });
     await reload();
@@ -333,6 +367,16 @@ export function V2ProjectsClient() {
                       />
                     ))}
                   </div>
+                  <RetainerListSection
+                    projects={filteredRetainers}
+                    starredIds={starred}
+                    onOpen={openProject}
+                    onToggleStar={toggleStar}
+                    onAdd={(name) => void createProject(name, "in_progress", "retainer")}
+                    canDelete={canDeleteProjects}
+                    onDeleteRequest={setDeleteTarget}
+                  />
+                  <DoneUnpaidSection projects={doneUnpaidAll} onOpen={openProject} />
                   <DoneSection projects={doneThisMonth} onOpen={openProject} />
                 </>
               ) : (
@@ -344,6 +388,7 @@ export function V2ProjectsClient() {
                     onToggleStar={toggleStar}
                     onMove={(id, st) => void moveProject(id, st)}
                     onAdd={(name, st) => void createProject(name, st)}
+                    onAddRetainer={(name) => void createProject(name, "in_progress", "retainer")}
                   />
                 </div>
               )}

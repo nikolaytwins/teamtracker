@@ -22,7 +22,7 @@ import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TabId = "tasks" | "kanban" | "activity" | "files";
 
@@ -36,7 +36,7 @@ const TABS: { id: TabId; label: string; icon: keyof typeof V2Icons; count?: (d: 
   { id: "tasks", label: "Задачи", icon: "tasks", count: (d) => d.tasks.length },
   { id: "kanban", label: "Канбан", icon: "kanban" },
   { id: "activity", label: "Активность", icon: "history", count: (d) => d.activity.length },
-  { id: "files", label: "Файлы", icon: "folder", count: (d) => d.files.length },
+  { id: "files", label: "Файлы и ссылки", icon: "folder", count: (d) => d.links.length + d.files.length },
 ];
 
 const KANBAN_COLUMNS: { key: V2TaskStatus; label: string; dot: string }[] = [
@@ -198,10 +198,20 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
     return () => clearInterval(id);
   }, [active]);
 
+  const reloadRef = useRef<(month?: string | null) => Promise<void>>(async () => {});
   async function reload(month?: string | null) {
     setTick(0);
     await Promise.all([load(month ?? workMonth), loadTimer(), refreshBoot()]);
   }
+  reloadRef.current = reload;
+
+  const drawerReloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDrawerUpdated = useCallback(() => {
+    if (drawerReloadTimer.current) clearTimeout(drawerReloadTimer.current);
+    drawerReloadTimer.current = setTimeout(() => {
+      void reloadRef.current();
+    }, 700);
+  }, []);
 
   async function changeWorkMonth(month: string) {
     setWorkMonth(month);
@@ -251,6 +261,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
     contractRef: string | null;
     releaseAt: string | null;
     budgetRub: number | null;
+    paidRub: number | null;
     teamMemberUserIds: string[];
     clientUserIds: string[];
   }) {
@@ -265,6 +276,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
         contractRef: input.contractRef,
         releaseAt: input.releaseAt,
         budgetRub: input.budgetRub,
+        paidRub: input.paidRub,
         teamMemberUserIds: input.teamMemberUserIds,
         clientUserIds: input.clientUserIds,
       }),
@@ -498,8 +510,13 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
       <TaskDrawer
         taskId={drawerTaskId}
         open={!!drawerTaskId}
-        onClose={() => setDrawerTaskId(null)}
-        onUpdated={reload}
+        onClose={() => {
+          setDrawerTaskId(null);
+          void reload();
+        }}
+        onUpdated={onDrawerUpdated}
+        currentUserId={me?.id ?? null}
+        currentUserName={me?.name ?? null}
         members={members}
         projects={projects.map((p) => ({
           id: p.id,

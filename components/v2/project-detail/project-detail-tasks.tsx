@@ -1,13 +1,22 @@
 "use client";
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import { gradientForUser, initialsFromName } from "@/lib/v2/projects/portfolio-utils";
 import type { PortfolioMember } from "@/lib/v2/projects/portfolio-types";
 import type { ProjectDetailSubtask, ProjectDetailTask } from "@/lib/v2/projects/project-detail-types";
 import { MemberAvatar } from "@/components/v2/projects/project-atoms";
+import {
+  InlineAssigneeEditor,
+  InlineDeadlineEditor,
+  InlinePopover,
+  InlinePriorityEditor,
+  InlineTitleEditor,
+  memberFromTeam,
+} from "@/components/v2/tasks/task-inline-editors";
 import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 import { IconBtn, PriorityDot, TaskCheckbox, TimerButton } from "@/components/v2/ui/primitives";
 import { useState } from "react";
+
+type InlineField = "priority" | "assignee" | "deadline" | null;
 
 function fmtHours(h: number): string {
   if (!h) return "0ч";
@@ -18,57 +27,59 @@ function fmtHours(h: number): string {
   return `${mm}м`;
 }
 
-function resolveMember(
-  assigneeUserId: string | null,
-  assigneeName: string | null,
-  team: PortfolioMember[]
-): PortfolioMember | null {
-  if (!assigneeUserId) return null;
-  const found = team.find((m) => m.userId === assigneeUserId);
-  if (found) return found;
-  if (!assigneeName) return null;
-  return {
-    userId: assigneeUserId,
-    name: assigneeName,
-    initials: initialsFromName(assigneeName),
-    gradient: gradientForUser(assigneeUserId),
-  };
-}
-
-function ScheduleChip({ planned, deadline, completed }: { planned: string; deadline: string; completed: boolean }) {
+function DeadlineChip({
+  planned,
+  deadline,
+  completed,
+  onClick,
+}: {
+  planned: string;
+  deadline: string;
+  completed: boolean;
+  onClick: () => void;
+}) {
   const hasPlanned = planned !== "—";
   const hasDeadline = deadline !== "—";
-  if (!hasPlanned && !hasDeadline) {
-    return (
-      <span className="v2-tight v2-tnum inline-flex items-center gap-1 text-[11.5px] text-[var(--v2-ink-400)]">
-        <V2Icons.clock className="h-3 w-3 opacity-70" />
-        без даты
-      </span>
-    );
-  }
   return (
-    <span className="v2-tight inline-flex flex-col items-end gap-0.5 text-[11px] leading-tight">
-      {hasPlanned ? (
-        <span className={`v2-tnum inline-flex items-center gap-1 ${completed ? "text-[var(--v2-ink-400)]" : "font-medium text-[var(--v2-brand-700)]"}`}>
-          <V2Icons.cal className="h-3 w-3 opacity-70" />
-          {planned}
-        </span>
-      ) : null}
-      {hasDeadline && deadline !== planned ? (
-        <span className={`v2-tnum inline-flex items-center gap-1 ${completed ? "text-[var(--v2-ink-400)]" : "text-[var(--v2-ink-500)]"}`}>
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="rounded-md px-1 py-0.5 transition hover:bg-[var(--v2-ink-100)]/80"
+      title="Изменить дедлайн"
+    >
+      {!hasPlanned && !hasDeadline ? (
+        <span className="v2-tight v2-tnum inline-flex items-center gap-1 text-[11.5px] text-[var(--v2-ink-400)]">
           <V2Icons.clock className="h-3 w-3 opacity-70" />
-          {deadline}
+          без даты
         </span>
-      ) : null}
-    </span>
+      ) : (
+        <span className="v2-tight inline-flex flex-col items-start gap-0.5 text-[11px] leading-tight">
+          {hasPlanned ? (
+            <span className={`v2-tnum inline-flex items-center gap-1 ${completed ? "text-[var(--v2-ink-400)]" : "font-medium text-[var(--v2-brand-700)]"}`}>
+              <V2Icons.cal className="h-3 w-3 opacity-70" />
+              {planned}
+            </span>
+          ) : null}
+          {hasDeadline && deadline !== planned ? (
+            <span className={`v2-tnum inline-flex items-center gap-1 ${completed ? "text-[var(--v2-ink-400)]" : "text-[var(--v2-ink-500)]"}`}>
+              <V2Icons.clock className="h-3 w-3 opacity-70" />
+              {deadline}
+            </span>
+          ) : null}
+        </span>
+      )}
+    </button>
   );
 }
 
 function TaskMicroProgress({ logged, est, completed }: { logged: number; est: number; completed: boolean }) {
   const pct = est > 0 ? Math.min(logged / est, 1.2) : 0;
-  const over = logged > est * 1.05;
+  const over = est > 0 && logged > est * 1.05;
   return (
-    <div className="hidden min-w-[90px] items-center gap-2 sm:flex">
+    <div className="hidden min-w-[108px] items-center gap-2 sm:flex">
       <div className="h-1 w-[52px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
         <div
           className="h-full rounded-full"
@@ -78,10 +89,115 @@ function TaskMicroProgress({ logged, est, completed }: { logged: number; est: nu
           }}
         />
       </div>
-      <div className="v2-tight v2-tnum text-[11px] text-[var(--v2-ink-500)]">
+      <div className="v2-tight v2-tnum whitespace-nowrap text-[11px] text-[var(--v2-ink-500)]">
         <span className={completed ? "text-emerald-600" : over ? "text-red-600" : "font-medium text-[var(--v2-ink-700)]"}>
           {fmtHours(logged)}
         </span>
+        {est > 0 ? <span className="text-[var(--v2-ink-400)]"> / {fmtHours(est)}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function TaskInlineMeta({
+  taskId,
+  priority,
+  assigneeUserId,
+  assigneeName,
+  deadlineAt,
+  plannedLabel,
+  deadlineLabel,
+  completed,
+  team,
+  onReload,
+  compact = false,
+}: {
+  taskId: string;
+  priority: ProjectDetailTask["priority"];
+  assigneeUserId: string | null;
+  assigneeName: string | null;
+  deadlineAt: string | null;
+  plannedLabel: string;
+  deadlineLabel: string;
+  completed: boolean;
+  team: PortfolioMember[];
+  onReload?: () => Promise<void>;
+  compact?: boolean;
+}) {
+  const [openField, setOpenField] = useState<InlineField>(null);
+  const member = memberFromTeam(assigneeUserId, assigneeName, team);
+
+  return (
+    <div className={`flex flex-wrap items-center gap-2 ${compact ? "" : "mt-1"}`}>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpenField((f) => (f === "priority" ? null : "priority"));
+          }}
+          className="rounded-md px-1 py-0.5 transition hover:bg-[var(--v2-ink-100)]/80"
+          title="Изменить приоритет"
+        >
+          <PriorityDot priority={priority} />
+        </button>
+        <InlinePopover open={openField === "priority"} onClose={() => setOpenField(null)}>
+          <InlinePriorityEditor
+            taskId={taskId}
+            value={priority}
+            onReload={onReload}
+            onClose={() => setOpenField(null)}
+          />
+        </InlinePopover>
+      </div>
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpenField((f) => (f === "assignee" ? null : "assignee"));
+          }}
+          className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 transition hover:bg-[var(--v2-ink-100)]/80"
+          title="Назначить ответственного"
+        >
+          {member ? (
+            <>
+              <MemberAvatar member={member} size={compact ? 20 : 20} />
+              <span className={`v2-tight text-[var(--v2-ink-600)] ${compact ? "hidden max-w-[72px] truncate text-[11px] lg:inline" : "text-[12px]"}`}>
+                {member.name.split(" ")[0]}
+              </span>
+            </>
+          ) : (
+            <span className={`v2-tight text-[var(--v2-ink-400)] ${compact ? "text-[11px]" : "text-[12px]"}`}>Без ответственного</span>
+          )}
+        </button>
+        <InlinePopover open={openField === "assignee"} onClose={() => setOpenField(null)} className="min-w-[200px]">
+          <InlineAssigneeEditor
+            taskId={taskId}
+            value={assigneeUserId}
+            team={team}
+            onReload={onReload}
+            onClose={() => setOpenField(null)}
+          />
+        </InlinePopover>
+      </div>
+
+      <div className="relative">
+        <DeadlineChip
+          planned={plannedLabel}
+          deadline={deadlineLabel}
+          completed={completed}
+          onClick={() => setOpenField((f) => (f === "deadline" ? null : "deadline"))}
+        />
+        <InlinePopover open={openField === "deadline"} onClose={() => setOpenField(null)}>
+          <InlineDeadlineEditor
+            taskId={taskId}
+            deadlineAt={deadlineAt}
+            onReload={onReload}
+            onClose={() => setOpenField(null)}
+          />
+        </InlinePopover>
       </div>
     </div>
   );
@@ -92,42 +208,73 @@ function SubtaskRow({
   team,
   last,
   onOpenTask,
+  onReload,
+  onToggleDone,
 }: {
   st: ProjectDetailSubtask;
   team: PortfolioMember[];
   last: boolean;
   onOpenTask: (id: string) => void;
+  onReload?: () => Promise<void>;
+  onToggleDone: (id: string, completed: boolean) => void;
 }) {
-  const member = resolveMember(st.assigneeUserId, st.assigneeName, team);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const completed = st.status === "done" || !!st.completedAt;
+  const pm = PRIORITY_META[st.priority];
+
   return (
-    <button
-      type="button"
-      onClick={() => onOpenTask(st.id)}
-      className="group relative w-full py-2 pl-[60px] pr-3 text-left transition hover:bg-[var(--v2-ink-50)]/60"
-    >
+    <div className="group relative w-full py-2 pl-[52px] pr-2 transition hover:bg-[var(--v2-ink-50)]/60 sm:pl-[60px] sm:pr-3">
       <span aria-hidden className="absolute bottom-0 left-[36px] top-0 w-px bg-[var(--v2-ink-200)]" />
       <span aria-hidden className="absolute left-[36px] top-[19px] h-px w-4 bg-[var(--v2-ink-200)]" />
       {last ? <span aria-hidden className="absolute bottom-0 left-[36px] top-5 w-px bg-white" /> : null}
-      <div className="flex items-center gap-3">
+      <div className="relative flex items-center gap-2 sm:gap-3">
         <span
-          className={`v2-tight flex-1 truncate text-[13px] ${st.status === "done" ? "text-[var(--v2-ink-400)] line-through decoration-[var(--v2-ink-300)]" : "text-[var(--v2-ink-800)]"}`}
-        >
-          {st.title}
-        </span>
-        <PriorityDot priority={st.priority} />
-        {member ? (
-          <span className="inline-flex items-center gap-1.5">
-            <MemberAvatar member={member} size={20} />
-            <span className="v2-tight hidden max-w-[72px] truncate text-[11px] text-[var(--v2-ink-600)] lg:inline">
-              {member.name.split(" ")[0]}
-            </span>
-          </span>
-        ) : (
-          <span className="v2-tight text-[11px] text-[var(--v2-ink-400)]">—</span>
-        )}
-        <ScheduleChip planned={st.plannedLabel} deadline={st.deadlineLabel} completed={st.status === "done"} />
+          aria-hidden
+          className="absolute bottom-2 left-[-16px] top-2 w-0.5 rounded-r-full sm:left-[-20px]"
+          style={{ background: pm.dot, opacity: completed ? 0.18 : 0.5 }}
+        />
+        <TaskCheckbox checked={completed} onChange={() => onToggleDone(st.id, !completed)} />
+        <div className="min-w-0 flex-1">
+          {editingTitle ? (
+            <InlineTitleEditor
+              taskId={st.id}
+              title={st.title}
+              completed={completed}
+              onReload={onReload}
+              onDone={() => setEditingTitle(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingTitle(true);
+              }}
+              className={`v2-tight block w-full truncate text-left text-[13px] transition hover:text-[var(--v2-brand-700)] ${completed ? "text-[var(--v2-ink-400)] line-through decoration-[var(--v2-ink-300)]" : "font-medium text-[var(--v2-ink-800)]"}`}
+            >
+              {st.title}
+            </button>
+          )}
+          <TaskInlineMeta
+            taskId={st.id}
+            priority={st.priority}
+            assigneeUserId={st.assigneeUserId}
+            assigneeName={st.assigneeName}
+            deadlineAt={st.deadlineAt}
+            plannedLabel={st.plannedLabel}
+            deadlineLabel={st.deadlineLabel}
+            completed={completed}
+            team={team}
+            onReload={onReload}
+            compact
+          />
+        </div>
+        <TaskMicroProgress logged={st.loggedHours} est={st.estimateHours} completed={completed} />
+        <IconBtn title="Открыть карточку" onClick={() => onOpenTask(st.id)} className="shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+          <V2Icons.chevR className="h-4 w-4" />
+        </IconBtn>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -140,6 +287,7 @@ export function TaskRow({
   onOpenTask,
   onToggleTimer,
   onToggleDone,
+  onReload,
 }: {
   task: ProjectDetailTask;
   team: PortfolioMember[];
@@ -149,13 +297,14 @@ export function TaskRow({
   onOpenTask: (id: string) => void;
   onToggleTimer: (id: string) => void;
   onToggleDone: (id: string, completed: boolean) => void;
+  onReload?: () => Promise<void>;
 }) {
   const hasSubs = task.subtasks.length > 0;
   const subsDone = task.subtasks.filter((s) => s.status === "done").length;
   const running = runningTaskId === task.id;
   const completed = !!task.completedAt || task.status === "done";
-  const member = resolveMember(task.assigneeUserId, task.assigneeName, team);
   const pm = PRIORITY_META[task.priority];
+  const [editingTitle, setEditingTitle] = useState(false);
 
   return (
     <div className={`transition-colors ${running ? "bg-[var(--v2-brand-50)]/40" : "hover:bg-[var(--v2-ink-50)]/60"}`}>
@@ -176,13 +325,25 @@ export function TaskRow({
           <V2Icons.chev className={`h-4 w-4 transition-transform ${expanded ? "" : "-rotate-90"}`} />
         </button>
 
-        <button type="button" onClick={() => onOpenTask(task.id)} className="min-w-0 flex-1 text-left">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`v2-tight truncate text-[13.5px] ${completed ? "font-medium text-[var(--v2-ink-400)] line-through decoration-[var(--v2-ink-300)]" : "font-medium text-[var(--v2-ink-900)]"}`}
-            >
-              {task.title}
-            </span>
+            {editingTitle ? (
+              <InlineTitleEditor
+                taskId={task.id}
+                title={task.title}
+                completed={completed}
+                onReload={onReload}
+                onDone={() => setEditingTitle(false)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingTitle(true)}
+                className={`v2-tight truncate text-left text-[13.5px] transition hover:text-[var(--v2-brand-700)] ${completed ? "font-medium text-[var(--v2-ink-400)] line-through decoration-[var(--v2-ink-300)]" : "font-medium text-[var(--v2-ink-900)]"}`}
+              >
+                {task.title}
+              </button>
+            )}
             {hasSubs ? (
               <span className="v2-tight v2-tnum inline-flex items-center gap-1 rounded-md bg-[var(--v2-ink-100)]/80 px-1.5 py-px text-[10.5px] text-[var(--v2-ink-500)]">
                 {subsDone}/{task.subtasks.length}
@@ -195,19 +356,19 @@ export function TaskRow({
               </span>
             ) : null}
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <PriorityDot priority={task.priority} />
-            {member ? (
-              <span className="inline-flex items-center gap-1.5">
-                <MemberAvatar member={member} size={20} />
-                <span className="v2-tight text-[12px] text-[var(--v2-ink-600)]">{member.name.split(" ")[0]}</span>
-              </span>
-            ) : (
-              <span className="v2-tight text-[12px] text-[var(--v2-ink-400)]">Без ответственного</span>
-            )}
-            <ScheduleChip planned={task.plannedLabel} deadline={task.deadlineLabel} completed={completed} />
-          </div>
-        </button>
+          <TaskInlineMeta
+            taskId={task.id}
+            priority={task.priority}
+            assigneeUserId={task.assigneeUserId}
+            assigneeName={task.assigneeName}
+            deadlineAt={task.deadlineAt}
+            plannedLabel={task.plannedLabel}
+            deadlineLabel={task.deadlineLabel}
+            completed={completed}
+            team={team}
+            onReload={onReload}
+          />
+        </div>
 
         <TaskMicroProgress logged={task.loggedHours} est={task.estimateHours} completed={completed} />
 
@@ -221,7 +382,15 @@ export function TaskRow({
       {hasSubs && expanded ? (
         <div className="pb-1.5">
           {task.subtasks.map((st, i) => (
-            <SubtaskRow key={st.id} st={st} team={team} last={i === task.subtasks.length - 1} onOpenTask={onOpenTask} />
+            <SubtaskRow
+              key={st.id}
+              st={st}
+              team={team}
+              last={i === task.subtasks.length - 1}
+              onOpenTask={onOpenTask}
+              onReload={onReload}
+              onToggleDone={onToggleDone}
+            />
           ))}
         </div>
       ) : null}
@@ -302,6 +471,7 @@ export function ProjectDetailTasks({
               onOpenTask={onOpenTask}
               onToggleTimer={onToggleTimer}
               onToggleDone={toggleDone}
+              onReload={onReload}
             />
           ))
         )}

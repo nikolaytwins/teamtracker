@@ -1,6 +1,16 @@
 import type { V2ProjectStatus, V2TaskPriority, V2ProjectEngagementType } from "@/lib/v2/types";
 
-export type PortfolioKanbanStatus = "not_started" | "in_progress" | "review" | "done" | "paused";
+export type PortfolioKanbanStatus =
+  | "not_started"
+  | "in_progress"
+  | "review"
+  | "done_unpaid"
+  | "done"
+  | "paused";
+
+export function isFinishedKanbanStatus(status: PortfolioKanbanStatus): boolean {
+  return status === "done" || status === "done_unpaid";
+}
 
 export type PortfolioHealth = "on_track" | "at_risk" | "critical" | "paused" | "done";
 
@@ -48,7 +58,10 @@ export type PortfolioTeamLoadRow = {
   initials: string;
   gradient: string;
   load: number;
-  projects: number;
+  taskCount: number;
+  estimatedSeconds: number;
+  capacitySeconds: number;
+  isWorkDay: boolean;
 };
 
 export type PortfolioPayload = {
@@ -70,6 +83,8 @@ export function v2StatusToKanban(status: V2ProjectStatus): PortfolioKanbanStatus
   switch (status) {
     case "approval":
       return "review";
+    case "completed_unpaid":
+      return "done_unpaid";
     case "completed":
       return "done";
     default:
@@ -81,6 +96,8 @@ export function kanbanToV2Status(status: PortfolioKanbanStatus): V2ProjectStatus
   switch (status) {
     case "review":
       return "approval";
+    case "done_unpaid":
+      return "completed_unpaid";
     case "done":
       return "completed";
     default:

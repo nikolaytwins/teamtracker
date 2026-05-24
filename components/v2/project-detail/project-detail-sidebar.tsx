@@ -88,8 +88,18 @@ export function ProjectDetailSidebar({
           </dd>
           <dt className="v2-tight text-[var(--v2-ink-500)]">Релиз</dt>
           <dd className="v2-tight font-medium text-[var(--v2-brand-700)]">{detail.releaseLabel}</dd>
-          <dt className="v2-tight text-[var(--v2-ink-500)]">Бюджет</dt>
-          <dd className="v2-tight v2-tnum font-medium text-[var(--v2-ink-900)]">{detail.budget.toLocaleString("ru-RU")} ₽</dd>
+          <dt className="v2-tight text-[var(--v2-ink-500)]">Сумма проекта</dt>
+          <dd className="v2-tight v2-tnum font-medium text-[var(--v2-ink-900)]">
+            {detail.budgetRub != null ? `${detail.budgetRub.toLocaleString("ru-RU")} ₽` : `${detail.budget.toLocaleString("ru-RU")} ₽`}
+          </dd>
+          {detail.paidRub != null ? (
+            <>
+              <dt className="v2-tight text-[var(--v2-ink-500)]">Оплачено</dt>
+              <dd className="v2-tight v2-tnum font-medium text-[var(--v2-brand-700)]">
+                {detail.paidRub.toLocaleString("ru-RU")} ₽
+              </dd>
+            </>
+          ) : null}
         </dl>
       </div>
 
@@ -129,7 +139,9 @@ export function ProjectDetailSidebar({
                 </span>
                 <div className="min-w-0 flex-1 leading-tight">
                   <div className="v2-tight truncate text-[13px] font-medium text-[var(--v2-ink-900)]">{l.title}</div>
-                  <div className="truncate text-[11px] text-[var(--v2-ink-500)]">{l.updatedLabel}</div>
+                  <div className="truncate text-[11px] text-[var(--v2-ink-500)]">
+                    {l.source === "task" && l.taskTitle ? `задача · ${l.taskTitle}` : l.updatedLabel}
+                  </div>
                 </div>
                 <V2Icons.arrowExt className="h-[14px] w-[14px] text-[var(--v2-ink-300)] group-hover:text-[var(--v2-ink-700)]" />
               </a>
@@ -198,7 +210,8 @@ export function ProjectDetailSidebar({
                 <div className="min-w-0 flex-1 leading-tight">
                   <div className="v2-tight truncate text-[12.5px] font-medium text-[var(--v2-ink-900)]">{f.name}</div>
                   <div className="v2-tnum truncate text-[11px] text-[var(--v2-ink-500)]">
-                    {f.sizeLabel} · {f.dateLabel}
+                    {f.sizeLabel}
+                    {f.source === "task" && f.taskTitle ? ` · ${f.taskTitle}` : ` · ${f.dateLabel}`}
                   </div>
                 </div>
                 <V2Icons.download className="h-[14px] w-[14px] text-[var(--v2-ink-300)] opacity-0 transition group-hover:opacity-100" />

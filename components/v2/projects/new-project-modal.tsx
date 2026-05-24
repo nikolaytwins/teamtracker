@@ -2,16 +2,23 @@
 
 import { fromDateInputValue } from "@/lib/v2/format";
 import { ClientNameInput } from "@/components/v2/projects/client-name-input";
+import { PROJECT_KIND_OPTIONS } from "@/lib/v2/projects/project-kind";
 import { TeamMembersPicker, type TeamMemberOption } from "@/components/v2/projects/team-members-picker";
+import { PriorityFlagPicker } from "@/components/v2/tasks/task-field-pickers";
+import { MoneyRubInput } from "@/components/v2/ui/money-rub-input";
+import type { V2ProjectKind, V2TaskPriority } from "@/lib/v2/types";
 import { useState } from "react";
 
 export type NewProjectModalInput = {
   name: string;
   engagementType: "one_off" | "retainer";
+  projectKind: V2ProjectKind | null;
+  priority: V2TaskPriority;
   clientName: string | null;
   clientId: string | null;
   releaseAt: string | null;
   projectSumRub: number | null;
+  paidRub: number | null;
   teamMemberIds: string[];
 };
 
@@ -28,11 +35,16 @@ export function NewProjectModal({
 }) {
   const [name, setName] = useState("");
   const [engagementType, setEngagementType] = useState<"one_off" | "retainer">("one_off");
+  const [projectKind, setProjectKind] = useState<V2ProjectKind>("site");
+  const [priority, setPriority] = useState<V2TaskPriority>("medium");
   const [clientName, setClientName] = useState("");
   const [clientId, setClientId] = useState<string | null>(null);
   const [releaseLocal, setReleaseLocal] = useState("");
-  const [noReleaseDate, setNoReleaseDate] = useState(true);
-  const [projectSumRub, setProjectSumRub] = useState("");
+  const [noReleaseDate, setNoReleaseDate] = useState(false);
+  const [projectSumDisplay, setProjectSumDisplay] = useState("");
+  const [projectSumRub, setProjectSumRub] = useState<number | null>(null);
+  const [paidDisplay, setPaidDisplay] = useState("");
+  const [paidRub, setPaidRub] = useState<number | null>(null);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -41,11 +53,16 @@ export function NewProjectModal({
   function reset() {
     setName("");
     setEngagementType("one_off");
+    setProjectKind("site");
+    setPriority("medium");
     setClientName("");
     setClientId(null);
     setReleaseLocal("");
-    setNoReleaseDate(true);
-    setProjectSumRub("");
+    setNoReleaseDate(false);
+    setProjectSumDisplay("");
+    setProjectSumRub(null);
+    setPaidDisplay("");
+    setPaidRub(null);
     setTeamMemberIds([]);
   }
 
@@ -61,10 +78,13 @@ export function NewProjectModal({
             await onCreate({
               name: name.trim(),
               engagementType,
+              projectKind: engagementType === "one_off" ? projectKind : null,
+              priority,
               clientName: clientName.trim() || null,
               clientId,
               releaseAt: noReleaseDate ? null : releaseLocal ? fromDateInputValue(releaseLocal) : null,
-              projectSumRub: projectSumRub.trim() ? Math.round(Number(projectSumRub)) : null,
+              projectSumRub,
+              paidRub,
               teamMemberIds,
             });
             reset();
@@ -96,7 +116,7 @@ export function NewProjectModal({
         </label>
 
         <div className="mt-4">
-          <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Тип проекта</p>
+          <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Формат</p>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -117,22 +137,71 @@ export function NewProjectModal({
           </div>
         </div>
 
-        <label className="mt-4 block text-[12px]">
-          <span className="text-[var(--v2-ink-600)]">Сумма проекта, ₽</span>
-          <input
-            type="number"
-            min={0}
-            step={1000}
-            className="v2-input mt-1.5 w-full"
-            value={projectSumRub}
-            onChange={(e) => setProjectSumRub(e.target.value)}
-            placeholder="Сколько оплатил клиент"
-          />
-        </label>
+        {engagementType === "one_off" ? (
+          <div className="mt-4">
+            <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Вид проекта</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {PROJECT_KIND_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setProjectKind(opt.value)}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition ${projectKind === opt.value ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)]" : "border-[var(--v2-ink-200)] hover:border-[var(--v2-ink-300)]"}`}
+                >
+                  <div className="v2-tight text-[13px] font-semibold text-[var(--v2-ink-900)]">{opt.label}</div>
+                  <div className="v2-tight mt-0.5 text-[10.5px] leading-snug text-[var(--v2-ink-500)]">{opt.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-4">
+          <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Приоритет</p>
+          <PriorityFlagPicker value={priority} onChange={setPriority} />
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Финансы</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block text-[12px]">
+              <span className="text-[var(--v2-ink-600)]">Сумма проекта, ₽</span>
+              <span className="mt-0.5 block text-[11px] text-[var(--v2-ink-400)]">100% стоимости по договору</span>
+              <MoneyRubInput
+                value={projectSumDisplay}
+                placeholder="100 000"
+                onChange={(display, amount) => {
+                  setProjectSumDisplay(display);
+                  setProjectSumRub(amount);
+                }}
+              />
+            </label>
+            <label className="block text-[12px]">
+              <span className="text-[var(--v2-ink-600)]">Оплачено клиентом, ₽</span>
+              <span className="mt-0.5 block text-[11px] text-[var(--v2-ink-400)]">Предоплата или частичная оплата</span>
+              <MoneyRubInput
+                value={paidDisplay}
+                placeholder="20 000"
+                onChange={(display, amount) => {
+                  setPaidDisplay(display);
+                  setPaidRub(amount);
+                }}
+              />
+            </label>
+          </div>
+        </div>
 
         <div className="mt-4">
           <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Дата релиза</span>
-          <label className="mb-2 flex cursor-pointer items-center gap-2">
+          {!noReleaseDate ? (
+            <input
+              type="date"
+              className="v2-input mb-2 w-full"
+              value={releaseLocal}
+              onChange={(e) => setReleaseLocal(e.target.value)}
+            />
+          ) : null}
+          <label className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
               checked={noReleaseDate}
@@ -143,14 +212,6 @@ export function NewProjectModal({
             />
             <span className="v2-tight text-[13px] text-[var(--v2-ink-700)]">Без даты</span>
           </label>
-          {!noReleaseDate ? (
-            <input
-              type="date"
-              className="v2-input w-full"
-              value={releaseLocal}
-              onChange={(e) => setReleaseLocal(e.target.value)}
-            />
-          ) : null}
         </div>
 
         <div className="mt-4">
