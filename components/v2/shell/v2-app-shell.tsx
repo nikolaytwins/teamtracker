@@ -12,7 +12,7 @@ import { V2ShellSidebar } from "@/components/v2/shell/v2-shell-sidebar";
 import type { V2ShellUser } from "@/components/v2/shell/v2-user-account-menu";
 
 type Me = V2ShellUser & { role: string };
-type Member = { user_id: string; display_name: string; role: string };
+type Member = { user_id: string; display_name: string; role: string; avatar_url?: string | null };
 
 export type TaskCreationContext = {
   projectId: string;

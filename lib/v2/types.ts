@@ -51,6 +51,7 @@ export type V2ProjectRow = {
   budget_rub: number | null;
   engagement_type: V2ProjectEngagementType;
   client_access_enabled: boolean;
+  client_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

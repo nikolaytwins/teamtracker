@@ -1,16 +1,15 @@
 export type AgencyDatabaseMode = "sqlite" | "supabase";
 
 /**
- * Режим агентства:
- * - `AGENCY_DATABASE=sqlite` — всегда SQLite.
- * - `AGENCY_DATABASE=supabase` — Supabase (нужны URL + service key; иначе репозиторий откатится на SQLite).
- * - не задано — если в env есть URL и service key, используется Supabase, иначе SQLite.
+ * Режим агентства (v1 /agency):
+ * - по умолчанию — SQLite (`AGENCY_SQLITE_PATH` или `data/agency.db`), даже если заданы ключи Supabase для v2.
+ * - `AGENCY_DATABASE=supabase` — Postgres (нужны URL + service key; иначе откат на SQLite).
+ * - `AGENCY_DATABASE=sqlite` — явно SQLite.
  */
 export function getAgencyDatabaseMode(): AgencyDatabaseMode {
   const v = process.env.AGENCY_DATABASE?.trim().toLowerCase();
   if (v === "sqlite") return "sqlite";
   if (v === "supabase") return "supabase";
-  if (isSupabaseAgencyConfigured()) return "supabase";
   return "sqlite";
 }
 

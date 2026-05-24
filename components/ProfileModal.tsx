@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiUrl } from "@/lib/api-url";
 
 export type ProfileUser = {
@@ -42,6 +42,8 @@ export function ProfileModal({ open, user, onClose, onProfileSaved }: Props) {
   const [pwOk, setPwOk] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -59,6 +61,49 @@ export function ProfileModal({ open, user, onClose, onProfileSaved }: Props) {
 
   if (!open || !user) return null;
 
+  const previewInitial = (name || user.login).charAt(0).toUpperCase();
+  const previewSrc = avatarUrl.trim() || null;
+
+  async function uploadAvatar(file: File) {
+    setUploadingAvatar(true);
+    setProfileErr(null);
+    setProfileOk(null);
+    try {
+      const form = new FormData();
+      form.append("avatar", file);
+      const r = await fetch(apiUrl("/api/me/avatar"), { method: "POST", body: form });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Не удалось загрузить фото");
+      const nextUrl = (d.user?.avatarUrl as string | undefined) ?? (d.avatarUrl as string | undefined) ?? "";
+      setAvatarUrl(nextUrl);
+      if (d.user) onProfileSaved(d.user);
+      setProfileOk("Фото обновлено");
+    } catch (e) {
+      setProfileErr(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function removeAvatar() {
+    setUploadingAvatar(true);
+    setProfileErr(null);
+    setProfileOk(null);
+    try {
+      const r = await fetch(apiUrl("/api/me/avatar"), { method: "DELETE" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof d.error === "string" ? d.error : "Не удалось удалить фото");
+      setAvatarUrl("");
+      if (d.user) onProfileSaved(d.user);
+      setProfileOk("Фото удалено");
+    } catch (e) {
+      setProfileErr(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   async function saveProfile() {
     setSavingProfile(true);
     setProfileErr(null);
@@ -70,7 +115,6 @@ export function ProfileModal({ open, user, onClose, onProfileSaved }: Props) {
         body: JSON.stringify({
           displayName: name.trim(),
           jobTitle: title.trim(),
-          avatarUrl: avatarUrl.trim() || null,
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -149,25 +193,50 @@ export function ProfileModal({ open, user, onClose, onProfileSaved }: Props) {
               <span className="text-xs font-medium text-[var(--muted-foreground)]">Должность</span>
               <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="tt-input mt-1 w-full py-2 text-sm" />
             </label>
-            <label className="block">
-              <span className="text-xs font-medium text-[var(--muted-foreground)]">Аватар (URL, https)</span>
-              <input
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://…"
-                className="tt-input mt-1 w-full py-2 text-sm"
-              />
-            </label>
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-14 w-14 shrink-0 overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--text)]">
-                {avatarUrl.trim() && /^https:\/\//i.test(avatarUrl.trim()) ? (
-                  <img src={avatarUrl.trim()} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center">{(name || user.login).charAt(0).toUpperCase()}</span>
-                )}
-              </span>
-              <p className="text-[11px] leading-snug text-[var(--muted-foreground)]">Превью по ссылке. Пустое поле — без фото.</p>
+            <div className="block">
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">Фото профиля</span>
+              <div className="mt-2 flex items-center gap-4">
+                <span className="inline-flex h-16 w-16 shrink-0 overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-base font-semibold text-[var(--text)]">
+                  {previewSrc ? (
+                    <img src={previewSrc} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center">{previewInitial}</span>
+                  )}
+                </span>
+                <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void uploadAvatar(file);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={uploadingAvatar}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/50 px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)] disabled:opacity-40"
+                  >
+                    {uploadingAvatar ? "Загрузка…" : "Загрузить фото"}
+                  </button>
+                  {previewSrc ? (
+                    <button
+                      type="button"
+                      disabled={uploadingAvatar}
+                      onClick={() => void removeAvatar()}
+                      className="rounded-xl px-3 py-2 text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-40"
+                    >
+                      Удалить
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <p className="mt-2 text-[11px] leading-snug text-[var(--muted-foreground)]">
+                JPEG, PNG, GIF или WebP, до 2 МБ. Фото сохраняется сразу после выбора файла.
+              </p>
             </div>
             <button
               type="button"

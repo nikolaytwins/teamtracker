@@ -4,7 +4,7 @@ import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PortfolioPayload, PortfolioKanbanStatus, PortfolioProject } from "@/lib/v2/projects/portfolio-types";
 import { kanbanToV2Status } from "@/lib/v2/projects/portfolio-types";
-import { kanbanStatusToV2CreateStatus, STARRED_STORAGE_KEY } from "@/components/v2/projects/portfolio-meta";
+import { STARRED_STORAGE_KEY, kanbanStatusToV2CreateStatus } from "@/components/v2/projects/portfolio-meta";
 import { NewProjectModal, type NewProjectModalInput } from "@/components/v2/projects/new-project-modal";
 import { DeleteProjectConfirmModal } from "@/components/v2/projects/delete-project-dialog";
 import { PortfolioHero } from "@/components/v2/projects/portfolio-hero";
@@ -183,31 +183,30 @@ export function V2ProjectsClient() {
       body: JSON.stringify({
         name: input.name,
         scope: "team",
-        status: kanbanStatusToV2CreateStatus(input.status),
+        status: "not_started",
         engagementType: input.engagementType,
-        clientAccessEnabled: input.clientAccessEnabled,
-        contractRef: input.contractRef,
+        clientName: input.clientName,
+        clientId: input.clientId,
         releaseAt: input.releaseAt,
-        budgetRub: input.budgetRub,
+        projectSumRub: input.projectSumRub,
         teamMemberUserIds: input.teamMemberIds,
-        clientUserIds: input.clientUserIds,
       }),
     });
     await reload();
   }
 
   async function createProject(name: string, status: PortfolioKanbanStatus) {
-    await createProjectFromModal({
-      name,
-      status,
-      engagementType: "one_off",
-      clientAccessEnabled: false,
-      contractRef: null,
-      releaseAt: null,
-      budgetRub: null,
-      teamMemberIds: [],
-      clientUserIds: [],
+    await fetchJson("/api/v2/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        scope: "team",
+        status: kanbanStatusToV2CreateStatus(status),
+        engagementType: "one_off",
+      }),
     });
+    await reload();
   }
 
   async function moveProject(id: string, status: PortfolioKanbanStatus) {

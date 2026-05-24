@@ -180,7 +180,7 @@
 }
 
 .v2-btn-primary {
-  background: var(--v2-ink-900);
+  background: var(--v2-brand-600);
   color: #fff;
   border-radius: 0.75rem;
   padding: 0.5rem 1rem;
@@ -189,7 +189,7 @@
 }
 
 .v2-btn-primary:hover {
-  background: var(--v2-ink-700);
+  background: var(--v2-brand-700);
 }
 
 .v2-btn-primary:disabled {

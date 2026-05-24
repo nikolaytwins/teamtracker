@@ -28,10 +28,14 @@
 | 007 | `007_v2_task_planned_at.sql` | planned_at у задач |
 | 008 | `008_v2_task_files_comment_replies.sql` | Файлы задач, ответы в комментариях |
 | 009 | `009_v2_project_phases.sql` | Этапы проекта, phase_id у задач |
-| 010 | `010_v2_clear_all_projects.sql` | Одноразово: удалить все v2_projects (v1 не трогаем) |
+| 010 | *(удалена)* | Не использовать SQL-миграцию для очистки v2 — только `npm run v2-clear-projects` |
 | 011 | `011_v2_attachments_storage_bucket.sql` | Supabase Storage bucket для файлов проектов и задач v2 |
+| 012 | `012_avatars_storage_bucket.sql` | Supabase Storage bucket для аватаров |
+| 013 | `013_v2_clients.sql` | CRM-клиенты v2 и привязка к проектам |
 
-**Следующий свободный номер:** `012`
+**Следующий свободный номер:** `014`
+
+Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 
 ## Legacy (v1, до нумерации)
 

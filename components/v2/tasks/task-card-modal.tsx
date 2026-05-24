@@ -528,6 +528,7 @@ export function TaskCardModal({
                     <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">Приоритет</span>
                     <div className="mt-2">
                       <PriorityFlagPicker
+                        compact
                         value={t.priority}
                         onChange={(priority) => {
                           if (priority !== t.priority) void patch({ priority });

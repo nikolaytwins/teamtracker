@@ -1,23 +1,18 @@
 "use client";
 
 import { fromDateInputValue } from "@/lib/v2/format";
-import type { PortfolioKanbanStatus } from "@/lib/v2/projects/portfolio-types";
-import { STATUS_META, STATUS_ORDER } from "@/components/v2/projects/portfolio-meta";
-import { ProjectMembersPicker } from "@/components/v2/projects/project-members-picker";
+import { ClientNameInput } from "@/components/v2/projects/client-name-input";
+import { TeamMembersPicker, type TeamMemberOption } from "@/components/v2/projects/team-members-picker";
 import { useState } from "react";
-
-type Member = { user_id: string; display_name: string; role: string };
 
 export type NewProjectModalInput = {
   name: string;
-  status: PortfolioKanbanStatus;
   engagementType: "one_off" | "retainer";
-  clientAccessEnabled: boolean;
-  contractRef: string | null;
+  clientName: string | null;
+  clientId: string | null;
   releaseAt: string | null;
-  budgetRub: number | null;
+  projectSumRub: number | null;
   teamMemberIds: string[];
-  clientUserIds: string[];
 };
 
 export function NewProjectModal({
@@ -27,33 +22,31 @@ export function NewProjectModal({
   onCreate,
 }: {
   open: boolean;
-  members: Member[];
+  members: TeamMemberOption[];
   onClose: () => void;
   onCreate: (input: NewProjectModalInput) => Promise<void>;
 }) {
   const [name, setName] = useState("");
-  const [status, setStatus] = useState<PortfolioKanbanStatus>("in_progress");
   const [engagementType, setEngagementType] = useState<"one_off" | "retainer">("one_off");
-  const [clientAccessEnabled, setClientAccessEnabled] = useState(false);
-  const [contractRef, setContractRef] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientId, setClientId] = useState<string | null>(null);
   const [releaseLocal, setReleaseLocal] = useState("");
-  const [budgetRub, setBudgetRub] = useState("");
+  const [noReleaseDate, setNoReleaseDate] = useState(true);
+  const [projectSumRub, setProjectSumRub] = useState("");
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
-  const [clientUserIds, setClientUserIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   if (!open) return null;
 
   function reset() {
     setName("");
-    setStatus("in_progress");
     setEngagementType("one_off");
-    setClientAccessEnabled(false);
-    setContractRef("");
+    setClientName("");
+    setClientId(null);
     setReleaseLocal("");
-    setBudgetRub("");
+    setNoReleaseDate(true);
+    setProjectSumRub("");
     setTeamMemberIds([]);
-    setClientUserIds([]);
   }
 
   return (
@@ -67,14 +60,12 @@ export function NewProjectModal({
           try {
             await onCreate({
               name: name.trim(),
-              status,
               engagementType,
-              clientAccessEnabled,
-              contractRef: contractRef.trim() || null,
-              releaseAt: releaseLocal ? fromDateInputValue(releaseLocal) : null,
-              budgetRub: budgetRub.trim() ? Math.round(Number(budgetRub)) : null,
+              clientName: clientName.trim() || null,
+              clientId,
+              releaseAt: noReleaseDate ? null : releaseLocal ? fromDateInputValue(releaseLocal) : null,
+              projectSumRub: projectSumRub.trim() ? Math.round(Number(projectSumRub)) : null,
               teamMemberIds,
-              clientUserIds: clientAccessEnabled ? clientUserIds : [],
             });
             reset();
             onClose();
@@ -85,7 +76,7 @@ export function NewProjectModal({
       >
         <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Новый проект</h2>
         <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-500)]">
-          Заполните параметры — они сразу появятся на странице проекта
+          Статус «Не начат» выставится автоматически
         </p>
 
         <label className="mt-4 block">
@@ -100,18 +91,8 @@ export function NewProjectModal({
         </label>
 
         <label className="mt-4 block">
-          <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Статус</span>
-          <select
-            className="v2-input"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as PortfolioKanbanStatus)}
-          >
-            {STATUS_ORDER.map((key) => (
-              <option key={key} value={key}>
-                {STATUS_META[key].label}
-              </option>
-            ))}
-          </select>
+          <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Клиент</span>
+          <ClientNameInput value={clientName} onChange={setClientName} onClientIdChange={setClientId} />
         </label>
 
         <div className="mt-4">
@@ -136,50 +117,44 @@ export function NewProjectModal({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="block text-[12px]">
-            <span className="text-[var(--v2-ink-600)]">Договор / реф.</span>
-            <input
-              className="v2-input mt-1.5 w-full"
-              value={contractRef}
-              onChange={(e) => setContractRef(e.target.value)}
-              placeholder="№ договора"
-            />
-          </label>
-          <label className="block text-[12px]">
-            <span className="text-[var(--v2-ink-600)]">Бюджет, ₽</span>
-            <input
-              type="number"
-              min={0}
-              step={1000}
-              className="v2-input mt-1.5 w-full"
-              value={budgetRub}
-              onChange={(e) => setBudgetRub(e.target.value)}
-              placeholder="500000"
-            />
-          </label>
-        </div>
-
         <label className="mt-4 block text-[12px]">
-          <span className="text-[var(--v2-ink-600)]">Дата релиза</span>
+          <span className="text-[var(--v2-ink-600)]">Сумма проекта, ₽</span>
           <input
-            type="date"
+            type="number"
+            min={0}
+            step={1000}
             className="v2-input mt-1.5 w-full"
-            value={releaseLocal}
-            onChange={(e) => setReleaseLocal(e.target.value)}
+            value={projectSumRub}
+            onChange={(e) => setProjectSumRub(e.target.value)}
+            placeholder="Сколько оплатил клиент"
           />
         </label>
 
         <div className="mt-4">
-          <ProjectMembersPicker
-            members={members}
-            teamMemberIds={teamMemberIds}
-            onTeamMemberIdsChange={setTeamMemberIds}
-            clientAccessEnabled={clientAccessEnabled}
-            onClientAccessEnabledChange={setClientAccessEnabled}
-            clientUserIds={clientUserIds}
-            onClientUserIdsChange={setClientUserIds}
-          />
+          <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Дата релиза</span>
+          <label className="mb-2 flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={noReleaseDate}
+              onChange={(e) => {
+                setNoReleaseDate(e.target.checked);
+                if (e.target.checked) setReleaseLocal("");
+              }}
+            />
+            <span className="v2-tight text-[13px] text-[var(--v2-ink-700)]">Без даты</span>
+          </label>
+          {!noReleaseDate ? (
+            <input
+              type="date"
+              className="v2-input w-full"
+              value={releaseLocal}
+              onChange={(e) => setReleaseLocal(e.target.value)}
+            />
+          ) : null}
+        </div>
+
+        <div className="mt-4">
+          <TeamMembersPicker members={members} selectedIds={teamMemberIds} onChange={setTeamMemberIds} />
         </div>
 
         <div className="mt-5 flex justify-end gap-2 border-t border-[var(--v2-ink-100)] pt-4">

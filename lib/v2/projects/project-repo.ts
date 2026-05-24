@@ -1,5 +1,6 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import { logActivity } from "@/lib/v2/activity/log";
+import { findOrCreateClient } from "@/lib/v2/clients/client-repo";
 import { canManageProjectMembers, canViewProject } from "@/lib/v2/auth/permissions";
 import {
   getProjectMemberIds,
@@ -30,6 +31,7 @@ function normalizeProjectRow(raw: Record<string, unknown>): V2ProjectRow {
     ...(raw as V2ProjectRow),
     engagement_type: raw.engagement_type === "retainer" ? "retainer" : "one_off",
     client_access_enabled: Boolean(raw.client_access_enabled),
+    client_id: typeof raw.client_id === "string" ? raw.client_id : null,
   };
 }
 
@@ -71,7 +73,11 @@ export type CreateProjectInput = {
   clientAccessEnabled?: boolean;
   contractRef?: string | null;
   releaseAt?: string | null;
+  /** Сумма проекта (сколько оплатил клиент), хранится в budget_rub. */
+  projectSumRub?: number | null;
   budgetRub?: number | null;
+  clientName?: string | null;
+  clientId?: string | null;
   teamMemberUserIds?: string[];
   clientUserIds?: string[];
   memberUserIds?: string[];
@@ -102,6 +108,12 @@ export async function createProject(ctx: V2SessionContext, input: CreateProjectI
   const ts = nowIso();
   const engagementType = input.engagementType === "retainer" ? "retainer" : "one_off";
   const clientAccessEnabled = Boolean(input.clientAccessEnabled);
+  const projectSumRub = input.projectSumRub ?? input.budgetRub ?? null;
+
+  let clientId: string | null = input.clientId?.trim() || null;
+  if (!clientId && input.clientName?.trim()) {
+    clientId = await findOrCreateClient(ctx, input.clientName);
+  }
 
   const row: V2ProjectRow = {
     id,
@@ -112,13 +124,14 @@ export async function createProject(ctx: V2SessionContext, input: CreateProjectI
     color_tint: colors.tint,
     color_bg: colors.bg,
     color_ink: colors.ink ?? colors.tint,
-    status: input.status ?? "in_progress",
+    status: input.status ?? "not_started",
     owner_user_id: input.scope === "personal" ? ctx.userId : null,
     contract_ref: input.contractRef?.trim() || null,
     release_at: input.releaseAt ?? null,
-    budget_rub: input.budgetRub ?? null,
+    budget_rub: projectSumRub,
     engagement_type: engagementType,
     client_access_enabled: clientAccessEnabled,
+    client_id: clientId,
     created_by: ctx.userId,
     created_at: ts,
     updated_at: ts,
@@ -137,6 +150,7 @@ export async function createProject(ctx: V2SessionContext, input: CreateProjectI
     scope: row.scope,
     engagement_type: row.engagement_type,
     client_access_enabled: row.client_access_enabled,
+    client_id: row.client_id,
     contract_ref: row.contract_ref,
     release_at: row.release_at,
     budget_rub: row.budget_rub,

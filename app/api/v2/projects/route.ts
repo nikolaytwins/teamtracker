@@ -57,8 +57,15 @@ export async function POST(request: NextRequest) {
 
     const contractRef = typeof body.contractRef === "string" ? body.contractRef.trim() || null : null;
     const releaseAt = typeof body.releaseAt === "string" && body.releaseAt.trim() ? body.releaseAt.trim() : null;
-    const budgetRub =
-      typeof body.budgetRub === "number" && Number.isFinite(body.budgetRub) ? Math.round(body.budgetRub) : null;
+    const projectSumRub =
+      typeof body.projectSumRub === "number" && Number.isFinite(body.projectSumRub)
+        ? Math.round(body.projectSumRub)
+        : typeof body.budgetRub === "number" && Number.isFinite(body.budgetRub)
+          ? Math.round(body.budgetRub)
+          : null;
+
+    const clientName = typeof body.clientName === "string" ? body.clientName.trim() || null : null;
+    const clientId = typeof body.clientId === "string" ? body.clientId.trim() || null : null;
 
     const project = await createProject(auth.ctx, {
       name,
@@ -66,12 +73,14 @@ export async function POST(request: NextRequest) {
       memberUserIds,
       teamMemberUserIds,
       clientUserIds,
-      status,
+      status: status ?? "not_started",
       engagementType,
       clientAccessEnabled,
       contractRef,
       releaseAt,
-      budgetRub,
+      projectSumRub,
+      clientName,
+      clientId,
     });
     return NextResponse.json({ project });
   } catch (e) {

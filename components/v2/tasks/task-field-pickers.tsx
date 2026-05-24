@@ -67,12 +67,14 @@ export function AssigneeAvatarPicker({
 export function PriorityFlagPicker({
   value,
   onChange,
+  compact = false,
 }: {
   value: V2TaskPriority;
   onChange: (priority: V2TaskPriority) => void;
+  compact?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div className={`grid gap-2 ${compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
       {(["urgent", "high", "medium", "low"] as V2TaskPriority[]).map((key) => {
         const m = PRIORITY_META[key];
         const active = value === key;
@@ -81,12 +83,15 @@ export function PriorityFlagPicker({
             key={key}
             type="button"
             onClick={() => onChange(key)}
-            className={`v2-tight flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition ${
+            className={`v2-tight flex w-full min-w-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-left transition ${
               active ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)]" : "border-[var(--v2-ink-200)] hover:border-[var(--v2-ink-300)]"
             }`}
           >
             <V2Icons.flag className="h-4 w-4 shrink-0" style={{ color: m.dot }} />
-            <span className="text-[12.5px] font-medium" style={{ color: active ? m.ink : "var(--v2-ink-700)" }}>
+            <span
+              className="min-w-0 truncate text-[12px] font-medium"
+              style={{ color: active ? m.ink : "var(--v2-ink-700)" }}
+            >
               {m.label}
             </span>
           </button>

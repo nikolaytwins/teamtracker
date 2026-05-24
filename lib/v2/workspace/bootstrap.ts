@@ -68,7 +68,7 @@ export async function buildV2SessionContext(
 }
 
 export async function listWorkspaceMembers(): Promise<
-  Array<V2WorkspaceMemberRow & { display_name: string; job_title: string }>
+  Array<V2WorkspaceMemberRow & { display_name: string; job_title: string; avatar_url: string | null }>
 > {
   const sb = getV2Supabase();
   const { data, error } = await sb
@@ -86,6 +86,7 @@ export async function listWorkspaceMembers(): Promise<
       ...(m as V2WorkspaceMemberRow),
       display_name: u?.display_name ?? m.user_id,
       job_title: u?.job_title ?? "",
+      avatar_url: u?.avatar_url ?? null,
     };
   });
 }
