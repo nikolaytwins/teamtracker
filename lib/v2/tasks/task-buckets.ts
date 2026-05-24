@@ -1,4 +1,10 @@
-import type { V2TaskBucket, V2TaskRow } from "@/lib/v2/types";
+import type { V2HomeBucket, V2TaskBucket, V2TaskRow } from "@/lib/v2/types";
+
+const HOME_BUCKETS: V2HomeBucket[] = ["today", "tomorrow", "this_week", "later"];
+
+function isHomeBucket(value: string | null | undefined): value is V2HomeBucket {
+  return value != null && HOME_BUCKETS.includes(value as V2HomeBucket);
+}
 
 function startOfLocalDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
@@ -34,6 +40,13 @@ export function classifyTaskBucket(task: V2TaskRow, now: Date = new Date()): V2T
     if (completed >= todayStart && completed <= todayEnd) return "done_today";
     return "later";
   }
+
+  if (task.deadline_at) {
+    const hardDeadline = new Date(task.deadline_at);
+    if (hardDeadline < todayStart) return "overdue";
+  }
+
+  if (isHomeBucket(task.home_bucket)) return task.home_bucket;
 
   if (!task.planned_at && !task.deadline_at) return "later";
 
@@ -99,30 +112,44 @@ function scheduleEndOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 18, 0, 0, 0);
 }
 
-/** ISO для planned_at / deadline_at, чтобы задача попала в нужный бакет. */
+/** ISO для planned_at при переносе в «сегодня» / «завтра». */
 export function isoScheduleForBucket(bucket: V2TaskBucket, now: Date = new Date()): string | null {
-  if (!canDropTaskOnHomeBucket(bucket)) return null;
+  if (bucket !== "today" && bucket !== "tomorrow") return null;
 
   const todayStart = startOfLocalDay(now);
   const tomorrow = addDays(todayStart, 1);
-  const weekEnd = endOfWeekSunday(now);
-  const tomorrowEnd = scheduleEndOfDay(tomorrow);
 
   switch (bucket) {
     case "today":
       return scheduleEndOfDay(now).toISOString();
     case "tomorrow":
-      return tomorrowEnd.toISOString();
-    case "this_week": {
-      let target = weekEnd;
-      if (target.getTime() <= tomorrowEnd.getTime()) {
-        target = scheduleEndOfDay(addDays(todayStart, 2));
-      }
-      return target.toISOString();
-    }
-    case "later":
-      return scheduleEndOfDay(addDays(weekEnd, 1)).toISOString();
+      return scheduleEndOfDay(tomorrow).toISOString();
     default:
       return null;
   }
+}
+
+export type HomeBucketMovePatch = {
+  homeBucket: V2HomeBucket;
+  plannedAt: string | null;
+};
+
+/** PATCH-поля при переносе задачи между секциями главной. */
+export function patchForHomeBucketMove(
+  bucket: V2TaskBucket,
+  now: Date = new Date()
+): HomeBucketMovePatch | null {
+  if (!canDropTaskOnHomeBucket(bucket)) return null;
+
+  if (bucket === "today" || bucket === "tomorrow") {
+    const plannedAt = isoScheduleForBucket(bucket, now);
+    if (!plannedAt) return null;
+    return { homeBucket: bucket, plannedAt };
+  }
+
+  if (bucket === "this_week" || bucket === "later") {
+    return { homeBucket: bucket, plannedAt: null };
+  }
+
+  return null;
 }

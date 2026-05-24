@@ -18,6 +18,9 @@ export type V2TaskStatus = "todo" | "in_progress" | "review" | "done";
 export type V2TaskPriority = "urgent" | "high" | "medium" | "low";
 export type V2InboxBucket = "this_week" | "this_month" | "someday";
 
+/** Явная секция на главной без привязки к конкретной дате. */
+export type V2HomeBucket = "today" | "tomorrow" | "this_week" | "later";
+
 export type V2TaskBucket =
   | "overdue"
   | "today"
@@ -95,6 +98,7 @@ export type V2TaskRow = {
   completed_at: string | null;
   sort_order: number;
   inbox_bucket: V2InboxBucket | null;
+  home_bucket: V2HomeBucket | null;
   work_month: string | null;
   deleted_at: string | null;
   created_at: string;

@@ -622,12 +622,13 @@ export function buildListSections(
   const oneOff = filteredActive.filter((p) => p.engagementType !== "retainer");
 
   if (statusFilter === "all") {
-    const burning = oneOff.filter((p) => p.health === "critical" || p.health === "at_risk");
+    const isBurning = (p: PortfolioProject) => p.health === "critical" || p.health === "at_risk";
+    const burning = oneOff.filter(isBurning);
     const inwork = oneOff.filter(
-      (p) => (p.status === "in_progress" || p.status === "review") && p.health !== "critical" && p.health !== "at_risk"
+      (p) => (p.status === "in_progress" || p.status === "review") && !isBurning(p)
     );
-    const upcoming = oneOff.filter((p) => p.status === "not_started");
-    const paused = oneOff.filter((p) => p.status === "paused");
+    const upcoming = oneOff.filter((p) => p.status === "not_started" && !isBurning(p));
+    const paused = oneOff.filter((p) => p.status === "paused" && !isBurning(p));
     return [
       { id: "burning", title: "Горят и под угрозой", subtitle: "нужна помощь / решения", accent: "#EF4444", list: burning, defaultStatus: "in_progress", allowAdd: false },
       { id: "in_progress", title: "В работе", subtitle: "идёт ежедневная активность", accent: "#3B6FF7", list: inwork, defaultStatus: "in_progress", allowAdd: true },

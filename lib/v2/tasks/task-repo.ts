@@ -7,6 +7,7 @@ import { normalizeWorkMonth } from "@/lib/v2/projects/retainer-utils";
 import { classifyTaskBucket } from "@/lib/v2/tasks/task-buckets";
 import { listUsersPublic } from "@/lib/tt-auth-db";
 import type {
+  V2HomeBucket,
   V2InboxBucket,
   V2SessionContext,
   V2TaskPriority,
@@ -27,6 +28,7 @@ export type CreateTaskInput = {
   priority?: V2TaskPriority;
   description?: string | null;
   inboxBucket?: V2InboxBucket | null;
+  homeBucket?: V2HomeBucket | null;
   parentId?: string | null;
   phaseId?: string | null;
   workMonth?: string | null;
@@ -44,6 +46,7 @@ export type UpdateTaskInput = Partial<{
   status: V2TaskStatus;
   scope: V2TaskScope;
   inboxBucket: V2InboxBucket | null;
+  homeBucket: V2HomeBucket | null;
   phaseId: string | null;
 }>;
 
@@ -365,6 +368,7 @@ export async function createTask(ctx: V2SessionContext, input: CreateTaskInput):
     completed_at: null,
     sort_order: 0,
     inbox_bucket: input.inboxBucket ?? null,
+    home_bucket: input.homeBucket ?? null,
     work_month: workMonth,
     deleted_at: null,
     created_at: ts,
@@ -421,6 +425,7 @@ export async function updateTask(
   if (input.status !== undefined) patch.status = input.status;
   if (input.scope !== undefined) patch.scope = input.scope;
   if (input.inboxBucket !== undefined) patch.inbox_bucket = input.inboxBucket;
+  if (input.homeBucket !== undefined) patch.home_bucket = input.homeBucket;
 
   const sb = getV2Supabase();
   const { error } = await sb.from("v2_tasks").update(patch).eq("id", taskId);

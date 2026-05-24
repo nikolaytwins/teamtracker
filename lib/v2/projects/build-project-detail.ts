@@ -352,10 +352,7 @@ export async function buildProjectDetail(
     clientName = (clientRow?.display_name as string | undefined) ?? null;
   }
 
-  const nearestDeadline = openTasks
-    .filter((t) => t.deadline_at)
-    .map((t) => t.deadline_at!)
-    .sort()[0] ?? releaseAt;
+  const nearestDeadline = releaseAt;
   const { label: deadlineLabel, days: deadlineDays } = formatDeadlineLabel(nearestDeadline, now);
 
   const started = new Date(project.created_at);

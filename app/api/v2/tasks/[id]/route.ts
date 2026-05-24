@@ -38,6 +38,7 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
       status: body.status,
       scope: body.scope,
       inboxBucket: body.inboxBucket !== undefined ? body.inboxBucket : undefined,
+      homeBucket: body.homeBucket !== undefined ? body.homeBucket : undefined,
     });
     return NextResponse.json({ task });
   } catch (e) {

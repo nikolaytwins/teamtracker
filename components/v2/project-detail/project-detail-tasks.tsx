@@ -220,7 +220,6 @@ function SubtaskRow({
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const completed = st.status === "done" || !!st.completedAt;
-  const pm = PRIORITY_META[st.priority];
 
   return (
     <div className="group relative w-full py-2 pl-[52px] pr-2 transition hover:bg-[var(--v2-ink-50)]/60 sm:pl-[60px] sm:pr-3">
@@ -228,11 +227,6 @@ function SubtaskRow({
       <span aria-hidden className="absolute left-[36px] top-[19px] h-px w-4 bg-[var(--v2-ink-200)]" />
       {last ? <span aria-hidden className="absolute bottom-0 left-[36px] top-5 w-px bg-white" /> : null}
       <div className="relative flex items-center gap-2 sm:gap-3">
-        <span
-          aria-hidden
-          className="absolute bottom-2 left-[-16px] top-2 w-0.5 rounded-r-full sm:left-[-20px]"
-          style={{ background: pm.dot, opacity: completed ? 0.18 : 0.5 }}
-        />
         <TaskCheckbox checked={completed} onChange={() => onToggleDone(st.id, !completed)} />
         <div className="min-w-0 flex-1">
           {editingTitle ? (

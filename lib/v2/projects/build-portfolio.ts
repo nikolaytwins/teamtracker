@@ -43,6 +43,12 @@ function maxPriorityFromTasks(tasks: V2TaskRow[]): V2TaskPriority {
   return best;
 }
 
+function deadlineForHealth(t: V2TaskRow): string | null {
+  if (!t.deadline_at) return null;
+  if (t.planned_at && t.deadline_at === t.planned_at) return null;
+  return t.deadline_at;
+}
+
 function computeHealth(
   kanbanStatus: ReturnType<typeof v2StatusToKanban>,
   openTasks: V2TaskRow[],
@@ -59,8 +65,9 @@ function computeHealth(
 
   for (const t of openTasks) {
     openCount++;
-    if (!t.deadline_at) continue;
-    const d = new Date(t.deadline_at);
+    const dlRaw = deadlineForHealth(t);
+    if (!dlRaw) continue;
+    const d = new Date(dlRaw);
     const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     const diff = Math.round((target - dayStart) / 86400000);
     if (diff < 0) hasOverdue = true;
@@ -76,20 +83,6 @@ function computeHealth(
     if (deadlineSoon) return "at_risk";
   }
   return "on_track";
-}
-
-function nearestDeadline(openTasks: V2TaskRow[]): string | null {
-  let best: string | null = null;
-  let bestTs = Infinity;
-  for (const t of openTasks) {
-    if (t.completed_at || !t.deadline_at) continue;
-    const ts = new Date(t.deadline_at).getTime();
-    if (ts < bestTs) {
-      bestTs = ts;
-      best = t.deadline_at;
-    }
-  }
-  return best;
 }
 
 export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPayload> {
@@ -183,7 +176,7 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
     const kanbanStatus = v2StatusToKanban(p.status);
     const health = computeHealth(kanbanStatus, openTasks, now);
     const priority = p.priority ?? maxPriorityFromTasks(tasks);
-    const deadlineAt = nearestDeadline(openTasks);
+    const deadlineAt = p.release_at;
     const { label: deadline, days: deadlineDays } = formatDeadlineLabel(deadlineAt, now);
 
     const budget = projectSumRub(p.budget_rub);
