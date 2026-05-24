@@ -25,7 +25,7 @@ type V2Bootstrap = {
   workspace: V2WorkspaceRow | null;
   members: Member[];
   projects: V2ProjectRow[];
-  taskCounts: { open: number; inbox: number; byProject: Record<string, number> };
+  taskCounts: { open: number; byProject: Record<string, number> };
   loading: boolean;
   refresh: () => Promise<void>;
   openNewTask: (projectId?: string | null, title?: string) => void;
@@ -38,7 +38,7 @@ const Ctx = createContext<V2Bootstrap>({
   workspace: null,
   members: [],
   projects: [],
-  taskCounts: { open: 0, inbox: 0, byProject: {} },
+  taskCounts: { open: 0, byProject: {} },
   loading: true,
   refresh: async () => {},
   openNewTask: () => {},
@@ -54,18 +54,15 @@ type NavItem = {
   href: string;
   label: string;
   icon: keyof typeof V2Icons;
-  countKey?: "inbox" | "open";
+  countKey?: "open";
   admin?: boolean;
   kbd?: string;
 };
 
 const NAV: NavItem[] = [
   { href: "/v2/home", label: "Главная", icon: "home", countKey: "open" },
-  { href: "/v2/inbox", label: "Входящие", icon: "inbox", countKey: "inbox" },
-  { href: "/v2/calendar", label: "Календарь", icon: "cal" },
   { href: "/v2/projects", label: "Проекты", icon: "projects" },
   { href: "/v2/admin/people", label: "Команда", icon: "team", admin: true },
-  { href: "/v2/admin/dashboard", label: "Отчёты", icon: "reports", admin: true },
 ];
 
 export function V2AppShell({ children }: { children: React.ReactNode }) {
@@ -75,7 +72,6 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [projects, setProjects] = useState<V2ProjectRow[]>([]);
   const [tasks, setTasks] = useState<V2TaskWithMeta[]>([]);
-  const [inboxCount, setInboxCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
@@ -120,20 +116,16 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
   );
 
   const refresh = useCallback(async () => {
-    const [meRes, projRes, taskRes, inboxRes] = await Promise.all([
+    const [meRes, projRes, taskRes] = await Promise.all([
       fetch(apiUrl("/api/v2/auth/me"), { credentials: "include" }).then((r) => r.json()),
       fetch(apiUrl("/api/v2/projects"), { credentials: "include" }).then((r) => r.json()),
       fetch(apiUrl("/api/v2/tasks?grouped=1"), { credentials: "include" }).then((r) => r.json()),
-      fetch(apiUrl("/api/v2/inbox"), { credentials: "include" }).then((r) => r.json()),
     ]);
     setMe(meRes.user ?? null);
     setWorkspace(meRes.workspace ?? null);
     setMembers(meRes.members ?? []);
     setProjects(projRes.projects ?? []);
     setTasks(taskRes.tasks ?? []);
-    const buckets = inboxRes.buckets ?? {};
-    const inboxTotal = Object.values(buckets as Record<string, unknown[]>).reduce((n, arr) => n + (arr?.length ?? 0), 0);
-    setInboxCount(inboxTotal);
   }, []);
 
   useEffect(() => {
@@ -174,8 +166,8 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
       if (t.completed_at || !t.project_id) continue;
       byProject[t.project_id] = (byProject[t.project_id] ?? 0) + 1;
     }
-    return { open, inbox: inboxCount, byProject };
-  }, [tasks, inboxCount]);
+    return { open, byProject };
+  }, [tasks]);
 
   const roleLabel =
     me?.role === "admin"

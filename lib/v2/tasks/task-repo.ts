@@ -493,6 +493,26 @@ export async function completeTask(ctx: V2SessionContext, taskId: string, comple
   return updated;
 }
 
+export async function deleteTask(ctx: V2SessionContext, taskId: string): Promise<void> {
+  const existing = await getTaskById(ctx, taskId);
+  if (!existing) throw new Error("Task not found");
+  if (!(await editPermission(ctx, existing))) throw new Error("Forbidden");
+
+  const sb = getV2Supabase();
+  const ts = nowIso();
+  const { error } = await sb.from("v2_tasks").update({ deleted_at: ts, updated_at: ts }).eq("id", taskId);
+  if (error) throw new Error(error.message);
+
+  const { error: subError } = await sb
+    .from("v2_tasks")
+    .update({ deleted_at: ts, updated_at: ts })
+    .eq("parent_id", taskId)
+    .is("deleted_at", null);
+  if (subError) throw new Error(subError.message);
+
+  await logActivity(ctx, "task.deleted", "task", taskId, { title: existing.title });
+}
+
 export async function listKanbanTasks(
   ctx: V2SessionContext,
   opts?: { assigneeUserId?: string; projectId?: string }

@@ -1,12 +1,12 @@
 "use client";
 
 import { formatBucketSubtitle } from "@/lib/v2/format";
+import { formatWeekColumnLabel, type HomeKanbanColumnKey } from "@/lib/v2/home/home-schedule";
 import { BUCKET_LABELS, BUCKET_ORDER, canDropTaskOnHomeBucket } from "@/lib/v2/tasks/task-buckets";
 import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
 import { InboxHighlightLegend } from "@/components/v2/inbox/inbox-views";
 import { InboxTaskCard } from "@/components/v2/inbox/inbox-task-card";
 import { TaskSection } from "@/components/v2/home/task-section";
-import { HEALTH_META } from "@/components/v2/projects/portfolio-meta";
 import type { PortfolioProject } from "@/lib/v2/projects/portfolio-types";
 
 const SECTION_ACCENTS: Partial<Record<V2TaskBucket, string>> = {
@@ -27,16 +27,6 @@ const BUCKET_EMPTY_LABELS: Partial<Record<V2TaskBucket, string>> = {
 };
 
 const ALWAYS_VISIBLE_BUCKETS = new Set<V2TaskBucket>(["today", "tomorrow", "this_week", "later", "done_today"]);
-
-const WEEK_BUCKETS: { key: V2TaskBucket; dot: string }[] = [
-  { key: "overdue", dot: HEALTH_META.critical.dot },
-  { key: "today", dot: "#3B6FF7" },
-  { key: "tomorrow", dot: "#A1A1AA" },
-  { key: "this_week", dot: "#A1A1AA" },
-  { key: "later", dot: "#D4D4D8" },
-];
-
-type HomeKanbanColumnKey = "unassigned" | "today" | "tomorrow" | "this_week" | "later";
 
 const KANBAN_COLUMNS: { key: HomeKanbanColumnKey; label: string; dot: string; dropBucket?: V2TaskBucket }[] = [
   { key: "unassigned", label: "Нераспределённые", dot: "#F59E0B" },
@@ -184,45 +174,69 @@ export function HomeDayView({
 }
 
 export function HomeWeekView({
-  filteredGroups,
+  weekDates,
+  weekColumns,
+  unscheduled,
   projectsById,
-  dnd,
+  dragId,
+  dragOverDate,
+  onDragStart,
+  onDragEnd,
+  onDropDate,
+  onDragOverDate,
   onOpenTask,
 }: {
-  filteredGroups: Record<string, V2TaskWithMeta[]>;
+  weekDates: string[];
+  weekColumns: Record<string, V2TaskWithMeta[]>;
+  unscheduled: V2TaskWithMeta[];
   projectsById: Map<string, PortfolioProject>;
-  dnd: Pick<HomeDndProps, "dragId" | "onDragStart" | "onDragEnd"> & {
-    onDrop: (bucket: V2TaskBucket) => void;
-  };
+  dragId: string | null;
+  dragOverDate: string | null;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
+  onDropDate: (ymd: string) => void;
+  onDragOverDate: (ymd: string | null) => void;
   onOpenTask: (id: string) => void;
 }) {
+  const todayYmd = weekDates[0] ?? "";
+
   return (
     <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
-      {WEEK_BUCKETS.map(({ key, dot }) => {
-        const list = filteredGroups[key] ?? [];
-        if (key === "overdue" && list.length === 0) return null;
-        return (
-          <HomeKanbanColumn
-            key={key}
-            label={BUCKET_LABELS[key]}
-            dot={dot}
-            tasks={list}
-            projectsById={projectsById}
-            dragId={dnd.dragId}
-            onDragStart={dnd.onDragStart}
-            onDragEnd={dnd.onDragEnd}
-            onOpenTask={onOpenTask}
-            onDrop={canDropTaskOnHomeBucket(key) ? () => dnd.onDrop(key) : undefined}
-          />
-        );
-      })}
+      {weekDates.map((ymd, i) => (
+        <HomeKanbanColumn
+          key={ymd}
+          label={formatWeekColumnLabel(ymd, todayYmd)}
+          dot={i === 0 ? "#3B6FF7" : i === 1 ? "#6366F1" : "#A1A1AA"}
+          tasks={weekColumns[ymd] ?? []}
+          projectsById={projectsById}
+          dragId={dragId}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onOpenTask={onOpenTask}
+          onDrop={() => onDropDate(ymd)}
+          dropActive={dragOverDate === ymd}
+          onDragEnterColumn={() => onDragOverDate(ymd)}
+        />
+      ))}
+      {unscheduled.length > 0 ? (
+        <HomeKanbanColumn
+          key="unscheduled"
+          label="Без даты"
+          dot="#D4D4D8"
+          tasks={unscheduled}
+          projectsById={projectsById}
+          dragId={dragId}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onOpenTask={onOpenTask}
+        />
+      ) : null}
     </div>
   );
 }
 
 export function HomeKanbanView({
-  filteredGroups,
-  unassignedTasks,
+  kanbanColumns,
   showUnassigned,
   projectsById,
   dragId,
@@ -233,8 +247,7 @@ export function HomeKanbanView({
   onDragOverBucket,
   onOpenTask,
 }: {
-  filteredGroups: Record<string, V2TaskWithMeta[]>;
-  unassignedTasks: V2TaskWithMeta[];
+  kanbanColumns: Record<HomeKanbanColumnKey, V2TaskWithMeta[]>;
   showUnassigned: boolean;
   projectsById: Map<string, PortfolioProject>;
   dragId: string | null;
@@ -245,14 +258,6 @@ export function HomeKanbanView({
   onDragOverBucket: (bucket: V2TaskBucket | null) => void;
   onOpenTask: (id: string) => void;
 }) {
-  const columnTasks: Record<HomeKanbanColumnKey, V2TaskWithMeta[]> = {
-    unassigned: unassignedTasks,
-    today: [...(filteredGroups.overdue ?? []), ...(filteredGroups.today ?? [])],
-    tomorrow: filteredGroups.tomorrow ?? [],
-    this_week: filteredGroups.this_week ?? [],
-    later: filteredGroups.later ?? [],
-  };
-
   const columns = showUnassigned ? KANBAN_COLUMNS : KANBAN_COLUMNS.filter((c) => c.key !== "unassigned");
 
   return (
@@ -262,7 +267,7 @@ export function HomeKanbanView({
       </div>
       <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
         {columns.map(({ key, label, dot, dropBucket }) => {
-          const list = columnTasks[key];
+          const list = kanbanColumns[key];
           if (key === "unassigned" && !showUnassigned) return null;
           return (
             <HomeKanbanColumn

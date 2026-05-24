@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Session } from "@/lib/v2/auth/require-v2-session";
-import { getTaskById, updateTask, completeTask } from "@/lib/v2/tasks/task-repo";
+import { getTaskById, updateTask, completeTask, deleteTask } from "@/lib/v2/tasks/task-repo";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -64,5 +64,21 @@ export async function POST(request: NextRequest, { params }: RouteCtx) {
   } catch (e) {
     console.error("POST /api/v2/tasks/[id]", e);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: RouteCtx) {
+  const auth = await requireV2Session();
+  if (!auth.ok) return auth.response;
+  const { id } = await params;
+
+  try {
+    await deleteTask(auth.ctx, id);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("DELETE /api/v2/tasks/[id]", e);
+    const msg = e instanceof Error ? e.message : "Failed";
+    const status = msg === "Forbidden" ? 403 : msg === "Task not found" ? 404 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

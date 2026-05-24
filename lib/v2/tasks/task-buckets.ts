@@ -112,6 +112,47 @@ function scheduleEndOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 18, 0, 0, 0);
 }
 
+export function toYmd(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Сегодня и следующие `days - 1` дней (по умолчанию 7 колонок). */
+export function rollingWeekDatesFromToday(now: Date = new Date(), days = 7): string[] {
+  const start = startOfLocalDay(now);
+  return Array.from({ length: days }, (_, i) => toYmd(addDays(start, i)));
+}
+
+export function taskScheduleYmd(
+  task: Pick<V2TaskRow, "planned_at" | "deadline_at">
+): string | null {
+  const iso = task.planned_at ?? task.deadline_at;
+  if (!iso) return null;
+  return toYmd(new Date(iso));
+}
+
+export function homeBucketForScheduleYmd(ymd: string, now: Date = new Date()): V2HomeBucket {
+  const todayYmd = toYmd(startOfLocalDay(now));
+  const tomorrowYmd = toYmd(startOfLocalDay(addDays(now, 1)));
+  if (ymd <= todayYmd) return "today";
+  if (ymd === tomorrowYmd) return "tomorrow";
+  const weekEndYmd = toYmd(endOfWeekSunday(now));
+  if (ymd <= weekEndYmd) return "this_week";
+  return "later";
+}
+
+export function plannedAtForYmd(ymd: string): string {
+  const d = new Date(`${ymd}T12:00:00`);
+  return scheduleEndOfDay(d).toISOString();
+}
+
+export function patchForHomeDateMove(ymd: string, now: Date = new Date()): HomeBucketMovePatch {
+  return {
+    homeBucket: homeBucketForScheduleYmd(ymd, now),
+    plannedAt: plannedAtForYmd(ymd),
+  };
+}
+
 /** Задача явно запланирована на главной (секция без жёсткого дедлайна). */
 export function hasHomeSchedule(task: V2TaskRow): boolean {
   if (isHomeBucket(task.home_bucket)) return true;

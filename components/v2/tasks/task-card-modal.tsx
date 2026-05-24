@@ -92,6 +92,8 @@ export function TaskCardModal({
   const [commentSaving, setCommentSaving] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (!taskId) return;
@@ -111,6 +113,7 @@ export function TaskCardModal({
       setDetail(null);
       setReplyTo(null);
       setCommentDraft("");
+      setDeleteConfirm(false);
       return;
     }
     void loadDetail();
@@ -251,6 +254,22 @@ export function TaskCardModal({
       await loadDetail();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Не удалось добавить ссылку");
+    }
+  }
+
+  async function confirmDeleteTask() {
+    if (!taskId) return;
+    setDeleting(true);
+    setActionError(null);
+    try {
+      await fetchJson(`/api/v2/tasks/${taskId}`, { method: "DELETE" });
+      onUpdated();
+      onClose();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Не удалось удалить задачу");
+      setDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -570,6 +589,41 @@ export function TaskCardModal({
                         }}
                       />
                     </div>
+                  </div>
+
+                  <div className="border-t border-[var(--v2-ink-100)] pt-4">
+                    {deleteConfirm ? (
+                      <div className="space-y-2">
+                        <p className="text-[12px] leading-snug text-[var(--v2-ink-600)]">Удалить задачу без возможности восстановления?</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={deleting}
+                            onClick={() => void confirmDeleteTask()}
+                            className="v2-tight flex-1 rounded-lg bg-red-600 px-3 py-2 text-[12.5px] font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {deleting ? "Удаление…" : "Да, удалить"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deleting}
+                            onClick={() => setDeleteConfirm(false)}
+                            className="v2-tight rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[12.5px] text-[var(--v2-ink-700)] hover:bg-white disabled:opacity-50"
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirm(true)}
+                        className="v2-tight inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-[12.5px] font-medium text-red-700 transition hover:bg-red-100"
+                      >
+                        <V2Icons.trash className="h-4 w-4" />
+                        Удалить задачу
+                      </button>
+                    )}
                   </div>
                 </div>
               </aside>

@@ -20,7 +20,7 @@ type NavItem = {
   href: string;
   label: string;
   icon: keyof typeof V2Icons;
-  countKey?: "inbox" | "open";
+  countKey?: "open";
   admin?: boolean;
 };
 
@@ -133,7 +133,7 @@ export function V2ShellSidebar({
 }: {
   nav: NavItem[];
   teamProjects: V2ProjectRow[];
-  taskCounts: { open: number; inbox: number; byProject: Record<string, number> };
+  taskCounts: { open: number; byProject: Record<string, number> };
   me: V2ShellUser | null;
   roleLabel: string;
   onOpenSearch: () => void;
@@ -289,8 +289,7 @@ export function V2ShellSidebar({
       <nav className="space-y-0.5">
         {nav.map((item) => {
           const active = pathname === appPath(item.href) || pathname?.startsWith(appPath(item.href + "/"));
-          const count =
-            item.countKey === "inbox" ? taskCounts.inbox : item.countKey === "open" ? taskCounts.open : undefined;
+          const count = item.countKey === "open" ? taskCounts.open : undefined;
           return <NavLink key={item.href} item={item} active={!!active} count={count} />;
         })}
       </nav>

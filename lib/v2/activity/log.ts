@@ -62,6 +62,8 @@ export function formatActivityMessage(
       return `${row.actor_name} прокомментировал(а) «${p.title ?? ""}»`;
     case "task.reopened":
       return `${row.actor_name} вернул(а) в работу «${p.title ?? ""}»`;
+    case "task.deleted":
+      return `${row.actor_name} удалил(а) задачу «${p.title ?? ""}»`;
     case "project.created":
       return `${row.actor_name} создал(а) проект «${p.name ?? ""}»`;
     case "project.deleted":

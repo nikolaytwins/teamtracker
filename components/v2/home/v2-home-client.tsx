@@ -1,7 +1,8 @@
 "use client";
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import { BUCKET_ORDER, canDropTaskOnHomeBucket, hasHomeSchedule } from "@/lib/v2/tasks/task-buckets";
+import { groupTasksForKanbanBoard, groupTasksForWeekBoard } from "@/lib/v2/home/home-schedule";
+import { BUCKET_ORDER, canDropTaskOnHomeBucket, hasHomeSchedule, rollingWeekDatesFromToday } from "@/lib/v2/tasks/task-buckets";
 import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
 import { readHomeView, writeHomeView } from "@/lib/v2/home/home-storage";
 import type { PortfolioPayload } from "@/lib/v2/projects/portfolio-types";
@@ -9,7 +10,7 @@ import type { TaskViewMode } from "@/lib/v2/task-view-mode";
 import { ActiveTrackerHero } from "@/components/v2/hero/active-tracker-hero";
 import { ChipBar } from "@/components/v2/home/chip-bar";
 import { HomeDayView, HomeKanbanView, HomeWeekView } from "@/components/v2/home/home-views";
-import { moveHomeTaskToBucket } from "@/components/v2/home/home-task-dnd";
+import { moveHomeTaskToBucket, moveHomeTaskToDate } from "@/components/v2/home/home-task-dnd";
 import { PageHead } from "@/components/v2/home/page-head";
 import { UnassignedTasksSection } from "@/components/v2/home/unassigned-tasks-section";
 import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
@@ -40,6 +41,7 @@ export function V2HomeClient() {
   const [unassignedTasks, setUnassignedTasks] = useState<V2TaskWithMeta[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverBucket, setDragOverBucket] = useState<V2TaskBucket | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [movingTask, setMovingTask] = useState(false);
   const [view, setViewState] = useState<TaskViewMode>("day");
   const [viewHydrated, setViewHydrated] = useState(false);
@@ -159,12 +161,37 @@ export function V2HomeClient() {
     [tasks, unassignedTasks]
   );
 
+  const handleDropOnDate = useCallback(
+    async (ymd: string) => {
+      if (!dragId || movingTask) return;
+      const taskId = dragId;
+      setDragId(null);
+      setDragOverDate(null);
+      setMovingTask(true);
+      setError(null);
+      try {
+        await moveHomeTaskToDate(taskId, ymd, findTaskById);
+        await reloadRef.current();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Не удалось перенести задачу");
+      } finally {
+        setMovingTask(false);
+      }
+    },
+    [dragId, movingTask, findTaskById]
+  );
+
+  const clearDrag = useCallback(() => {
+    setDragId(null);
+    setDragOverBucket(null);
+    setDragOverDate(null);
+  }, []);
+
   const handleDropOnBucket = useCallback(
     async (bucket: V2TaskBucket) => {
       if (!dragId || movingTask || !canDropTaskOnHomeBucket(bucket)) return;
       const taskId = dragId;
-      setDragId(null);
-      setDragOverBucket(null);
+      clearDrag();
       setMovingTask(true);
       setError(null);
       try {
@@ -176,7 +203,7 @@ export function V2HomeClient() {
         setMovingTask(false);
       }
     },
-    [dragId, movingTask, findTaskById]
+    [dragId, movingTask, findTaskById, clearDrag]
   );
 
   const filteredGroups = useMemo(() => {
@@ -195,6 +222,33 @@ export function V2HomeClient() {
     if (!canViewUnassigned) return [];
     return unassignedTasks.filter((t) => (projectFilter === "all" ? true : t.project_id === projectFilter));
   }, [unassignedTasks, projectFilter, canViewUnassigned]);
+
+  const weekDates = useMemo(() => rollingWeekDatesFromToday(), []);
+
+  const boardTasks = useMemo(() => {
+    const fromTasks = tasks.filter((t) => {
+      if (t.completed_at || t.inbox_bucket) return false;
+      return projectFilter === "all" ? true : t.project_id === projectFilter;
+    });
+    if (!canViewUnassigned) return fromTasks;
+    const ids = new Set(fromTasks.map((t) => t.id));
+    return [...fromTasks, ...filteredUnassigned.filter((t) => !ids.has(t.id))];
+  }, [tasks, projectFilter, canViewUnassigned, filteredUnassigned]);
+
+  const weekBoard = useMemo(() => groupTasksForWeekBoard(boardTasks, weekDates), [boardTasks, weekDates]);
+
+  const kanbanColumns = useMemo(
+    () =>
+      groupTasksForKanbanBoard(
+        tasks.filter((t) => {
+          if (t.completed_at || t.inbox_bucket) return false;
+          return projectFilter === "all" ? true : t.project_id === projectFilter;
+        }),
+        filteredUnassigned,
+        weekDates
+      ),
+    [tasks, filteredUnassigned, projectFilter, weekDates]
+  );
 
   const chipCounts = useMemo(() => {
     const c: Record<string, number> = { all: tasks.filter((t) => !t.completed_at).length };
@@ -225,10 +279,7 @@ export function V2HomeClient() {
     dragId,
     dragOverBucket,
     onDragStart: setDragId,
-    onDragEnd: () => {
-      setDragId(null);
-      setDragOverBucket(null);
-    },
+    onDragEnd: clearDrag,
     onDragOverBucket: setDragOverBucket,
     onDropOnBucket: (bucket: V2TaskBucket) => void handleDropOnBucket(bucket),
   };
@@ -288,16 +339,13 @@ export function V2HomeClient() {
               projects={projects}
             />
 
-            {canViewUnassigned && view !== "kanban" ? (
+            {canViewUnassigned && view !== "kanban" && view !== "week" ? (
               <UnassignedTasksSection
                 tasks={filteredUnassigned}
                 onOpenTask={setDrawerTaskId}
                 dragId={dragId}
                 onDragStart={setDragId}
-                onDragEnd={() => {
-                  setDragId(null);
-                  setDragOverBucket(null);
-                }}
+                onDragEnd={clearDrag}
               />
             ) : null}
 
@@ -305,32 +353,27 @@ export function V2HomeClient() {
               <HomeDayView filteredGroups={filteredGroups} dnd={homeDnd} actions={homeActions} />
             ) : view === "week" ? (
               <HomeWeekView
-                filteredGroups={filteredGroups}
+                weekDates={weekDates}
+                weekColumns={weekBoard.columns}
+                unscheduled={weekBoard.unscheduled}
                 projectsById={projectsById}
-                dnd={{
-                  dragId,
-                  onDragStart: setDragId,
-                  onDragEnd: () => {
-                    setDragId(null);
-                    setDragOverBucket(null);
-                  },
-                  onDrop: (bucket) => void handleDropOnBucket(bucket),
-                }}
+                dragId={dragId}
+                dragOverDate={dragOverDate}
+                onDragStart={setDragId}
+                onDragEnd={clearDrag}
+                onDropDate={(ymd) => void handleDropOnDate(ymd)}
+                onDragOverDate={setDragOverDate}
                 onOpenTask={setDrawerTaskId}
               />
             ) : (
               <HomeKanbanView
-                filteredGroups={filteredGroups}
-                unassignedTasks={filteredUnassigned}
+                kanbanColumns={kanbanColumns}
                 showUnassigned={canViewUnassigned}
                 projectsById={projectsById}
                 dragId={dragId}
                 dragOverBucket={dragOverBucket}
                 onDragStart={setDragId}
-                onDragEnd={() => {
-                  setDragId(null);
-                  setDragOverBucket(null);
-                }}
+                onDragEnd={clearDrag}
                 onDropBucket={(bucket) => void handleDropOnBucket(bucket)}
                 onDragOverBucket={setDragOverBucket}
                 onOpenTask={setDrawerTaskId}
