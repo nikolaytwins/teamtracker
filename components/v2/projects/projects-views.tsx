@@ -379,6 +379,12 @@ function KanbanCard({
         <span className="v2-tight truncate text-[11.5px] font-medium text-[var(--v2-ink-500)]">{p.name.split(" ")[0]}</span>
         <span className="text-[var(--v2-ink-300)]">·</span>
         <span className="v2-tight truncate text-[11.5px] text-[var(--v2-ink-500)]">{p.category}</span>
+        {p.clientName ? (
+          <>
+            <span className="text-[var(--v2-ink-300)]">·</span>
+            <span className="v2-tight truncate text-[11.5px] font-medium text-[var(--v2-ink-700)]">{p.clientName}</span>
+          </>
+        ) : null}
         <div className="ml-auto flex items-center gap-1">
           <HealthDot health={p.health} />
           <button

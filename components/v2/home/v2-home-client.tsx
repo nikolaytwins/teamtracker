@@ -2,7 +2,7 @@
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { formatBucketSubtitle } from "@/lib/v2/format";
-import { BUCKET_LABELS, BUCKET_ORDER, canDropTaskOnHomeBucket } from "@/lib/v2/tasks/task-buckets";
+import { BUCKET_LABELS, BUCKET_ORDER, canDropTaskOnHomeBucket, hasHomeSchedule } from "@/lib/v2/tasks/task-buckets";
 import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
 import { ActiveTrackerHero } from "@/components/v2/hero/active-tracker-hero";
 import { ChipBar } from "@/components/v2/home/chip-bar";
@@ -185,7 +185,7 @@ export function V2HomeClient() {
     const next: Record<string, V2TaskWithMeta[]> = {};
     for (const bucket of BUCKET_ORDER) {
       next[bucket] = (groups[bucket] ?? []).filter((t) => {
-        if (unassignedIds.has(t.id)) return false;
+        if (unassignedIds.has(t.id) && !hasHomeSchedule(t)) return false;
         return projectFilter === "all" ? true : t.project_id === projectFilter;
       });
     }

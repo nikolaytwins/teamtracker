@@ -4,7 +4,7 @@ import { canCreateProjectTask, canEditTask, canViewAllTeamData, canViewTask, can
 import { getProjectById } from "@/lib/v2/projects/project-repo";
 import { fetchMemberProjectIds, getMemberRoleForUser } from "@/lib/v2/projects/project-members-repo";
 import { normalizeWorkMonth } from "@/lib/v2/projects/retainer-utils";
-import { classifyTaskBucket } from "@/lib/v2/tasks/task-buckets";
+import { classifyTaskBucket, hasHomeSchedule, isMissingHomeBucketColumn, plannedAtFallbackForHomeBucket } from "@/lib/v2/tasks/task-buckets";
 import { listUsersPublic } from "@/lib/tt-auth-db";
 import type {
   V2HomeBucket,
@@ -214,8 +214,11 @@ const PRIORITY_RANK: Record<V2TaskPriority, number> = {
   low: 1,
 };
 
-export function isUnassignedTask(task: Pick<V2TaskRow, "assignee_user_id" | "deadline_at" | "completed_at" | "scope">): boolean {
+export function isUnassignedTask(
+  task: Pick<V2TaskRow, "assignee_user_id" | "deadline_at" | "completed_at" | "scope" | "home_bucket" | "planned_at">
+): boolean {
   if (task.completed_at || task.scope !== "team") return false;
+  if (hasHomeSchedule(task as V2TaskRow)) return false;
   return !task.assignee_user_id || !task.deadline_at;
 }
 
@@ -235,7 +238,7 @@ export async function listUnassignedTasks(ctx: V2SessionContext): Promise<V2Task
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
 
-  const tasks = (data ?? []) as V2TaskRow[];
+  const tasks = ((data ?? []) as V2TaskRow[]).filter((t) => isUnassignedTask(t));
   const projectIds = [...new Set(tasks.map((t) => t.project_id).filter(Boolean))] as string[];
   const projects = new Map<
     string,
@@ -428,7 +431,14 @@ export async function updateTask(
   if (input.homeBucket !== undefined) patch.home_bucket = input.homeBucket;
 
   const sb = getV2Supabase();
-  const { error } = await sb.from("v2_tasks").update(patch).eq("id", taskId);
+  let { error } = await sb.from("v2_tasks").update(patch).eq("id", taskId);
+  if (error && input.homeBucket !== undefined && input.homeBucket !== null && isMissingHomeBucketColumn(error.message)) {
+    const fallback = { ...patch };
+    delete fallback.home_bucket;
+    const plannedAt = input.plannedAt ?? plannedAtFallbackForHomeBucket(input.homeBucket);
+    if (plannedAt !== null) fallback.planned_at = plannedAt;
+    ({ error } = await sb.from("v2_tasks").update(fallback).eq("id", taskId));
+  }
   if (error) throw new Error(error.message);
 
   await logActivity(ctx, "task.updated", "task", taskId, { title: input.title ?? existing.title });
@@ -443,13 +453,24 @@ export async function completeTask(ctx: V2SessionContext, taskId: string, comple
   if (!(await editPermission(ctx, existing))) throw new Error("Forbidden");
 
   const sb = getV2Supabase();
+  const ts = nowIso();
   const patch = {
-    completed_at: completed ? nowIso() : null,
+    completed_at: completed ? ts : null,
     status: completed ? ("done" as V2TaskStatus) : ("todo" as V2TaskStatus),
-    updated_at: nowIso(),
+    updated_at: ts,
   };
   const { error } = await sb.from("v2_tasks").update(patch).eq("id", taskId);
   if (error) throw new Error(error.message);
+
+  if (completed) {
+    const { error: subError } = await sb
+      .from("v2_tasks")
+      .update(patch)
+      .eq("parent_id", taskId)
+      .is("deleted_at", null)
+      .is("completed_at", null);
+    if (subError) throw new Error(subError.message);
+  }
 
   await logActivity(ctx, completed ? "task.completed" : "task.reopened", "task", taskId, {
     title: existing.title,

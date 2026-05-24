@@ -112,6 +112,35 @@ function scheduleEndOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 18, 0, 0, 0);
 }
 
+/** Задача явно запланирована на главной (секция без жёсткого дедлайна). */
+export function hasHomeSchedule(task: V2TaskRow): boolean {
+  if (isHomeBucket(task.home_bucket)) return true;
+  if (!task.planned_at || task.deadline_at) return false;
+  const bucket = classifyTaskBucket({ ...task, home_bucket: null, deadline_at: null });
+  return HOME_DROP_BUCKETS.includes(bucket);
+}
+
+/** planned_at-запасной якорь, если колонка home_bucket ещё не в БД. */
+export function plannedAtFallbackForHomeBucket(bucket: V2HomeBucket, now: Date = new Date()): string | null {
+  if (bucket === "today" || bucket === "tomorrow") return isoScheduleForBucket(bucket, now);
+  if (bucket === "this_week") {
+    const weekEnd = endOfWeekSunday(now);
+    return new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 12, 0, 0, 0).toISOString();
+  }
+  if (bucket === "later") {
+    const weekEnd = endOfWeekSunday(now);
+    const dayAfter = addDays(new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate()), 1);
+    return scheduleEndOfDay(dayAfter).toISOString();
+  }
+  return null;
+}
+
+function isMissingHomeBucketColumn(message: string): boolean {
+  return /home_bucket/i.test(message) && /column|schema|does not exist|could not find/i.test(message);
+}
+
+export { isMissingHomeBucketColumn };
+
 /** ISO для planned_at при переносе в «сегодня» / «завтра». */
 export function isoScheduleForBucket(bucket: V2TaskBucket, now: Date = new Date()): string | null {
   if (bucket !== "today" && bucket !== "tomorrow") return null;

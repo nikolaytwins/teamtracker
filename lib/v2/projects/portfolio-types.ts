@@ -51,6 +51,8 @@ export type PortfolioProject = {
   pauseReason?: string;
   updatedAt: string;
   completedAt: string | null;
+  clientId: string | null;
+  clientName: string | null;
 };
 
 export type PortfolioTeamLoadRow = {

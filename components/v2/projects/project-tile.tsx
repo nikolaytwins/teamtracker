@@ -75,6 +75,12 @@ export function ProjectTile({
               <HealthDot health={p.health} withLabel />
               <span className="text-[var(--v2-ink-300)]">·</span>
               <span className="v2-tight">{p.category}</span>
+              {p.clientName ? (
+                <>
+                  <span className="text-[var(--v2-ink-300)]">·</span>
+                  <span className="v2-tight font-medium text-[var(--v2-ink-700)]">{p.clientName}</span>
+                </>
+              ) : null}
               <span className="text-[var(--v2-ink-300)]">·</span>
               <PriorityDot priority={p.priority} />
               <span className="text-[var(--v2-ink-300)]">·</span>

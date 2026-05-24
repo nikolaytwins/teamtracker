@@ -27,6 +27,18 @@ function fmtHours(h: number): string {
   return `${mm}м`;
 }
 
+function stopRowClick(e: React.MouseEvent) {
+  e.stopPropagation();
+}
+
+function TaskEditButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <IconBtn title="Редактировать" onClick={onOpen} className="shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+      <V2Icons.edit className="h-4 w-4" />
+    </IconBtn>
+  );
+}
+
 function DeadlineChip({
   planned,
   deadline,
@@ -222,21 +234,36 @@ function SubtaskRow({
   const completed = st.status === "done" || !!st.completedAt;
 
   return (
-    <div className="group relative w-full py-2 pl-[52px] pr-2 transition hover:bg-[var(--v2-ink-50)]/60 sm:pl-[60px] sm:pr-3">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpenTask(st.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpenTask(st.id);
+        }
+      }}
+      className="group relative w-full cursor-pointer py-2 pl-[52px] pr-2 transition hover:bg-[var(--v2-ink-50)]/60 sm:pl-[60px] sm:pr-3"
+    >
       <span aria-hidden className="absolute bottom-0 left-[36px] top-0 w-px bg-[var(--v2-ink-200)]" />
       <span aria-hidden className="absolute left-[36px] top-[19px] h-px w-4 bg-[var(--v2-ink-200)]" />
       {last ? <span aria-hidden className="absolute bottom-0 left-[36px] top-5 w-px bg-white" /> : null}
       <div className="relative flex items-center gap-2 sm:gap-3">
-        <TaskCheckbox checked={completed} onChange={() => onToggleDone(st.id, !completed)} />
+        <span onClick={stopRowClick} onMouseDown={stopRowClick}>
+          <TaskCheckbox checked={completed} onChange={() => onToggleDone(st.id, !completed)} />
+        </span>
         <div className="min-w-0 flex-1">
           {editingTitle ? (
-            <InlineTitleEditor
-              taskId={st.id}
-              title={st.title}
-              completed={completed}
-              onReload={onReload}
-              onDone={() => setEditingTitle(false)}
-            />
+            <span onClick={stopRowClick} onMouseDown={stopRowClick}>
+              <InlineTitleEditor
+                taskId={st.id}
+                title={st.title}
+                completed={completed}
+                onReload={onReload}
+                onDone={() => setEditingTitle(false)}
+              />
+            </span>
           ) : (
             <button
               type="button"
@@ -264,9 +291,9 @@ function SubtaskRow({
           />
         </div>
         <TaskMicroProgress logged={st.loggedHours} est={st.estimateHours} completed={completed} />
-        <IconBtn title="Открыть карточку" onClick={() => onOpenTask(st.id)} className="shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-          <V2Icons.chevR className="h-4 w-4" />
-        </IconBtn>
+        <span onClick={stopRowClick} onMouseDown={stopRowClick}>
+          <TaskEditButton onOpen={() => onOpenTask(st.id)} />
+        </span>
       </div>
     </div>
   );
@@ -302,18 +329,34 @@ export function TaskRow({
 
   return (
     <div className={`transition-colors ${running ? "bg-[var(--v2-brand-50)]/40" : "hover:bg-[var(--v2-ink-50)]/60"}`}>
-      <div className="group relative flex items-center gap-2 py-2.5 pl-3 pr-2 sm:gap-3 sm:pl-4 sm:pr-3">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpenTask(task.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpenTask(task.id);
+          }
+        }}
+        className="group relative flex cursor-pointer items-center gap-2 py-2.5 pl-3 pr-2 sm:gap-3 sm:pl-4 sm:pr-3"
+      >
         <span
           aria-hidden
           className="absolute bottom-2 left-0 top-2 w-0.5 rounded-r-full"
           style={{ background: pm.dot, opacity: completed ? 0.18 : 0.65 }}
         />
 
-        <TaskCheckbox checked={completed} onChange={() => onToggleDone(task.id, !completed)} />
+        <span onClick={stopRowClick} onMouseDown={stopRowClick}>
+          <TaskCheckbox checked={completed} onChange={() => onToggleDone(task.id, !completed)} />
+        </span>
 
         <button
           type="button"
-          onClick={onToggleExpand}
+          onClick={(e) => {
+            stopRowClick(e);
+            onToggleExpand();
+          }}
           className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--v2-ink-400)] transition hover:text-[var(--v2-ink-900)] ${hasSubs ? "" : "pointer-events-none opacity-0"}`}
         >
           <V2Icons.chev className={`h-4 w-4 transition-transform ${expanded ? "" : "-rotate-90"}`} />
@@ -322,17 +365,22 @@ export function TaskRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {editingTitle ? (
-              <InlineTitleEditor
-                taskId={task.id}
-                title={task.title}
-                completed={completed}
-                onReload={onReload}
-                onDone={() => setEditingTitle(false)}
-              />
+              <span onClick={stopRowClick} onMouseDown={stopRowClick}>
+                <InlineTitleEditor
+                  taskId={task.id}
+                  title={task.title}
+                  completed={completed}
+                  onReload={onReload}
+                  onDone={() => setEditingTitle(false)}
+                />
+              </span>
             ) : (
               <button
                 type="button"
-                onClick={() => setEditingTitle(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingTitle(true);
+                }}
                 className={`v2-tight truncate text-left text-[13.5px] transition hover:text-[var(--v2-brand-700)] ${completed ? "font-medium text-[var(--v2-ink-400)] line-through decoration-[var(--v2-ink-300)]" : "font-medium text-[var(--v2-ink-900)]"}`}
               >
                 {task.title}
@@ -367,10 +415,12 @@ export function TaskRow({
         <TaskMicroProgress logged={task.loggedHours} est={task.estimateHours} completed={completed} />
 
         <div className="flex shrink-0 items-center gap-0.5">
-          <TimerButton running={running} onClick={() => onToggleTimer(task.id)} />
-          <IconBtn title="Открыть карточку" onClick={() => onOpenTask(task.id)} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-            <V2Icons.chevR className="h-4 w-4" />
-          </IconBtn>
+          <span onClick={stopRowClick} onMouseDown={stopRowClick}>
+            <TimerButton running={running} onClick={() => onToggleTimer(task.id)} />
+          </span>
+          <span onClick={stopRowClick} onMouseDown={stopRowClick}>
+            <TaskEditButton onOpen={() => onOpenTask(task.id)} />
+          </span>
         </div>
       </div>
       {hasSubs && expanded ? (

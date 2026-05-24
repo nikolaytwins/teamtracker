@@ -168,6 +168,19 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
     }
   }
 
+  const clientIds = [...new Set(projects.map((p) => p.client_id).filter(Boolean))] as string[];
+  const clientNames = new Map<string, string>();
+  if (clientIds.length) {
+    const { data: clientRows, error: clientError } = await sb
+      .from("v2_clients")
+      .select("id, display_name")
+      .in("id", clientIds);
+    if (clientError) throw new Error(clientError.message);
+    for (const row of clientRows ?? []) {
+      clientNames.set(row.id as string, row.display_name as string);
+    }
+  }
+
   const portfolioProjects: PortfolioProject[] = projects.map((p) => {
     const tasks = tasksByProject.get(p.id) ?? [];
     const openTasks = tasks.filter((t) => !t.completed_at);
@@ -234,6 +247,8 @@ export async function buildPortfolio(ctx: V2SessionContext): Promise<PortfolioPa
       pauseReason: p.status === "paused" ? "Проект приостановлен" : undefined,
       updatedAt: p.updated_at,
       completedAt,
+      clientId: p.client_id,
+      clientName: p.client_id ? (clientNames.get(p.client_id) ?? null) : null,
     };
   });
 
