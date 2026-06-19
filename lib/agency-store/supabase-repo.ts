@@ -517,7 +517,13 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     employeeRole: string | null;
     amount: number;
     notes: string | null;
+    year?: number;
+    month?: number;
   }): Promise<Record<string, unknown>> {
+    const createdAt =
+      input.year && input.month
+        ? `${input.year}-${String(input.month).padStart(2, "0")}-01T12:00:00.000Z`
+        : new Date().toISOString();
     const now = new Date().toISOString();
     const { error } = await this.sb.from("agency_general_expense").insert({
       id: input.id,
@@ -525,7 +531,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       employee_role: input.employeeRole,
       amount: input.amount,
       notes: input.notes,
-      created_at: now,
+      created_at: createdAt,
       updated_at: now,
     });
     if (error) throw error;

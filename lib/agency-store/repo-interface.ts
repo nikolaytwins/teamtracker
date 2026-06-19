@@ -95,6 +95,9 @@ export interface AgencyRepo {
     employeeRole: string | null;
     amount: number;
     notes: string | null;
+    /** Если задано — расход попадает в этот месяц (по created_at), а не в текущую дату */
+    year?: number;
+    month?: number;
   }): Promise<Record<string, unknown>>;
   getGeneralExpenseById(id: string): Promise<Record<string, unknown> | undefined>;
   updateGeneralExpenseById(

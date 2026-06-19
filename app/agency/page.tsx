@@ -99,6 +99,122 @@ interface ProjectDetailRow {
   unitPrice?: number
 }
 
+function adjacentMonth(year: number, month: number, delta: -1 | 1): { year: number; month: number } {
+  if (delta === 1) {
+    return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
+  }
+  return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
+}
+
+function MoveProjectPicker({
+  projectId,
+  currentYear,
+  currentMonth,
+  yearOptions,
+  monthNames,
+  onClose,
+  onMoved,
+}: {
+  projectId: string
+  currentYear: number
+  currentMonth: number
+  yearOptions: number[]
+  monthNames: string[]
+  onClose: () => void
+  onMoved: () => void
+}) {
+  const [targetYear, setTargetYear] = useState(currentYear)
+  const [targetMonth, setTargetMonth] = useState(currentMonth)
+  const [moving, setMoving] = useState(false)
+
+  const handleMove = async (year: number, month: number) => {
+    setMoving(true)
+    try {
+      const res = await fetch(apiUrl(`/api/agency/projects/${projectId}/move-to-month`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year, month }),
+      })
+      if (res.ok) {
+        onMoved()
+        onClose()
+      } else {
+        console.error('Failed to move project:', await res.json())
+      }
+    } catch (err) {
+      console.error('Error moving project:', err)
+    } finally {
+      setMoving(false)
+    }
+  }
+
+  const prev = adjacentMonth(currentYear, currentMonth, -1)
+  const next = adjacentMonth(currentYear, currentMonth, 1)
+
+  return (
+    <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
+      <div className="mb-2 text-xs font-medium text-[var(--text)]">Перенести в месяц</div>
+      <div className="mb-2 flex gap-1">
+        <button
+          type="button"
+          disabled={moving}
+          onClick={() => void handleMove(prev.year, prev.month)}
+          className="flex-1 rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)] disabled:opacity-50"
+          title={`${monthNames[prev.month - 1]} ${prev.year}`}
+        >
+          ← {monthNames[prev.month - 1].slice(0, 3)}
+        </button>
+        <button
+          type="button"
+          disabled={moving}
+          onClick={() => void handleMove(next.year, next.month)}
+          className="flex-1 rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)] disabled:opacity-50"
+          title={`${monthNames[next.month - 1]} ${next.year}`}
+        >
+          {monthNames[next.month - 1].slice(0, 3)} →
+        </button>
+      </div>
+      <div className="mb-2 flex gap-1">
+        <select
+          value={targetYear}
+          onChange={(e) => setTargetYear(Number(e.target.value))}
+          className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-1 py-1 text-xs text-[var(--text)]"
+        >
+          {yearOptions.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+        <select
+          value={targetMonth}
+          onChange={(e) => setTargetMonth(Number(e.target.value))}
+          className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-1 py-1 text-xs text-[var(--text)]"
+        >
+          {monthNames.map((name, index) => (
+            <option key={index + 1} value={index + 1}>{name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          disabled={moving}
+          onClick={() => void handleMove(targetYear, targetMonth)}
+          className="flex-1 rounded bg-[var(--primary)] px-2 py-1 text-xs text-white hover:brightness-110 disabled:opacity-50"
+        >
+          Перенести
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)]"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function AgencyPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [generalExpenses, setGeneralExpenses] = useState<GeneralExpense[]>([])
@@ -107,6 +223,7 @@ export default function AgencyPage() {
   const [isCustomExpense, setIsCustomExpense] = useState(false)
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
   const [editingExpenseValue, setEditingExpenseValue] = useState('')
+  const [movePickerProjectId, setMovePickerProjectId] = useState<string | null>(null)
   
   // Месяц для фильтрации (по дате создания проекта)
   const today = new Date()
@@ -272,6 +389,10 @@ export default function AgencyPage() {
     void fetchGeneralExpenses()
   }, [fetchProjects, fetchGeneralExpenses, monthFilterReady])
 
+  useEffect(() => {
+    setMovePickerProjectId(null)
+  }, [selectedYear, selectedMonth])
+
   const handleAddExpense = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
@@ -288,6 +409,8 @@ export default function AgencyPage() {
       employeeRole: isCustomExpense ? null : (formData.get('employeeRole') as string || null),
       amount: amount,
       notes: formData.get('notes') as string || null,
+      year: selectedYear,
+      month: selectedMonth,
     }
 
     try {
@@ -545,7 +668,7 @@ export default function AgencyPage() {
 
   const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
   const currentYear = new Date().getFullYear()
-  const yearOptions = Array.from({ length: 3 }, (_, i) => currentYear - i)
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear + 1 - i)
 
   return (
     <div>
@@ -653,7 +776,9 @@ export default function AgencyPage() {
             </tr>
           </thead>
           <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
-            {projects.map((project) => (
+            {projects.map((project) => {
+              const nextMonthForCopy = adjacentMonth(selectedYear, selectedMonth, 1)
+              return (
               <tr key={project.id}>
                 <td className="px-3 py-4 sm:px-6">
                   <div className="flex items-center gap-2">
@@ -664,13 +789,11 @@ export default function AgencyPage() {
                       type="button"
                       onClick={async (e) => {
                         e.preventDefault()
-                        const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1
-                        const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear
                         try {
                           const res = await fetch(apiUrl(`/api/agency/projects/${project.id}/copy`), {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ year: nextYear, month: nextMonth }),
+                            body: JSON.stringify({ year: nextMonthForCopy.year, month: nextMonthForCopy.month }),
                           })
                           if (res.ok) await fetchProjects()
                           else console.error('Failed to copy project:', await res.json())
@@ -679,39 +802,38 @@ export default function AgencyPage() {
                         }
                       }}
                       className="p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--primary)]"
-                      title={`Копировать на ${monthNames[selectedMonth === 12 ? 0 : selectedMonth]} ${selectedMonth === 12 ? selectedYear + 1 : selectedYear} (с расходами)`}
+                      title={`Копировать на ${monthNames[nextMonthForCopy.month - 1]} ${nextMonthForCopy.year} (с расходами)`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     </button>
-                    {project.status !== 'paid' && (
+                    <div className="relative">
                       <button
                         type="button"
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.preventDefault()
-                          const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1
-                          const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear
-                          try {
-                            const res = await fetch(apiUrl(`/api/agency/projects/${project.id}/move-to-month`), {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ year: nextYear, month: nextMonth }),
-                            })
-                            if (res.ok) await fetchProjects()
-                            else console.error('Failed to move project:', await res.json())
-                          } catch (err) {
-                            console.error('Error moving project:', err)
-                          }
+                          setMovePickerProjectId(movePickerProjectId === project.id ? null : project.id)
                         }}
                         className="p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--primary)]"
-                        title={`Перенести на ${monthNames[selectedMonth === 12 ? 0 : selectedMonth]} ${selectedMonth === 12 ? selectedYear + 1 : selectedYear}`}
+                        title="Перенести в другой месяц"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </button>
-                    )}
+                      {movePickerProjectId === project.id && (
+                        <MoveProjectPicker
+                          projectId={project.id}
+                          currentYear={selectedYear}
+                          currentMonth={selectedMonth}
+                          yearOptions={yearOptions}
+                          monthNames={monthNames}
+                          onClose={() => setMovePickerProjectId(null)}
+                          onMoved={fetchProjects}
+                        />
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -811,7 +933,7 @@ export default function AgencyPage() {
                   )}
                 </td>
               </tr>
-            ))}
+            )})}
             {projects.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-3 py-4 sm:px-6 text-center text-sm text-[var(--muted-foreground)]">
@@ -869,6 +991,13 @@ export default function AgencyPage() {
 
         {showExpenseForm && (
           <form onSubmit={handleAddExpense} className="mb-6 p-4 bg-[var(--surface-2)] rounded-lg">
+            <p className="mb-3 text-sm text-[var(--muted-foreground)]">
+              Расход будет добавлен в{' '}
+              <span className="font-medium text-[var(--text)]">
+                {monthNames[selectedMonth - 1]} {selectedYear}
+              </span>
+              {' '}(выбранный месяц в фильтре)
+            </p>
             <div className="mb-4">
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input

@@ -14,10 +14,19 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { employeeName, employeeRole, amount, notes } = body;
+    const { employeeName, employeeRole, amount, notes, year, month } = body;
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: "Amount is required and must be greater than 0" }, { status: 400 });
+    }
+
+    const parsedYear = year != null ? Number(year) : undefined;
+    const parsedMonth = month != null ? Number(month) : undefined;
+    if (
+      (parsedYear != null && (!parsedYear || parsedYear < 2000 || parsedYear > 2100)) ||
+      (parsedMonth != null && (!parsedMonth || parsedMonth < 1 || parsedMonth > 12))
+    ) {
+      return NextResponse.json({ error: "Invalid year or month" }, { status: 400 });
     }
 
     const id = `agexp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -27,6 +36,8 @@ export async function POST(request: NextRequest) {
       employeeRole: employeeRole || null,
       amount,
       notes: notes || null,
+      year: parsedYear,
+      month: parsedMonth,
     });
 
     return NextResponse.json({ success: true, expense }, { status: 200 });

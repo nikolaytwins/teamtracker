@@ -630,15 +630,21 @@ export class SqliteAgencyRepo implements AgencyRepo {
     employeeRole: string | null;
     amount: number;
     notes: string | null;
+    year?: number;
+    month?: number;
   }): Promise<Record<string, unknown>> {
     const db = openSqlite();
     try {
+      const createdAt =
+        input.year && input.month
+          ? `${input.year}-${String(input.month).padStart(2, "0")}-01 12:00:00`
+          : null;
       db.prepare(
         `
       INSERT INTO AgencyGeneralExpense (id, employeeName, employeeRole, amount, notes, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))
     `
-      ).run(input.id, input.employeeName, input.employeeRole, input.amount, input.notes);
+      ).run(input.id, input.employeeName, input.employeeRole, input.amount, input.notes, createdAt);
       return db.prepare("SELECT * FROM AgencyGeneralExpense WHERE id = ?").get(input.id) as Record<
         string,
         unknown
