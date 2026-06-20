@@ -2,6 +2,7 @@
 
 import { WorkScheduleEditor } from "@/components/v2/admin/work-schedule-editor";
 import { MemberAvatar } from "@/components/v2/projects/project-atoms";
+import { PAY_TYPE_LABELS, fmtRub, type TtPayType } from "@/lib/v2/admin/compensation";
 import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { fmtDuration } from "@/lib/v2/format";
@@ -15,7 +16,10 @@ type PeopleRow = {
   displayName: string;
   jobTitle: string;
   weeklyHoursNorm: number;
+  payType: TtPayType;
   hourlyRateRub: number | null;
+  monthlySalaryRub: number | null;
+  monthlyPaidRub: number | null;
   workHoursPerDay: number;
   workDays: number[];
   todayLoad: number;
@@ -25,6 +29,9 @@ type PeopleRow = {
   isWorkDayToday: boolean;
   weeks: Array<{ weekStart: string; loggedSeconds: number; normSeconds: number; status: string }>;
   totalLoggedSeconds: number;
+  monthLoggedSeconds: number;
+  monthCostRub: number | null;
+  effectiveHourlyRub: number | null;
 };
 
 function statusColor(status: string) {
@@ -105,7 +112,14 @@ export function V2AdminPeopleClient() {
     setRows((list) => list.map((r) => (r.userId === userId ? optimistic(r) : r)));
     try {
       const res = await fetchJson<{
-        user: { hourly_rate_rub: number | null; work_hours_per_day: number; work_days: number[] };
+        user: {
+          hourly_rate_rub: number | null;
+          pay_type: TtPayType;
+          monthly_salary_rub: number | null;
+          monthly_paid_rub: number | null;
+          work_hours_per_day: number;
+          work_days: number[];
+        };
       }>(`/api/v2/admin/people/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -117,6 +131,9 @@ export function V2AdminPeopleClient() {
             ? {
                 ...r,
                 hourlyRateRub: res.user.hourly_rate_rub,
+                payType: res.user.pay_type,
+                monthlySalaryRub: res.user.monthly_salary_rub,
+                monthlyPaidRub: res.user.monthly_paid_rub,
                 workHoursPerDay: res.user.work_hours_per_day,
                 workDays: res.user.work_days,
               }
@@ -132,12 +149,23 @@ export function V2AdminPeopleClient() {
     }
   }
 
-  async function saveHourlyRate(userId: string, value: string, prev: number | null) {
+  async function savePayType(userId: string, payType: TtPayType, prev: TtPayType) {
+    if (payType === prev) return;
+    await patchUser(userId, { pay_type: payType }, (r) => ({ ...r, payType }));
+  }
+
+  async function saveMoneyField(
+    userId: string,
+    field: "hourly_rate_rub" | "monthly_salary_rub" | "monthly_paid_rub",
+    value: string,
+    prev: number | null,
+    optimisticKey: "hourlyRateRub" | "monthlySalaryRub" | "monthlyPaidRub"
+  ) {
     const trimmed = value.trim();
     const next = trimmed === "" ? null : Math.round(Number(trimmed.replace(/\s/g, "")));
     if (trimmed !== "" && (!Number.isFinite(next!) || next! < 0)) return;
     if (next === prev || (next == null && prev == null)) return;
-    await patchUser(userId, { hourly_rate_rub: next }, (r) => ({ ...r, hourlyRateRub: next }));
+    await patchUser(userId, { [field]: next }, (r) => ({ ...r, [optimisticKey]: next }));
   }
 
   async function saveSchedule(
@@ -155,14 +183,15 @@ export function V2AdminPeopleClient() {
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  const monthLabel = new Date().toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 
   return (
     <div className="px-7 py-6">
       <div className="mb-6">
         <h1 className="text-3xl font-semibold tracking-tight">Команда</h1>
         <p className="v2-tight mt-2 max-w-2xl text-[13px] text-[var(--v2-ink-500)]">
-          График работы задаёт ёмкость дня. Загрузка на сегодня — сумма оценок задач (сегодня и просроченных), делённая на
-          рабочие часы сотрудника.
+          График работы задаёт ёмкость дня. Часы и оплата считаются по сессиям таймера v2. Тип оплаты: почасовая, оклад
+          или сделка (выплата за месяц вручную).
         </p>
       </div>
 
@@ -185,12 +214,46 @@ export function V2AdminPeopleClient() {
                     {r.jobTitle || `${r.weeklyHoursNorm}ч/нед`}
                   </div>
                 </div>
-                <Link
-                  href={appPath(`/v2/admin/people/${r.userId}?date=${today}`)}
-                  className="v2-tight shrink-0 text-[12px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)]"
-                >
-                  День →
-                </Link>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Link
+                    href={appPath(`/v2/admin/people/${r.userId}?date=${today}`)}
+                    className="v2-tight text-[12px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)]"
+                  >
+                    День →
+                  </Link>
+                  <Link
+                    href={appPath(`/v2/admin/people/${r.userId}?tab=month`)}
+                    className="v2-tight text-[12px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)]"
+                  >
+                    Месяц →
+                  </Link>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-[var(--v2-brand-50)]/50 p-3">
+                <div className="v2-tight mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                  {monthLabel}
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="v2-tnum text-[15px] font-semibold text-[var(--v2-ink-900)]">
+                      {fmtDuration(r.monthLoggedSeconds)}
+                    </div>
+                    <div className="text-[10px] text-[var(--v2-ink-500)]">часов</div>
+                  </div>
+                  <div>
+                    <div className="v2-tnum text-[15px] font-semibold text-[var(--v2-ink-900)]">
+                      {fmtRub(r.monthCostRub)}
+                    </div>
+                    <div className="text-[10px] text-[var(--v2-ink-500)]">к оплате</div>
+                  </div>
+                  <div>
+                    <div className="v2-tnum text-[15px] font-semibold text-[var(--v2-ink-900)]">
+                      {fmtRub(r.effectiveHourlyRub)}
+                    </div>
+                    <div className="text-[10px] text-[var(--v2-ink-500)]">₽/час</div>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-4 rounded-xl bg-[var(--v2-ink-50)] p-3">
@@ -223,37 +286,114 @@ export function V2AdminPeopleClient() {
                 />
               </div>
 
-              <div className="mt-4 flex items-end justify-between gap-3 border-t border-[var(--v2-ink-100)] pt-4">
+              <div className="mt-4 space-y-3 border-t border-[var(--v2-ink-100)] pt-4">
                 <div>
-                  <div className="v2-tight text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
-                    ₽ / час
+                  <div className="v2-tight mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                    Тип оплаты
                   </div>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    defaultValue={r.hourlyRateRub != null ? String(r.hourlyRateRub) : ""}
-                    key={`rate-${r.userId}-${r.hourlyRateRub ?? "x"}`}
+                  <select
+                    className="v2-input w-full text-[13px]"
+                    value={r.payType}
                     disabled={saving}
-                    placeholder="—"
-                    className="v2-tnum mt-1 w-28 rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 py-1.5 text-[13px] disabled:opacity-50"
-                    onBlur={(e) => void saveHourlyRate(r.userId, e.target.value, r.hourlyRateRub)}
-                  />
-                </div>
-                <div className="text-right">
-                  <div className="v2-tight text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
-                    6 недель
-                  </div>
-                  <div className="mt-1.5 flex justify-end gap-1">
-                    {r.weeks.map((w) => (
-                      <span
-                        key={w.weekStart}
-                        title={`${w.weekStart}: ${fmtDuration(w.loggedSeconds)}`}
-                        className={`h-5 w-5 rounded ${statusColor(w.status)}`}
-                      />
+                    onChange={(e) => void savePayType(r.userId, e.target.value as TtPayType, r.payType)}
+                  >
+                    {(Object.keys(PAY_TYPE_LABELS) as TtPayType[]).map((k) => (
+                      <option key={k} value={k}>
+                        {PAY_TYPE_LABELS[k]}
+                      </option>
                     ))}
+                  </select>
+                </div>
+
+                {r.payType === "hourly" ? (
+                  <div>
+                    <div className="v2-tight text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                      ₽ / час
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      defaultValue={r.hourlyRateRub != null ? String(r.hourlyRateRub) : ""}
+                      key={`rate-${r.userId}-${r.hourlyRateRub ?? "x"}`}
+                      disabled={saving}
+                      placeholder="—"
+                      className="v2-tnum mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 py-1.5 text-[13px] disabled:opacity-50"
+                      onBlur={(e) =>
+                        void saveMoneyField(r.userId, "hourly_rate_rub", e.target.value, r.hourlyRateRub, "hourlyRateRub")
+                      }
+                    />
                   </div>
-                  <div className="v2-tnum mt-1 text-[11px] text-[var(--v2-ink-500)]">
-                    {fmtDuration(r.totalLoggedSeconds)}
+                ) : null}
+
+                {r.payType === "monthly" ? (
+                  <div>
+                    <div className="v2-tight text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                      Оклад, ₽/мес
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      defaultValue={r.monthlySalaryRub != null ? String(r.monthlySalaryRub) : ""}
+                      key={`salary-${r.userId}-${r.monthlySalaryRub ?? "x"}`}
+                      disabled={saving}
+                      placeholder="—"
+                      className="v2-tnum mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 py-1.5 text-[13px] disabled:opacity-50"
+                      onBlur={(e) =>
+                        void saveMoneyField(
+                          r.userId,
+                          "monthly_salary_rub",
+                          e.target.value,
+                          r.monthlySalaryRub,
+                          "monthlySalaryRub"
+                        )
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                {r.payType === "deal" ? (
+                  <div>
+                    <div className="v2-tight text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                      Выплачено за месяц, ₽
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      defaultValue={r.monthlyPaidRub != null ? String(r.monthlyPaidRub) : ""}
+                      key={`paid-${r.userId}-${r.monthlyPaidRub ?? "x"}`}
+                      disabled={saving}
+                      placeholder="—"
+                      className="v2-tnum mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 py-1.5 text-[13px] disabled:opacity-50"
+                      onBlur={(e) =>
+                        void saveMoneyField(
+                          r.userId,
+                          "monthly_paid_rub",
+                          e.target.value,
+                          r.monthlyPaidRub,
+                          "monthlyPaidRub"
+                        )
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                <div className="flex items-end justify-between gap-3">
+                  <div className="text-right">
+                    <div className="v2-tight text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                      6 недель
+                    </div>
+                    <div className="mt-1.5 flex justify-end gap-1">
+                      {r.weeks.map((w) => (
+                        <span
+                          key={w.weekStart}
+                          title={`${w.weekStart}: ${fmtDuration(w.loggedSeconds)}`}
+                          className={`h-5 w-5 rounded ${statusColor(w.status)}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="v2-tnum mt-1 text-[11px] text-[var(--v2-ink-500)]">
+                      {fmtDuration(r.totalLoggedSeconds)}
+                    </div>
                   </div>
                 </div>
               </div>

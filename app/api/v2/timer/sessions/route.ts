@@ -10,8 +10,17 @@ export async function GET(request: NextRequest) {
   const userId = request.nextUrl.searchParams.get("userId") ?? undefined;
   const limit = Number(request.nextUrl.searchParams.get("limit") ?? "50");
 
-  const sessions = await listSessions(auth.ctx, { taskId, userId, limit });
-  return NextResponse.json({ sessions });
+  try {
+    const sessions = await listSessions(auth.ctx, { taskId, userId, limit });
+    return NextResponse.json({ sessions });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Failed";
+    if (msg === "Forbidden") {
+      return NextResponse.json({ error: msg }, { status: 403 });
+    }
+    console.error("GET /api/v2/timer/sessions", e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {

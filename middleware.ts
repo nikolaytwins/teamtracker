@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { canAccessAgencyRoutes, canAccessPmBoard, isMemberRestrictedRole, sessionRole } from "@/lib/roles";
+import { canAccessAgencyRoutes, canAccessPmBoard, isClientRole, isMemberRestrictedRole, sessionRole } from "@/lib/roles";
 import { getAuthSecret, verifySession } from "@/lib/session-token";
 
 /**
@@ -93,6 +93,15 @@ export async function middleware(request: NextRequest) {
 
   const role = sessionRole(session);
 
+  if (isClientRole(role)) {
+    if (pathname.startsWith("/api/v2/personal")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (pathname.startsWith("/v2/personal")) {
+      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/projects"));
+    }
+  }
+
   if (isMemberRestrictedRole(role)) {
     if (pathname.startsWith("/board")) {
       return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
@@ -127,10 +136,18 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/api/agency") || pathname.startsWith("/api/admin")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    if (pathname.startsWith("/api/v2/finance")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     if (pathname.startsWith("/api/time-analytics/team-week")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (pathname.startsWith("/agency") || pathname.startsWith("/sales") || pathname.startsWith("/admin")) {
+    if (
+      pathname.startsWith("/agency") ||
+      pathname.startsWith("/sales") ||
+      pathname.startsWith("/admin") ||
+      pathname.startsWith("/v2/agency")
+    ) {
       return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
     }
     if (pathname.startsWith("/board/team-load")) {

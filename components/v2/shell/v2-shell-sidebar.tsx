@@ -123,6 +123,7 @@ function ProjectNavLink({
 
 export function V2ShellSidebar({
   nav,
+  personalNav = [],
   teamProjects,
   taskCounts,
   me,
@@ -132,6 +133,7 @@ export function V2ShellSidebar({
   onLogout,
 }: {
   nav: NavItem[];
+  personalNav?: NavItem[];
   teamProjects: V2ProjectRow[];
   taskCounts: { open: number; byProject: Record<string, number> };
   me: V2ShellUser | null;
@@ -293,6 +295,21 @@ export function V2ShellSidebar({
           return <NavLink key={item.href} item={item} active={!!active} count={count} />;
         })}
       </nav>
+
+      {personalNav.length > 0 ? (
+        <div className="mt-4">
+          <div className="mb-1 px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
+            Личное
+          </div>
+          <nav className="space-y-0.5">
+            {personalNav.map((item) => {
+              const active =
+                pathname === appPath(item.href) || (pathname?.startsWith(appPath("/v2/personal")) ?? false);
+              return <NavLink key={item.href} item={item} active={!!active} />;
+            })}
+          </nav>
+        </div>
+      ) : null}
 
       {pinnedProjects.length > 0 ? (
         <div className="mt-4">

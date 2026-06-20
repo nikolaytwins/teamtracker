@@ -110,6 +110,16 @@ export function V2HomeClient() {
     return () => clearInterval(id);
   }, [active]);
 
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void loadPage().catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadPage]);
+
   const reloadRef = useRef<() => Promise<void>>(async () => {});
   async function reload() {
     setTick(0);
@@ -137,17 +147,22 @@ export function V2HomeClient() {
   }
 
   async function toggleTimer(taskId: string) {
-    if (runningTaskId === taskId) {
-      await fetchJson("/api/v2/timer/stop", { method: "POST" });
-    } else {
-      await fetchJson("/api/v2/timer/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
-      });
+    setError(null);
+    try {
+      if (runningTaskId === taskId) {
+        await fetchJson("/api/v2/timer/stop", { method: "POST" });
+      } else {
+        await fetchJson("/api/v2/timer/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId }),
+        });
+      }
+      setTick(0);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось переключить таймер");
     }
-    setTick(0);
-    await reload();
   }
 
   async function stopTimer() {
@@ -364,6 +379,8 @@ export function V2HomeClient() {
                 onDropDate={(ymd) => void handleDropOnDate(ymd)}
                 onDragOverDate={setDragOverDate}
                 onOpenTask={setDrawerTaskId}
+                runningId={runningTaskId}
+                onToggleRun={toggleTimer}
               />
             ) : (
               <HomeKanbanView
@@ -377,6 +394,8 @@ export function V2HomeClient() {
                 onDropBucket={(bucket) => void handleDropOnBucket(bucket)}
                 onDragOverBucket={setDragOverBucket}
                 onOpenTask={setDrawerTaskId}
+                runningId={runningTaskId}
+                onToggleRun={toggleTimer}
               />
             )}
           </div>
@@ -416,6 +435,7 @@ export function V2HomeClient() {
         members={members}
         projects={teamProjects.map((p) => ({ id: p.id, name: p.name }))}
         runningTaskId={runningTaskId}
+        runningElapsedSeconds={runningTaskId && active?.session.task_id === drawerTaskId ? elapsed : 0}
         onToggleTimer={toggleTimer}
       />
     </>

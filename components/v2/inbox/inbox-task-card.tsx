@@ -3,7 +3,7 @@
 import { isBurningProject, projectForTask } from "@/components/v2/inbox/inbox-meta";
 import { HealthDot, PriorityDot } from "@/components/v2/projects/project-atoms";
 import { HEALTH_META, PRIORITY_META } from "@/components/v2/projects/portfolio-meta";
-import { ProjectChip } from "@/components/v2/ui/primitives";
+import { ProjectChip, TimerButton } from "@/components/v2/ui/primitives";
 import type { PortfolioProject } from "@/lib/v2/projects/portfolio-types";
 import type { V2TaskWithMeta } from "@/lib/v2/types";
 
@@ -17,6 +17,8 @@ export function InboxTaskCard({
   onPromote,
   onOpen,
   compact = false,
+  running = false,
+  onToggleRun,
 }: {
   task: V2TaskWithMeta;
   projectsById: Map<string, PortfolioProject>;
@@ -27,6 +29,8 @@ export function InboxTaskCard({
   onPromote?: () => void;
   onOpen?: () => void;
   compact?: boolean;
+  running?: boolean;
+  onToggleRun?: () => void;
 }) {
   const project = projectForTask(task, projectsById);
   const burning = project ? isBurningProject(project.health) : false;
@@ -69,6 +73,9 @@ export function InboxTaskCard({
           <h4 className={`v2-tight min-w-0 flex-1 font-semibold leading-[1.3] text-[var(--v2-ink-900)] ${compact ? "text-[13px]" : "text-[14px]"}`}>
             {task.title}
           </h4>
+          {onToggleRun ? (
+            <TimerButton running={running} onClick={onToggleRun} />
+          ) : null}
           {healthDot && burning ? <HealthDot health={healthDot} /> : null}
         </div>
 

@@ -62,7 +62,13 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: "/v2/home", label: "Главная", icon: "home", countKey: "open" },
   { href: "/v2/projects", label: "Проекты", icon: "projects" },
+  { href: "/v2/agency", label: "Проекты и финансы", icon: "reports", admin: true },
   { href: "/v2/admin/people", label: "Команда", icon: "team", admin: true },
+];
+
+const PERSONAL_NAV: NavItem[] = [
+  { href: "/v2/personal/tasks/today", label: "Задачи", icon: "tasks" },
+  { href: "/v2/personal/finance", label: "Финансы", icon: "ruble" },
 ];
 
 export function V2AppShell({ children }: { children: React.ReactNode }) {
@@ -157,6 +163,7 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
     if (isClient) return n.href === "/v2/projects";
     return true;
   });
+  const personalNav = isClient ? [] : PERSONAL_NAV;
   const teamProjects = useMemo(() => projects.filter((p) => p.scope === "team"), [projects]);
 
   const taskCounts = useMemo(() => {
@@ -204,6 +211,7 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen">
         <V2ShellSidebar
           nav={nav}
+          personalNav={personalNav}
           teamProjects={teamProjects}
           taskCounts={taskCounts}
           me={me}

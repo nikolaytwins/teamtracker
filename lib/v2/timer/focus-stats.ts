@@ -1,28 +1,6 @@
 import { getV2Supabase } from "@/lib/v2/db/client";
 import type { V2SessionContext } from "@/lib/v2/types";
-
-function startOfLocalDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-}
-
-function endOfLocalDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-}
-
-function overlapSeconds(
-  startedAt: string,
-  endedAt: string | null,
-  windowStart: Date,
-  windowEnd: Date,
-  now: Date
-): number {
-  const start = new Date(startedAt).getTime();
-  const end = (endedAt ? new Date(endedAt) : now).getTime();
-  const from = Math.max(start, windowStart.getTime());
-  const to = Math.min(end, windowEnd.getTime());
-  if (to <= from) return 0;
-  return Math.floor((to - from) / 1000);
-}
+import { overlapSeconds, startOfLocalDay, endOfLocalDay } from "@/lib/v2/timer/session-duration";
 
 /** Сумма секунд в фокусе за локальный день (пересечение сессий с календарным днём). */
 export async function sumFocusSecondsForDay(

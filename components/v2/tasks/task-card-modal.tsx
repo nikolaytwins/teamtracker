@@ -55,6 +55,7 @@ export function TaskCardModal({
   members,
   projects,
   runningTaskId,
+  runningElapsedSeconds = 0,
   onToggleTimer,
   lockedProjectId,
   lockedProject,
@@ -68,6 +69,7 @@ export function TaskCardModal({
   members: Array<{ user_id: string; display_name: string; role?: string; avatar_url?: string | null }>;
   projects: ProjectOption[];
   runningTaskId: string | null;
+  runningElapsedSeconds?: number;
   onToggleTimer: (id: string) => void;
   lockedProjectId?: string | null;
   lockedProject?: {
@@ -332,7 +334,9 @@ export function TaskCardModal({
                 <>
                   <TimerButton running={runningTaskId === t.id} onClick={() => onToggleTimer(t.id)} />
                   <span className="v2-tnum hidden text-[12px] text-[var(--v2-ink-500)] sm:inline">
-                    {fmtDuration(t.logged_seconds)}
+                    {fmtDuration(
+                      t.logged_seconds + (runningTaskId === t.id ? runningElapsedSeconds : 0)
+                    )}
                     {t.estimate_seconds ? ` / ${fmtHoursMinutes(t.estimate_seconds / 3600)}` : ""}
                   </span>
                 </>

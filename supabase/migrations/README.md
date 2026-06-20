@@ -33,8 +33,14 @@
 | 012 | `012_avatars_storage_bucket.sql` | Supabase Storage bucket для аватаров |
 | 013 | `013_v2_clients.sql` | CRM-клиенты v2 и привязка к проектам |
 | 014 | `014_v2_project_kind_priority_paid.sql` | Вид проекта, приоритет, оплаченная сумма |
+| 015 | `015_v2_project_completed_unpaid.sql` | Статус completed_unpaid |
+| 016 | `016_v2_tasks_home_bucket.sql` | home_bucket у задач |
+| 017 | `017_v2_finance.sql` | v2 «Проекты и финансы» (отдельно от v1 agency_*) |
+| 018 | `018_v2_personal_finance.sql` | v2 «Личное» → личные финансы (счета, бюджет, налоги) |
+| 019 | `019_v2_personal_todos.sql` | v2 «Личное» → личный планировщик задач |
+| 020 | `020_v2_timer_unique_active.sql` | Один активный таймер на пользователя |
 
-**Следующий свободный номер:** `015`
+**Следующий свободный номер:** `020`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

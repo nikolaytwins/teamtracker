@@ -7,6 +7,7 @@ import {
   parseWorkDaysJson,
   serializeWorkDaysJson,
 } from "@/lib/tt-user-schedule";
+import { normalizePayType, type TtPayType } from "@/lib/v2/admin/compensation";
 
 export interface TtUserRow {
   id: string;
@@ -27,6 +28,12 @@ export interface TtUserRow {
   work_days_json: string | null;
   /** Стоимость часа для расчёта себестоимости проектов, ₽. */
   hourly_rate_rub: number | null;
+  /** Тип оплаты: hourly | monthly | deal */
+  pay_type: TtPayType;
+  /** Оклад, ₽/мес (для pay_type=monthly). */
+  monthly_salary_rub: number | null;
+  /** Выплачено за месяц, ₽ (для pay_type=deal). */
+  monthly_paid_rub: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -94,6 +101,21 @@ export function ensureTtUsersSchema() {
   } catch {
     /* exists */
   }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN pay_type TEXT NOT NULL DEFAULT 'hourly'`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN monthly_salary_rub INTEGER`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE tt_users ADD COLUMN monthly_paid_rub INTEGER`);
+  } catch {
+    /* exists */
+  }
 }
 
 function hashPassword(password: string, saltHex: string): string {
@@ -156,6 +178,15 @@ function rowToUser(row: Record<string, unknown> | undefined): TtUserRow | null {
       row.hourly_rate_rub != null && !Number.isNaN(Number(row.hourly_rate_rub))
         ? Math.round(Number(row.hourly_rate_rub))
         : null,
+    pay_type: normalizePayType(row.pay_type != null ? String(row.pay_type) : null),
+    monthly_salary_rub:
+      row.monthly_salary_rub != null && !Number.isNaN(Number(row.monthly_salary_rub))
+        ? Math.round(Number(row.monthly_salary_rub))
+        : null,
+    monthly_paid_rub:
+      row.monthly_paid_rub != null && !Number.isNaN(Number(row.monthly_paid_rub))
+        ? Math.round(Number(row.monthly_paid_rub))
+        : null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   };
@@ -192,6 +223,9 @@ export type TtUserPublic = {
   auth_email: string | null;
   /** Стоимость часа, ₽ (null — используется ставка по умолчанию в расчётах). */
   hourly_rate_rub: number | null;
+  pay_type: TtPayType;
+  monthly_salary_rub: number | null;
+  monthly_paid_rub: number | null;
   created_at: string;
 };
 
@@ -216,6 +250,9 @@ export function toTtUserPublic(row: TtUserRow): TtUserPublic {
     avatar_url: row.avatar_url,
     auth_email: row.auth_email,
     hourly_rate_rub: row.hourly_rate_rub,
+    pay_type: row.pay_type,
+    monthly_salary_rub: row.monthly_salary_rub,
+    monthly_paid_rub: row.monthly_paid_rub,
     created_at: row.created_at,
   };
 }
@@ -573,6 +610,9 @@ export function updateUserScheduleAndProfile(
     display_name?: string;
     job_title?: string | null;
     hourly_rate_rub?: number | null;
+    pay_type?: TtPayType;
+    monthly_salary_rub?: number | null;
+    monthly_paid_rub?: number | null;
   }
 ): { ok: true; user: TtUserPublic } | { ok: false; error: string } {
   const target = getUserById(targetUserId);
@@ -630,9 +670,40 @@ export function updateUserScheduleAndProfile(
     }
   }
 
+  let pay_type = target.pay_type;
+  if (patch.pay_type !== undefined) {
+    pay_type = normalizePayType(patch.pay_type);
+  }
+
+  let monthly_salary_rub = target.monthly_salary_rub;
+  if (patch.monthly_salary_rub !== undefined) {
+    if (patch.monthly_salary_rub === null) {
+      monthly_salary_rub = null;
+    } else {
+      const r = Math.round(Number(patch.monthly_salary_rub));
+      if (!Number.isFinite(r) || r < 0 || r > 100_000_000) {
+        return { ok: false, error: "monthly_salary_rub: ожидается число от 0 до 100 000 000" };
+      }
+      monthly_salary_rub = r > 0 ? r : null;
+    }
+  }
+
+  let monthly_paid_rub = target.monthly_paid_rub;
+  if (patch.monthly_paid_rub !== undefined) {
+    if (patch.monthly_paid_rub === null) {
+      monthly_paid_rub = null;
+    } else {
+      const r = Math.round(Number(patch.monthly_paid_rub));
+      if (!Number.isFinite(r) || r < 0 || r > 100_000_000) {
+        return { ok: false, error: "monthly_paid_rub: ожидается число от 0 до 100 000 000" };
+      }
+      monthly_paid_rub = r > 0 ? r : null;
+    }
+  }
+
   const db = getDb();
   db.prepare(
-    `UPDATE tt_users SET work_hours_per_day = ?, work_days_json = ?, weekly_capacity_hours = ?, display_name = ?, job_title = ?, hourly_rate_rub = ?, updated_at = datetime('now') WHERE id = ?`
+    `UPDATE tt_users SET work_hours_per_day = ?, work_days_json = ?, weekly_capacity_hours = ?, display_name = ?, job_title = ?, hourly_rate_rub = ?, pay_type = ?, monthly_salary_rub = ?, monthly_paid_rub = ?, updated_at = datetime('now') WHERE id = ?`
   ).run(
     work_hours_per_day,
     work_days_json,
@@ -640,6 +711,9 @@ export function updateUserScheduleAndProfile(
     display_name,
     job_title,
     hourly_rate_rub,
+    pay_type,
+    monthly_salary_rub,
+    monthly_paid_rub,
     targetUserId
   );
 

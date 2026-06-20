@@ -65,6 +65,8 @@ function HomeKanbanColumn({
   onDrop,
   dropActive,
   onDragEnterColumn,
+  runningId,
+  onToggleRun,
 }: {
   label: string;
   dot: string;
@@ -77,6 +79,8 @@ function HomeKanbanColumn({
   onDrop?: () => void;
   dropActive?: boolean;
   onDragEnterColumn?: () => void;
+  runningId?: string | null;
+  onToggleRun?: (id: string) => void;
 }) {
   return (
     <div
@@ -121,6 +125,8 @@ function HomeKanbanColumn({
                 onDragEnd={onDragEnd}
                 onOpen={() => onOpenTask(task.id)}
                 compact
+                running={runningId === task.id}
+                onToggleRun={onToggleRun ? () => onToggleRun(task.id) : undefined}
               />
             </div>
           ))
@@ -185,6 +191,8 @@ export function HomeWeekView({
   onDropDate,
   onDragOverDate,
   onOpenTask,
+  runningId,
+  onToggleRun,
 }: {
   weekDates: string[];
   weekColumns: Record<string, V2TaskWithMeta[]>;
@@ -197,6 +205,8 @@ export function HomeWeekView({
   onDropDate: (ymd: string) => void;
   onDragOverDate: (ymd: string | null) => void;
   onOpenTask: (id: string) => void;
+  runningId?: string | null;
+  onToggleRun?: (id: string) => void;
 }) {
   const todayYmd = weekDates[0] ?? "";
 
@@ -216,6 +226,8 @@ export function HomeWeekView({
           onDrop={() => onDropDate(ymd)}
           dropActive={dragOverDate === ymd}
           onDragEnterColumn={() => onDragOverDate(ymd)}
+          runningId={runningId}
+          onToggleRun={onToggleRun}
         />
       ))}
       {unscheduled.length > 0 ? (
@@ -229,6 +241,8 @@ export function HomeWeekView({
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
           onOpenTask={onOpenTask}
+          runningId={runningId}
+          onToggleRun={onToggleRun}
         />
       ) : null}
     </div>
@@ -246,6 +260,8 @@ export function HomeKanbanView({
   onDropBucket,
   onDragOverBucket,
   onOpenTask,
+  runningId,
+  onToggleRun,
 }: {
   kanbanColumns: Record<HomeKanbanColumnKey, V2TaskWithMeta[]>;
   showUnassigned: boolean;
@@ -257,6 +273,8 @@ export function HomeKanbanView({
   onDropBucket: (bucket: V2TaskBucket) => void;
   onDragOverBucket: (bucket: V2TaskBucket | null) => void;
   onOpenTask: (id: string) => void;
+  runningId?: string | null;
+  onToggleRun?: (id: string) => void;
 }) {
   const columns = showUnassigned ? KANBAN_COLUMNS : KANBAN_COLUMNS.filter((c) => c.key !== "unassigned");
 
@@ -283,6 +301,8 @@ export function HomeKanbanView({
               onDrop={dropBucket && canDropTaskOnHomeBucket(dropBucket) ? () => onDropBucket(dropBucket) : undefined}
               dropActive={!!dropBucket && dragOverBucket === dropBucket}
               onDragEnterColumn={dropBucket ? () => onDragOverBucket(dropBucket) : undefined}
+              runningId={runningId}
+              onToggleRun={onToggleRun}
             />
           );
         })}

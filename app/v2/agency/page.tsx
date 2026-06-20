@@ -1,5 +1,5 @@
-import { V2LegacyEmbed } from "@/components/v2/shell/legacy-embed";
+import { V2FinanceClient } from "@/components/v2/finance/v2-finance-client";
 
 export default function V2AgencyPage() {
-  return <V2LegacyEmbed title="Финансы (v1)" v1Path="/agency" />;
+  return <V2FinanceClient />;
 }

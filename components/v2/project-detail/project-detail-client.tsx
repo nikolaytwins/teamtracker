@@ -537,6 +537,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
           colorInk: detail.colorInk,
         }}
         runningTaskId={runningTaskId}
+        runningElapsedSeconds={runningTaskId && active?.session.task_id === drawerTaskId ? elapsed : 0}
         onToggleTimer={toggleTimer}
       />
     </>

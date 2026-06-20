@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Admin } from "@/lib/v2/auth/require-v2-session";
+import { type TtPayType } from "@/lib/v2/admin/compensation";
 import { getUserById, toTtUserPublic, updateUserScheduleAndProfile } from "@/lib/tt-auth-db";
 
 type Params = { params: Promise<{ userId: string }> };
@@ -12,6 +13,10 @@ function parseHourlyRate(value: unknown): number | null | "invalid" {
     return Number.isFinite(n) ? n : "invalid";
   }
   return "invalid";
+}
+
+function parseMoney(value: unknown): number | null | "invalid" {
+  return parseHourlyRate(value);
 }
 
 function parseWorkHours(value: unknown): number | "invalid" {
@@ -28,6 +33,13 @@ function parseWorkDays(value: unknown): number[] | "invalid" {
     out.push(n);
   }
   return out;
+}
+
+function parsePayType(value: unknown): TtPayType | "invalid" {
+  if (typeof value !== "string") return "invalid";
+  const t = value.trim();
+  if (t === "hourly" || t === "monthly" || t === "deal") return t;
+  return "invalid";
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
@@ -50,16 +62,25 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const hasRate = Object.prototype.hasOwnProperty.call(body, "hourly_rate_rub");
   const hasHours = Object.prototype.hasOwnProperty.call(body, "work_hours_per_day");
   const hasDays = Object.prototype.hasOwnProperty.call(body, "work_days");
+  const hasPayType = Object.prototype.hasOwnProperty.call(body, "pay_type");
+  const hasSalary = Object.prototype.hasOwnProperty.call(body, "monthly_salary_rub");
+  const hasPaid = Object.prototype.hasOwnProperty.call(body, "monthly_paid_rub");
 
-  if (!hasRate && !hasHours && !hasDays) {
+  if (!hasRate && !hasHours && !hasDays && !hasPayType && !hasSalary && !hasPaid) {
     return NextResponse.json(
-      { error: "Укажите hourly_rate_rub, work_hours_per_day и/или work_days" },
+      {
+        error:
+          "Укажите hourly_rate_rub, pay_type, monthly_salary_rub, monthly_paid_rub, work_hours_per_day и/или work_days",
+      },
       { status: 400 }
     );
   }
 
   const patch: {
     hourly_rate_rub?: number | null;
+    pay_type?: TtPayType;
+    monthly_salary_rub?: number | null;
+    monthly_paid_rub?: number | null;
     work_hours_per_day?: number;
     work_days?: number[];
   } = {};
@@ -70,6 +91,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "hourly_rate_rub: число или null" }, { status: 400 });
     }
     patch.hourly_rate_rub = parsed;
+  }
+
+  if (hasPayType) {
+    const parsed = parsePayType(body.pay_type);
+    if (parsed === "invalid") {
+      return NextResponse.json({ error: "pay_type: hourly | monthly | deal" }, { status: 400 });
+    }
+    patch.pay_type = parsed;
+  }
+
+  if (hasSalary) {
+    const parsed = parseMoney(body.monthly_salary_rub);
+    if (parsed === "invalid") {
+      return NextResponse.json({ error: "monthly_salary_rub: число или null" }, { status: 400 });
+    }
+    patch.monthly_salary_rub = parsed;
+  }
+
+  if (hasPaid) {
+    const parsed = parseMoney(body.monthly_paid_rub);
+    if (parsed === "invalid") {
+      return NextResponse.json({ error: "monthly_paid_rub: число или null" }, { status: 400 });
+    }
+    patch.monthly_paid_rub = parsed;
   }
 
   if (hasHours) {

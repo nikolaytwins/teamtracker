@@ -2,6 +2,7 @@ import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import { logActivity } from "@/lib/v2/activity/log";
 import { getTaskById } from "@/lib/v2/tasks/task-repo";
 import type { V2SessionContext, V2TimeSessionRow, V2TaskWithMeta } from "@/lib/v2/types";
+import { canViewAllTeamData } from "@/lib/v2/auth/permissions";
 
 export type ActiveTimerState = {
   session: V2TimeSessionRow;
@@ -69,34 +70,43 @@ export async function startTimer(ctx: V2SessionContext, taskId: string): Promise
 
 export async function stopActiveTimer(ctx: V2SessionContext): Promise<V2TimeSessionRow | null> {
   const sb = getV2Supabase();
-  const { data: active } = await sb
-    .from("v2_time_sessions")
-    .select("*")
-    .eq("user_id", ctx.userId)
-    .is("ended_at", null)
-    .maybeSingle();
-  if (!active) return null;
+  let lastStopped: V2TimeSessionRow | null = null;
 
-  const session = active as V2TimeSessionRow;
-  const endedAt = nowIso();
-  const durationSeconds = Math.max(
-    0,
-    Math.floor((new Date(endedAt).getTime() - new Date(session.started_at).getTime()) / 1000)
-  );
+  while (true) {
+    const { data: active, error: fetchErr } = await sb
+      .from("v2_time_sessions")
+      .select("*")
+      .eq("user_id", ctx.userId)
+      .is("ended_at", null)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!active) break;
 
-  const { error } = await sb
-    .from("v2_time_sessions")
-    .update({ ended_at: endedAt, duration_seconds: durationSeconds })
-    .eq("id", session.id);
-  if (error) throw new Error(error.message);
+    const session = active as V2TimeSessionRow;
+    const endedAt = nowIso();
+    const durationSeconds = Math.max(
+      0,
+      Math.floor((new Date(endedAt).getTime() - new Date(session.started_at).getTime()) / 1000)
+    );
 
-  const task = await getTaskById(ctx, session.task_id);
-  await logActivity(ctx, "timer.stopped", "task", session.task_id, {
-    title: task?.title,
-    duration_seconds: durationSeconds,
-  });
+    const { error } = await sb
+      .from("v2_time_sessions")
+      .update({ ended_at: endedAt, duration_seconds: durationSeconds })
+      .eq("id", session.id);
+    if (error) throw new Error(error.message);
 
-  return { ...session, ended_at: endedAt, duration_seconds: durationSeconds };
+    const task = await getTaskById(ctx, session.task_id);
+    await logActivity(ctx, "timer.stopped", "task", session.task_id, {
+      title: task?.title,
+      duration_seconds: durationSeconds,
+    });
+
+    lastStopped = { ...session, ended_at: endedAt, duration_seconds: durationSeconds };
+  }
+
+  return lastStopped;
 }
 
 export type ManualSessionInput = {
@@ -149,15 +159,20 @@ export async function listSessions(
   ctx: V2SessionContext,
   opts?: { taskId?: string; userId?: string; limit?: number }
 ): Promise<V2TimeSessionRow[]> {
+  const targetUserId = opts?.userId ?? ctx.userId;
+  if (targetUserId !== ctx.userId && !canViewAllTeamData(ctx.role)) {
+    throw new Error("Forbidden");
+  }
+
   const sb = getV2Supabase();
   let q = sb
     .from("v2_time_sessions")
     .select("*")
     .eq("workspace_id", ctx.workspaceId)
+    .eq("user_id", targetUserId)
     .order("started_at", { ascending: false });
 
   if (opts?.taskId) q = q.eq("task_id", opts.taskId);
-  if (opts?.userId) q = q.eq("user_id", opts.userId);
   if (opts?.limit) q = q.limit(opts.limit);
 
   const { data, error } = await q;
