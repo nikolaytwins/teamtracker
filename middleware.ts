@@ -133,7 +133,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!canAccessAgencyRoutes(role)) {
-    if (pathname.startsWith("/api/agency") || pathname.startsWith("/api/admin")) {
+    if (pathname.startsWith("/api/agency") || pathname.startsWith("/api/v2/agency") || pathname.startsWith("/api/admin")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (pathname.startsWith("/api/v2/finance")) {
@@ -148,6 +148,9 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/admin") ||
       pathname.startsWith("/v2/agency")
     ) {
+      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
+    }
+    if (pathname.startsWith("/v2/agency")) {
       return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
     }
     if (pathname.startsWith("/board/team-load")) {

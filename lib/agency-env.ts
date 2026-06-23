@@ -1,10 +1,11 @@
 export type AgencyDatabaseMode = "sqlite" | "supabase";
 
 /**
- * Режим агентства (v1 /agency):
- * - по умолчанию — SQLite (`AGENCY_SQLITE_PATH` или `data/agency.db`), даже если заданы ключи Supabase для v2.
- * - `AGENCY_DATABASE=supabase` — Postgres (нужны URL + service key; иначе откат на SQLite).
- * - `AGENCY_DATABASE=sqlite` — явно SQLite.
+ * Хранилище агентства разделено по версиям UI:
+ * - v1 `/agency` и `/api/agency/**` — всегда SQLite (`AGENCY_SQLITE_PATH` или `data/agency.db`).
+ * - v2 `/v2/agency` и `/api/v2/agency/**` — Postgres в Supabase (ключи URL + service role).
+ *
+ * Переменная `AGENCY_DATABASE` больше не переключает v1. Импорт SQLite → Supabase: `npm run import-agency-to-supabase`.
  */
 export function getAgencyDatabaseMode(): AgencyDatabaseMode {
   const v = process.env.AGENCY_DATABASE?.trim().toLowerCase();
@@ -20,7 +21,7 @@ export function isSupabaseAgencyConfigured(): boolean {
   );
 }
 
-/** true, если выбран режим Supabase и заданы URL + service key. */
+/** @deprecated v1 всегда SQLite; для v2 используется getAgencyRepoV2(). */
 export function shouldUseSupabaseAgency(): boolean {
   return getAgencyDatabaseMode() === "supabase" && isSupabaseAgencyConfigured();
 }

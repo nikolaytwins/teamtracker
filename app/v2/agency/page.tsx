@@ -1,5 +1,10 @@
-import { V2FinanceClient } from "@/components/v2/finance/v2-finance-client";
+import { AgencyFinanceClient } from "@/components/agency/agency-finance-client";
+import { AGENCY_V2_PATHS } from "@/lib/agency/finance-paths";
 
 export default function V2AgencyPage() {
-  return <V2FinanceClient />;
+  return (
+    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
+      <AgencyFinanceClient paths={AGENCY_V2_PATHS} />
+    </div>
+  );
 }

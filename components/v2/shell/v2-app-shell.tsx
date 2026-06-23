@@ -4,6 +4,7 @@ import { apiUrl, appPath } from "@/lib/api-url";
 import type { V2ProjectRow, V2TaskWithMeta, V2WorkspaceRow } from "@/lib/v2/types";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { ProfileModal } from "@/components/ProfileModal";
+import { canAccessAgencyRoutes, normalizeTtUserRole } from "@/lib/roles";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CommandPalette } from "@/components/v2/shell/command-palette";
@@ -56,13 +57,14 @@ type NavItem = {
   icon: keyof typeof V2Icons;
   countKey?: "open";
   admin?: boolean;
+  agency?: boolean;
   kbd?: string;
 };
 
 const NAV: NavItem[] = [
   { href: "/v2/home", label: "Главная", icon: "home", countKey: "open" },
   { href: "/v2/projects", label: "Проекты", icon: "projects" },
-  { href: "/v2/agency", label: "Проекты и финансы", icon: "reports", admin: true },
+  { href: "/v2/agency", label: "Проекты и финансы", icon: "reports", agency: true },
   { href: "/v2/admin/people", label: "Команда", icon: "team", admin: true },
 ];
 
@@ -160,6 +162,7 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
   const isClient = me?.role === "client";
   const nav = NAV.filter((n) => {
     if (n.admin && !isAdmin) return false;
+    if (n.agency && !canAccessAgencyRoutes(normalizeTtUserRole(me?.role))) return false;
     if (isClient) return n.href === "/v2/projects";
     return true;
   });

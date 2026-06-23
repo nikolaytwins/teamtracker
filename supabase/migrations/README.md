@@ -39,8 +39,9 @@
 | 018 | `018_v2_personal_finance.sql` | v2 «Личное» → личные финансы (счета, бюджет, налоги) |
 | 019 | `019_v2_personal_todos.sql` | v2 «Личное» → личный планировщик задач |
 | 020 | `020_v2_timer_unique_active.sql` | Один активный таймер на пользователя |
+| 021 | `021_agency_general_expense_nullable_employee.sql` | NULL employee_name/role для произвольных общих расходов agency |
 
-**Следующий свободный номер:** `020`
+**Следующий свободный номер:** `022`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 
