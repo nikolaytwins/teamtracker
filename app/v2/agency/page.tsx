@@ -1,9 +1,5 @@
-import { AgencyFinanceClient } from "@/components/agency/agency-finance-client";
+import { V2FinanceClient } from "@/components/v2/finance/v2-finance-client";
 
 export default function V2AgencyPage() {
-  return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
-      <AgencyFinanceClient variant="v2" />
-    </div>
-  );
+  return <V2FinanceClient />;
 }

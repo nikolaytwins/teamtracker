@@ -1,5 +1,5 @@
-import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
-import { financeMonthRange, isInFinanceMonth } from "@/lib/v2/finance/meta";
+import { getAgencyRepoV2 } from "@/lib/agency-store";
+import { isInFinanceMonth } from "@/lib/v2/finance/meta";
 import { FINANCE_SERVICE_META } from "@/lib/v2/finance/meta";
 import type {
   V2FinanceGeneralExpenseRow,
@@ -12,75 +12,64 @@ import type {
 } from "@/lib/v2/finance/types";
 import type { V2SessionContext } from "@/lib/v2/types";
 
-function mapProject(raw: Record<string, unknown>): V2FinanceProjectRow {
-  const st = raw.service_type;
+function repo() {
+  return getAgencyRepoV2();
+}
+
+function mapAgencyProject(raw: Record<string, unknown>, workspaceId: string): V2FinanceProjectRow {
+  const st = raw.serviceType;
   const service_type: V2FinanceServiceType =
     st === "presentation" || st === "small_task" || st === "subscription" ? st : "site";
   const statusRaw = raw.status;
   const status: V2FinancePaymentStatus =
     statusRaw === "paid" || statusRaw === "prepaid" ? statusRaw : "not_paid";
+  const pm = raw.paymentMethod;
   return {
     id: String(raw.id),
-    workspace_id: String(raw.workspace_id),
+    workspace_id: workspaceId,
     name: String(raw.name),
-    total_amount: Number(raw.total_amount) || 0,
-    paid_amount: Number(raw.paid_amount) || 0,
+    total_amount: Number(raw.totalAmount) || 0,
+    paid_amount: Number(raw.paidAmount) || 0,
     deadline: raw.deadline ? String(raw.deadline) : null,
     status,
     service_type,
-    client_type: raw.client_type ? String(raw.client_type) : null,
-    payment_method:
-      raw.payment_method === "card" || raw.payment_method === "account" ? raw.payment_method : null,
-    client_contact: raw.client_contact ? String(raw.client_contact) : null,
+    client_type: raw.clientType ? String(raw.clientType) : null,
+    payment_method: pm === "card" || pm === "account" ? pm : null,
+    client_contact: raw.clientContact ? String(raw.clientContact) : null,
     notes: raw.notes ? String(raw.notes) : null,
     source_lead_id: raw.source_lead_id ? String(raw.source_lead_id) : null,
-    created_at: String(raw.created_at),
-    updated_at: String(raw.updated_at),
+    created_at: String(raw.createdAt),
+    updated_at: String(raw.updatedAt),
   };
 }
 
-function mapGeneralExpense(raw: Record<string, unknown>): V2FinanceGeneralExpenseRow {
+function mapAgencyGeneralExpense(
+  raw: Record<string, unknown>,
+  workspaceId: string
+): V2FinanceGeneralExpenseRow {
+  const name = raw.employeeName ? String(raw.employeeName).trim() : "";
+  const role = raw.employeeRole ? String(raw.employeeRole).trim() : "";
   return {
     id: String(raw.id),
-    workspace_id: String(raw.workspace_id),
-    employee_name: String(raw.employee_name),
-    employee_role: String(raw.employee_role),
+    workspace_id: workspaceId,
+    employee_name: name || String(raw.notes ?? "—"),
+    employee_role: role || "custom",
     amount: Number(raw.amount) || 0,
     notes: raw.notes ? String(raw.notes) : null,
-    created_at: String(raw.created_at),
-    updated_at: String(raw.updated_at),
+    created_at: String(raw.createdAt),
+    updated_at: String(raw.updatedAt),
   };
 }
 
 async function loadDetailsTotals(projectIds: string[]): Promise<Map<string, number>> {
-  const sb = getV2Supabase();
   const out = new Map<string, number>();
   if (!projectIds.length) return out;
-  const { data, error } = await sb
-    .from("v2_finance_project_details")
-    .select("project_id, quantity, unit_price")
-    .in("project_id", projectIds);
-  if (error) throw error;
-  for (const row of data ?? []) {
-    const pid = row.project_id as string;
-    const sum = (Number(row.quantity) || 0) * (Number(row.unit_price) || 0);
+  const details = await repo().listProjectDetails();
+  for (const row of details) {
+    const pid = String(row.projectId);
+    if (!projectIds.includes(pid)) continue;
+    const sum = (Number(row.quantity) || 0) * (Number(row.unitPrice) || 0);
     out.set(pid, (out.get(pid) ?? 0) + sum);
-  }
-  return out;
-}
-
-async function loadExpenseTotals(projectIds: string[]): Promise<Map<string, number>> {
-  const sb = getV2Supabase();
-  const out = new Map<string, number>();
-  if (!projectIds.length) return out;
-  const { data, error } = await sb
-    .from("v2_finance_expenses")
-    .select("project_id, amount")
-    .in("project_id", projectIds);
-  if (error) throw error;
-  for (const row of data ?? []) {
-    const pid = row.project_id as string;
-    out.set(pid, (out.get(pid) ?? 0) + (Number(row.amount) || 0));
   }
   return out;
 }
@@ -101,14 +90,8 @@ function enrichProject(
 }
 
 export async function listFinanceProjects(ctx: V2SessionContext): Promise<V2FinanceProjectRow[]> {
-  const sb = getV2Supabase();
-  const { data, error } = await sb
-    .from("v2_finance_projects")
-    .select("*")
-    .eq("workspace_id", ctx.workspaceId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((r) => mapProject(r as Record<string, unknown>));
+  const rows = await repo().listProjectsWithTotalExpenses();
+  return rows.map((r) => mapAgencyProject(r, ctx.workspaceId));
 }
 
 export async function listFinanceProjectsForMonth(
@@ -116,15 +99,19 @@ export async function listFinanceProjectsForMonth(
   year: number,
   month: number
 ): Promise<V2FinanceProjectView[]> {
-  const all = await listFinanceProjects(ctx);
-  const filtered = all.filter((p) => isInFinanceMonth(p.created_at, year, month));
-  const ids = filtered.map((p) => p.id);
-  const [expenseTotals, detailTotals] = await Promise.all([
-    loadExpenseTotals(ids),
-    loadDetailsTotals(ids),
-  ]);
-  return filtered
-    .map((p) => enrichProject(p, expenseTotals, detailTotals))
+  const rawProjects = await repo().listProjectsWithTotalExpenses();
+  const filteredRaw = rawProjects.filter((r) => isInFinanceMonth(String(r.createdAt), year, month));
+  const ids = filteredRaw.map((r) => String(r.id));
+  const [detailTotals] = await Promise.all([loadDetailsTotals(ids)]);
+  const expenseTotals = new Map<string, number>();
+  for (const r of filteredRaw) {
+    expenseTotals.set(String(r.id), Number(r.totalExpenses) || 0);
+  }
+  return filteredRaw
+    .map((r) => {
+      const base = mapAgencyProject(r, ctx.workspaceId);
+      return enrichProject(base, expenseTotals, detailTotals);
+    })
     .sort((a, b) => {
       const order: Record<V2FinancePaymentStatus, number> = { paid: 0, prepaid: 1, not_paid: 2 };
       return order[a.status] - order[b.status];
@@ -161,33 +148,23 @@ export async function createFinanceProject(
     month?: number;
   }
 ): Promise<V2FinanceProjectRow> {
-  const sb = getV2Supabase();
-  const id = newV2Id();
-  const now = nowIso();
-  let created_at = now;
-  if (input.year && input.month) {
-    created_at = `${input.year}-${String(input.month).padStart(2, "0")}-01T12:00:00.000Z`;
-  }
-  const row = {
-    id,
-    workspace_id: ctx.workspaceId,
-    name: input.name.trim(),
-    total_amount: input.totalAmount ?? 0,
-    paid_amount: input.paidAmount ?? 0,
-    deadline: null,
+  const created = await repo().createProject({
+    name: input.name,
+    totalAmount: input.totalAmount ?? 0,
+    paidAmount: input.paidAmount ?? 0,
     status: input.status ?? "not_paid",
-    service_type: input.serviceType ?? "site",
-    client_type: input.clientType ?? null,
-    payment_method: input.paymentMethod ?? null,
-    client_contact: input.clientContact ?? null,
+    serviceType: input.serviceType ?? "site",
+    clientType: input.clientType ?? null,
+    paymentMethod: input.paymentMethod ?? null,
+    clientContact: input.clientContact ?? null,
     notes: input.notes ?? null,
-    source_lead_id: null,
-    created_at,
-    updated_at: now,
-  };
-  const { error } = await sb.from("v2_finance_projects").insert(row);
-  if (error) throw error;
-  return mapProject(row);
+  });
+  if (input.year && input.month) {
+    await repo().moveProjectToMonth(created.id, input.year, input.month);
+  }
+  const full = await repo().getProjectById(created.id);
+  if (!full) throw new Error("create_failed");
+  return mapAgencyProject(full, ctx.workspaceId);
 }
 
 export async function updateFinanceProject(
@@ -205,33 +182,40 @@ export async function updateFinanceProject(
     notes: string | null;
   }>
 ): Promise<V2FinanceProjectRow | null> {
-  const sb = getV2Supabase();
-  const { data: existing, error: e0 } = await sb
-    .from("v2_finance_projects")
-    .select("id")
-    .eq("id", id)
-    .eq("workspace_id", ctx.workspaceId)
-    .maybeSingle();
-  if (e0) throw e0;
-  if (!existing) return null;
-  const { error } = await sb
-    .from("v2_finance_projects")
-    .update({ ...patch, updated_at: nowIso() })
-    .eq("id", id);
-  if (error) throw error;
-  const { data, error: e1 } = await sb.from("v2_finance_projects").select("*").eq("id", id).single();
-  if (e1) throw e1;
-  return mapProject(data as Record<string, unknown>);
+  const cur = await repo().getProjectById(id);
+  if (!cur) return null;
+
+  const totalAmount = patch.total_amount ?? (Number(cur.totalAmount) || 0);
+  let paidAmount = patch.paid_amount ?? (Number(cur.paidAmount) || 0);
+  const status = (patch.status ?? String(cur.status)) as V2FinancePaymentStatus;
+  if (patch.status === "paid") paidAmount = totalAmount;
+  if (patch.status === "not_paid") paidAmount = 0;
+
+  const updated = await repo().updateProjectById(id, {
+    name: patch.name ?? String(cur.name),
+    totalAmount,
+    paidAmount,
+    deadline: cur.deadline ?? null,
+    status,
+    serviceType: patch.service_type ?? String(cur.serviceType ?? "site"),
+    clientType:
+      patch.client_type !== undefined ? patch.client_type : (cur.clientType as string | null) ?? null,
+    paymentMethod:
+      patch.payment_method !== undefined
+        ? patch.payment_method
+        : (cur.paymentMethod as string | null) ?? null,
+    clientContact:
+      patch.client_contact !== undefined
+        ? patch.client_contact
+        : (cur.clientContact as string | null) ?? null,
+    notes: patch.notes !== undefined ? patch.notes : (cur.notes as string | null) ?? null,
+  });
+  if (!updated) return null;
+  return mapAgencyProject(updated, ctx.workspaceId);
 }
 
-export async function deleteFinanceProject(ctx: V2SessionContext, id: string): Promise<boolean> {
-  const sb = getV2Supabase();
-  const { error } = await sb
-    .from("v2_finance_projects")
-    .delete()
-    .eq("id", id)
-    .eq("workspace_id", ctx.workspaceId);
-  if (error) throw error;
+export async function deleteFinanceProject(_ctx: V2SessionContext, id: string): Promise<boolean> {
+  await repo().deleteProjectById(id);
   return true;
 }
 
@@ -241,72 +225,30 @@ export async function copyFinanceProjectToNextMonth(
   year: number,
   month: number
 ): Promise<V2FinanceProjectRow | null> {
-  const sb = getV2Supabase();
-  const { data: cur, error: e0 } = await sb
-    .from("v2_finance_projects")
-    .select("*")
-    .eq("id", id)
-    .eq("workspace_id", ctx.workspaceId)
-    .maybeSingle();
-  if (e0) throw e0;
-  if (!cur) return null;
-  const newId = newV2Id();
-  const created_at = `${year}-${String(month).padStart(2, "0")}-01T12:00:00.000Z`;
-  const now = nowIso();
-  const { error: e1 } = await sb.from("v2_finance_projects").insert({
-    id: newId,
-    workspace_id: ctx.workspaceId,
-    name: cur.name,
-    total_amount: cur.total_amount,
-    paid_amount: 0,
-    deadline: cur.deadline,
-    status: "not_paid",
-    service_type: cur.service_type,
-    client_type: cur.client_type,
-    payment_method: cur.payment_method,
-    client_contact: cur.client_contact,
-    notes: cur.notes,
-    source_lead_id: null,
-    created_at,
-    updated_at: now,
-  });
-  if (e1) throw e1;
-  const { data: exps, error: e2 } = await sb.from("v2_finance_expenses").select("*").eq("project_id", id);
-  if (e2) throw e2;
-  for (const e of exps ?? []) {
-    const { error: e3 } = await sb.from("v2_finance_expenses").insert({
-      id: newV2Id(),
-      workspace_id: ctx.workspaceId,
-      project_id: newId,
-      employee_name: e.employee_name,
-      employee_role: e.employee_role,
-      amount: e.amount,
-      notes: e.notes,
-      created_at: now,
-      updated_at: now,
-    });
-    if (e3) throw e3;
+  try {
+    const copied = await repo().copyProjectToMonth(id, year, month);
+    const full = await repo().getProjectById(copied.id);
+    if (!full) return null;
+    return mapAgencyProject(full, ctx.workspaceId);
+  } catch (e) {
+    if (e instanceof Error && e.message === "not_found") return null;
+    throw e;
   }
-  const { data, error: e4 } = await sb.from("v2_finance_projects").select("*").eq("id", newId).single();
-  if (e4) throw e4;
-  return mapProject(data as Record<string, unknown>);
 }
 
 export async function moveFinanceProjectToMonth(
-  ctx: V2SessionContext,
+  _ctx: V2SessionContext,
   id: string,
   year: number,
   month: number
 ): Promise<boolean> {
-  const sb = getV2Supabase();
-  const created_at = `${year}-${String(month).padStart(2, "0")}-01T12:00:00.000Z`;
-  const { error } = await sb
-    .from("v2_finance_projects")
-    .update({ created_at, updated_at: nowIso() })
-    .eq("id", id)
-    .eq("workspace_id", ctx.workspaceId);
-  if (error) throw error;
-  return true;
+  try {
+    await repo().moveProjectToMonth(id, year, month);
+    return true;
+  } catch (e) {
+    if (e instanceof Error && e.message === "not_found") return false;
+    throw e;
+  }
 }
 
 export async function listFinanceGeneralExpenses(
@@ -314,15 +256,9 @@ export async function listFinanceGeneralExpenses(
   year: number,
   month: number
 ): Promise<V2FinanceGeneralExpenseRow[]> {
-  const sb = getV2Supabase();
-  const { data, error } = await sb
-    .from("v2_finance_general_expenses")
-    .select("*")
-    .eq("workspace_id", ctx.workspaceId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data ?? [])
-    .map((r) => mapGeneralExpense(r as Record<string, unknown>))
+  const rows = await repo().listGeneralExpenses();
+  return rows
+    .map((r) => mapAgencyGeneralExpense(r, ctx.workspaceId))
     .filter((e) => isInFinanceMonth(e.created_at, year, month));
 }
 
@@ -337,72 +273,36 @@ export async function createFinanceGeneralExpense(
     month?: number;
   }
 ): Promise<V2FinanceGeneralExpenseRow> {
-  const sb = getV2Supabase();
-  const id = newV2Id();
-  const now = nowIso();
-  let created_at = now;
-  if (input.year && input.month) {
-    created_at = `${input.year}-${String(input.month).padStart(2, "0")}-15T12:00:00.000Z`;
-  }
-  const row = {
+  const id = `agexp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const row = await repo().createGeneralExpense({
     id,
-    workspace_id: ctx.workspaceId,
-    employee_name: input.employeeName.trim(),
-    employee_role: input.employeeRole.trim(),
+    employeeName: input.employeeName.trim(),
+    employeeRole: input.employeeRole.trim(),
     amount: input.amount,
     notes: input.notes ?? null,
-    created_at,
-    updated_at: now,
-  };
-  const { error } = await sb.from("v2_finance_general_expenses").insert(row);
-  if (error) throw error;
-  return mapGeneralExpense(row);
+    year: input.year,
+    month: input.month,
+  });
+  return mapAgencyGeneralExpense(row, ctx.workspaceId);
 }
 
-export async function deleteFinanceGeneralExpense(ctx: V2SessionContext, id: string): Promise<void> {
-  const sb = getV2Supabase();
-  const { error } = await sb
-    .from("v2_finance_general_expenses")
-    .delete()
-    .eq("id", id)
-    .eq("workspace_id", ctx.workspaceId);
-  if (error) throw error;
+export async function deleteFinanceGeneralExpense(_ctx: V2SessionContext, id: string): Promise<void> {
+  await repo().deleteGeneralExpenseById(id);
 }
 
 export async function copyFinanceGeneralExpensesFromMonth(
-  ctx: V2SessionContext,
+  _ctx: V2SessionContext,
   fromYear: number,
   fromMonth: number,
   toYear: number,
   toMonth: number
 ): Promise<number> {
-  const sb = getV2Supabase();
-  const { start: fromStart, end: fromEnd } = financeMonthRange(fromYear, fromMonth);
-  const toDate = `${toYear}-${String(toMonth).padStart(2, "0")}-15T12:00:00.000Z`;
-  const { data, error } = await sb
-    .from("v2_finance_general_expenses")
-    .select("*")
-    .eq("workspace_id", ctx.workspaceId);
-  if (error) throw error;
-  let copied = 0;
-  const now = nowIso();
-  for (const exp of data ?? []) {
-    const ca = new Date(exp.created_at as string);
-    if (ca < fromStart || ca > fromEnd) continue;
-    const { error: e2 } = await sb.from("v2_finance_general_expenses").insert({
-      id: newV2Id(),
-      workspace_id: ctx.workspaceId,
-      employee_name: exp.employee_name,
-      employee_role: exp.employee_role,
-      amount: exp.amount,
-      notes: exp.notes,
-      created_at: toDate,
-      updated_at: now,
-    });
-    if (e2) throw e2;
-    copied++;
-  }
-  return copied;
+  return repo().copyGeneralExpensesBetweenMonths({
+    fromYear,
+    fromMonth,
+    toYear,
+    toMonth,
+  });
 }
 
 export function computeFinanceMonthSummary(

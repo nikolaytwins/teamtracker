@@ -329,7 +329,7 @@ export function V2FinanceClient() {
       <div className="mx-auto max-w-lg px-6 py-16 text-center">
         <p className="text-[var(--v2-ink-700)]">{error}</p>
         <p className="mt-2 text-sm text-[var(--v2-ink-500)]">
-          Проверьте Supabase и примените миграцию 017_v2_finance.sql
+          Проверьте Supabase: ключи в env и импорт agency (`npm run import-agency-to-supabase`)
         </p>
       </div>
     );
