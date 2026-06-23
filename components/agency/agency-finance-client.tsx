@@ -1,6 +1,7 @@
 'use client'
 import { apiUrl, appPath } from '@/lib/api-url'
-import type { AgencyFinancePaths } from '@/lib/agency/finance-paths'
+import type { AgencyFinanceVariant } from '@/lib/agency/finance-paths'
+import { AGENCY_FINANCE_PATHS, agencyProjectHref } from '@/lib/agency/finance-paths'
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -218,7 +219,8 @@ function MoveProjectPicker({
   )
 }
 
-export function AgencyFinanceClient({ paths }: { paths: AgencyFinancePaths }) {
+export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant }) {
+  const paths = AGENCY_FINANCE_PATHS[variant]
   const { apiBase } = paths
   const [projects, setProjects] = useState<Project[]>([])
   const [generalExpenses, setGeneralExpenses] = useState<GeneralExpense[]>([])
@@ -786,7 +788,7 @@ export function AgencyFinanceClient({ paths }: { paths: AgencyFinancePaths }) {
               <tr key={project.id}>
                 <td className="px-3 py-4 sm:px-6">
                   <div className="flex items-center gap-2">
-                    <Link href={appPath(paths.projectHref(project.id))} className="text-base font-medium text-[var(--primary)] hover:underline">
+                    <Link href={appPath(agencyProjectHref(paths, project.id))} className="text-base font-medium text-[var(--primary)] hover:underline">
                       {project.name}
                     </Link>
                     <button

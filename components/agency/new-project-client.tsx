@@ -1,12 +1,14 @@
 'use client'
 import { apiUrl, appPath } from '@/lib/api-url'
-import type { AgencyFinancePaths } from '@/lib/agency/finance-paths'
+import type { AgencyFinanceVariant } from '@/lib/agency/finance-paths'
+import { AGENCY_FINANCE_PATHS } from '@/lib/agency/finance-paths'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-export function NewAgencyProjectClient({ paths }: { paths: AgencyFinancePaths }) {
+export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVariant }) {
+  const paths = AGENCY_FINANCE_PATHS[variant]
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')

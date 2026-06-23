@@ -1,6 +1,7 @@
 'use client'
 import { apiUrl, appPath } from '@/lib/api-url'
-import type { AgencyFinancePaths } from '@/lib/agency/finance-paths'
+import type { AgencyFinanceVariant } from '@/lib/agency/finance-paths'
+import { AGENCY_FINANCE_PATHS } from '@/lib/agency/finance-paths'
 
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -188,7 +189,8 @@ function ExpenseRow({
   )
 }
 
-export function AgencyProjectDetailClient({ paths }: { paths: AgencyFinancePaths }) {
+export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceVariant }) {
+  const paths = AGENCY_FINANCE_PATHS[variant]
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
