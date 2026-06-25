@@ -75,7 +75,7 @@ export const PersonalTodoQuickAdd = forwardRef<
     const parsed = parsePersonalQuickAdd(raw);
     if (!parsed.title) return;
 
-    const resolvedPriority = parsed.priority ?? priority ?? "medium";
+    const resolvedPriority = parsed.priority ?? priority ?? null;
 
     let due_date: string | null = parsed.due_date;
     let scheduled_date: string | null = parsed.scheduled_date;
@@ -180,16 +180,15 @@ export const PersonalTodoQuickAdd = forwardRef<
             </span>
             {PRIORITIES.map((p) => {
               const m = PRIORITY_META[p];
-              const active = (priority ?? "medium") === p && priority !== null;
-              const isDefault = priority === null && p === "medium";
+              const active = priority === p;
               return (
                 <button
                   key={p}
                   type="button"
                   title={m.label}
-                  onClick={() => setPriority(active && !isDefault ? null : p)}
+                  onClick={() => setPriority(active ? null : p)}
                   className={`v2-tight inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition ${
-                    active || isDefault
+                    active
                       ? "border-[var(--v2-ink-300)] bg-white shadow-sm"
                       : "border-transparent text-[var(--v2-ink-500)] hover:bg-white/80"
                   }`}

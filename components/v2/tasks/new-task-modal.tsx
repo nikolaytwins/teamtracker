@@ -331,7 +331,7 @@ export function NewTaskModal({
 
           <div>
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Приоритет</span>
-            <PriorityFlagPicker value={priority} onChange={setPriority} />
+            <PriorityFlagPicker value={priority} onChange={(p) => p && setPriority(p)} />
           </div>
 
           <div className="flex items-center justify-end gap-2 border-t border-[var(--v2-ink-100)] pt-4">

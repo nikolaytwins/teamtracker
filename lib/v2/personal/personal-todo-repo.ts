@@ -24,9 +24,10 @@ function personalTodoSortOrder(): number {
 
 const PRIORITIES: V2TaskPriority[] = ["urgent", "high", "medium", "low"];
 
-function normPriority(p: unknown): V2TaskPriority {
-  const s = String(p ?? "medium").toLowerCase();
-  return PRIORITIES.includes(s as V2TaskPriority) ? (s as V2TaskPriority) : "medium";
+function normPriority(p: unknown): V2TaskPriority | null {
+  if (p == null || p === "") return null;
+  const s = String(p).toLowerCase();
+  return PRIORITIES.includes(s as V2TaskPriority) ? (s as V2TaskPriority) : null;
 }
 
 function mapProject(r: Record<string, unknown>): PersonalTodoProjectRow {
@@ -135,6 +136,39 @@ async function enrichTodos(rows: Record<string, unknown>[], projects: Map<string
   });
 }
 
+async function attachSubtasks(
+  parents: PersonalTodoRow[],
+  projects: Map<string, PersonalTodoProjectRow>
+): Promise<PersonalTodoRow[]> {
+  const ids = parents.map((p) => p.id);
+  if (!ids.length) return parents;
+
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_todos")
+    .select("*")
+    .in("parent_id", ids)
+    .is("deleted_at", null)
+    .order("sort_order")
+    .order("created_at");
+  if (error) throw error;
+
+  const subs = await enrichTodos((data ?? []) as Record<string, unknown>[], projects);
+  const byParent = new Map<string, PersonalTodoRow[]>();
+  for (const sub of subs) {
+    const pid = sub.parent_id;
+    if (!pid) continue;
+    const list = byParent.get(pid) ?? [];
+    list.push(sub);
+    byParent.set(pid, list);
+  }
+
+  return parents.map((p) => ({
+    ...p,
+    subtasks: byParent.get(p.id) ?? [],
+  }));
+}
+
 async function fetchOpenParentTodos(userId: string) {
   const sb = getV2Supabase();
   const { data, error } = await sb
@@ -192,8 +226,9 @@ export async function loadPersonalTodoBootstrap(ctx: V2SessionContext): Promise<
 
 function sortTodosForDisplay(todos: PersonalTodoRow[]): PersonalTodoRow[] {
   const priorityRank: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+  const rank = (p: V2TaskPriority | null) => (p == null ? 2.5 : priorityRank[p] ?? 2.5);
   return [...todos].sort((a, b) => {
-    const pr = (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2);
+    const pr = rank(a.priority) - rank(b.priority);
     if (pr !== 0) return pr;
     return a.sort_order - b.sort_order;
   });
@@ -254,8 +289,9 @@ export async function loadPersonalTodoList(
   if (view === "inbox") {
     const rows = await fetchOpenParentTodos(userId);
     const todos = await enrichTodos(rows, projects);
+    const withSubtasks = await attachSubtasks(todos, projects);
     filtered = sortTodosForDisplay(
-      todos.filter((t) => !t.due_date && !t.scheduled_date)
+      withSubtasks.filter((t) => !t.due_date && !t.scheduled_date)
     );
   } else if (view === "today") {
     const rows = await fetchOpenParentTodos(userId);
@@ -333,7 +369,7 @@ export async function createPersonalTodo(
     project_id?: string | null;
     parent_id?: string | null;
     description?: string | null;
-    priority?: V2TaskPriority;
+    priority?: V2TaskPriority | null;
     due_date?: string | null;
     due_time?: string | null;
     scheduled_date?: string | null;
@@ -378,7 +414,7 @@ export async function createPersonalTodo(
     parent_id: input.parent_id ?? null,
     title,
     description: input.description ?? null,
-    priority: normPriority(input.priority),
+    priority: input.priority !== undefined ? normPriority(input.priority) : null,
     due_date: input.due_date ?? null,
     due_time: input.due_time ?? null,
     scheduled_date:

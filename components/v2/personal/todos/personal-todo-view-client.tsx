@@ -389,8 +389,11 @@ export function PersonalTodoViewClient({
 
 function findTodo(payload: PersonalTodoListPayload | null, id: string): PersonalTodoRow | undefined {
   if (!payload) return undefined;
-  const direct = payload.todos.find((t) => t.id === id);
-  if (direct) return direct;
+  for (const t of payload.todos) {
+    if (t.id === id) return t;
+    const sub = t.subtasks?.find((s) => s.id === id);
+    if (sub) return sub;
+  }
   for (const g of payload.groups ?? []) {
     const found = g.todos.find((t) => t.id === id);
     if (found) return found;

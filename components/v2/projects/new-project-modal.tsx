@@ -158,7 +158,7 @@ export function NewProjectModal({
 
         <div className="mt-4">
           <p className="mb-2 text-[12px] font-medium text-[var(--v2-ink-600)]">Приоритет</p>
-          <PriorityFlagPicker value={priority} onChange={setPriority} />
+          <PriorityFlagPicker value={priority} onChange={(p) => p && setPriority(p)} />
         </div>
 
         <div className="mt-4">

@@ -207,8 +207,9 @@ export function PersonalTodoDetailDrawer({
                 <label className="v2-tight mb-2 block text-[12px] font-medium text-[var(--v2-ink-500)]">Приоритет</label>
                 <PriorityFlagPicker
                   value={todo.priority}
-                  onChange={(priority: V2TaskPriority) => void patchTodo({ priority })}
+                  onChange={(priority) => void patchTodo({ priority })}
                   compact
+                  allowUnset
                 />
               </div>
 
@@ -293,7 +294,7 @@ export function PersonalTodoDetailDrawer({
                     </div>
                     <PriorityFlagPicker
                       value={subtaskPriority}
-                      onChange={setSubtaskPriority}
+                      onChange={(priority) => setSubtaskPriority(priority ?? "medium")}
                       compact
                     />
                   </form>

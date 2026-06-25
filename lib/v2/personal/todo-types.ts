@@ -20,7 +20,7 @@ export type PersonalTodoRow = {
   parent_id: string | null;
   title: string;
   description: string | null;
-  priority: V2TaskPriority;
+  priority: V2TaskPriority | null;
   due_date: string | null;
   due_time: string | null;
   scheduled_date: string | null;
@@ -30,6 +30,7 @@ export type PersonalTodoRow = {
   project_color?: string | null;
   subtask_count?: number;
   subtask_done?: number;
+  subtasks?: PersonalTodoRow[];
 };
 
 export type PersonalTodoBootstrap = {

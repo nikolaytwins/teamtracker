@@ -79,10 +79,12 @@ export function PriorityFlagPicker({
   value,
   onChange,
   compact = false,
+  allowUnset = false,
 }: {
-  value: V2TaskPriority;
-  onChange: (priority: V2TaskPriority) => void;
+  value: V2TaskPriority | null;
+  onChange: (priority: V2TaskPriority | null) => void;
   compact?: boolean;
+  allowUnset?: boolean;
 }) {
   return (
     <div className={`grid gap-2 ${compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
@@ -93,7 +95,7 @@ export function PriorityFlagPicker({
           <button
             key={key}
             type="button"
-            onClick={() => onChange(key)}
+            onClick={() => onChange(active && allowUnset ? null : key)}
             className={`v2-tight flex w-full min-w-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-left transition ${
               active ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)]" : "border-[var(--v2-ink-200)] hover:border-[var(--v2-ink-300)]"
             }`}
