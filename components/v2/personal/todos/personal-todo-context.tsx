@@ -15,6 +15,10 @@ type PersonalTodoContextValue = {
   inboxProjectId: string;
   counts: PersonalTodoBootstrap["counts"];
   listNonce: number;
+  parentCandidates: Array<{ id: string; title: string }>;
+  setParentCandidates: (items: Array<{ id: string; title: string }>) => void;
+  subtaskParentId: string | null;
+  setSubtaskParentId: (id: string | null) => void;
   refreshBootstrap: () => Promise<void>;
   bumpList: () => void;
   focusQuickAdd: () => void;
@@ -30,6 +34,8 @@ export function PersonalTodoProvider({ children }: { children: React.ReactNode }
   const [inboxProjectId, setInboxProjectId] = useState("");
   const [counts, setCounts] = useState<PersonalTodoBootstrap["counts"]>({ inbox: 0, today: 0, overdue: 0 });
   const [listNonce, setListNonce] = useState(0);
+  const [parentCandidates, setParentCandidates] = useState<Array<{ id: string; title: string }>>([]);
+  const [subtaskParentId, setSubtaskParentId] = useState<string | null>(null);
   const quickAddHandleRef = useRef<PersonalTodoQuickAddHandle | null>(null);
 
   const bumpList = useCallback(() => setListNonce((n) => n + 1), []);
@@ -64,12 +70,16 @@ export function PersonalTodoProvider({ children }: { children: React.ReactNode }
       inboxProjectId,
       counts,
       listNonce,
+      parentCandidates,
+      setParentCandidates,
+      subtaskParentId,
+      setSubtaskParentId,
       refreshBootstrap,
       bumpList,
       focusQuickAdd,
       registerQuickAdd,
     }),
-    [loading, error, projects, inboxProjectId, counts, listNonce, refreshBootstrap, bumpList, focusQuickAdd, registerQuickAdd]
+    [loading, error, projects, inboxProjectId, counts, listNonce, parentCandidates, subtaskParentId, refreshBootstrap, bumpList, focusQuickAdd, registerQuickAdd]
   );
 
   return <PersonalTodoContext.Provider value={value}>{children}</PersonalTodoContext.Provider>;

@@ -1,7 +1,6 @@
 "use client";
 
 import { PersonalTodoProvider, usePersonalTodo } from "@/components/v2/personal/todos/personal-todo-context";
-import { PersonalTodoQuickAdd } from "@/components/v2/personal/todos/personal-todo-quick-add";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
@@ -23,17 +22,9 @@ function NavIcon({ name }: { name: (typeof NAV_ITEMS)[number]["icon"] }) {
   return <Icon className="h-4 w-4 shrink-0" />;
 }
 
-function PersonalTodoPlannerShellInner({
-  children,
-  defaultProjectId,
-}: {
-  children: React.ReactNode;
-  defaultProjectId?: string | null;
-}) {
+function PersonalTodoPlannerShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const { counts, projects, refreshBootstrap, loading, focusQuickAdd } = usePersonalTodo();
-  const projectFromPath = pathname.match(/\/personal\/tasks\/project\/([^/]+)/)?.[1] ?? null;
-  const resolvedDefaultProject = defaultProjectId ?? projectFromPath;
   const [creatingProject, setCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -196,23 +187,16 @@ function PersonalTodoPlannerShellInner({
       </nav>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <PersonalTodoQuickAdd defaultProjectId={resolvedDefaultProject} />
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
 }
 
-export function PersonalTodoPlannerShell({
-  children,
-  defaultProjectId,
-}: {
-  children: React.ReactNode;
-  defaultProjectId?: string | null;
-}) {
+export function PersonalTodoPlannerShell({ children }: { children: React.ReactNode }) {
   return (
     <PersonalTodoProvider>
-      <PersonalTodoPlannerShellInner defaultProjectId={defaultProjectId}>{children}</PersonalTodoPlannerShellInner>
+      <PersonalTodoPlannerShellInner>{children}</PersonalTodoPlannerShellInner>
     </PersonalTodoProvider>
   );
 }

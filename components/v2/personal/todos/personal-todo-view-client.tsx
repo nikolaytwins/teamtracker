@@ -9,11 +9,12 @@ import {
 import { usePersonalTodo } from "@/components/v2/personal/todos/personal-todo-context";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { formatPersonalTodoDateLabel, isPersonalTodoOverdue } from "@/lib/v2/personal/todo-date";
+import { groupInboxTodosByPriority, INBOX_IMPORTANT_SECTION_IDS } from "@/lib/v2/personal/todo-inbox-groups";
 import type { PersonalTodoListPayload, PersonalTodoRow, PersonalTodoView } from "@/lib/v2/personal/todo-types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const EMPTY_MESSAGES: Partial<Record<PersonalTodoView, string>> = {
-  inbox: "Во входящих пусто — добавьте задачу через строку сверху или перенесите сюда задачи без даты.",
+  inbox: "Во входящих пусто — добавьте задачу в поле ниже.",
   today: "На сегодня задач нет. Запланируйте что-нибудь или отдохните.",
   upcoming: "Предстоящих задач нет на ближайшие две недели.",
   week: "На этой неделе пока ничего не запланировано. Перетащите задачи из блока «Без даты».",
@@ -31,17 +32,15 @@ export function PersonalTodoViewClient({
   title,
   subtitle,
   focusQuickAddOnMount = false,
-  embedQuickAdd = false,
 }: {
   view: PersonalTodoView;
   projectId?: string;
   title: string;
   subtitle?: string;
   focusQuickAddOnMount?: boolean;
-  /** When true, renders its own quick-add (for pages outside planner shell). */
-  embedQuickAdd?: boolean;
 }) {
-  const { refreshBootstrap, listNonce, projects, focusQuickAdd } = usePersonalTodo();
+  const { refreshBootstrap, listNonce, projects, focusQuickAdd, setParentCandidates, setSubtaskParentId } =
+    usePersonalTodo();
   const quickAddRef = useRef<PersonalTodoQuickAddHandle>(null);
   const [payload, setPayload] = useState<PersonalTodoListPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,14 +63,25 @@ export function PersonalTodoViewClient({
       .finally(() => setLoading(false));
   }, [load, listNonce]);
 
+  useEffect(() => {
+    if (focusQuickAddOnMount) focusQuickAdd();
+  }, [focusQuickAddOnMount, focusQuickAdd]);
+
   async function reload() {
     await load();
     await refreshBootstrap();
   }
 
+  function handleAddSubtask(id: string) {
+    setSubtaskParentId(id);
+    focusQuickAdd();
+  }
+
   useEffect(() => {
-    if (focusQuickAddOnMount) focusQuickAdd();
-  }, [focusQuickAddOnMount, focusQuickAdd]);
+    if (!payload) return;
+    const candidates = payload.todos.map((t) => ({ id: t.id, title: t.title }));
+    setParentCandidates(candidates);
+  }, [payload, setParentCandidates]);
 
   async function toggleComplete(id: string) {
     const todo = findTodo(payload, id);
@@ -102,10 +112,16 @@ export function PersonalTodoViewClient({
     }
   }
 
-  function renderList(todos: PersonalTodoRow[], opts?: { showProject?: boolean; compact?: boolean }) {
+  function renderList(
+    todos: PersonalTodoRow[],
+    opts?: { showProject?: boolean; compact?: boolean; priorityAccent?: string }
+  ) {
     if (!todos.length) return null;
     return (
       <div className="overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-soft)]">
+        {opts?.priorityAccent ? (
+          <div className="h-1 w-full" style={{ background: opts.priorityAccent }} aria-hidden />
+        ) : null}
         <div className="divide-y divide-[var(--v2-ink-100)]/70">
           {todos.map((todo, i) => (
             <div key={todo.id} className="v2-row-in" style={{ animationDelay: `${i * 30}ms` }}>
@@ -113,6 +129,7 @@ export function PersonalTodoViewClient({
                 todo={todo}
                 onToggle={(id) => void toggleComplete(id)}
                 onOpen={setSelectedId}
+                onAddSubtask={handleAddSubtask}
                 showProject={opts?.showProject ?? view !== "project"}
                 compact={opts?.compact}
               />
@@ -165,6 +182,7 @@ export function PersonalTodoViewClient({
                       todo={todo}
                       onToggle={(id) => void toggleComplete(id)}
                       onOpen={setSelectedId}
+                      onAddSubtask={handleAddSubtask}
                       showProject
                       compact
                       draggable
@@ -225,6 +243,72 @@ export function PersonalTodoViewClient({
     );
   }
 
+  function renderInboxSectionHeader(
+    title: string,
+    count: number,
+    opts?: { subtitle?: string; accent?: string; prominent?: boolean }
+  ) {
+    return (
+      <div className="mb-3 flex items-start gap-2">
+        {opts?.accent ? (
+          <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: opts.accent }} aria-hidden />
+        ) : null}
+        <div>
+          <h2
+            className={`v2-tight font-semibold ${
+              opts?.prominent ? "text-[17px] text-[var(--v2-ink-900)]" : "text-[15px] text-[var(--v2-ink-800)]"
+            }`}
+          >
+            {title}
+            <span className="v2-tnum ml-2 text-[13px] font-medium text-[var(--v2-ink-400)]">{count}</span>
+          </h2>
+          {opts?.subtitle ? (
+            <p className="v2-tight mt-0.5 text-[12px] text-[var(--v2-ink-500)]">{opts.subtitle}</p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  function renderInboxByPriority() {
+    const todos = payload?.todos ?? [];
+    if (!todos.length) return renderEmpty();
+    const sections = groupInboxTodosByPriority(todos);
+    const important = sections.filter((s) => INBOX_IMPORTANT_SECTION_IDS.includes(s.id));
+    const rest = sections.filter((s) => !INBOX_IMPORTANT_SECTION_IDS.includes(s.id));
+    const importantCount = important.reduce((n, s) => n + s.todos.length, 0);
+
+    return (
+      <div className="space-y-8 px-6 pb-6">
+        {important.length > 0 ? (
+          <section>
+            {renderInboxSectionHeader("Важное сейчас", importantCount, {
+              subtitle: "Срочные и высокоприоритетные задачи",
+              prominent: true,
+            })}
+            <div className="space-y-4">
+              {important.map((section) => (
+                <div key={section.id}>
+                  {renderInboxSectionHeader(section.title, section.todos.length, { accent: section.accent })}
+                  {renderList(section.todos, { showProject: true, priorityAccent: section.accent })}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+        {rest.map((section) => (
+          <section key={section.id}>
+            {renderInboxSectionHeader(section.title, section.todos.length, {
+              subtitle: section.subtitle,
+              accent: section.accent,
+            })}
+            {renderList(section.todos, { showProject: true, priorityAccent: section.accent })}
+          </section>
+        ))}
+      </div>
+    );
+  }
+
   function renderTodayList() {
     const todos = payload?.todos ?? [];
     if (!todos.length) return renderEmpty();
@@ -263,12 +347,17 @@ export function PersonalTodoViewClient({
 
   return (
     <>
-      {embedQuickAdd ? <PersonalTodoQuickAdd ref={quickAddRef} defaultProjectId={projectId} onCreated={() => void reload()} /> : null}
-
-      <header className="px-6 pb-4 pt-6">
+      <header className="px-6 pb-2 pt-6">
         <h1 className="v2-tight text-2xl font-semibold text-[var(--v2-ink-900)]">{displayTitle}</h1>
         {subtitle ? <p className="v2-tight mt-1 text-[14px] text-[var(--v2-ink-500)]">{subtitle}</p> : null}
       </header>
+
+      <PersonalTodoQuickAdd
+        ref={quickAddRef}
+        view={view}
+        defaultProjectId={projectId}
+        onCreated={() => void reload()}
+      />
 
       {error ? (
         <div className="mx-6 mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
@@ -282,6 +371,8 @@ export function PersonalTodoViewClient({
         renderUpcomingGroups()
       ) : view === "today" ? (
         renderTodayList()
+      ) : view === "inbox" ? (
+        renderInboxByPriority()
       ) : (
         renderDefaultList()
       )}

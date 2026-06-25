@@ -17,6 +17,11 @@ function uid(ctx: V2SessionContext) {
   return ctx.userId;
 }
 
+/** Колонка sort_order в Postgres — INTEGER (max ~2.1e9); Date.now() не влезает. */
+function personalTodoSortOrder(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
 const PRIORITIES: V2TaskPriority[] = ["urgent", "high", "medium", "low"];
 
 function normPriority(p: unknown): V2TaskPriority {
@@ -383,7 +388,7 @@ export async function createPersonalTodo(
           ? input.due_date
           : null,
     completed_at: null,
-    sort_order: Date.now(),
+    sort_order: personalTodoSortOrder(),
     deleted_at: null,
     created_at: now,
     updated_at: now,
@@ -479,7 +484,7 @@ export async function createPersonalTodoProject(
     name: input.name.trim() || "Проект",
     color: input.color ?? "#3B6FF7",
     icon_key: input.icon_key ?? "folder",
-    sort_order: Date.now(),
+    sort_order: personalTodoSortOrder(),
     is_inbox: false,
     archived_at: null,
     created_at: now,

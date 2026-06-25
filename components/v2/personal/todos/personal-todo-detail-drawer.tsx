@@ -30,6 +30,7 @@ export function PersonalTodoDetailDrawer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [subtaskPriority, setSubtaskPriority] = useState<V2TaskPriority>("medium");
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -53,6 +54,7 @@ export function PersonalTodoDetailDrawer({
       void loadDetail();
       setDeleteConfirm(false);
       setSubtaskTitle("");
+      setSubtaskPriority("medium");
     } else if (!open) {
       setDetail(null);
     }
@@ -114,9 +116,14 @@ export function PersonalTodoDetailDrawer({
       await fetchJson("/api/v2/personal/todos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: subtaskTitle.trim(), parent_id: todoId }),
+        body: JSON.stringify({
+          title: subtaskTitle.trim(),
+          parent_id: todoId,
+          priority: subtaskPriority,
+        }),
       });
       setSubtaskTitle("");
+      setSubtaskPriority("medium");
       await loadDetail();
       onUpdated();
     } catch (e) {
@@ -273,14 +280,21 @@ export function PersonalTodoDetailDrawer({
                       </span>
                     </div>
                   ))}
-                  <form onSubmit={(e) => void addSubtask(e)} className="flex items-center gap-2 px-3 py-2">
-                    <V2Icons.plus className="h-4 w-4 shrink-0 text-[var(--v2-ink-400)]" />
-                    <input
-                      type="text"
-                      value={subtaskTitle}
-                      onChange={(e) => setSubtaskTitle(e.target.value)}
-                      placeholder="Добавить подзадачу…"
-                      className="v2-tight min-w-0 flex-1 bg-transparent text-[13px] text-[var(--v2-ink-800)] outline-none placeholder:text-[var(--v2-ink-400)]"
+                  <form onSubmit={(e) => void addSubtask(e)} className="space-y-2 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <V2Icons.plus className="h-4 w-4 shrink-0 text-[var(--v2-ink-400)]" />
+                      <input
+                        type="text"
+                        value={subtaskTitle}
+                        onChange={(e) => setSubtaskTitle(e.target.value)}
+                        placeholder="Добавить подзадачу…"
+                        className="v2-tight min-w-0 flex-1 bg-transparent text-[13px] text-[var(--v2-ink-800)] outline-none placeholder:text-[var(--v2-ink-400)]"
+                      />
+                    </div>
+                    <PriorityFlagPicker
+                      value={subtaskPriority}
+                      onChange={setSubtaskPriority}
+                      compact
                     />
                   </form>
                 </div>

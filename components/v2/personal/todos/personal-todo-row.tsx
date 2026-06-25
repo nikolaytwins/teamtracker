@@ -27,6 +27,7 @@ export function PersonalTodoRowItem({
   todo,
   onToggle,
   onOpen,
+  onAddSubtask,
   draggable = false,
   isDragging = false,
   onDragStart,
@@ -37,6 +38,7 @@ export function PersonalTodoRowItem({
   todo: PersonalTodoRow;
   onToggle: (id: string) => void;
   onOpen: (id: string) => void;
+  onAddSubtask?: (id: string) => void;
   draggable?: boolean;
   isDragging?: boolean;
   onDragStart?: () => void;
@@ -120,6 +122,20 @@ export function PersonalTodoRowItem({
           ) : null}
         </div>
       </div>
+
+      {onAddSubtask && !completed ? (
+        <button
+          type="button"
+          title="Добавить подзадачу"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddSubtask(todo.id);
+          }}
+          className="v2-tight shrink-0 rounded-lg p-1.5 text-[var(--v2-ink-400)] opacity-0 transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)] group-hover:opacity-100"
+        >
+          <V2Icons.plus className="h-4 w-4" />
+        </button>
+      ) : null}
     </div>
   );
 }
