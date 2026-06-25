@@ -131,6 +131,56 @@ function InlineMoney({
   );
 }
 
+function FinanceStatusSelect({
+  value,
+  onChange,
+}: {
+  value: V2FinancePaymentStatus;
+  onChange: (status: V2FinancePaymentStatus) => void;
+}) {
+  const meta = FINANCE_STATUS_META[value];
+  return (
+    <div className="relative inline-flex">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as V2FinancePaymentStatus)}
+        className="v2-tight h-8 cursor-pointer appearance-none rounded-full py-0 pl-3 pr-8 text-[12px] font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+        style={{ background: meta.bg, color: meta.tint }}
+      >
+        {(Object.keys(FINANCE_STATUS_META) as V2FinancePaymentStatus[]).map((k) => (
+          <option key={k} value={k}>
+            {FINANCE_STATUS_META[k].label}
+          </option>
+        ))}
+      </select>
+      <V2Icons.chev
+        className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 opacity-60"
+        style={{ color: meta.tint }}
+      />
+    </div>
+  );
+}
+
+function FinanceStatusChip({
+  count,
+  status,
+}: {
+  count: number;
+  status: V2FinancePaymentStatus;
+}) {
+  if (count <= 0) return null;
+  const meta = FINANCE_STATUS_META[status];
+  return (
+    <span
+      className="v2-tight inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold"
+      style={{ background: meta.bg, color: meta.tint }}
+    >
+      <span className="h-2 w-2 rounded-full" style={{ background: meta.dot }} />
+      {count} {meta.label.toLowerCase()}
+    </span>
+  );
+}
+
 function KpiCard({
   label,
   value,
@@ -446,16 +496,23 @@ export function V2FinanceClient() {
               <KpiCard
                 label="Прибыль"
                 value={formatRub(summary.profit)}
-                tone="green"
-                accent="#10B981"
+                tone={summary.profit >= 0 ? "green" : "red"}
+                accent={summary.profit >= 0 ? "#10B981" : "#EF4444"}
                 icon={V2Icons.reports}
-                sub={`маржа ${Math.round(summary.margin)}%`}
+                sub={`маржа ${Math.round(summary.margin)}% · предполагаемая выручка − расходы`}
               />
             </div>
           ) : null}
 
           {tab === "projects" ? (
             <>
+              {projects.length > 0 ? (
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <FinanceStatusChip count={projects.filter((p) => p.status === "paid").length} status="paid" />
+                  <FinanceStatusChip count={projects.filter((p) => p.status === "prepaid").length} status="prepaid" />
+                  <FinanceStatusChip count={projects.filter((p) => p.status === "not_paid").length} status="not_paid" />
+                </div>
+              ) : null}
               <FinanceCard className="mb-7 overflow-hidden">
                 <div
                   className={`${PROJECT_COLS} border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
@@ -477,6 +534,7 @@ export function V2FinanceClient() {
                   ) : (
                     projects.map((p, i) => {
                       const tint = financeAvatarTint(p.name, i);
+                      const statusMeta = FINANCE_STATUS_META[p.status];
                       const paidTone =
                         p.paid_amount >= p.effective_total_amount
                           ? "green"
@@ -486,7 +544,11 @@ export function V2FinanceClient() {
                       return (
                         <div
                           key={p.id}
-                          className={`group ${PROJECT_COLS} items-center px-5 py-3.5 transition hover:bg-[var(--v2-ink-50)]/60`}
+                          className={`group ${PROJECT_COLS} items-center border-l-[3px] px-5 py-3.5 transition hover:brightness-[0.99]`}
+                          style={{
+                            borderLeftColor: statusMeta.dot,
+                            backgroundColor: statusMeta.bg,
+                          }}
                         >
                           <div className="flex min-w-0 items-center gap-2.5 pr-2">
                             <span
@@ -568,23 +630,15 @@ export function V2FinanceClient() {
                             </select>
                           </div>
                           <div>
-                            <select
+                            <FinanceStatusSelect
                               value={p.status}
-                              onChange={(e) => {
-                                const status = e.target.value as V2FinancePaymentStatus;
+                              onChange={(status) => {
                                 const patch: Record<string, unknown> = { status };
                                 if (status === "paid") patch.paidAmount = p.effective_total_amount;
                                 if (status === "not_paid") patch.paidAmount = 0;
                                 void patchProject(p.id, patch);
                               }}
-                              className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
-                            >
-                              {(Object.keys(FINANCE_STATUS_META) as V2FinancePaymentStatus[]).map((k) => (
-                                <option key={k} value={k}>
-                                  {FINANCE_STATUS_META[k].label}
-                                </option>
-                              ))}
-                            </select>
+                            />
                           </div>
                           <div className="v2-tight truncate text-[13px] text-[var(--v2-ink-600)]">
                             {p.client_contact || <Dash />}
@@ -922,7 +976,7 @@ function StatsTab({
     { label: "Налоги", value: summary.taxAmount, tint: "#F59E0B" },
     { label: "Прибыль", value: summary.profit, tint: "#10B981" },
   ];
-  const maxComp = summary.actualRevenue || 1;
+  const maxComp = summary.expectedRevenue || 1;
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

@@ -1,4 +1,4 @@
-export type V2FinanceServiceType = "site" | "presentation" | "small_task" | "subscription";
+export type V2FinanceServiceType = "site" | "presentation" | "small_task" | "subscription" | "ai_development";
 export type V2FinancePaymentStatus = "not_paid" | "prepaid" | "paid";
 export type V2FinancePaymentMethod = "card" | "account" | null;
 

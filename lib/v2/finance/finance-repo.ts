@@ -1,6 +1,6 @@
 import { getAgencyRepoV2 } from "@/lib/agency-store";
 import { isInFinanceMonth } from "@/lib/v2/finance/meta";
-import { FINANCE_SERVICE_META } from "@/lib/v2/finance/meta";
+import { FINANCE_SERVICE_META, isFinanceServiceType } from "@/lib/v2/finance/meta";
 import type {
   V2FinanceGeneralExpenseRow,
   V2FinanceMonthSummary,
@@ -19,7 +19,7 @@ function repo() {
 function mapAgencyProject(raw: Record<string, unknown>, workspaceId: string): V2FinanceProjectRow {
   const st = raw.serviceType;
   const service_type: V2FinanceServiceType =
-    st === "presentation" || st === "small_task" || st === "subscription" ? st : "site";
+    isFinanceServiceType(st) ? st : "site";
   const statusRaw = raw.status;
   const status: V2FinancePaymentStatus =
     statusRaw === "paid" || statusRaw === "prepaid" ? statusRaw : "not_paid";
@@ -320,8 +320,8 @@ export function computeFinanceMonthSummary(
     .reduce((s, p) => s + p.paid_amount, 0);
   const taxAmount = 6916 + accountRevenue * 0.01;
   const totalExpenses = projectExpenses + manualGeneralExpenses + taxAmount;
-  const profit = actualRevenue - totalExpenses;
-  const margin = actualRevenue ? (profit / actualRevenue) * 100 : 0;
+  const profit = expectedRevenue - totalExpenses;
+  const margin = expectedRevenue ? (profit / expectedRevenue) * 100 : 0;
   return {
     year,
     month,

@@ -641,6 +641,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
     { value: 'presentation', label: 'Презентация' },
     { value: 'small_task', label: 'Мелкая задача' },
     { value: 'subscription', label: 'Подписка' },
+    { value: 'ai_development', label: 'AI-разработка' },
   ]
 
   const paymentMethodOptions = [
@@ -868,6 +869,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
                       project.serviceType === 'site' ? 'bg-[var(--primary-soft)] text-[var(--primary)]' :
                       project.serviceType === 'presentation' ? 'bg-purple-50 text-purple-800 dark:bg-violet-500/15 dark:text-violet-200' :
                       project.serviceType === 'subscription' ? 'bg-emerald-50 text-emerald-800 dark:bg-[var(--success-soft)] dark:text-[var(--success)]' :
+                      project.serviceType === 'ai_development' ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-200' :
                       'bg-[var(--surface-2)] text-[var(--text)]'
                     }`}
                   />

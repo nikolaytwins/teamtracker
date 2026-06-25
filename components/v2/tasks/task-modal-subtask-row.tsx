@@ -9,6 +9,7 @@ import { TaskCheckbox } from "@/components/v2/ui/primitives";
 import {
   InlineAssigneeEditor,
   InlineDeadlineEditor,
+  InlinePlannedEditor,
   InlinePopover,
   InlinePriorityEditor,
   InlineTitleEditor,
@@ -16,7 +17,7 @@ import {
 } from "@/components/v2/tasks/task-inline-editors";
 import { useState } from "react";
 
-type Field = "priority" | "assignee" | "deadline" | null;
+type Field = "priority" | "assignee" | "planned" | "deadline" | null;
 
 export function TaskModalSubtaskRow({
   sub,
@@ -114,11 +115,24 @@ export function TaskModalSubtaskRow({
           <div className="relative">
             <button
               type="button"
+              onClick={() => setOpenField((f) => (f === "planned" ? null : "planned"))}
+              className="v2-tight rounded-md px-1 py-0.5 text-[11px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+            >
+              <V2Icons.cal className="mr-0.5 inline h-3 w-3" />
+              {sub.planned_at ? "выполнение" : "без даты"}
+            </button>
+            <InlinePopover open={openField === "planned"} onClose={() => setOpenField(null)}>
+              <InlinePlannedEditor taskId={sub.id} plannedAt={sub.planned_at} onReload={afterPatch} onClose={() => setOpenField(null)} />
+            </InlinePopover>
+          </div>
+          <div className="relative">
+            <button
+              type="button"
               onClick={() => setOpenField((f) => (f === "deadline" ? null : "deadline"))}
               className="v2-tight rounded-md px-1 py-0.5 text-[11px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
             >
               <V2Icons.clock className="mr-0.5 inline h-3 w-3" />
-              {sub.deadline_at ? "дедлайн" : "без даты"}
+              дедлайн {sub.deadline_at ? "" : "—"}
             </button>
             <InlinePopover open={openField === "deadline"} onClose={() => setOpenField(null)}>
               <InlineDeadlineEditor taskId={sub.id} deadlineAt={sub.deadline_at} onReload={afterPatch} onClose={() => setOpenField(null)} />

@@ -129,6 +129,7 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
                 <option value="presentation">Презентация</option>
                 <option value="small_task">Мелкая задача</option>
                 <option value="subscription">Подписка</option>
+                <option value="ai_development">AI-разработка</option>
               </select>
             </div>
 

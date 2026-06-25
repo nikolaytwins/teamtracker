@@ -167,6 +167,65 @@ export function InlineAssigneeEditor({
   );
 }
 
+export function InlinePlannedEditor({
+  taskId,
+  plannedAt,
+  onReload,
+  onClose,
+}: {
+  taskId: string;
+  plannedAt: string | null;
+  onReload?: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [local, setLocal] = useState(toDateInputValue(plannedAt));
+  const [saving, setSaving] = useState(false);
+
+  async function save(value: string) {
+    const next = value.trim() ? fromDateInputValue(value) : null;
+    const prev = plannedAt;
+    if (next === prev || (!next && !prev)) {
+      onClose();
+      return;
+    }
+    setSaving(true);
+    try {
+      await patchTask(taskId, { plannedAt: next }, onReload);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 p-1">
+      <div className="px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">Дата выполнения</div>
+      <input
+        type="date"
+        autoFocus
+        disabled={saving}
+        value={local}
+        onChange={(e) => {
+          setLocal(e.target.value);
+          void save(e.target.value);
+        }}
+        className="v2-input w-full text-[12px]"
+      />
+      <button
+        type="button"
+        disabled={saving}
+        onClick={() => {
+          setLocal("");
+          void save("");
+        }}
+        className="v2-tight w-full rounded-lg px-2 py-1.5 text-[12px] text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)]"
+      >
+        Без даты
+      </button>
+    </div>
+  );
+}
+
 export function InlineDeadlineEditor({
   taskId,
   deadlineAt,
@@ -199,6 +258,7 @@ export function InlineDeadlineEditor({
 
   return (
     <div className="space-y-2 p-1">
+      <div className="px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">Дедлайн</div>
       <input
         type="date"
         autoFocus
@@ -219,7 +279,7 @@ export function InlineDeadlineEditor({
         }}
         className="v2-tight w-full rounded-lg px-2 py-1.5 text-[12px] text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)]"
       >
-        Без даты
+        Без дедлайна
       </button>
     </div>
   );

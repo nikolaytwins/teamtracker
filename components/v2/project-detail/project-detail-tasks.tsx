@@ -8,6 +8,7 @@ import { MemberAvatar } from "@/components/v2/projects/project-atoms";
 import {
   InlineAssigneeEditor,
   InlineDeadlineEditor,
+  InlinePlannedEditor,
   InlinePopover,
   InlinePriorityEditor,
   InlineTitleEditor,
@@ -17,7 +18,7 @@ import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 import { IconBtn, PriorityDot, TaskCheckbox, TimerButton } from "@/components/v2/ui/primitives";
 import { useState } from "react";
 
-type InlineField = "priority" | "assignee" | "deadline" | null;
+type InlineField = "priority" | "assignee" | "planned" | "deadline" | null;
 
 const fmtHours = fmtHoursMinutes;
 
@@ -33,19 +34,16 @@ function TaskEditButton({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function DeadlineChip({
-  planned,
-  deadline,
+function PlannedChip({
+  label,
   completed,
   onClick,
 }: {
-  planned: string;
-  deadline: string;
+  label: string;
   completed: boolean;
   onClick: () => void;
 }) {
-  const hasPlanned = planned !== "—";
-  const hasDeadline = deadline !== "—";
+  const hasDate = label !== "—";
   return (
     <button
       type="button"
@@ -54,29 +52,57 @@ function DeadlineChip({
         onClick();
       }}
       className="rounded-md px-1 py-0.5 transition hover:bg-[var(--v2-ink-100)]/80"
-      title="Изменить дедлайн"
+      title="Дата выполнения"
     >
-      {!hasPlanned && !hasDeadline ? (
-        <span className="v2-tight v2-tnum inline-flex items-center gap-1 text-[11.5px] text-[var(--v2-ink-400)]">
-          <V2Icons.clock className="h-3 w-3 opacity-70" />
-          без даты
-        </span>
-      ) : (
-        <span className="v2-tight inline-flex flex-col items-start gap-0.5 text-[11px] leading-tight">
-          {hasPlanned ? (
-            <span className={`v2-tnum inline-flex items-center gap-1 ${completed ? "text-[var(--v2-ink-400)]" : "font-medium text-[var(--v2-brand-700)]"}`}>
-              <V2Icons.cal className="h-3 w-3 opacity-70" />
-              {planned}
-            </span>
-          ) : null}
-          {hasDeadline && deadline !== planned ? (
-            <span className={`v2-tnum inline-flex items-center gap-1 ${completed ? "text-[var(--v2-ink-400)]" : "text-[var(--v2-ink-500)]"}`}>
-              <V2Icons.clock className="h-3 w-3 opacity-70" />
-              {deadline}
-            </span>
-          ) : null}
-        </span>
-      )}
+      <span
+        className={`v2-tight v2-tnum inline-flex items-center gap-1 text-[11.5px] ${
+          hasDate
+            ? completed
+              ? "text-[var(--v2-ink-400)]"
+              : "font-medium text-[var(--v2-brand-700)]"
+            : "text-[var(--v2-ink-400)]"
+        }`}
+      >
+        <V2Icons.cal className="h-3 w-3 opacity-70" />
+        {hasDate ? label : "без даты"}
+      </span>
+    </button>
+  );
+}
+
+function DeadlineChip({
+  label,
+  completed,
+  onClick,
+}: {
+  label: string;
+  completed: boolean;
+  onClick: () => void;
+}) {
+  const hasDate = label !== "—";
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="rounded-md px-1 py-0.5 transition hover:bg-[var(--v2-ink-100)]/80"
+      title="Дедлайн"
+    >
+      <span
+        className={`v2-tight v2-tnum inline-flex items-center gap-1 text-[11.5px] ${
+          hasDate
+            ? completed
+              ? "text-[var(--v2-ink-400)]"
+              : "text-[var(--v2-ink-600)]"
+            : "text-[var(--v2-ink-400)]"
+        }`}
+      >
+        <V2Icons.clock className="h-3 w-3 opacity-70" />
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.04em] text-[var(--v2-ink-500)]">дедлайн</span>
+        {hasDate ? label : "—"}
+      </span>
     </button>
   );
 }
@@ -110,6 +136,7 @@ function TaskInlineMeta({
   priority,
   assigneeUserId,
   assigneeName,
+  plannedAt,
   deadlineAt,
   plannedLabel,
   deadlineLabel,
@@ -122,6 +149,7 @@ function TaskInlineMeta({
   priority: ProjectDetailTask["priority"];
   assigneeUserId: string | null;
   assigneeName: string | null;
+  plannedAt: string | null;
   deadlineAt: string | null;
   plannedLabel: string;
   deadlineLabel: string;
@@ -190,19 +218,24 @@ function TaskInlineMeta({
       </div>
 
       <div className="relative">
+        <PlannedChip
+          label={plannedLabel}
+          completed={completed}
+          onClick={() => setOpenField((f) => (f === "planned" ? null : "planned"))}
+        />
+        <InlinePopover open={openField === "planned"} onClose={() => setOpenField(null)}>
+          <InlinePlannedEditor taskId={taskId} plannedAt={plannedAt} onReload={onReload} onClose={() => setOpenField(null)} />
+        </InlinePopover>
+      </div>
+
+      <div className="relative">
         <DeadlineChip
-          planned={plannedLabel}
-          deadline={deadlineLabel}
+          label={deadlineLabel}
           completed={completed}
           onClick={() => setOpenField((f) => (f === "deadline" ? null : "deadline"))}
         />
         <InlinePopover open={openField === "deadline"} onClose={() => setOpenField(null)}>
-          <InlineDeadlineEditor
-            taskId={taskId}
-            deadlineAt={deadlineAt}
-            onReload={onReload}
-            onClose={() => setOpenField(null)}
-          />
+          <InlineDeadlineEditor taskId={taskId} deadlineAt={deadlineAt} onReload={onReload} onClose={() => setOpenField(null)} />
         </InlinePopover>
       </div>
     </div>
@@ -275,6 +308,7 @@ function SubtaskRow({
             priority={st.priority}
             assigneeUserId={st.assigneeUserId}
             assigneeName={st.assigneeName}
+            plannedAt={st.plannedAt}
             deadlineAt={st.deadlineAt}
             plannedLabel={st.plannedLabel}
             deadlineLabel={st.deadlineLabel}
@@ -397,6 +431,7 @@ export function TaskRow({
             priority={task.priority}
             assigneeUserId={task.assigneeUserId}
             assigneeName={task.assigneeName}
+            plannedAt={task.plannedAt}
             deadlineAt={task.deadlineAt}
             plannedLabel={task.plannedLabel}
             deadlineLabel={task.deadlineLabel}

@@ -23,7 +23,12 @@ export const FINANCE_SERVICE_META: Record<
   presentation: { label: "Презентация", tint: "#7C3AED", bg: "#EFE8FF" },
   small_task: { label: "Мелкая задача", tint: "#0EA5A4", bg: "#DEF6F5" },
   subscription: { label: "Подписка", tint: "#F59E0B", bg: "#FEF3D1" },
+  ai_development: { label: "AI-разработка", tint: "#0891B2", bg: "#CFFAFE" },
 };
+
+export function isFinanceServiceType(v: unknown): v is V2FinanceServiceType {
+  return typeof v === "string" && v in FINANCE_SERVICE_META;
+}
 
 export const FINANCE_STATUS_META: Record<
   V2FinancePaymentStatus,

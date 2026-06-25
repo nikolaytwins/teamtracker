@@ -38,6 +38,7 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
   presentation: 'Презентация',
   small_task: 'Мелкая задача',
   subscription: 'Подписка',
+  ai_development: 'AI-разработка',
 }
 
 const CLIENT_TYPE_LABELS: Record<string, string> = {

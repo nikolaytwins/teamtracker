@@ -5,6 +5,7 @@ import {
   updateFinanceProject,
 } from "@/lib/v2/finance/finance-repo";
 import type { V2FinancePaymentStatus, V2FinanceServiceType } from "@/lib/v2/finance/types";
+import { isFinanceServiceType } from "@/lib/v2/finance/meta";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,13 +24,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if (body.status === "paid" || body.status === "prepaid" || body.status === "not_paid") {
       patch.status = body.status as V2FinancePaymentStatus;
     }
-    if (
-      body.serviceType === "site" ||
-      body.serviceType === "presentation" ||
-      body.serviceType === "small_task" ||
-      body.serviceType === "subscription"
-    ) {
-      patch.service_type = body.serviceType as V2FinanceServiceType;
+    if (isFinanceServiceType(body.serviceType)) {
+      patch.service_type = body.serviceType;
     }
     if (body.clientType === null || typeof body.clientType === "string") patch.client_type = body.clientType;
     if (body.paymentMethod === null || body.paymentMethod === "card" || body.paymentMethod === "account") {

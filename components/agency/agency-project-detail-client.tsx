@@ -435,6 +435,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
     presentation: 'Презентация',
     small_task: 'Мелкая задача',
     subscription: 'Подписка',
+    ai_development: 'AI-разработка',
   }
 
   const paymentMethodLabels: Record<string, string> = {
