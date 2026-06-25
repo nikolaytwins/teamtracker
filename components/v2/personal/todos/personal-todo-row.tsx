@@ -1,5 +1,6 @@
 "use client";
 
+import { PersonalTodoSchedulePopover } from "@/components/v2/personal/todos/personal-todo-schedule-popover";
 import { PriorityDot, TaskCheckbox } from "@/components/v2/ui/primitives";
 import { V2Icons } from "@/components/v2/ui/icons";
 import {
@@ -7,6 +8,7 @@ import {
   isPersonalTodoOverdue,
 } from "@/lib/v2/personal/todo-date";
 import type { PersonalTodoRow } from "@/lib/v2/personal/todo-types";
+import { useState } from "react";
 
 function PersonalProjectChipMini({ name, color }: { name: string; color?: string | null }) {
   const bg = color ?? "#E4E4E7";
@@ -28,6 +30,7 @@ type RowProps = {
   onToggle: (id: string) => void;
   onOpen: (id: string) => void;
   onAddSubtask?: (id: string) => void;
+  onSchedule?: (id: string, date: string) => void;
   draggable?: boolean;
   isDragging?: boolean;
   onDragStart?: () => void;
@@ -42,6 +45,7 @@ function PersonalTodoRowContent({
   onToggle,
   onOpen,
   onAddSubtask,
+  onSchedule,
   draggable = false,
   isDragging = false,
   onDragStart,
@@ -50,6 +54,7 @@ function PersonalTodoRowContent({
   compact = false,
   nested = false,
 }: RowProps) {
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const completed = !!todo.completed_at;
   const overdue = isPersonalTodoOverdue(todo);
   const dateYmd = todo.scheduled_date ?? todo.due_date;
@@ -136,6 +141,30 @@ function PersonalTodoRowContent({
             </div>
           ) : null}
         </div>
+
+        {onSchedule && !completed && !nested ? (
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              title="Назначить дату"
+              onClick={(e) => {
+                e.stopPropagation();
+                setScheduleOpen((v) => !v);
+              }}
+              className="v2-tight rounded-lg p-1.5 text-[var(--v2-ink-400)] opacity-0 transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)] group-hover:opacity-100"
+            >
+              <V2Icons.cal className="h-4 w-4" />
+            </button>
+            <PersonalTodoSchedulePopover
+              open={scheduleOpen}
+              onClose={() => setScheduleOpen(false)}
+              onPick={(date) => {
+                onSchedule(todo.id, date);
+                setScheduleOpen(false);
+              }}
+            />
+          </div>
+        ) : null}
 
         {onAddSubtask && !completed && !nested ? (
           <button

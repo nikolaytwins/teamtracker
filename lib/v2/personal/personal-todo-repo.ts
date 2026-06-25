@@ -305,33 +305,26 @@ export async function loadPersonalTodoList(
       })
     );
   } else if (view === "upcoming") {
-    const end = addDaysYmd(today, 14);
+    const start = addDaysYmd(today, 1);
+    const dates = personalTodoWeekDates(start, 7);
+    const end = dates[dates.length - 1]!;
     const rows = await fetchOpenParentTodos(userId);
     const todos = await enrichTodos(rows, projects);
-    filtered = sortTodosForDisplay(
-      todos.filter((t) => {
-        const d = t.scheduled_date ?? t.due_date;
-        return d != null && d > today && d <= end;
-      })
-    );
+    const columns: Record<string, PersonalTodoRow[]> = {};
+    for (const d of dates) columns[d] = [];
+    for (const t of todos) {
+      const day = t.scheduled_date ?? t.due_date;
+      if (day && day >= start && day <= end && columns[day]) {
+        columns[day]!.push(t);
+      }
+    }
+    for (const d of dates) columns[d] = sortTodosForDisplay(columns[d] ?? []);
+    const filteredUpcoming = dates.flatMap((d) => columns[d] ?? []);
+    return { view, todos: filteredUpcoming, week: { dates, columns, unscheduled: [] } };
   } else if (view === "project" && opts?.projectId) {
     const rows = await fetchOpenParentTodos(userId);
     const todos = await enrichTodos(rows, projects);
     filtered = sortTodosForDisplay(todos.filter((t) => t.project_id === opts.projectId));
-  }
-
-  if (view === "upcoming") {
-    const groups: PersonalTodoListPayload["groups"] = [];
-    const byDate = new Map<string, PersonalTodoRow[]>();
-    for (const t of filtered) {
-      const d = t.scheduled_date ?? t.due_date ?? today;
-      if (!byDate.has(d)) byDate.set(d, []);
-      byDate.get(d)!.push(t);
-    }
-    for (const d of [...byDate.keys()].sort()) {
-      groups.push({ date: d, label: d, todos: byDate.get(d)! });
-    }
-    return { view, todos: filtered, groups };
   }
 
   return { view, todos: filtered };

@@ -5,7 +5,7 @@ export default function PersonalTasksUpcomingPage() {
     <PersonalTodoViewClient
       view="upcoming"
       title="Предстоящее"
-      subtitle="Следующие 14 дней"
+      subtitle="Следующие 7 дней"
     />
   );
 }

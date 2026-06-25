@@ -11,12 +11,12 @@ import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { formatPersonalTodoDateLabel, isPersonalTodoOverdue } from "@/lib/v2/personal/todo-date";
 import { groupInboxTodosByPriority, INBOX_IMPORTANT_SECTION_IDS } from "@/lib/v2/personal/todo-inbox-groups";
 import type { PersonalTodoListPayload, PersonalTodoRow, PersonalTodoView } from "@/lib/v2/personal/todo-types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 const EMPTY_MESSAGES: Partial<Record<PersonalTodoView, string>> = {
   inbox: "Во входящих пусто — добавьте задачу в поле ниже.",
   today: "На сегодня задач нет. Запланируйте что-нибудь или отдохните.",
-  upcoming: "Предстоящих задач нет на ближайшие две недели.",
+  upcoming: "На ближайшие 7 дней задач нет — назначьте дату из входящих.",
   week: "На этой неделе пока ничего не запланировано. Перетащите задачи из блока «Без даты».",
   project: "В этом проекте пока нет открытых задач.",
   completed: "Выполненных задач пока нет.",
@@ -114,9 +114,18 @@ export function PersonalTodoViewClient({
 
   function renderList(
     todos: PersonalTodoRow[],
-    opts?: { showProject?: boolean; compact?: boolean; priorityAccent?: string }
+    opts?: {
+      showProject?: boolean;
+      compact?: boolean;
+      priorityAccent?: string;
+      showSchedule?: boolean;
+      draggable?: boolean;
+    }
   ) {
     if (!todos.length) return null;
+    const scheduleHandler = opts?.showSchedule
+      ? (id: string, date: string) => void scheduleOn(id, date)
+      : undefined;
     return (
       <div className="overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-soft)]">
         {opts?.priorityAccent ? (
@@ -130,12 +139,25 @@ export function PersonalTodoViewClient({
                 onToggle={(id) => void toggleComplete(id)}
                 onOpen={setSelectedId}
                 onAddSubtask={handleAddSubtask}
+                onSchedule={scheduleHandler}
                 showProject={opts?.showProject ?? view !== "project"}
                 compact={opts?.compact}
+                draggable={opts?.draggable}
+                isDragging={opts?.draggable && dragId === todo.id}
+                onDragStart={() => setDragId(todo.id)}
+                onDragEnd={() => setDragId(null)}
               />
             </div>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  function renderDropZone(children: React.ReactNode) {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-dashed border-[var(--v2-ink-200)] bg-white/60 shadow-[var(--v2-shadow-soft)]">
+        {children}
       </div>
     );
   }
@@ -226,19 +248,40 @@ export function PersonalTodoViewClient({
     );
   }
 
-  function renderUpcomingGroups() {
-    const groups = payload?.groups ?? [];
-    if (!groups.length) return renderEmpty();
+  function renderUpcomingDays() {
+    const week = payload?.week;
+    if (!week?.dates.length) return renderEmpty();
+
     return (
-      <div className="space-y-6 px-6 pb-6">
-        {groups.map((group) => (
-          <section key={group.date}>
-            <h2 className="v2-tight mb-2 text-[13px] font-semibold text-[var(--v2-ink-800)]">
-              {formatPersonalTodoDateLabel(group.date) ?? group.label}
-            </h2>
-            {renderList(group.todos)}
-          </section>
-        ))}
+      <div className="space-y-8 px-6 pb-6">
+        {week.dates.map((date) => {
+          const todos = week.columns[date] ?? [];
+          return (
+            <section
+              key={date}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragId) void scheduleOn(dragId, date);
+                setDragId(null);
+              }}
+            >
+              {renderInboxSectionHeader(formatWeekColumnLabel(date), todos.length)}
+              {todos.length > 0 ? (
+                renderList(todos, { showProject: true, draggable: true })
+              ) : (
+                renderDropZone(
+                  <p className="v2-tight px-4 py-8 text-center text-[13px] text-[var(--v2-ink-400)]">
+                    Перетащите задачу сюда
+                  </p>
+                )
+              )}
+            </section>
+          );
+        })}
       </div>
     );
   }
@@ -290,7 +333,7 @@ export function PersonalTodoViewClient({
               {important.map((section) => (
                 <div key={section.id}>
                   {renderInboxSectionHeader(section.title, section.todos.length, { accent: section.accent })}
-                  {renderList(section.todos, { showProject: true, priorityAccent: section.accent })}
+                  {renderList(section.todos, { showProject: true, priorityAccent: section.accent, showSchedule: true })}
                 </div>
               ))}
             </div>
@@ -302,7 +345,7 @@ export function PersonalTodoViewClient({
               subtitle: section.subtitle,
               accent: section.accent,
             })}
-            {renderList(section.todos, { showProject: true, priorityAccent: section.accent })}
+            {renderList(section.todos, { showProject: true, priorityAccent: section.accent, showSchedule: true })}
           </section>
         ))}
       </div>
@@ -368,7 +411,7 @@ export function PersonalTodoViewClient({
       ) : view === "week" ? (
         renderWeekBoard()
       ) : view === "upcoming" ? (
-        renderUpcomingGroups()
+        renderUpcomingDays()
       ) : view === "today" ? (
         renderTodayList()
       ) : view === "inbox" ? (
