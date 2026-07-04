@@ -1,16 +1,58 @@
 "use client";
 
+import { appPath } from "@/lib/api-url";
 import {
   formatPersonalRubShort,
   formatPersonalRubSigned,
   PERSONAL_MONTH_SHORT,
 } from "@/lib/v2/personal/formatters";
 import type { PersonalIncomeHistoryRow } from "@/lib/v2/personal/types";
+import { V2Icons } from "@/components/v2/ui/icons";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 export type IncomeHistoryChartPoint = PersonalIncomeHistoryRow & {
   delta: number | null;
+  profit_delta: number | null;
 };
+
+export type IncomeHistoryChartMode = "capital" | "profit";
+
+export type IncomeHistoryChartKind = "capital-total" | "capital-delta" | "profit-total";
+
+export function incomeHistoryChartExpandHref(kind: IncomeHistoryChartKind, mode: IncomeHistoryChartMode) {
+  return appPath(`/v2/personal/finance/history/charts?kind=${kind}&mode=${mode}`);
+}
+
+export const CHART_KIND_META: Record<
+  IncomeHistoryChartKind,
+  { title: string; mode: IncomeHistoryChartMode }
+> = {
+  "capital-total": { title: "Капитал на счетах", mode: "capital" },
+  "capital-delta": { title: "Изменение помесячно", mode: "capital" },
+  "profit-total": { title: "Прибыль", mode: "profit" },
+};
+
+type ChartLayout = {
+  W: number;
+  H: number;
+  padX: number;
+  padTop: number;
+  padBot: number;
+  expanded: boolean;
+};
+
+function getChartLayout(pointCount: number, expanded = false): ChartLayout {
+  const count = Math.max(pointCount, 2);
+  return {
+    W: expanded ? Math.max(1400, count * 58) : 920,
+    H: expanded ? 380 : 248,
+    padX: 24,
+    padTop: expanded ? 36 : 28,
+    padBot: expanded ? 44 : 36,
+    expanded,
+  };
+}
 
 function smoothPath(pts: { x: number; y: number }[]) {
   if (pts.length < 2) return "";
@@ -35,14 +77,10 @@ function monthLabel(p: { year: number; month: number }, compact = false) {
   return `${m} ${String(p.year).slice(2)}`;
 }
 
-const W = 920;
-const H = 248;
-const padX = 24;
-const padTop = 28;
-const padBot = 36;
-
-function ChartGrid({ midY }: { midY?: number }) {
-  const lines = midY != null ? [padTop, midY, H - padBot] : [0, 0.5, 1].map((t) => padTop + t * (H - padTop - padBot));
+function ChartGrid({ layout, midY }: { layout: ChartLayout; midY?: number }) {
+  const { W, H, padTop, padBot, padX } = layout;
+  const lines =
+    midY != null ? [padTop, midY, H - padBot] : [0, 0.5, 1].map((t) => padTop + t * (H - padTop - padBot));
   return (
     <>
       {lines.map((y, i) => (
@@ -63,19 +101,21 @@ function ChartGrid({ midY }: { midY?: number }) {
 }
 
 function Tooltip({
+  layout,
   x,
   y,
   title,
   value,
   sub,
 }: {
+  layout: ChartLayout;
   x: number;
   y: number;
   title: string;
   value: string;
   sub?: string;
 }) {
-  const tx = Math.min(Math.max(x, 72), W - 72);
+  const tx = Math.min(Math.max(x, 72), layout.W - 72);
   const ty = Math.max(y, 36);
   return (
     <g transform={`translate(${tx}, ${ty})`}>
@@ -95,8 +135,44 @@ function Tooltip({
   );
 }
 
-/** Линия + заливка — всего на счетах */
-export function IncomeHistoryCapitalChart({ points }: { points: IncomeHistoryChartPoint[] }) {
+function shouldShowLabel(i: number, total: number, expanded: boolean) {
+  if (expanded) return true;
+  return i === 0 || i === total - 1 || i % Math.ceil(total / 8) === 0;
+}
+
+function ChartSvgShell({
+  layout,
+  children,
+  onMouseLeave,
+}: {
+  layout: ChartLayout;
+  children: React.ReactNode;
+  onMouseLeave?: () => void;
+}) {
+  const { W, H } = layout;
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      width={W}
+      height={H}
+      className="block max-w-none"
+      style={{ display: "block" }}
+      onMouseLeave={onMouseLeave}
+    >
+      {children}
+    </svg>
+  );
+}
+
+export function IncomeHistoryCapitalChart({
+  points,
+  expanded = false,
+}: {
+  points: IncomeHistoryChartPoint[];
+  expanded?: boolean;
+}) {
+  const layout = getChartLayout(points.length, expanded);
+  const { W, H, padX, padTop, padBot } = layout;
   const [hover, setHover] = useState(() => Math.max(0, points.length - 1));
   if (points.length < 2) return null;
 
@@ -114,44 +190,59 @@ export function IncomeHistoryCapitalChart({ points }: { points: IncomeHistoryCha
   const area = `${line} L ${pts[pts.length - 1]!.x} ${H - padBot} L ${pts[0]!.x} ${H - padBot} Z`;
   const hp = pts[hover];
   const hd = points[hover];
+  const slotW = (W - padX * 2) / (points.length - 1);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: "block" }} onMouseLeave={() => setHover(points.length - 1)}>
+    <ChartSvgShell layout={layout} onMouseLeave={() => setHover(points.length - 1)}>
       <defs>
         <linearGradient id="ihCapFill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#3B6FF7" stopOpacity="0.22" />
           <stop offset="100%" stopColor="#3B6FF7" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <ChartGrid />
+      <ChartGrid layout={layout} />
       <path d={area} fill="url(#ihCapFill)" />
       <path d={line} fill="none" stroke="#3B6FF7" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      {pts.map((p, i) => {
-        const showLabel = i === 0 || i === points.length - 1 || i % Math.ceil(points.length / 8) === 0;
-        return (
-          <g key={i}>
-            <rect
-              x={p.x - (W - padX * 2) / (points.length - 1) / 2}
-              y={0}
-              width={(W - padX * 2) / (points.length - 1)}
-              height={H}
-              fill="transparent"
-              onMouseEnter={() => setHover(i)}
-              style={{ cursor: "pointer" }}
-            />
-            <circle cx={p.x} cy={p.y} r={i === hover ? 5 : 0} fill="#fff" stroke="#3B6FF7" strokeWidth="2.5" />
-            {showLabel ? (
-              <text x={p.x} y={H - 12} textAnchor="middle" fontSize="10.5" fill="#A1A1AA" fontWeight={i === hover ? 700 : 500}>
-                {monthLabel(points[i]!, true)}
-              </text>
-            ) : null}
-          </g>
-        );
-      })}
+      {pts.map((p, i) => (
+        <g key={i}>
+          <rect
+            x={p.x - slotW / 2}
+            y={0}
+            width={slotW}
+            height={H}
+            fill="transparent"
+            onMouseEnter={() => setHover(i)}
+            style={{ cursor: "pointer" }}
+          />
+          <circle cx={p.x} cy={p.y} r={i === hover ? 5 : 0} fill="#fff" stroke="#3B6FF7" strokeWidth="2.5" />
+          {shouldShowLabel(i, points.length, expanded) ? (
+            <text
+              x={p.x}
+              y={H - 12}
+              textAnchor="middle"
+              fontSize={expanded ? 11 : 10.5}
+              fill="#A1A1AA"
+              fontWeight={i === hover ? 700 : 500}
+            >
+              {layout.expanded ? monthLabel(points[i]!) : monthLabel(points[i]!, true)}
+            </text>
+          ) : null}
+        </g>
+      ))}
       {hp && hd ? (
         <g>
-          <line x1={hp.x} x2={hp.x} y1={padTop} y2={H - padBot} stroke="#3B6FF7" strokeOpacity="0.22" strokeWidth="1.5" strokeDasharray="3 3" />
+          <line
+            x1={hp.x}
+            x2={hp.x}
+            y1={padTop}
+            y2={H - padBot}
+            stroke="#3B6FF7"
+            strokeOpacity="0.22"
+            strokeWidth="1.5"
+            strokeDasharray="3 3"
+          />
           <Tooltip
+            layout={layout}
             x={hp.x}
             y={hp.y - 16}
             title={monthLabel(hd)}
@@ -160,13 +251,20 @@ export function IncomeHistoryCapitalChart({ points }: { points: IncomeHistoryCha
           />
         </g>
       ) : null}
-    </svg>
+    </ChartSvgShell>
   );
 }
 
-/** Столбцы — динамика капитала помесячно */
-export function IncomeHistoryCapitalDeltaChart({ points }: { points: IncomeHistoryChartPoint[] }) {
+export function IncomeHistoryCapitalDeltaChart({
+  points,
+  expanded = false,
+}: {
+  points: IncomeHistoryChartPoint[];
+  expanded?: boolean;
+}) {
   const deltas = points.filter((p) => p.delta != null);
+  const layout = getChartLayout(deltas.length, expanded);
+  const { W, H, padX, padTop, padBot } = layout;
   const [hover, setHover] = useState(() => Math.max(0, deltas.length - 1));
   if (deltas.length < 1) return null;
 
@@ -175,13 +273,13 @@ export function IncomeHistoryCapitalDeltaChart({ points }: { points: IncomeHisto
   const midY = padTop + (H - padTop - padBot) / 2;
   const halfH = (H - padTop - padBot) / 2;
   const slot = (W - padX * 2) / deltas.length;
-  const bw = Math.min(slot * 0.55, 22);
+  const bw = Math.min(slot * 0.55, expanded ? 28 : 22);
   const Y = (v: number) => midY - (v / absMax) * halfH;
   const hd = deltas[hover];
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: "block" }}>
-      <ChartGrid midY={midY} />
+    <ChartSvgShell layout={layout}>
+      <ChartGrid layout={layout} midY={midY} />
       {deltas.map((d, i) => {
         const v = d.delta!;
         const cx = padX + slot * i + slot / 2;
@@ -189,7 +287,6 @@ export function IncomeHistoryCapitalDeltaChart({ points }: { points: IncomeHisto
         const y1 = Y(v);
         const up = v >= 0;
         const on = i === hover;
-        const showLabel = i === 0 || i === deltas.length - 1 || i % Math.ceil(deltas.length / 8) === 0;
         return (
           <g key={`${d.year}-${d.month}`} onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }}>
             <rect x={padX + slot * i} y={0} width={slot} height={H} fill="transparent" />
@@ -202,9 +299,16 @@ export function IncomeHistoryCapitalDeltaChart({ points }: { points: IncomeHisto
               fill={up ? "#10B981" : "#EF4444"}
               opacity={on ? 1 : 0.82}
             />
-            {showLabel ? (
-              <text x={cx} y={H - 12} textAnchor="middle" fontSize="10.5" fill="#A1A1AA" fontWeight={on ? 700 : 500}>
-                {monthLabel(d, true)}
+            {shouldShowLabel(i, deltas.length, expanded) ? (
+              <text
+                x={cx}
+                y={H - 12}
+                textAnchor="middle"
+                fontSize={expanded ? 11 : 10.5}
+                fill="#A1A1AA"
+                fontWeight={on ? 700 : 500}
+              >
+                {layout.expanded ? monthLabel(d) : monthLabel(d, true)}
               </text>
             ) : null}
           </g>
@@ -212,6 +316,7 @@ export function IncomeHistoryCapitalDeltaChart({ points }: { points: IncomeHisto
       })}
       {hd && hd.delta != null ? (
         <Tooltip
+          layout={layout}
           x={padX + slot * hover + slot / 2}
           y={padTop + 8}
           title={monthLabel(hd)}
@@ -219,103 +324,29 @@ export function IncomeHistoryCapitalDeltaChart({ points }: { points: IncomeHisto
           sub={formatPersonalRubShort(hd.accounts_total_rub)}
         />
       ) : null}
-    </svg>
+    </ChartSvgShell>
   );
 }
 
-/** Столбцы — доход и прибыль */
-export function IncomeHistoryProfitChart({ points }: { points: IncomeHistoryChartPoint[] }) {
-  const data = points.filter((p) => p.earned_rub != null || p.profit_rub != null);
-  const [hover, setHover] = useState(() => Math.max(0, data.length - 1));
-  if (data.length < 1) return null;
-
-  const earned = data.map((p) => p.earned_rub ?? 0);
-  const profit = data.map((p) => p.profit_rub ?? 0);
-  const rawMax = Math.max(...earned, ...profit, 1);
-  const max = rawMax * 1.08;
-  const slot = (W - padX * 2) / data.length;
-  const bw = Math.min(slot * 0.28, 16);
-  const base = H - padBot;
-  const Y = (v: number) => padTop + (1 - v / max) * (H - padTop - padBot);
-  const hd = data[hover];
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: "block" }}>
-      <defs>
-        <linearGradient id="ihEarnFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3B6FF7" />
-          <stop offset="100%" stopColor="#2A56EB" />
-        </linearGradient>
-        <linearGradient id="ihProfitFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#10B981" />
-          <stop offset="100%" stopColor="#059669" />
-        </linearGradient>
-      </defs>
-      <ChartGrid />
-      {data.map((d, i) => {
-        const cx = padX + slot * i + slot / 2;
-        const on = i === hover;
-        const showLabel = i === 0 || i === data.length - 1 || i % Math.ceil(data.length / 8) === 0;
-        const e = d.earned_rub ?? 0;
-        const pr = d.profit_rub ?? 0;
-        return (
-          <g key={`${d.year}-${d.month}`} onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }}>
-            <rect x={padX + slot * i} y={0} width={slot} height={H} fill="transparent" />
-            {e > 0 ? (
-              <rect
-                x={cx - bw - 2}
-                y={Y(e)}
-                width={bw}
-                height={base - Y(e)}
-                rx={4}
-                fill="url(#ihEarnFill)"
-                opacity={on ? 1 : 0.88}
-              />
-            ) : null}
-            {pr > 0 ? (
-              <rect
-                x={cx + 2}
-                y={Y(pr)}
-                width={bw}
-                height={base - Y(pr)}
-                rx={4}
-                fill="url(#ihProfitFill)"
-                opacity={on ? 1 : 0.92}
-              />
-            ) : null}
-            {showLabel ? (
-              <text x={cx} y={H - 12} textAnchor="middle" fontSize="10.5" fill="#A1A1AA" fontWeight={on ? 700 : 500}>
-                {monthLabel(d, true)}
-              </text>
-            ) : null}
-          </g>
-        );
-      })}
-      {hd ? (
-        <Tooltip
-          x={padX + slot * hover + slot / 2}
-          y={padTop + 10}
-          title={monthLabel(hd)}
-          value={hd.profit_rub != null ? formatPersonalRubShort(hd.profit_rub) : "—"}
-          sub={hd.earned_rub != null ? `доход ${formatPersonalRubShort(hd.earned_rub)}` : undefined}
-        />
-      ) : null}
-    </svg>
-  );
-}
-
-/** Линия прибыли — тренд заработка */
-export function IncomeHistoryProfitLineChart({ points }: { points: IncomeHistoryChartPoint[] }) {
+export function IncomeHistoryProfitChart({
+  points,
+  expanded = false,
+}: {
+  points: IncomeHistoryChartPoint[];
+  expanded?: boolean;
+}) {
   const data = points.filter((p) => p.profit_rub != null);
+  const layout = getChartLayout(data.length, expanded);
+  const { W, H, padX, padTop, padBot } = layout;
   const [hover, setHover] = useState(() => Math.max(0, data.length - 1));
   if (data.length < 2) return null;
 
   const vals = data.map((p) => p.profit_rub!);
-  const rawMin = Math.min(...vals, 0);
-  const rawMax = Math.max(...vals, 1);
-  const span = rawMax - rawMin || rawMax * 0.1 || 1;
-  const min = rawMin - span * 0.06;
-  const max = rawMax + span * 0.06;
+  const rawMin = Math.min(...vals);
+  const rawMax = Math.max(...vals);
+  const span = rawMax - rawMin || Math.max(rawMax, 1) * 0.1 || 1;
+  const min = rawMin - span * 0.04;
+  const max = rawMax + span * 0.04;
 
   const X = (i: number) => padX + (i * (W - padX * 2)) / (data.length - 1);
   const Y = (v: number) => padTop + (1 - (v - min) / (max - min)) * (H - padTop - padBot);
@@ -324,53 +355,129 @@ export function IncomeHistoryProfitLineChart({ points }: { points: IncomeHistory
   const area = `${line} L ${pts[pts.length - 1]!.x} ${H - padBot} L ${pts[0]!.x} ${H - padBot} Z`;
   const hp = pts[hover];
   const hd = data[hover];
+  const slotW = (W - padX * 2) / (data.length - 1);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: "block" }} onMouseLeave={() => setHover(data.length - 1)}>
+    <ChartSvgShell layout={layout} onMouseLeave={() => setHover(data.length - 1)}>
       <defs>
-        <linearGradient id="ihProfitLineFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#10B981" stopOpacity="0.2" />
+        <linearGradient id="ihProfitFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#10B981" stopOpacity="0.22" />
           <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <ChartGrid />
-      <path d={area} fill="url(#ihProfitLineFill)" />
+      <ChartGrid layout={layout} />
+      <path d={area} fill="url(#ihProfitFill)" />
       <path d={line} fill="none" stroke="#10B981" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      {pts.map((p, i) => {
-        const showLabel = i === 0 || i === data.length - 1 || i % Math.ceil(data.length / 8) === 0;
-        return (
-          <g key={i}>
-            <rect
-              x={p.x - (W - padX * 2) / (data.length - 1) / 2}
-              y={0}
-              width={(W - padX * 2) / (data.length - 1)}
-              height={H}
-              fill="transparent"
-              onMouseEnter={() => setHover(i)}
-              style={{ cursor: "pointer" }}
-            />
-            <circle cx={p.x} cy={p.y} r={i === hover ? 5 : 0} fill="#fff" stroke="#10B981" strokeWidth="2.5" />
-            {showLabel ? (
-              <text x={p.x} y={H - 12} textAnchor="middle" fontSize="10.5" fill="#A1A1AA" fontWeight={i === hover ? 700 : 500}>
-                {monthLabel(data[i]!, true)}
-              </text>
-            ) : null}
-          </g>
-        );
-      })}
+      {pts.map((p, i) => (
+        <g key={i}>
+          <rect
+            x={p.x - slotW / 2}
+            y={0}
+            width={slotW}
+            height={H}
+            fill="transparent"
+            onMouseEnter={() => setHover(i)}
+            style={{ cursor: "pointer" }}
+          />
+          <circle cx={p.x} cy={p.y} r={i === hover ? 5 : 0} fill="#fff" stroke="#10B981" strokeWidth="2.5" />
+          {shouldShowLabel(i, data.length, expanded) ? (
+            <text
+              x={p.x}
+              y={H - 12}
+              textAnchor="middle"
+              fontSize={expanded ? 11 : 10.5}
+              fill="#A1A1AA"
+              fontWeight={i === hover ? 700 : 500}
+            >
+              {layout.expanded ? monthLabel(data[i]!) : monthLabel(data[i]!, true)}
+            </text>
+          ) : null}
+        </g>
+      ))}
       {hp && hd ? (
         <g>
-          <line x1={hp.x} x2={hp.x} y1={padTop} y2={H - padBot} stroke="#10B981" strokeOpacity="0.22" strokeWidth="1.5" strokeDasharray="3 3" />
+          <line
+            x1={hp.x}
+            x2={hp.x}
+            y1={padTop}
+            y2={H - padBot}
+            stroke="#10B981"
+            strokeOpacity="0.22"
+            strokeWidth="1.5"
+            strokeDasharray="3 3"
+          />
           <Tooltip
+            layout={layout}
             x={hp.x}
             y={hp.y - 16}
             title={monthLabel(hd)}
             value={formatPersonalRubShort(hd.profit_rub!)}
-            sub={hd.earned_rub != null ? `доход ${formatPersonalRubShort(hd.earned_rub)}` : undefined}
+            sub={hd.profit_delta != null ? `Δ ${formatPersonalRubSigned(hd.profit_delta)}` : undefined}
           />
         </g>
       ) : null}
-    </svg>
+    </ChartSvgShell>
+  );
+}
+
+export function IncomeHistoryChartByKind({
+  kind,
+  points,
+  expanded = false,
+}: {
+  kind: IncomeHistoryChartKind;
+  points: IncomeHistoryChartPoint[];
+  expanded?: boolean;
+}) {
+  switch (kind) {
+    case "capital-total":
+      return <IncomeHistoryCapitalChart points={points} expanded={expanded} />;
+    case "capital-delta":
+      return <IncomeHistoryCapitalDeltaChart points={points} expanded={expanded} />;
+    case "profit-total":
+      return <IncomeHistoryProfitChart points={points} expanded={expanded} />;
+  }
+}
+
+export function ChartScrollWrap({ layout, children }: { layout: ChartLayout; children: React.ReactNode }) {
+  if (!layout.expanded) return <>{children}</>;
+  return (
+    <div className="overflow-x-auto pb-1">
+      <div style={{ minWidth: layout.W }}>{children}</div>
+    </div>
+  );
+}
+
+function ChartExpandLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)]"
+      title={label}
+      aria-label={label}
+    >
+      <V2Icons.expand className="h-4 w-4" />
+    </Link>
+  );
+}
+
+function ChartCardHeader({
+  title,
+  legend,
+  expandHref,
+}: {
+  title: string;
+  legend?: React.ReactNode;
+  expandHref: string;
+}) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <span className="text-[13px] font-semibold text-[var(--v2-ink-800)]">{title}</span>
+      <div className="flex items-center gap-1">
+        {legend}
+        <ChartExpandLink href={expandHref} label={`Развернуть: ${title}`} />
+      </div>
+    </div>
   );
 }
 
@@ -380,12 +487,12 @@ export function useIncomeHistoryChartPoints(rows: PersonalIncomeHistoryRow[]): I
     return sorted.map((row, i) => {
       const prev = sorted[i - 1];
       const delta = prev ? row.accounts_total_rub - prev.accounts_total_rub : null;
-      return { ...row, delta };
+      const profit_delta =
+        prev && row.profit_rub != null && prev.profit_rub != null ? row.profit_rub - prev.profit_rub : null;
+      return { ...row, delta, profit_delta };
     });
   }, [rows]);
 }
-
-export type IncomeHistoryChartMode = "capital" | "profit";
 
 export function IncomeHistoryChartsSection({
   points,
@@ -405,10 +512,7 @@ export function IncomeHistoryChartsSection({
     return ((last.accounts_total_rub - first.accounts_total_rub) / first.accounts_total_rub) * 100;
   }, [points]);
 
-  const profitTotal = useMemo(
-    () => points.reduce((s, p) => s + (p.profit_rub ?? 0), 0),
-    [points]
-  );
+  const profitTotal = useMemo(() => points.reduce((s, p) => s + (p.profit_rub ?? 0), 0), [points]);
 
   if (points.length < 2) {
     return (
@@ -450,12 +554,16 @@ export function IncomeHistoryChartsSection({
         </div>
         {mode === "capital" && latest ? (
           <div className="text-right">
-            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">Сейчас на счетах</div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
+              Сейчас на счетах
+            </div>
             <div className="v2-tnum text-[18px] font-semibold text-[var(--v2-ink-900)]">
               {formatPersonalRubShort(latest.accounts_total_rub)}
             </div>
             {capitalDeltaPct != null ? (
-              <div className={`v2-tnum text-[12px] font-medium ${capitalDeltaPct >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+              <div
+                className={`v2-tnum text-[12px] font-medium ${capitalDeltaPct >= 0 ? "text-emerald-600" : "text-red-500"}`}
+              >
                 {capitalDeltaPct >= 0 ? "+" : "−"}
                 {Math.abs(capitalDeltaPct).toFixed(1).replace(".", ",")}% за период
               </div>
@@ -463,7 +571,9 @@ export function IncomeHistoryChartsSection({
           </div>
         ) : (
           <div className="text-right">
-            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">Сумма прибыли</div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
+              Сумма прибыли
+            </div>
             <div className="v2-tnum text-[18px] font-semibold text-emerald-600">{formatPersonalRubShort(profitTotal)}</div>
             <div className="text-[12px] text-[var(--v2-ink-500)]">за весь период на графике</div>
           </div>
@@ -473,68 +583,60 @@ export function IncomeHistoryChartsSection({
       {mode === "capital" ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <PfCard className="p-4 pt-5">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-[var(--v2-ink-800)]">Капитал на счетах</span>
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--v2-ink-500)]">
-                <span className="h-2 w-2 rounded-full bg-[var(--v2-brand-500)]" />
-                динамика
-              </span>
-            </div>
+            <ChartCardHeader
+              title="Капитал на счетах"
+              expandHref={incomeHistoryChartExpandHref("capital-total", "capital")}
+              legend={
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--v2-ink-500)]">
+                  <span className="h-2 w-2 rounded-full bg-[var(--v2-brand-500)]" />
+                  динамика
+                </span>
+              }
+            />
             <IncomeHistoryCapitalChart points={points} />
           </PfCard>
           <PfCard className="p-4 pt-5">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-[var(--v2-ink-800)]">Изменение помесячно</span>
-              <span className="flex items-center gap-2 text-[11px] text-[var(--v2-ink-500)]">
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-emerald-500" />
-                  рост
+            <ChartCardHeader
+              title="Изменение помесячно"
+              expandHref={incomeHistoryChartExpandHref("capital-delta", "capital")}
+              legend={
+                <span className="flex items-center gap-2 text-[11px] text-[var(--v2-ink-500)]">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm bg-emerald-500" />
+                    рост
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm bg-red-500" />
+                    спад
+                  </span>
                 </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-red-500" />
-                  спад
-                </span>
-              </span>
-            </div>
+              }
+            />
             <IncomeHistoryCapitalDeltaChart points={points} />
           </PfCard>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <PfCard className="p-4 pt-5">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-[var(--v2-ink-800)]">Доход и прибыль</span>
-              <span className="flex items-center gap-2 text-[11px] text-[var(--v2-ink-500)]">
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-[var(--v2-brand-500)]" />
-                  доход
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-emerald-500" />
-                  прибыль
-                </span>
-              </span>
-            </div>
-            <IncomeHistoryProfitChart points={points} />
-          </PfCard>
-          <PfCard className="p-4 pt-5">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-[var(--v2-ink-800)]">Тренд прибыли</span>
+        <PfCard className="p-4 pt-5">
+          <ChartCardHeader
+            title="Прибыль"
+            expandHref={incomeHistoryChartExpandHref("profit-total", "profit")}
+            legend={
               <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--v2-ink-500)]">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                прибыль
+                динамика
               </span>
-            </div>
-            <IncomeHistoryProfitLineChart points={points} />
-          </PfCard>
-        </div>
+            }
+          />
+          <IncomeHistoryProfitChart points={points} />
+        </PfCard>
       )}
     </div>
   );
 }
 
 function PfCard({ className = "", children }: { className?: string; children: React.ReactNode }) {
-  return (
-    <div className={`rounded-2xl bg-white shadow-[var(--v2-shadow-soft)] ${className}`}>{children}</div>
-  );
+  return <div className={`rounded-2xl bg-white shadow-[var(--v2-shadow-soft)] ${className}`}>{children}</div>;
 }
+
+export { getChartLayout };
+export type { ChartLayout };

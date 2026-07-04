@@ -155,9 +155,7 @@ function EditableMoneyCell({
             ? value >= 0
               ? "font-semibold text-emerald-600"
               : "font-semibold text-red-500"
-            : field === "earned_rub"
-              ? "font-medium text-emerald-600"
-              : "font-semibold text-[var(--v2-ink-900)]"
+            : "font-semibold text-[var(--v2-ink-900)]"
       }`}
       title="Нажмите, чтобы изменить"
     >
@@ -168,13 +166,62 @@ function EditableMoneyCell({
 
 type RowWithDelta = PersonalIncomeHistoryRow & { delta: number | null };
 
-function computeYearDelta(year: number, rows: PersonalIncomeHistoryRow[]): number | null {
+function computeYearDelta(
+  year: number,
+  rows: PersonalIncomeHistoryRow[]
+): { delta: number | null; partial: boolean } {
   const dec = rows.find((r) => r.year === year && r.month === 12);
   const prevDec = rows.find((r) => r.year === year - 1 && r.month === 12);
-  if (dec && prevDec) return dec.accounts_total_rub - prevDec.accounts_total_rub;
+  if (dec && prevDec) return { delta: dec.accounts_total_rub - prevDec.accounts_total_rub, partial: false };
+  if (dec) {
+    const jan = rows.find((r) => r.year === year && r.month === 1);
+    if (jan) return { delta: dec.accounts_total_rub - jan.accounts_total_rub, partial: false };
+  }
+
+  const yearRows = rows.filter((r) => r.year === year).sort((a, b) => b.month - a.month);
+  if (yearRows.length === 0) return { delta: null, partial: false };
+  const latest = yearRows[0]!;
   const jan = rows.find((r) => r.year === year && r.month === 1);
-  if (dec && jan) return dec.accounts_total_rub - jan.accounts_total_rub;
-  return null;
+  if (jan && latest.month !== 1) {
+    return { delta: latest.accounts_total_rub - jan.accounts_total_rub, partial: true };
+  }
+  if (prevDec) return { delta: latest.accounts_total_rub - prevDec.accounts_total_rub, partial: true };
+  return { delta: null, partial: false };
+}
+
+function YearDeltaLine({ delta, partial }: { delta: number; partial?: boolean }) {
+  const up = delta >= 0;
+  return (
+    <span className="text-[12.5px] text-[var(--v2-ink-500)]">
+      Динамика за год{partial ? " (с янв.)" : ""}:{" "}
+      <span className={`v2-tnum font-semibold ${up ? "text-emerald-600" : "text-red-500"}`}>
+        {formatPersonalRubSigned(delta)}
+      </span>
+    </span>
+  );
+}
+
+function YearCurrentHeader({
+  year,
+  yearDelta,
+  partialYear,
+  monthCount,
+}: {
+  year: number;
+  yearDelta: number | null;
+  partialYear: boolean;
+  monthCount: number;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b border-[var(--v2-brand-100)] bg-[var(--v2-brand-50)]/50 px-5 py-3.5">
+      <span className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">{year}</span>
+      <span className="rounded-md bg-[var(--v2-brand-100)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--v2-brand-700)]">
+        текущий
+      </span>
+      {yearDelta != null ? <YearDeltaLine delta={yearDelta} partial={partialYear} /> : null}
+      <span className="ml-auto text-[12px] text-[var(--v2-ink-400)]">{monthCount} мес.</span>
+    </div>
+  );
 }
 
 function HistoryTableRow({
@@ -187,7 +234,7 @@ function HistoryTableRow({
   onError: (msg: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-[1.35fr_1fr_1fr_0.95fr_0.95fr_0.95fr] items-center px-3 py-1.5 transition hover:bg-[var(--v2-ink-50)]/50">
+    <div className="grid grid-cols-[1.35fr_1fr_1fr_0.95fr_1.15fr_0.95fr] items-center px-3 py-1.5 transition hover:bg-[var(--v2-ink-50)]/50">
       <div className="px-2 py-2">
         <span className="v2-tight text-[13.5px] font-medium text-[var(--v2-ink-900)]">
           {monthTitle(row.year, row.month)}
@@ -206,19 +253,19 @@ function HistoryTableRow({
         <DeltaRub value={row.delta} />
       </div>
       <EditableMoneyCell
-        value={row.earned_rub}
-        field="earned_rub"
-        year={row.year}
-        month={row.month}
-        onSaved={onSaved}
-        onError={onError}
-      />
-      <EditableMoneyCell
         value={row.profit_rub}
         field="profit_rub"
         year={row.year}
         month={row.month}
         profitStyle
+        onSaved={onSaved}
+        onError={onError}
+      />
+      <EditableMoneyCell
+        value={row.earned_rub}
+        field="earned_rub"
+        year={row.year}
+        month={row.month}
         onSaved={onSaved}
         onError={onError}
       />
@@ -262,14 +309,7 @@ function YearAccordion({
           className={`h-4 w-4 shrink-0 text-[var(--v2-ink-400)] transition-transform ${open ? "" : "-rotate-90"}`}
         />
         <span className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">{year}</span>
-        {yearDelta != null ? (
-          <span className="text-[12.5px] text-[var(--v2-ink-500)]">
-            Динамика за год:{" "}
-            <span className={`v2-tnum font-medium ${yearDelta >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-              {formatPersonalRubSigned(yearDelta)}
-            </span>
-          </span>
-        ) : null}
+        {yearDelta != null ? <YearDeltaLine delta={yearDelta} /> : null}
         <span className="ml-auto text-[12px] text-[var(--v2-ink-400)]">{rows.length} мес.</span>
       </button>
       {open ? (
@@ -330,12 +370,16 @@ export function PersonalIncomeHistoryClient() {
     }
     const years = [...byYear.keys()].sort((a, b) => b - a);
     const currentYear = years[0] ?? new Date().getFullYear();
-    return years.map((year) => ({
-      year,
-      rows: byYear.get(year)!,
-      yearDelta: computeYearDelta(year, rows),
-      isCurrent: year === currentYear,
-    }));
+    return years.map((year) => {
+      const { delta, partial } = computeYearDelta(year, rows);
+      return {
+        year,
+        rows: byYear.get(year)!,
+        yearDelta: delta,
+        partialYear: partial,
+        isCurrent: year === currentYear,
+      };
+    });
   }, [rowsWithDelta, rows]);
 
   const chartPoints = useIncomeHistoryChartPoints(rows);
@@ -374,7 +418,7 @@ export function PersonalIncomeHistoryClient() {
                 История дохода
               </h1>
               <p className="mt-1 text-[13.5px] text-[var(--v2-ink-500)]">
-                Помесячная сводка: счета, динамика, доход, прибыль и расход. Клик по ячейке — редактирование.
+                Помесячная сводка: счета, динамика, прибыль, выручка проектов и расход. Клик по ячейке — редактирование.
               </p>
             </div>
             <button
@@ -399,12 +443,12 @@ export function PersonalIncomeHistoryClient() {
           ) : null}
 
           <PfCard className="overflow-hidden">
-            <div className="grid grid-cols-[1.35fr_1fr_1fr_0.95fr_0.95fr_0.95fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
+            <div className="grid grid-cols-[1.35fr_1fr_1fr_0.95fr_1.15fr_0.95fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
               <div>Месяц</div>
               <div className="text-right">Всего на счетах</div>
               <div className="text-right">Динамика капитала</div>
-              <div className="text-right">Доход</div>
               <div className="text-right">Прибыль</div>
+              <div className="text-right">Выручка проектов</div>
               <div className="text-right">Расход</div>
             </div>
 
@@ -418,15 +462,23 @@ export function PersonalIncomeHistoryClient() {
               <div>
                 {yearGroups.map((group) =>
                   group.isCurrent ? (
-                    <div key={group.year} className="divide-y divide-[var(--v2-ink-100)]/70">
-                      {group.rows.map((row) => (
-                        <HistoryTableRow
-                          key={`${row.year}-${row.month}`}
-                          row={row}
-                          onSaved={handleSaved}
-                          onError={showError}
-                        />
-                      ))}
+                    <div key={group.year}>
+                      <YearCurrentHeader
+                        year={group.year}
+                        yearDelta={group.yearDelta}
+                        partialYear={group.partialYear}
+                        monthCount={group.rows.length}
+                      />
+                      <div className="divide-y divide-[var(--v2-ink-100)]/70">
+                        {group.rows.map((row) => (
+                          <HistoryTableRow
+                            key={`${row.year}-${row.month}`}
+                            row={row}
+                            onSaved={handleSaved}
+                            onError={showError}
+                          />
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <YearAccordion

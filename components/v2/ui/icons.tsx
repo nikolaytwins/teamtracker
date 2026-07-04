@@ -226,6 +226,17 @@ export const V2Icons = {
       <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  expand: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path
+        d="M8 4H4v4M16 4h4v4M20 16v4h-4M8 20H4v-4"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
   link: (p: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path
