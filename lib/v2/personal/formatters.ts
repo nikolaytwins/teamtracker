@@ -55,6 +55,24 @@ export const PERSONAL_MONTH_SHORT = [
   "Дек",
 ] as const;
 
+export function nextPersonalMonthAfter(rows: { year: number; month: number }[]): {
+  year: number;
+  month: number;
+} {
+  if (rows.length === 0) {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }
+  const top = rows[0];
+  let m = top.month + 1;
+  let y = top.year;
+  if (m > 12) {
+    m = 1;
+    y += 1;
+  }
+  return { year: y, month: m };
+}
+
 export const PERSONAL_BRANDS: Record<
   string,
   { name: string; short: string; tint: string; bg: string; ink?: string }

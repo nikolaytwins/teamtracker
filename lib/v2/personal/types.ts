@@ -89,6 +89,16 @@ export type PersonalMonthSnapshotRow = {
   spent_rub: number;
 };
 
+export type PersonalIncomeHistoryRow = {
+  user_id: string;
+  year: number;
+  month: number;
+  accounts_total_rub: number;
+  earned_rub: number | null;
+  profit_rub: number | null;
+  spent_rub: number | null;
+};
+
 export type PersonalFinanceDashboard = {
   year: number;
   month: number;
