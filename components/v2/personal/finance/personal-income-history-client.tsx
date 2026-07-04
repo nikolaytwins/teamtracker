@@ -365,7 +365,7 @@ export function PersonalIncomeHistoryClient() {
   };
 
   return (
-    <PersonalMaskProvider defaultMasked={false}>
+    <PersonalMaskProvider masked={false}>
       <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-[var(--v2-ink-50)]/40">
         <div className="mx-auto w-full max-w-[1180px] px-6 py-8">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
