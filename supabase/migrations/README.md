@@ -43,8 +43,10 @@
 | 022 | `022_v2_personal_todo_priority_nullable.sql` | NULL priority = без приоритета у личных задач |
 | 023 | `023_v2_task_personal_links.sql` | Связь задач проекта с личными todos, nullable priority у v2_tasks |
 | 024 | `024_v2_leads.sql` | v2 админ-канбан лидов (статусы, тип агентство/курс) |
+| 025 | `025_v2_leads_estimated_amount.sql` | Ориентировочная сумма у лидов |
+| 026 | `026_v2_leads_awaiting_start_status.sql` | Статус лидов «Ожидает начала работы» |
 
-**Следующий свободный номер:** `025`
+**Следующий свободный номер:** `027`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

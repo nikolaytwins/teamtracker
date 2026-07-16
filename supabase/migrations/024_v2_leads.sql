@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS v2_leads (
   lead_type TEXT NOT NULL DEFAULT 'agency'
     CHECK (lead_type IN ('agency', 'course')),
   status TEXT NOT NULL DEFAULT 'correspondence'
-    CHECK (status IN ('correspondence', 'thinking', 'pause', 'lost')),
+    CHECK (status IN ('correspondence', 'thinking', 'awaiting_start', 'pause', 'lost')),
   reminder_at DATE,
   sort_order INTEGER NOT NULL DEFAULT 0,
   archived_at TIMESTAMPTZ,

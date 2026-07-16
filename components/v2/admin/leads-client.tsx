@@ -11,17 +11,43 @@ import {
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-function formatReminder(ymd: string | null): { label: string; overdue: boolean } | null {
-  if (!ymd) return null;
+function todayYmd() {
   const today = new Date();
-  const todayYmd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+function formatRubShort(n: number) {
+  return `${Math.round(n).toLocaleString("ru-RU")} ₽`;
+}
+
+type ReminderState = "none" | "today" | "overdue";
+
+function reminderState(ymd: string | null): ReminderState {
+  if (!ymd) return "none";
+  const today = todayYmd();
+  if (ymd === today) return "today";
+  if (ymd < today) return "overdue";
+  return "none";
+}
+
+function formatReminder(ymd: string | null): { label: string; state: ReminderState } | null {
+  if (!ymd) return null;
+  const state = reminderState(ymd);
   const [y, m, d] = ymd.split("-").map(Number);
-  if (!y || !m || !d) return { label: ymd, overdue: false };
+  if (!y || !m || !d) return { label: ymd, state };
   const label = new Date(y, m - 1, d).toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "short",
   });
-  return { label, overdue: ymd < todayYmd };
+  return { label, state };
+}
+
+function parseAmountInput(raw: string): number | null {
+  const trimmed = raw.trim().replace(/\s/g, "").replace(",", ".");
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
 }
 
 function TypeBadge({ type }: { type: V2LeadType }) {
@@ -50,6 +76,8 @@ function LeadCard({
   onDragEnd: () => void;
 }) {
   const reminder = formatReminder(lead.reminder_at);
+  const hot = reminder?.state === "today" || reminder?.state === "overdue";
+  const overdue = reminder?.state === "overdue";
 
   return (
     <button
@@ -62,26 +90,60 @@ function LeadCard({
       }}
       onDragEnd={onDragEnd}
       onClick={onOpen}
-      className={`w-full rounded-xl bg-white p-3 text-left shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] ${
+      className={`relative w-full overflow-hidden rounded-xl p-3 text-left transition ${
         dragging ? "opacity-40" : ""
+      } ${
+        overdue
+          ? "bg-red-50 shadow-[0_0_0_2px_rgba(239,68,68,0.55),0_10px_24px_rgba(239,68,68,0.18)]"
+          : reminder?.state === "today"
+            ? "bg-amber-50 shadow-[0_0_0_2px_rgba(245,158,11,0.55),0_10px_24px_rgba(245,158,11,0.18)]"
+            : "bg-white shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-cardHv)]"
       }`}
     >
+      {hot ? (
+        <span
+          className={`absolute inset-y-0 left-0 w-1.5 ${overdue ? "bg-red-500" : "bg-amber-500"}`}
+          aria-hidden
+        />
+      ) : null}
+
       <div className="mb-2 flex items-start justify-between gap-2">
         <TypeBadge type={lead.lead_type} />
         {reminder ? (
           <span
-            className={`v2-tnum inline-flex items-center gap-1 text-[11px] ${
-              reminder.overdue ? "font-medium text-red-600" : "text-[var(--v2-ink-500)]"
+            className={`v2-tnum inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
+              overdue
+                ? "bg-red-500 text-white"
+                : reminder.state === "today"
+                  ? "bg-amber-500 text-white"
+                  : "text-[var(--v2-ink-500)]"
             }`}
           >
-            <V2Icons.cal className="h-3 w-3 opacity-70" />
+            <V2Icons.cal className="h-3 w-3 opacity-90" />
             {reminder.label}
           </span>
         ) : null}
       </div>
+
+      {hot ? (
+        <div
+          className={`mb-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11.5px] font-semibold ${
+            overdue ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+          }`}
+        >
+          <V2Icons.bell className="h-3.5 w-3.5" />
+          {overdue ? "Просрочено — напиши" : "Сегодня — напиши"}
+        </div>
+      ) : null}
+
       <div className="v2-tight text-[13.5px] font-semibold leading-snug text-[var(--v2-ink-900)]">{lead.name}</div>
       {lead.contact ? (
         <div className="v2-tight mt-1 truncate text-[12px] text-[var(--v2-ink-600)]">{lead.contact}</div>
+      ) : null}
+      {lead.estimated_amount != null ? (
+        <div className="v2-tnum mt-2 text-[13px] font-semibold text-[var(--v2-ink-900)]">
+          ~ {formatRubShort(lead.estimated_amount)}
+        </div>
       ) : null}
       {lead.comment ? (
         <div className="v2-tight mt-2 line-clamp-2 text-[12px] leading-snug text-[var(--v2-ink-500)]">{lead.comment}</div>
@@ -97,6 +159,7 @@ type LeadFormState = {
   leadType: V2LeadType;
   status: V2LeadStatus;
   reminderAt: string;
+  estimatedAmount: string;
 };
 
 const EMPTY_FORM: LeadFormState = {
@@ -106,6 +169,7 @@ const EMPTY_FORM: LeadFormState = {
   leadType: "agency",
   status: "correspondence",
   reminderAt: "",
+  estimatedAmount: "",
 };
 
 function LeadModal({
@@ -227,6 +291,22 @@ function LeadModal({
 
             <label className="block">
               <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                Ориентировочная сумма, ₽
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.estimatedAmount}
+                onChange={(e) => setForm((f) => ({ ...f, estimatedAmount: e.target.value }))}
+                className="v2-tnum v2-input w-full"
+                placeholder="например 150000"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
                 Напоминание
               </span>
               <input
@@ -236,24 +316,24 @@ function LeadModal({
                 className="v2-input w-full"
               />
             </label>
-          </div>
 
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
-              Статус
-            </span>
-            <select
-              value={form.status}
-              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as V2LeadStatus }))}
-              className="v2-input w-full"
-            >
-              {V2_LEAD_STATUSES.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                Статус
+              </span>
+              <select
+                value={form.status}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as V2LeadStatus }))}
+                className="v2-input w-full"
+              >
+                {V2_LEAD_STATUSES.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           {error ? (
             <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">{error}</div>
@@ -295,6 +375,13 @@ function LeadModal({
   );
 }
 
+function reminderRank(lead: V2LeadRow) {
+  const state = reminderState(lead.reminder_at);
+  if (state === "overdue") return 0;
+  if (state === "today") return 1;
+  return 2;
+}
+
 export function V2AdminLeadsClient() {
   const [leads, setLeads] = useState<V2LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -319,14 +406,31 @@ export function V2AdminLeadsClient() {
       .finally(() => setLoading(false));
   }, [load]);
 
+  const dueNow = useMemo(
+    () =>
+      leads.filter((l) => {
+        const s = reminderState(l.reminder_at);
+        return s === "today" || s === "overdue";
+      }),
+    [leads]
+  );
+
   const grouped = useMemo(() => {
     const g: Record<V2LeadStatus, V2LeadRow[]> = {
       correspondence: [],
       thinking: [],
+      awaiting_start: [],
       pause: [],
       lost: [],
     };
     for (const lead of leads) g[lead.status].push(lead);
+    for (const key of Object.keys(g) as V2LeadStatus[]) {
+      g[key].sort((a, b) => {
+        const rr = reminderRank(a) - reminderRank(b);
+        if (rr !== 0) return rr;
+        return (b.estimated_amount ?? 0) - (a.estimated_amount ?? 0);
+      });
+    }
     return g;
   }, [leads]);
 
@@ -360,6 +464,7 @@ export function V2AdminLeadsClient() {
           leadType: form.leadType,
           status: form.status,
           reminderAt: form.reminderAt || null,
+          estimatedAmount: parseAmountInput(form.estimatedAmount),
         }),
       });
       setCreateOpen(false);
@@ -386,6 +491,7 @@ export function V2AdminLeadsClient() {
           leadType: form.leadType,
           status: form.status,
           reminderAt: form.reminderAt || null,
+          estimatedAmount: parseAmountInput(form.estimatedAmount),
         }),
       });
       setEditLead(null);
@@ -421,6 +527,7 @@ export function V2AdminLeadsClient() {
         leadType: editLead.lead_type,
         status: editLead.status,
         reminderAt: editLead.reminder_at ?? "",
+        estimatedAmount: editLead.estimated_amount != null ? String(editLead.estimated_amount) : "",
       }
     : EMPTY_FORM;
 
@@ -451,6 +558,20 @@ export function V2AdminLeadsClient() {
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-6">
         <div className="mx-auto max-w-[1600px]">
+          {dueNow.length > 0 ? (
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-950">
+              <V2Icons.bell className="h-4 w-4 shrink-0 text-amber-600" />
+              <span className="font-semibold">Написать сегодня: {dueNow.length}</span>
+              <span className="text-amber-800/80">
+                {dueNow
+                  .slice(0, 4)
+                  .map((l) => l.name)
+                  .join(", ")}
+                {dueNow.length > 4 ? ` и ещё ${dueNow.length - 4}` : ""}
+              </span>
+            </div>
+          ) : null}
+
           {error ? (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-800">
               {error}

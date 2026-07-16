@@ -1,4 +1,4 @@
-export type V2LeadStatus = "correspondence" | "thinking" | "pause" | "lost";
+export type V2LeadStatus = "correspondence" | "thinking" | "awaiting_start" | "pause" | "lost";
 export type V2LeadType = "agency" | "course";
 
 export type V2LeadRow = {
@@ -10,6 +10,7 @@ export type V2LeadRow = {
   lead_type: V2LeadType;
   status: V2LeadStatus;
   reminder_at: string | null;
+  estimated_amount: number | null;
   sort_order: number;
   archived_at: string | null;
   created_by: string;
@@ -24,6 +25,7 @@ export const V2_LEAD_STATUSES: {
 }[] = [
   { key: "correspondence", label: "Переписка", dot: "#3B6FF7" },
   { key: "thinking", label: "Думает", dot: "#F59E0B" },
+  { key: "awaiting_start", label: "Ожидает начала работы", dot: "#10B981" },
   { key: "pause", label: "Пауза", dot: "#7C3AED" },
   { key: "lost", label: "Слив", dot: "#A1A1AA" },
 ];
@@ -39,7 +41,7 @@ export const V2_LEAD_TYPES: {
 ];
 
 export function isV2LeadStatus(v: unknown): v is V2LeadStatus {
-  return v === "correspondence" || v === "thinking" || v === "pause" || v === "lost";
+  return v === "correspondence" || v === "thinking" || v === "awaiting_start" || v === "pause" || v === "lost";
 }
 
 export function isV2LeadType(v: unknown): v is V2LeadType {

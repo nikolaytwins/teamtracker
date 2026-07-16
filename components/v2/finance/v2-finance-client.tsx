@@ -589,18 +589,13 @@ export function V2FinanceClient() {
                             >
                               {p.name[0]}
                             </span>
-                            <div className="min-w-0 flex-1">
-                              <Link
-                                href={appPath(`/v2/agency/projects/${p.id}`)}
-                                className="v2-tight block truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline"
-                                title="Открыть проект и детализацию"
-                              >
-                                {p.name}
-                              </Link>
-                              {p.total_details_amount > 0 ? (
-                                <span className="v2-tight text-[11px] text-[var(--v2-ink-400)]">есть детализация</span>
-                              ) : null}
-                            </div>
+                            <Link
+                              href={appPath(`/v2/agency/projects/${p.id}`)}
+                              className="v2-tight min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline"
+                              title="Открыть проект и детализацию"
+                            >
+                              {p.name}
+                            </Link>
                             <span className="ml-0.5 hidden items-center gap-0.5 group-hover:flex">
                               <Link
                                 href={appPath(`/v2/agency/projects/${p.id}`)}

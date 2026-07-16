@@ -25,6 +25,12 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
           : typeof body.reminderAt === "string"
             ? body.reminderAt
             : undefined,
+      estimatedAmount:
+        body.estimatedAmount === null
+          ? null
+          : typeof body.estimatedAmount === "number"
+            ? body.estimatedAmount
+            : undefined,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : undefined,
     });
     return NextResponse.json({ lead });

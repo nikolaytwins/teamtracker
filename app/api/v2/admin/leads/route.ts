@@ -31,6 +31,12 @@ export async function POST(request: NextRequest) {
       leadType: isV2LeadType(body.leadType) ? body.leadType : undefined,
       status: isV2LeadStatus(body.status) ? body.status : undefined,
       reminderAt: typeof body.reminderAt === "string" ? body.reminderAt : body.reminderAt === null ? null : undefined,
+      estimatedAmount:
+        body.estimatedAmount === null
+          ? null
+          : typeof body.estimatedAmount === "number"
+            ? body.estimatedAmount
+            : undefined,
     });
     return NextResponse.json({ lead });
   } catch (e) {

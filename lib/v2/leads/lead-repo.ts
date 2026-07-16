@@ -20,6 +20,10 @@ function mapLead(raw: Record<string, unknown>): V2LeadRow {
     lead_type: leadType,
     status,
     reminder_at: raw.reminder_at ? String(raw.reminder_at).slice(0, 10) : null,
+    estimated_amount:
+      typeof raw.estimated_amount === "number" && Number.isFinite(raw.estimated_amount)
+        ? Math.round(raw.estimated_amount)
+        : null,
     sort_order: Number(raw.sort_order) || 0,
     archived_at: raw.archived_at ? String(raw.archived_at) : null,
     created_by: String(raw.created_by),
@@ -61,11 +65,17 @@ export type CreateLeadInput = {
   leadType?: V2LeadType;
   status?: V2LeadStatus;
   reminderAt?: string | null;
+  estimatedAmount?: number | null;
 };
 
 export async function createLead(ctx: V2SessionContext, input: CreateLeadInput): Promise<V2LeadRow> {
   const name = input.name.trim();
   if (!name) throw new Error("name required");
+
+  const estimatedAmount =
+    typeof input.estimatedAmount === "number" && Number.isFinite(input.estimatedAmount) && input.estimatedAmount >= 0
+      ? Math.round(input.estimatedAmount)
+      : null;
 
   const ts = nowIso();
   const row = {
@@ -77,6 +87,7 @@ export async function createLead(ctx: V2SessionContext, input: CreateLeadInput):
     lead_type: input.leadType && isV2LeadType(input.leadType) ? input.leadType : "agency",
     status: input.status && isV2LeadStatus(input.status) ? input.status : "correspondence",
     reminder_at: input.reminderAt?.trim() || null,
+    estimated_amount: estimatedAmount,
     sort_order: Math.floor(Date.now() / 1000),
     archived_at: null,
     created_by: ctx.userId,
@@ -97,6 +108,7 @@ export type UpdateLeadInput = Partial<{
   leadType: V2LeadType;
   status: V2LeadStatus;
   reminderAt: string | null;
+  estimatedAmount: number | null;
   sortOrder: number;
 }>;
 
@@ -125,6 +137,12 @@ export async function updateLead(
     patch.status = input.status;
   }
   if (input.reminderAt !== undefined) patch.reminder_at = input.reminderAt?.trim() || null;
+  if (input.estimatedAmount !== undefined) {
+    patch.estimated_amount =
+      input.estimatedAmount != null && Number.isFinite(input.estimatedAmount) && input.estimatedAmount >= 0
+        ? Math.round(input.estimatedAmount)
+        : null;
+  }
   if (input.sortOrder !== undefined) patch.sort_order = input.sortOrder;
 
   const sb = getV2Supabase();
