@@ -1,4 +1,10 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
+import {
+  computeFinanceMonthSummary,
+  listFinanceGeneralExpenses,
+  listFinanceProjectsForMonth,
+} from "@/lib/v2/finance/finance-repo";
+import { listPersonalIncomeHistory } from "@/lib/v2/personal/income-history-repo";
 import { DEFAULT_BUDGET_CATEGORIES } from "@/lib/v2/personal/formatters";
 import type {
   PersonalAccountRow,
@@ -6,10 +12,12 @@ import type {
   PersonalBudgetMonthRow,
   PersonalCapitalRow,
   PersonalFinanceDashboard,
+  PersonalIncomeHistoryRow,
   PersonalIncomeRow,
   PersonalMonthSnapshotRow,
   PersonalTaxAdvanceRow,
   PersonalTaxProfileRow,
+  PersonalTransactionRow,
   PersonalTxnType,
 } from "@/lib/v2/personal/types";
 import type { V2SessionContext } from "@/lib/v2/types";
@@ -292,18 +300,111 @@ export async function loadPersonalFinanceDashboard(
   );
 
   const summary = buildSummary(accounts, capital, incomes, tax, budget, budgetCategories);
+
+  // Доход из «Проекты и финансы» за выбранный месяц + среднее за 6 мес. из истории
+  let projectExpectedRevenue = 0;
+  let projectActualRevenue = 0;
+  let projectCount = 0;
+  try {
+    const [projects, generalExpenses] = await Promise.all([
+      listFinanceProjectsForMonth(ctx, year, month),
+      listFinanceGeneralExpenses(ctx, year, month),
+    ]);
+    const fin = computeFinanceMonthSummary(projects, generalExpenses, year, month);
+    projectExpectedRevenue = fin.expectedRevenue;
+    projectActualRevenue = fin.actualRevenue;
+    projectCount = fin.projectCount;
+  } catch (e) {
+    console.warn("personal finance: agency month summary unavailable", e);
+  }
+
+  let avgIncome6m = 0;
+  let capitalYearDelta: number | null = null;
+  let incomeHistory: PersonalIncomeHistoryRow[] = [];
+  try {
+    incomeHistory = await listPersonalIncomeHistory(ctx);
+    const past: number[] = [];
+    for (let i = 1; i <= 6; i++) {
+      let m = month - i;
+      let y = year;
+      while (m <= 0) {
+        m += 12;
+        y -= 1;
+      }
+      const row = incomeHistory.find((r) => r.year === y && r.month === m);
+      if (row?.earned_rub != null && row.earned_rub > 0) past.push(row.earned_rub);
+    }
+    if (past.length > 0) {
+      avgIncome6m = Math.round(past.reduce((s, v) => s + v, 0) / past.length);
+    }
+
+    const yearRows = [...incomeHistory]
+      .filter((r) => r.year === year)
+      .sort((a, b) => a.month - b.month);
+    const yearStart = yearRows[0];
+    if (yearStart) {
+      capitalYearDelta = summary.netWorth - yearStart.accounts_total_rub;
+    } else {
+      const yearSnaps = history.filter((h) => h.year === year).sort((a, b) => a.month - b.month);
+      if (yearSnaps.length > 0) {
+        capitalYearDelta = summary.netWorth - yearSnaps[0]!.capital_total_rub;
+      }
+    }
+  } catch (e) {
+    console.warn("personal finance: income history unavailable", e);
+  }
+
+  // Основной доход на дашборде — из «Проекты и финансы»
+  if (projectCount > 0 || projectExpectedRevenue > 0 || projectActualRevenue > 0) {
+    summary.incomeExpected = projectExpectedRevenue;
+    summary.incomeReceived = projectActualRevenue;
+    summary.incomePending = Math.max(projectExpectedRevenue - projectActualRevenue, 0);
+  }
+
   await upsertCurrentSnapshot(userId, year, month, summary);
 
-  const historyWithCurrent = [...history.filter((h) => !(h.year === year && h.month === month))];
+  // Для графиков: история дохода (счета) + текущий месяц из живых данных
+  const chartFromIncome = incomeHistory
+    .map(
+      (r) =>
+        ({
+          user_id: r.user_id,
+          year: r.year,
+          month: r.month,
+          capital_total_rub: r.accounts_total_rub,
+          earned_rub: r.earned_rub ?? 0,
+          spent_rub: r.spent_rub ?? 0,
+        }) satisfies PersonalMonthSnapshotRow
+    )
+    .sort((a, b) => a.year - b.year || a.month - b.month);
+
+  const historyWithCurrent = [
+    ...chartFromIncome.filter((h) => !(h.year === year && h.month === month)),
+  ];
   historyWithCurrent.push({
     user_id: userId,
     year,
     month,
-    capital_total_rub: summary.netWorth,
-    earned_rub: summary.incomeReceived,
+    capital_total_rub: summary.disposable + summary.reserves,
+    earned_rub: projectExpectedRevenue || summary.incomeReceived,
     spent_rub: summary.budgetSpent,
   });
   historyWithCurrent.sort((a, b) => a.year - b.year || a.month - b.month);
+
+  // incomeHistory для таблицы — по убыванию (как во вкладке), с актуальным текущим месяцем
+  const incomeHistoryForUi = [
+    ...incomeHistory.filter((r) => !(r.year === year && r.month === month)),
+  ];
+  incomeHistoryForUi.unshift({
+    user_id: userId,
+    year,
+    month,
+    accounts_total_rub: summary.disposable + summary.reserves,
+    earned_rub: projectExpectedRevenue || summary.incomeReceived || null,
+    profit_rub: incomeHistory.find((r) => r.year === year && r.month === month)?.profit_rub ?? null,
+    spent_rub: summary.budgetSpent,
+  });
+  incomeHistoryForUi.sort((a, b) => b.year - a.year || b.month - a.month);
 
   return {
     year,
@@ -316,7 +417,15 @@ export async function loadPersonalFinanceDashboard(
     budget,
     budgetCategories,
     history: historyWithCurrent,
-    summary,
+    incomeHistory: incomeHistoryForUi,
+    summary: {
+      ...summary,
+      projectExpectedRevenue,
+      projectActualRevenue,
+      projectCount,
+      avgIncome6m,
+      capitalYearDelta,
+    },
   };
 }
 
@@ -378,6 +487,7 @@ function accountPatch(patch: Partial<PersonalAccountRow>): Partial<PersonalAccou
   if (patch.disposable !== undefined) out.disposable = patch.disposable;
   if (patch.goal_amount_rub !== undefined) out.goal_amount_rub = patch.goal_amount_rub;
   if (patch.sort_order !== undefined) out.sort_order = patch.sort_order;
+  if (patch.balance_rub !== undefined) out.balance_rub = Math.round(Number(patch.balance_rub) || 0);
   return out;
 }
 
@@ -601,8 +711,13 @@ export async function createPersonalTransaction(
     budget_category_id?: string | null;
     year: number;
     month: number;
+    txn_date?: string | null;
+    external_id?: string | null;
+    import_batch_id?: string | null;
+    /** When true, skip balance/spent updates if external_id already exists */
+    skip_if_duplicate?: boolean;
   }
-): Promise<void> {
+): Promise<PersonalTransactionRow | null> {
   const userId = uid(ctx);
   const { txn_type, amount_rub, year, month } = input;
 
@@ -651,12 +766,33 @@ export async function createPersonalTransaction(
   await ensureBudgetMonth(userId, year, month);
 
   const sb = getV2Supabase();
+
+  if (input.external_id) {
+    const { data: existing } = await sb
+      .from("v2_personal_transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("external_id", input.external_id)
+      .maybeSingle();
+    if (existing) {
+      if (input.skip_if_duplicate) return null;
+      throw new PersonalFinanceValidationError("Операция уже импортирована");
+    }
+  }
+
   const id = newV2Id();
   const now = nowIso();
+  let txnDate = input.txn_date?.trim() || now;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(txnDate)) {
+    txnDate = `${txnDate}T12:00:00.000Z`;
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(txnDate)) {
+    txnDate = `${txnDate}:00.000Z`;
+  }
+
   const { error: insErr } = await sb.from("v2_personal_transactions").insert({
     id,
-    user_id: uid(ctx),
-    txn_date: now,
+    user_id: userId,
+    txn_date: txnDate,
     txn_type: input.txn_type,
     amount_rub: input.amount_rub,
     category: null,
@@ -666,16 +802,24 @@ export async function createPersonalTransaction(
     budget_category_id: input.budget_category_id ?? null,
     year: input.year,
     month: input.month,
+    external_id: input.external_id ?? null,
+    import_batch_id: input.import_batch_id ?? null,
     created_at: now,
   });
-  if (insErr) throw insErr;
+  if (insErr) {
+    if (String(insErr.message || "").includes("idx_v2_personal_txn_user_external")) {
+      if (input.skip_if_duplicate) return null;
+      throw new PersonalFinanceValidationError("Операция уже импортирована");
+    }
+    throw insErr;
+  }
 
   if (input.txn_type === "expense" && input.from_account_id) {
     const { data: acc } = await sb
       .from("v2_personal_accounts")
       .select("balance_rub")
       .eq("id", input.from_account_id)
-      .eq("user_id", uid(ctx))
+      .eq("user_id", userId)
       .maybeSingle();
     if (acc) {
       await sb
@@ -705,7 +849,7 @@ export async function createPersonalTransaction(
       .from("v2_personal_accounts")
       .select("balance_rub")
       .eq("id", input.to_account_id)
-      .eq("user_id", uid(ctx))
+      .eq("user_id", userId)
       .maybeSingle();
     if (acc) {
       await sb
@@ -743,6 +887,308 @@ export async function createPersonalTransaction(
         .eq("id", input.to_account_id);
     }
   }
+
+  return {
+    id,
+    user_id: userId,
+    txn_date: txnDate,
+    txn_type: input.txn_type,
+    amount_rub: input.amount_rub,
+    category: null,
+    description: input.description ?? null,
+    from_account_id: input.from_account_id ?? null,
+    to_account_id: input.to_account_id ?? null,
+    budget_category_id: input.budget_category_id ?? null,
+    year: input.year,
+    month: input.month,
+    external_id: input.external_id ?? null,
+    import_batch_id: input.import_batch_id ?? null,
+    created_at: now,
+  };
+}
+
+function mapTransaction(
+  r: Record<string, unknown>,
+  accountsById: Map<string, string>,
+  categoriesById: Map<string, { name: string; tint: string }>
+): PersonalTransactionRow {
+  const fromId = r.from_account_id ? String(r.from_account_id) : null;
+  const toId = r.to_account_id ? String(r.to_account_id) : null;
+  const catId = r.budget_category_id ? String(r.budget_category_id) : null;
+  const cat = catId ? categoriesById.get(catId) : undefined;
+  return {
+    id: String(r.id),
+    user_id: String(r.user_id),
+    txn_date: String(r.txn_date),
+    txn_type: r.txn_type as PersonalTxnType,
+    amount_rub: Number(r.amount_rub) || 0,
+    category: r.category != null ? String(r.category) : null,
+    description: r.description != null ? String(r.description) : null,
+    from_account_id: fromId,
+    to_account_id: toId,
+    budget_category_id: catId,
+    year: Number(r.year),
+    month: Number(r.month),
+    external_id: r.external_id != null ? String(r.external_id) : null,
+    import_batch_id: r.import_batch_id != null ? String(r.import_batch_id) : null,
+    created_at: String(r.created_at ?? ""),
+    from_account_name: fromId ? accountsById.get(fromId) ?? null : null,
+    to_account_name: toId ? accountsById.get(toId) ?? null : null,
+    budget_category_name: cat?.name ?? null,
+    budget_category_tint: cat?.tint ?? null,
+  };
+}
+
+export async function listPersonalTransactions(
+  ctx: V2SessionContext,
+  opts: {
+    year: number;
+    month: number;
+    txn_type?: PersonalTxnType | null;
+    budget_category_id?: string | null;
+    q?: string | null;
+  }
+): Promise<PersonalTransactionRow[]> {
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+  let q = sb
+    .from("v2_personal_transactions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("year", opts.year)
+    .eq("month", opts.month)
+    .order("txn_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (opts.txn_type) q = q.eq("txn_type", opts.txn_type);
+  if (opts.budget_category_id) q = q.eq("budget_category_id", opts.budget_category_id);
+
+  const { data, error } = await q;
+  if (error) throw error;
+
+  const [{ data: accounts }, { data: categories }] = await Promise.all([
+    sb.from("v2_personal_accounts").select("id, name").eq("user_id", userId),
+    sb
+      .from("v2_personal_budget_categories")
+      .select("id, name, tint")
+      .eq("user_id", userId)
+      .eq("year", opts.year)
+      .eq("month", opts.month),
+  ]);
+
+  const accountsById = new Map((accounts ?? []).map((a) => [String(a.id), String(a.name)]));
+  const categoriesById = new Map(
+    (categories ?? []).map((c) => [String(c.id), { name: String(c.name), tint: String(c.tint) }])
+  );
+
+  let rows = (data ?? []).map((r) => mapTransaction(r as Record<string, unknown>, accountsById, categoriesById));
+  const needle = opts.q?.trim().toLowerCase();
+  if (needle) {
+    rows = rows.filter(
+      (t) =>
+        (t.description ?? "").toLowerCase().includes(needle) ||
+        (t.budget_category_name ?? "").toLowerCase().includes(needle) ||
+        (t.from_account_name ?? "").toLowerCase().includes(needle) ||
+        (t.to_account_name ?? "").toLowerCase().includes(needle)
+    );
+  }
+  return rows;
+}
+
+export async function deletePersonalTransaction(ctx: V2SessionContext, id: string): Promise<void> {
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+  const { data, error } = await sb
+    .from("v2_personal_transactions")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new PersonalFinanceValidationError("Операция не найдена");
+
+  const amount = Number(data.amount_rub) || 0;
+  const now = nowIso();
+  const txnType = String(data.txn_type) as PersonalTxnType;
+
+  if (txnType === "expense" && data.from_account_id) {
+    const { data: acc } = await sb
+      .from("v2_personal_accounts")
+      .select("balance_rub")
+      .eq("id", data.from_account_id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (acc) {
+      await sb
+        .from("v2_personal_accounts")
+        .update({ balance_rub: Number(acc.balance_rub) + amount, updated_at: now })
+        .eq("id", data.from_account_id);
+    }
+    if (data.budget_category_id) {
+      const { data: cat } = await sb
+        .from("v2_personal_budget_categories")
+        .select("spent_rub")
+        .eq("id", data.budget_category_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (cat) {
+        await sb
+          .from("v2_personal_budget_categories")
+          .update({ spent_rub: Math.max(0, Number(cat.spent_rub) - amount), updated_at: now })
+          .eq("id", data.budget_category_id)
+          .eq("user_id", userId);
+      }
+    }
+  }
+
+  if (txnType === "income" && data.to_account_id) {
+    const { data: acc } = await sb
+      .from("v2_personal_accounts")
+      .select("balance_rub")
+      .eq("id", data.to_account_id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (acc) {
+      await sb
+        .from("v2_personal_accounts")
+        .update({ balance_rub: Number(acc.balance_rub) - amount, updated_at: now })
+        .eq("id", data.to_account_id);
+    }
+  }
+
+  if (txnType === "transfer" && data.from_account_id && data.to_account_id) {
+    const [{ data: fromAcc }, { data: toAcc }] = await Promise.all([
+      sb
+        .from("v2_personal_accounts")
+        .select("balance_rub")
+        .eq("id", data.from_account_id)
+        .eq("user_id", userId)
+        .maybeSingle(),
+      sb
+        .from("v2_personal_accounts")
+        .select("balance_rub")
+        .eq("id", data.to_account_id)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    ]);
+    if (fromAcc) {
+      await sb
+        .from("v2_personal_accounts")
+        .update({ balance_rub: Number(fromAcc.balance_rub) + amount, updated_at: now })
+        .eq("id", data.from_account_id);
+    }
+    if (toAcc) {
+      await sb
+        .from("v2_personal_accounts")
+        .update({ balance_rub: Number(toAcc.balance_rub) - amount, updated_at: now })
+        .eq("id", data.to_account_id);
+    }
+  }
+
+  const { error: delErr } = await sb.from("v2_personal_transactions").delete().eq("id", id).eq("user_id", userId);
+  if (delErr) throw delErr;
+}
+
+export async function importPersonalTransactions(
+  ctx: V2SessionContext,
+  input: {
+    items: {
+      txn_type: "expense" | "income";
+      amount_rub: number;
+      description: string;
+      date: string;
+      external_id: string;
+      budget_category_id?: string | null;
+      selected?: boolean;
+    }[];
+    from_account_id: string;
+    to_account_id?: string | null;
+    apply_balances: boolean;
+  }
+): Promise<{ created: number; skipped: number; batchId: string }> {
+  const userId = uid(ctx);
+  if (!(await ownAccountId(userId, input.from_account_id))) {
+    throw new PersonalFinanceValidationError("Счёт не найден");
+  }
+  const toId = input.to_account_id || input.from_account_id;
+  if (!(await ownAccountId(userId, toId))) {
+    throw new PersonalFinanceValidationError("Счёт зачисления не найден");
+  }
+
+  const batchId = newV2Id();
+  let created = 0;
+  let skipped = 0;
+
+  for (const item of input.items) {
+    if (item.selected === false) {
+      skipped++;
+      continue;
+    }
+    const d = new Date(`${item.date}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) {
+      skipped++;
+      continue;
+    }
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth() + 1;
+
+    const row = await createPersonalTransaction(ctx, {
+      txn_type: item.txn_type,
+      amount_rub: item.amount_rub,
+      description: item.description,
+      from_account_id: item.txn_type === "expense" ? input.from_account_id : null,
+      to_account_id: item.txn_type === "income" ? toId : null,
+      budget_category_id: item.txn_type === "expense" ? item.budget_category_id ?? null : null,
+      year,
+      month,
+      txn_date: item.date,
+      external_id: item.external_id,
+      import_batch_id: batchId,
+      skip_if_duplicate: true,
+    });
+
+    if (!row) {
+      skipped++;
+      continue;
+    }
+
+    // If user doesn't want balances touched (statement already reflected on account), reverse balance delta.
+    if (!input.apply_balances) {
+      const sb = getV2Supabase();
+      const now = nowIso();
+      if (item.txn_type === "expense") {
+        const { data: acc } = await sb
+          .from("v2_personal_accounts")
+          .select("balance_rub")
+          .eq("id", input.from_account_id)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (acc) {
+          await sb
+            .from("v2_personal_accounts")
+            .update({ balance_rub: Number(acc.balance_rub) + item.amount_rub, updated_at: now })
+            .eq("id", input.from_account_id);
+        }
+      } else {
+        const { data: acc } = await sb
+          .from("v2_personal_accounts")
+          .select("balance_rub")
+          .eq("id", toId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (acc) {
+          await sb
+            .from("v2_personal_accounts")
+            .update({ balance_rub: Number(acc.balance_rub) - item.amount_rub, updated_at: now })
+            .eq("id", toId);
+        }
+      }
+    }
+
+    created++;
+  }
+
+  return { created, skipped, batchId };
 }
 
 export async function updatePersonalTaxProfile(

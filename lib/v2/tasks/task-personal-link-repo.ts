@@ -31,7 +31,10 @@ export async function getLinkByProjectTaskId(taskId: string): Promise<TaskPerson
     .select("*")
     .eq("project_task_id", taskId)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("getLinkByProjectTaskId:", error.message);
+    return null;
+  }
   return data ? mapLink(data as Record<string, unknown>) : null;
 }
 
@@ -42,7 +45,10 @@ export async function getLinkByPersonalTodoId(todoId: string): Promise<TaskPerso
     .select("*")
     .eq("personal_todo_id", todoId)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.warn("getLinkByPersonalTodoId:", error.message);
+    return null;
+  }
   return data ? mapLink(data as Record<string, unknown>) : null;
 }
 
@@ -149,12 +155,20 @@ export async function syncLinkedCompletionFromProjectTask(
 ): Promise<void> {
   const link = await getLinkByProjectTaskId(projectTaskId);
   if (!link) return;
-  await updatePersonalTodo(
-    ctx,
-    link.personal_todo_id,
-    { completed_at: completed ? completedAt ?? nowIso() : null },
-    { skipLinkSync: true }
-  );
+  try {
+    await updatePersonalTodo(
+      ctx,
+      link.personal_todo_id,
+      { completed_at: completed ? completedAt ?? nowIso() : null },
+      { skipLinkSync: true }
+    );
+  } catch (e) {
+    console.warn(
+      "syncLinkedCompletionFromProjectTask:",
+      e instanceof Error ? e.message : e,
+      { projectTaskId, personalTodoId: link.personal_todo_id }
+    );
+  }
 }
 
 export async function syncLinkedCompletionFromPersonalTodo(
@@ -164,5 +178,14 @@ export async function syncLinkedCompletionFromPersonalTodo(
 ): Promise<void> {
   const link = await getLinkByPersonalTodoId(personalTodoId);
   if (!link) return;
-  await completeTask(ctx, link.project_task_id, completed, { skipLinkSync: true });
+  try {
+    await completeTask(ctx, link.project_task_id, completed, { skipLinkSync: true });
+  } catch (e) {
+    // Не блокируем личную задачу, если связанная проектная недоступна (права / удалена).
+    console.warn(
+      "syncLinkedCompletionFromPersonalTodo:",
+      e instanceof Error ? e.message : e,
+      { personalTodoId, projectTaskId: link.project_task_id }
+    );
+  }
 }

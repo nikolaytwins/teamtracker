@@ -11,7 +11,103 @@ import type {
 import { V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+function parseMoneyInput(raw: string): number | null {
+  const t = raw.trim();
+  if (!t || t === "—" || t === "-") return null;
+  const cleaned = t.replace(/\s/g, "").replace(/₽/g, "").replace(/,/g, ".").replace(/^\+/, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function formatDraft(v: number) {
+  return String(Math.round(v));
+}
+
+function AccountBalanceInline({
+  accountId,
+  value,
+  onSaved,
+  onError,
+}: {
+  accountId: string;
+  value: number;
+  onSaved: (balance: number) => void;
+  onError: (msg: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(formatDraft(value));
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing, value]);
+
+  const commit = async () => {
+    const parsed = parseMoneyInput(draft);
+    if (parsed == null) {
+      onError("Некорректная сумма");
+      return;
+    }
+    setEditing(false);
+    if (parsed === value) return;
+
+    setSaving(true);
+    try {
+      const { account } = await fetchJson<{ account: PersonalAccountRow }>(
+        `/api/v2/personal/finance/accounts/${accountId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ balance_rub: parsed }),
+        }
+      );
+      onSaved(account.balance_rub);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Не удалось сохранить баланс");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void commit();
+          }
+          if (e.key === "Escape") setEditing(false);
+        }}
+        className="v2-tnum w-[120px] rounded-lg border border-[var(--v2-brand-300)] bg-white px-2.5 py-1.5 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] outline-none ring-2 ring-[var(--v2-brand-100)]"
+        inputMode="numeric"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      disabled={saving}
+      title="Нажмите, чтобы изменить баланс"
+      className="v2-tnum rounded-lg px-2 py-1 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] transition hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)] disabled:opacity-50"
+    >
+      <PersonalAmt v={value} />
+    </button>
+  );
+}
 
 const ACCOUNT_TYPES: { value: PersonalAccountType; label: string }[] = [
   { value: "card", label: "Карта" },
@@ -116,6 +212,7 @@ export function PersonalAccountsClient() {
         note: accountDraft.note,
         disposable: accountDraft.disposable,
         goal_amount_rub: accountDraft.goal_amount_rub,
+        balance_rub: accountDraft.balance_rub,
       };
       if (accountDraft.id) {
         await fetchJson(`/api/v2/personal/finance/accounts/${accountDraft.id}`, {
@@ -249,7 +346,7 @@ export function PersonalAccountsClient() {
               <div>
                 <h1 className="v2-tight text-2xl font-semibold text-[var(--v2-ink-900)]">Счета</h1>
                 <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
-                  Карты, наличные, подушки и цели — балансы обновляются через операции
+                  Карты, наличные, подушки и цели — клик по сумме, чтобы поправить баланс
                 </p>
               </div>
               <button
@@ -294,9 +391,23 @@ export function PersonalAccountsClient() {
                         {a.note ? ` · ${a.note}` : ""}
                       </div>
                     </div>
-                    <div className="v2-tnum text-right text-[15px] font-semibold text-[var(--v2-ink-900)]">
-                      <PersonalAmt v={a.balance_rub} />
-                    </div>
+                    <AccountBalanceInline
+                      accountId={a.id}
+                      value={a.balance_rub}
+                      onSaved={(balance) => {
+                        setData((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                accounts: prev.accounts.map((x) =>
+                                  x.id === a.id ? { ...x, balance_rub: balance } : x
+                                ),
+                              }
+                            : prev
+                        );
+                      }}
+                      onError={setError}
+                    />
                     <div className="flex shrink-0 gap-1">
                       <button
                         type="button"
@@ -350,7 +461,7 @@ export function PersonalAccountsClient() {
                       className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                       style={{ background: c.tint ?? "#EEEEF1" }}
                     >
-                      <V2Icons.folder className="h-5 w-5 text-[var(--v2-ink-700)]" />
+                      <V2Icons.folder className="h-5 w-5 text-white" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="v2-tight font-medium text-[var(--v2-ink-900)]">{c.name}</div>
@@ -413,19 +524,17 @@ export function PersonalAccountsClient() {
                     ))}
                   </select>
                 </label>
-                {!accountDraft.id ? (
-                  <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
-                    Начальный баланс, ₽
-                    <input
-                      type="number"
-                      className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
-                      value={accountDraft.balance_rub ?? 0}
-                      onChange={(e) =>
-                        setAccountDraft({ ...accountDraft, balance_rub: Number(e.target.value) || 0 })
-                      }
-                    />
-                  </label>
-                ) : null}
+                <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
+                  {accountDraft.id ? "Баланс, ₽" : "Начальный баланс, ₽"}
+                  <input
+                    type="number"
+                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                    value={accountDraft.balance_rub ?? 0}
+                    onChange={(e) =>
+                      setAccountDraft({ ...accountDraft, balance_rub: Number(e.target.value) || 0 })
+                    }
+                  />
+                </label>
                 <label className="flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)]">
                   <input
                     type="checkbox"

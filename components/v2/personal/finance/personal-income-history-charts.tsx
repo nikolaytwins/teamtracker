@@ -149,14 +149,15 @@ function ChartSvgShell({
   children: React.ReactNode;
   onMouseLeave?: () => void;
 }) {
-  const { W, H } = layout;
+  const { W, H, expanded } = layout;
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      width={W}
-      height={H}
-      className="block max-w-none"
+      width={expanded ? W : undefined}
+      height={expanded ? H : undefined}
+      className={expanded ? "block max-w-none" : "block h-auto w-full max-w-full"}
       style={{ display: "block" }}
+      preserveAspectRatio="xMidYMid meet"
       onMouseLeave={onMouseLeave}
     >
       {children}
@@ -582,7 +583,7 @@ export function IncomeHistoryChartsSection({
 
       {mode === "capital" ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <PfCard className="p-4 pt-5">
+          <PfCard className="overflow-hidden p-4 pt-5">
             <ChartCardHeader
               title="Капитал на счетах"
               expandHref={incomeHistoryChartExpandHref("capital-total", "capital")}
@@ -595,7 +596,7 @@ export function IncomeHistoryChartsSection({
             />
             <IncomeHistoryCapitalChart points={points} />
           </PfCard>
-          <PfCard className="p-4 pt-5">
+          <PfCard className="overflow-hidden p-4 pt-5">
             <ChartCardHeader
               title="Изменение помесячно"
               expandHref={incomeHistoryChartExpandHref("capital-delta", "capital")}
@@ -616,7 +617,7 @@ export function IncomeHistoryChartsSection({
           </PfCard>
         </div>
       ) : (
-        <PfCard className="p-4 pt-5">
+        <PfCard className="overflow-hidden p-4 pt-5">
           <ChartCardHeader
             title="Прибыль"
             expandHref={incomeHistoryChartExpandHref("profit-total", "profit")}

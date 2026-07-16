@@ -1,5 +1,6 @@
 "use client";
 
+import { InboxSectionQuickAdd } from "@/components/v2/personal/todos/inbox-section-quick-add";
 import { PersonalTodoDetailDrawer } from "@/components/v2/personal/todos/personal-todo-detail-drawer";
 import { PersonalTodoRowItem } from "@/components/v2/personal/todos/personal-todo-row";
 import {
@@ -9,8 +10,9 @@ import {
 import { usePersonalTodo } from "@/components/v2/personal/todos/personal-todo-context";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { formatPersonalTodoDateLabel, isPersonalTodoOverdue } from "@/lib/v2/personal/todo-date";
-import { groupInboxTodosByPriority, INBOX_IMPORTANT_SECTION_IDS } from "@/lib/v2/personal/todo-inbox-groups";
+import { groupInboxTodosByPriority, INBOX_IMPORTANT_SECTION_IDS, type InboxTodoSectionId } from "@/lib/v2/personal/todo-inbox-groups";
 import type { PersonalTodoListPayload, PersonalTodoRow, PersonalTodoView } from "@/lib/v2/personal/todo-types";
+import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 const EMPTY_MESSAGES: Partial<Record<PersonalTodoView, string>> = {
@@ -47,6 +49,7 @@ export function PersonalTodoViewClient({
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [quickAddSection, setQuickAddSection] = useState<InboxTodoSectionId | null>(null);
 
   const load = useCallback(async () => {
     const qs = new URLSearchParams({ view });
@@ -289,33 +292,66 @@ export function PersonalTodoViewClient({
   function renderInboxSectionHeader(
     title: string,
     count: number,
-    opts?: { subtitle?: string; accent?: string; prominent?: boolean }
+    opts?: {
+      subtitle?: string;
+      accent?: string;
+      prominent?: boolean;
+      sectionId?: InboxTodoSectionId;
+    }
   ) {
+    const sectionId = opts?.sectionId;
+    const quickOpen = sectionId && quickAddSection === sectionId;
+
     return (
-      <div className="mb-3 flex items-start gap-2">
-        {opts?.accent ? (
-          <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: opts.accent }} aria-hidden />
-        ) : null}
-        <div>
-          <h2
-            className={`v2-tight font-semibold ${
-              opts?.prominent ? "text-[17px] text-[var(--v2-ink-900)]" : "text-[15px] text-[var(--v2-ink-800)]"
-            }`}
-          >
-            {title}
-            <span className="v2-tnum ml-2 text-[13px] font-medium text-[var(--v2-ink-400)]">{count}</span>
-          </h2>
-          {opts?.subtitle ? (
-            <p className="v2-tight mt-0.5 text-[12px] text-[var(--v2-ink-500)]">{opts.subtitle}</p>
+      <div className="mb-3">
+        <div className="flex items-start gap-2">
+          {opts?.accent ? (
+            <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: opts.accent }} aria-hidden />
           ) : null}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <h2
+                className={`v2-tight font-semibold ${
+                  opts?.prominent ? "text-[17px] text-[var(--v2-ink-900)]" : "text-[15px] text-[var(--v2-ink-800)]"
+                }`}
+              >
+                {title}
+                <span className="v2-tnum ml-2 text-[13px] font-medium text-[var(--v2-ink-400)]">{count}</span>
+              </h2>
+              {sectionId ? (
+                <button
+                  type="button"
+                  onClick={() => setQuickAddSection(quickOpen ? null : sectionId)}
+                  className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${
+                    quickOpen
+                      ? "bg-[var(--v2-brand-100)] text-[var(--v2-brand-700)]"
+                      : "text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)]"
+                  }`}
+                  title={`Добавить в «${title}»`}
+                >
+                  <V2Icons.plus className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+            {opts?.subtitle ? (
+              <p className="v2-tight mt-0.5 text-[12px] text-[var(--v2-ink-500)]">{opts.subtitle}</p>
+            ) : null}
+          </div>
         </div>
+        {sectionId ? (
+          <InboxSectionQuickAdd
+            sectionId={sectionId}
+            open={!!quickOpen}
+            onClose={() => setQuickAddSection(null)}
+            onCreated={() => void reload()}
+          />
+        ) : null}
       </div>
     );
   }
 
   function renderInboxByPriority() {
     const todos = payload?.todos ?? [];
-    if (!todos.length) return renderEmpty();
     const sections = groupInboxTodosByPriority(todos);
     const important = sections.filter((s) => INBOX_IMPORTANT_SECTION_IDS.includes(s.id));
     const rest = sections.filter((s) => !INBOX_IMPORTANT_SECTION_IDS.includes(s.id));
@@ -323,29 +359,35 @@ export function PersonalTodoViewClient({
 
     return (
       <div className="space-y-8 px-6 pb-6">
-        {important.length > 0 ? (
-          <section>
-            {renderInboxSectionHeader("Важное сейчас", importantCount, {
-              subtitle: "Срочные и высокоприоритетные задачи",
-              prominent: true,
-            })}
-            <div className="space-y-4">
-              {important.map((section) => (
-                <div key={section.id}>
-                  {renderInboxSectionHeader(section.title, section.todos.length, { accent: section.accent })}
-                  {renderList(section.todos, { showProject: true, priorityAccent: section.accent, showSchedule: true })}
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <section>
+          {renderInboxSectionHeader("Важное сейчас", importantCount, {
+            subtitle: "Срочные и высокоприоритетные задачи",
+            prominent: true,
+          })}
+          <div className="space-y-4">
+            {important.map((section) => (
+              <div key={section.id}>
+                {renderInboxSectionHeader(section.title, section.todos.length, {
+                  accent: section.accent,
+                  sectionId: section.id,
+                })}
+                {section.todos.length > 0
+                  ? renderList(section.todos, { showProject: true, priorityAccent: section.accent, showSchedule: true })
+                  : null}
+              </div>
+            ))}
+          </div>
+        </section>
         {rest.map((section) => (
           <section key={section.id}>
             {renderInboxSectionHeader(section.title, section.todos.length, {
               subtitle: section.subtitle,
               accent: section.accent,
+              sectionId: section.id,
             })}
-            {renderList(section.todos, { showProject: true, priorityAccent: section.accent, showSchedule: true })}
+            {section.todos.length > 0
+              ? renderList(section.todos, { showProject: true, priorityAccent: section.accent, showSchedule: true })
+              : null}
           </section>
         ))}
       </div>

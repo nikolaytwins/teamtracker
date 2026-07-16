@@ -470,8 +470,16 @@ export async function updatePersonalTodo(
     const wasCompleted = Boolean(before?.todo.completed_at);
     const nowCompleted = patch.completed_at != null;
     if (wasCompleted !== nowCompleted) {
-      const { syncLinkedCompletionFromPersonalTodo } = await import("@/lib/v2/tasks/task-personal-link-repo");
-      await syncLinkedCompletionFromPersonalTodo(ctx, id, nowCompleted);
+      try {
+        const { syncLinkedCompletionFromPersonalTodo } = await import("@/lib/v2/tasks/task-personal-link-repo");
+        await syncLinkedCompletionFromPersonalTodo(ctx, id, nowCompleted);
+      } catch (e) {
+        console.warn(
+          "personal todo link sync failed:",
+          e instanceof Error ? e.message : e,
+          { todoId: id }
+        );
+      }
     }
   }
 

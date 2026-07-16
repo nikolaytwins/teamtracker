@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   {
-    href: "/v2/personal/tasks/today",
+    href: "/v2/personal/tasks/inbox",
     label: "Задачи",
     match: (p: string) => p.includes(appPath("/v2/personal/tasks")),
   },

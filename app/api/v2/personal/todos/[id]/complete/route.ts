@@ -15,6 +15,10 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     if (!todo) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ todo });
   } catch (e) {
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+    console.error("complete personal todo:", e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Failed" },
+      { status: 500 }
+    );
   }
 }

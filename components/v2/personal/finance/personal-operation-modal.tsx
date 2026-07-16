@@ -28,6 +28,7 @@ export function PersonalOperationModal({
   const [txnType, setTxnType] = useState<PersonalTxnType>("expense");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [txnDate, setTxnDate] = useState("");
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -40,10 +41,17 @@ export function PersonalOperationModal({
     setAmount("");
     setDescription("");
     setError(null);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const today = new Date();
+    const inMonth =
+      today.getFullYear() === year && today.getMonth() + 1 === month
+        ? today
+        : new Date(year, month - 1, Math.min(today.getDate(), 28));
+    setTxnDate(`${inMonth.getFullYear()}-${pad(inMonth.getMonth() + 1)}-${pad(inMonth.getDate())}`);
     setFromId(accounts[0]?.id ?? "");
     setToId(accounts[1]?.id ?? accounts[0]?.id ?? "");
     setCategoryId(budgetCategories[0]?.id ?? "");
-  }, [open, accounts, budgetCategories]);
+  }, [open, accounts, budgetCategories, year, month]);
 
   if (!open) return null;
 
@@ -79,6 +87,12 @@ export function PersonalOperationModal({
     setSaving(true);
     setError(null);
     try {
+      let y = year;
+      let m = month;
+      if (txnDate && /^\d{4}-\d{2}-\d{2}$/.test(txnDate)) {
+        y = Number(txnDate.slice(0, 4));
+        m = Number(txnDate.slice(5, 7));
+      }
       await fetchJson("/api/v2/personal/finance/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -89,8 +103,9 @@ export function PersonalOperationModal({
           from_account_id: txnType !== "income" ? fromId || null : null,
           to_account_id: txnType !== "expense" ? toId || null : null,
           budget_category_id: txnType === "expense" ? categoryId || null : null,
-          year,
-          month,
+          year: y,
+          month: m,
+          txn_date: txnDate || null,
         }),
       });
       onDone();
@@ -143,6 +158,15 @@ export function PersonalOperationModal({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="v2-tnum mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+              />
+            </label>
+            <label className="mt-3 block text-xs text-[var(--v2-ink-500)]">
+              Дата
+              <input
+                type="date"
+                value={txnDate}
+                onChange={(e) => setTxnDate(e.target.value)}
+                className="mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
               />
             </label>
             {txnType !== "income" ? (

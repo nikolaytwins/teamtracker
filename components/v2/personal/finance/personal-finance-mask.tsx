@@ -31,11 +31,17 @@ export function PersonalAmt({
   className?: string;
 }) {
   const masked = useContext(MaskCtx);
-  const text = signed
-    ? formatPersonalRubSigned(v)
-    : short
-      ? formatPersonalRubShort(v)
-      : formatPersonalRub(v);
+  let text: string;
+  if (signed && short) {
+    const prefix = v > 0 ? "+" : v < 0 ? "−" : "";
+    text = prefix + formatPersonalRubShort(Math.abs(v)).replace(/^−/, "");
+  } else if (signed) {
+    text = formatPersonalRubSigned(v);
+  } else if (short) {
+    text = formatPersonalRubShort(v);
+  } else {
+    text = formatPersonalRub(v);
+  }
   return (
     <span
       className={`v2-tnum tabular-nums transition-all duration-300 ${masked ? "select-none blur-[7px]" : ""} ${className}`}

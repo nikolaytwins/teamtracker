@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2PersonalFinance } from "@/lib/v2/auth/require-v2-personal";
-import {
-  getLatestPersonalFinanceMonth,
-  loadPersonalFinanceDashboard,
-} from "@/lib/v2/personal/personal-finance-repo";
+import { loadPersonalFinanceDashboard } from "@/lib/v2/personal/personal-finance-repo";
 
 export async function GET(request: NextRequest) {
   const auth = await requireV2PersonalFinance();
@@ -14,10 +11,9 @@ export async function GET(request: NextRequest) {
   const valid = Number.isFinite(year) && Number.isFinite(month) && month >= 1 && month <= 12;
 
   if (!valid) {
-    const latest = await getLatestPersonalFinanceMonth(auth.ctx);
     const now = new Date();
-    year = latest?.year ?? now.getFullYear();
-    month = latest?.month ?? now.getMonth() + 1;
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
   }
 
   try {

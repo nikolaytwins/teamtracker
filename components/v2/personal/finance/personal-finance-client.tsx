@@ -10,14 +10,13 @@ import { PersonalOperationModal } from "./personal-operation-modal";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
   formatPersonalPct,
-  PERSONAL_BRANDS,
   PERSONAL_MONTH_NAMES,
 } from "@/lib/v2/personal/formatters";
 import type {
   PersonalAccountRow,
   PersonalCapitalRow,
   PersonalFinanceDashboard,
-  PersonalIncomeRow,
+  PersonalIncomeHistoryRow,
   PersonalMonthSnapshotRow,
 } from "@/lib/v2/personal/types";
 import { V2Icons } from "@/components/v2/ui/icons";
@@ -183,27 +182,6 @@ function PfDelta({ value, suffix = "", size = "sm" }: { value: number; suffix?: 
       <Icn className={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
       {formatPersonalPct(value)}
       {suffix}
-    </span>
-  );
-}
-
-function PfBrandChip({ id, size = "sm" }: { id: string; size?: "sm" | "md" }) {
-  const b = PERSONAL_BRANDS[id];
-  if (!b) return null;
-  const sm = size === "sm";
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full bg-white text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] ${
-        sm ? "py-[3px] pl-1 pr-2.5 text-[12px]" : "py-1 pl-1.5 pr-3 text-[13px]"
-      }`}
-    >
-      <span
-        className={`inline-flex items-center justify-center rounded-full font-semibold ${sm ? "h-[18px] w-[18px] text-[10.5px]" : "h-5 w-5 text-[11px]"}`}
-        style={{ background: b.bg, color: b.ink || b.tint }}
-      >
-        {b.short}
-      </span>
-      <span className="v2-tight font-medium">{b.name}</span>
     </span>
   );
 }
@@ -400,9 +378,12 @@ function PfHeroCards({
   const capSeries = history.map((h) => h.capital_total_rub);
   const cushion = accounts.find((a) => a.account_type === "cushion");
   const goal = accounts.find((a) => a.account_type === "goal");
-  const capitalDelta = computeCapitalDeltaPct(history);
-  const incomePct = summary.incomeExpected ? (summary.incomeReceived / summary.incomeExpected) * 100 : 0;
+  const incomeExpected = summary.projectExpectedRevenue || summary.incomeExpected;
+  const incomeReceived = summary.projectActualRevenue || summary.incomeReceived;
+  const incomePending = Math.max(incomeExpected - incomeReceived, 0);
+  const incomePct = incomeExpected ? (incomeReceived / incomeExpected) * 100 : 0;
   const monthName = PERSONAL_MONTH_NAMES[month - 1]?.toLowerCase() ?? "";
+  const yearDelta = summary.capitalYearDelta;
 
   const StatCard = ({
     label,
@@ -492,10 +473,14 @@ function PfHeroCards({
           </div>
         }
       >
-        {capitalDelta != null ? (
+        {yearDelta != null ? (
           <div className="mt-2 flex items-center gap-2">
-            <PfDelta value={capitalDelta} />
-            <span className="text-[12px] text-[var(--v2-ink-500)]">за месяц</span>
+            <span
+              className={`v2-tnum text-[13px] font-semibold ${yearDelta >= 0 ? "text-emerald-600" : "text-red-500"}`}
+            >
+              <PersonalAmt v={yearDelta} signed short />
+            </span>
+            <span className="text-[12px] text-[var(--v2-ink-500)]">за {year} год</span>
           </div>
         ) : null}
       </StatCard>
@@ -504,28 +489,45 @@ function PfHeroCards({
         label={`Доход за ${monthName}`}
         icon={PfUiIcons.coin}
         accent="#F59E0B"
-        value={summary.incomeExpected}
+        value={incomeExpected}
         footer={
-          <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Получено{" "}
-              <span className="font-medium text-[var(--v2-ink-700)]">
-                <PersonalAmt v={summary.incomeReceived} short />
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Оплачено{" "}
+                <span className="font-medium text-[var(--v2-ink-700)]">
+                  <PersonalAmt v={incomeReceived} short />
+                </span>
               </span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--v2-ink-300)]" />
-              Ждём{" "}
-              <span className="font-medium text-[var(--v2-ink-700)]">
-                <PersonalAmt v={summary.incomePending} short />
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--v2-ink-300)]" />
+                Ждём{" "}
+                <span className="font-medium text-[var(--v2-ink-700)]">
+                  <PersonalAmt v={incomePending} short />
+                </span>
               </span>
-            </span>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                Ср. за 6 мес.{" "}
+                <span className="font-medium text-[var(--v2-ink-700)]">
+                  <PersonalAmt v={summary.avgIncome6m} short />
+                </span>
+              </span>
+              <Link
+                href={appPath("/v2/agency")}
+                className="font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)]"
+              >
+                из проектов
+                {summary.projectCount ? ` · ${summary.projectCount}` : ""}
+              </Link>
+            </div>
           </div>
         }
       >
         <div className="mt-2.5 flex h-[6px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
-          <div className="h-full bg-emerald-500" style={{ width: `${incomePct}%` }} />
+          <div className="h-full bg-emerald-500" style={{ width: `${Math.min(incomePct, 100)}%` }} />
         </div>
       </StatCard>
     </div>
@@ -654,7 +656,7 @@ function PfCapitalRow({ c }: { c: PersonalCapitalRow }) {
     <div className="flex items-center gap-3.5 px-4 py-3 transition hover:bg-[var(--v2-ink-50)]/70">
       <span
         className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-        style={{ background: `${tint}16`, color: tint }}
+        style={{ background: tint, color: "#fff" }}
       >
         <PfAccountIcon iconKey={c.icon_key} className="h-[18px] w-[18px]" />
       </span>
@@ -836,41 +838,57 @@ function PfChartsSection({
 }
 
 function PfHistoryTable({
-  history,
+  incomeHistory,
   year,
   month,
 }: {
-  history: PersonalMonthSnapshotRow[];
+  incomeHistory: PersonalIncomeHistoryRow[];
   year: number;
   month: number;
 }) {
-  const rows = [...history].reverse();
+  const rows = incomeHistory.slice(0, 10);
+  const historyHref = appPath("/v2/personal/finance/history");
+  const hasMore = incomeHistory.length > 10;
 
   return (
     <div>
-      <PfSectionTitle accent="#9A8CFF" title="История по месяцам" />
+      <PfSectionTitle
+        accent="#9A8CFF"
+        title="История по месяцам"
+        right={
+          <Link
+            href={historyHref}
+            className="text-[12.5px] font-medium text-[var(--v2-brand-600)] transition hover:text-[var(--v2-brand-700)]"
+          >
+            Вся история
+          </Link>
+        }
+      />
       {rows.length === 0 ? (
         <PfCard className="p-8 text-center text-sm text-[var(--v2-ink-500)]">История пока пуста</PfCard>
       ) : (
         <PfCard className="overflow-hidden">
-          <div className="grid grid-cols-[1.4fr_1fr_0.9fr_1fr_1fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
+          <div className="grid grid-cols-[1.3fr_1fr_0.85fr_1fr_1fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
             <div>Месяц</div>
-            <div className="text-right">Капитал</div>
+            <div className="text-right">На счетах</div>
             <div className="text-right">Динамика</div>
-            <div className="text-right">Заработано</div>
-            <div className="text-right">Потрачено</div>
+            <div className="text-right">Выручка</div>
+            <div className="text-right">Прибыль</div>
           </div>
           <div className="divide-y divide-[var(--v2-ink-100)]/70">
             {rows.map((h, i) => {
-              const prev = rows[i + 1];
-              const delta = prev ? h.capital_total_rub - prev.capital_total_rub : 0;
-              const deltaPct = prev && prev.capital_total_rub ? (delta / prev.capital_total_rub) * 100 : 0;
+              const older = incomeHistory[i + 1];
+              const delta = older ? h.accounts_total_rub - older.accounts_total_rub : null;
+              const deltaPct =
+                older && older.accounts_total_rub
+                  ? ((h.accounts_total_rub - older.accounts_total_rub) / older.accounts_total_rub) * 100
+                  : null;
               const isCurrent = h.year === year && h.month === month;
               const full = monthLabel(h.year, h.month);
               return (
                 <div
                   key={`${h.year}-${h.month}`}
-                  className={`grid grid-cols-[1.4fr_1fr_0.9fr_1fr_1fr] items-center px-5 py-3 text-[13.5px] transition hover:bg-[var(--v2-ink-50)]/60 ${
+                  className={`grid grid-cols-[1.3fr_1fr_0.85fr_1fr_1fr] items-center px-5 py-3 text-[13.5px] transition hover:bg-[var(--v2-ink-50)]/60 ${
                     isCurrent ? "bg-[var(--v2-brand-50)]/40" : ""
                   }`}
                 >
@@ -883,113 +901,166 @@ function PfHistoryTable({
                     ) : null}
                   </div>
                   <div className="v2-tight text-right font-semibold text-[var(--v2-ink-900)]">
-                    <PersonalAmt v={h.capital_total_rub} />
+                    <PersonalAmt v={h.accounts_total_rub} />
                   </div>
-                  <div className="text-right">{prev ? <PfDelta value={deltaPct} /> : <span className="text-[var(--v2-ink-300)]">—</span>}</div>
+                  <div className="text-right">
+                    {deltaPct != null ? (
+                      <span className="inline-flex flex-col items-end gap-0.5">
+                        <PfDelta value={deltaPct} />
+                        {delta != null ? (
+                          <span
+                            className={`v2-tnum text-[11px] ${delta >= 0 ? "text-emerald-600/80" : "text-red-500/80"}`}
+                          >
+                            <PersonalAmt v={delta} signed short />
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--v2-ink-300)]">—</span>
+                    )}
+                  </div>
+                  <div className="v2-tnum text-right font-medium text-[var(--v2-ink-800)]">
+                    {h.earned_rub != null ? <PersonalAmt v={h.earned_rub} short /> : "—"}
+                  </div>
                   <div className="v2-tnum text-right font-medium text-emerald-600">
-                    <PersonalAmt v={h.earned_rub} short />
-                  </div>
-                  <div className="v2-tnum text-right text-[var(--v2-ink-600)]">
-                    <PersonalAmt v={h.spent_rub} short />
+                    {h.profit_rub != null ? <PersonalAmt v={h.profit_rub} short /> : "—"}
                   </div>
                 </div>
               );
             })}
           </div>
+          {hasMore || rows.length > 0 ? (
+            <div className="border-t border-[var(--v2-ink-100)]/70 px-5 py-3 text-center">
+              <Link
+                href={historyHref}
+                className="inline-flex h-9 items-center justify-center rounded-xl bg-[var(--v2-ink-50)] px-4 text-[13px] font-medium text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-100)]"
+              >
+                {hasMore
+                  ? `Посмотреть всю историю · ещё ${incomeHistory.length - 10}`
+                  : "Открыть историю дохода"}
+              </Link>
+            </div>
+          ) : null}
         </PfCard>
       )}
     </div>
   );
 }
 
-function PfIncomeList({
-  incomes,
-  summary,
-  onToggle,
-}: {
-  incomes: PersonalIncomeRow[];
-  summary: PersonalFinanceDashboard["summary"];
-  onToggle: (id: string, status: PersonalIncomeRow["status"]) => void;
-}) {
-  const received = incomes.filter((i) => i.status === "received");
-  const expected = incomes.filter((i) => i.status === "expected");
+type TaxFormState = {
+  scheme: string;
+  taxRatePct: string;
+  yearIncome: string;
+  insuranceDeduction: string;
+  paidAdvances: string;
+};
 
-  const Row = ({ i }: { i: PersonalIncomeRow }) => {
-    const got = i.status === "received";
-    return (
-      <button
-        type="button"
-        onClick={() => onToggle(i.id, i.status)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--v2-ink-50)]/70"
-        title={got ? "Отметить как ожидаемое" : "Отметить как получено"}
-      >
-        <span
-          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-            got ? "bg-emerald-50 text-emerald-600" : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-400)]"
-          }`}
-        >
-          {got ? <V2Icons.check className="h-4 w-4" /> : <V2Icons.clock className="h-4 w-4" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="v2-tight truncate text-[13.5px] font-medium text-[var(--v2-ink-900)]">{i.title}</div>
-          <div className="mt-1 flex items-center gap-2">
-            <PfBrandChip id={i.brand_key} />
-            <span className="v2-tight text-[12px] text-[var(--v2-ink-500)]">
-              {got ? "получено" : "ожидается"} {i.date_label || ""}
-            </span>
-          </div>
-        </div>
-        <div
-          className={`v2-tight shrink-0 text-[14px] font-semibold ${got ? "text-[var(--v2-ink-900)]" : "text-[var(--v2-ink-500)]"}`}
-        >
-          <PersonalAmt v={i.amount_rub} />
-        </div>
-      </button>
-    );
-  };
+function PfTaxModal({
+  open,
+  tax,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  tax: PersonalFinanceDashboard["tax"];
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSave: (form: TaxFormState) => void;
+}) {
+  const [form, setForm] = useState<TaxFormState>(() => ({
+    scheme: tax.scheme,
+    taxRatePct: String(Math.round(tax.tax_rate * 1000) / 10),
+    yearIncome: String(tax.year_income_rub),
+    insuranceDeduction: String(tax.insurance_deduction_rub),
+    paidAdvances: String(tax.paid_advances_rub),
+  }));
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        scheme: tax.scheme,
+        taxRatePct: String(Math.round(tax.tax_rate * 1000) / 10),
+        yearIncome: String(tax.year_income_rub),
+        insuranceDeduction: String(tax.insurance_deduction_rub),
+        paidAdvances: String(tax.paid_advances_rub),
+      });
+    }
+  }, [open, tax]);
+
+  if (!open) return null;
+
+  const field = (label: string, key: keyof TaxFormState, opts?: { suffix?: string; placeholder?: string }) => (
+    <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
+      {label}
+      <div className="relative mt-1">
+        <input
+          className="v2-tnum w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px] outline-none focus:border-[var(--v2-brand-300)] focus:ring-2 focus:ring-[var(--v2-brand-100)]"
+          value={form[key]}
+          inputMode="decimal"
+          placeholder={opts?.placeholder}
+          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+        />
+        {opts?.suffix ? (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-[var(--v2-ink-400)]">
+            {opts.suffix}
+          </span>
+        ) : null}
+      </div>
+    </label>
+  );
 
   return (
-    <div>
-      <PfSectionTitle
-        accent="#F59E0B"
-        title="Поступления по проектам"
-        right={
-          <span className="text-[12.5px] text-[var(--v2-ink-500)]">
-            Всего{" "}
-            <span className="font-semibold text-[var(--v2-ink-800)]">
-              <PersonalAmt v={summary.incomeExpected} short />
-            </span>
-          </span>
-        }
-      />
-      <PfCard className="overflow-hidden">
-        {incomes.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-[var(--v2-ink-500)]">Поступлений за месяц нет</div>
-        ) : (
-          <>
-            <div className="px-4 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-600">
-              Получено · <PersonalAmt v={summary.incomeReceived} short />
-            </div>
-            <div className="divide-y divide-[var(--v2-ink-100)]/70">
-              {received.length === 0 ? (
-                <div className="px-4 py-4 text-[13px] text-[var(--v2-ink-400)]">Пока ничего не получено</div>
-              ) : (
-                received.map((i) => <Row key={i.id} i={i} />)
-              )}
-            </div>
-            <div className="border-t border-[var(--v2-ink-100)]/70 px-4 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
-              Ожидается · <PersonalAmt v={summary.incomePending} short />
-            </div>
-            <div className="divide-y divide-[var(--v2-ink-100)]/70">
-              {expected.length === 0 ? (
-                <div className="px-4 py-4 text-[13px] text-[var(--v2-ink-400)]">Все поступления получены</div>
-              ) : (
-                expected.map((i) => <Row key={i.id} i={i} />)
-              )}
-            </div>
-          </>
-        )}
-      </PfCard>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
+        <h3 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Настройка налогов ИП</h3>
+        <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
+          Схема, ставка и вычеты. «К уплате» пересчитается автоматически.
+        </p>
+        <div className="mt-4 space-y-3">
+          <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
+            Схема
+            <input
+              className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px] outline-none focus:border-[var(--v2-brand-300)] focus:ring-2 focus:ring-[var(--v2-brand-100)]"
+              value={form.scheme}
+              placeholder="ИП · УСН «Доходы» 6 %"
+              onChange={(e) => setForm((f) => ({ ...f, scheme: e.target.value }))}
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {field("Ставка налога", "taxRatePct", { suffix: "%", placeholder: "6" })}
+            {field("Доход с начала года", "yearIncome", { suffix: "₽" })}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {field("Вычет страховых", "insuranceDeduction", { suffix: "₽" })}
+            {field("Оплачено авансами", "paidAdvances", { suffix: "₽" })}
+          </div>
+        </div>
+        {error ? (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+            {error}
+          </div>
+        ) : null}
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 rounded-lg px-4 text-[13px] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => onSave(form)}
+            className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-4 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50"
+          >
+            {saving ? "Сохранение…" : "Сохранить"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -998,10 +1069,12 @@ function PfTaxCard({
   tax,
   taxAdvances,
   summary,
+  onEdit,
 }: {
   tax: PersonalFinanceDashboard["tax"];
   taxAdvances: PersonalFinanceDashboard["taxAdvances"];
   summary: PersonalFinanceDashboard["summary"];
+  onEdit: () => void;
 }) {
   const accrued = summary.taxAccrued;
   const reducedPayable = Math.max(accrued - tax.insurance_deduction_rub, 0);
@@ -1019,7 +1092,19 @@ function PfTaxCard({
       <PfSectionTitle
         accent="#EF4444"
         title="Налоги ИП"
-        right={<span className="text-[12px] text-[var(--v2-ink-500)]">{tax.scheme}</span>}
+        right={
+          <div className="flex items-center gap-2">
+            <span className="hidden text-[12px] text-[var(--v2-ink-500)] sm:inline">{tax.scheme}</span>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-medium text-[var(--v2-ink-700)] transition hover:bg-[var(--v2-ink-50)]"
+            >
+              <V2Icons.edit className="h-3.5 w-3.5" />
+              Настроить
+            </button>
+          </div>
+        }
       />
       <PfCard className="p-5">
         <div className="flex items-end justify-between">
@@ -1125,80 +1210,102 @@ function PfBudgetCard({
   const projected = pacePerDay * dim;
   const surplus = budget.limit_rub - projected;
   const monthName = PERSONAL_MONTH_NAMES[month - 1]?.toLowerCase() ?? "";
+  const txLink = `${appPath("/v2/personal/finance/transactions")}?year=${year}&month=${month}`;
 
   return (
     <div>
-      <PfSectionTitle accent="#3B6FF7" title={`Траты на жизнь · ${monthName}`} />
-      <PfCard className="p-5">
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 flex flex-col md:col-span-4">
+      <PfSectionTitle
+        accent="#3B6FF7"
+        title={`Траты на жизнь · ${monthName}`}
+        right={
+          <Link
+            href={txLink}
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-medium text-[var(--v2-ink-700)] transition hover:bg-[var(--v2-ink-50)]"
+          >
+            Транзакции
+            <V2Icons.chevR className="h-3.5 w-3.5" />
+          </Link>
+        }
+      />
+      <PfCard className="flex h-full flex-col p-5">
+        <div className="flex items-end justify-between gap-3">
+          <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
               Потрачено из лимита
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="v2-tighter text-[30px] font-semibold leading-none text-[var(--v2-ink-900)]">
-                <PersonalAmt v={summary.budgetSpent} />
-              </span>
+            <div className="v2-tighter mt-1.5 text-[30px] font-semibold leading-none text-[var(--v2-ink-900)]">
+              <PersonalAmt v={summary.budgetSpent} />
             </div>
-            <div className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-500)]">
+            <div className="v2-tight mt-1.5 text-[13px] text-[var(--v2-ink-500)]">
               из <PersonalAmt v={budget.limit_rub} className="font-medium text-[var(--v2-ink-700)]" /> · осталось{" "}
               <PersonalAmt v={left} className="font-medium text-emerald-600" />
             </div>
-            <div className="mt-3 h-[10px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[var(--v2-brand-500)] to-[var(--v2-brand-600)]"
-                style={{ width: `${Math.min(pctSpent * 100, 100)}%` }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-[12px] text-[var(--v2-ink-500)]">
-              <span>{Math.round(pctSpent * 100)}% бюджета</span>
-              <span>
-                день {day} из {dim}
-              </span>
-            </div>
-            {surplus > 0 && day > 0 ? (
-              <div className="v2-tight mt-auto flex items-start gap-1.5 pt-4 text-[12px] text-[var(--v2-ink-500)]">
-                <V2Icons.spark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--v2-brand-500)]" />
-                Темп ниже среднего — при таком ритме уложитесь в лимит с запасом ≈{" "}
-                <PersonalAmt v={Math.round(surplus)} short className="font-medium text-[var(--v2-ink-700)]" />.
-              </div>
-            ) : null}
           </div>
-          <div className="col-span-12 md:col-span-8">
-            {budgetCategories.length === 0 ? (
-              <p className="text-sm text-[var(--v2-ink-500)]">Категории бюджета не настроены</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
-                {budgetCategories.map((c) => {
-                  const p = c.limit_rub ? Math.min(c.spent_rub / c.limit_rub, 1) : 0;
-                  const over = c.limit_rub ? c.spent_rub / c.limit_rub > 0.92 : false;
-                  return (
-                    <div key={c.id}>
-                      <div className="flex items-center justify-between text-[13px]">
-                        <span className="v2-tight inline-flex items-center gap-2 text-[var(--v2-ink-700)]">
-                          <span className="h-2 w-2 rounded-sm" style={{ background: c.tint }} />
-                          {c.name}
-                        </span>
-                        <span className="v2-tnum text-[var(--v2-ink-500)]">
-                          <span className="font-medium text-[var(--v2-ink-900)]">
-                            <PersonalAmt v={c.spent_rub} short />
-                          </span>{" "}
-                          / <PersonalAmt v={c.limit_rub} short />
-                        </span>
-                      </div>
-                      <div className="mt-1.5 h-[6px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${p * 100}%`, background: over ? "#EF4444" : c.tint }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]">
+            <V2Icons.ruble className="h-5 w-5" />
+          </span>
         </div>
+
+        <div className="mt-4 h-[10px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[var(--v2-brand-500)] to-[var(--v2-brand-600)]"
+            style={{ width: `${Math.min(pctSpent * 100, 100)}%` }}
+          />
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[12px] text-[var(--v2-ink-500)]">
+          <span>{Math.round(pctSpent * 100)}% бюджета</span>
+          <span>
+            день {day} из {dim}
+          </span>
+        </div>
+
+        {surplus > 0 && day > 0 ? (
+          <div className="v2-tight mt-3 flex items-start gap-1.5 text-[12px] text-[var(--v2-ink-500)]">
+            <V2Icons.spark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--v2-brand-500)]" />
+            Темп ок — запас ≈{" "}
+            <PersonalAmt v={Math.round(surplus)} short className="font-medium text-[var(--v2-ink-700)]" />
+          </div>
+        ) : null}
+
+        <div className="mt-4 space-y-3 border-t border-[var(--v2-ink-100)]/80 pt-4">
+          {budgetCategories.length === 0 ? (
+            <p className="text-sm text-[var(--v2-ink-500)]">Категории бюджета не настроены</p>
+          ) : (
+            budgetCategories.map((c) => {
+              const p = c.limit_rub ? Math.min(c.spent_rub / c.limit_rub, 1) : 0;
+              const over = c.limit_rub ? c.spent_rub / c.limit_rub > 0.92 : false;
+              return (
+                <div key={c.id}>
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className="v2-tight inline-flex items-center gap-2 text-[var(--v2-ink-700)]">
+                      <span className="h-2 w-2 rounded-sm" style={{ background: c.tint }} />
+                      {c.name}
+                    </span>
+                    <span className="v2-tnum text-[var(--v2-ink-500)]">
+                      <span className="font-medium text-[var(--v2-ink-900)]">
+                        <PersonalAmt v={c.spent_rub} short />
+                      </span>{" "}
+                      / <PersonalAmt v={c.limit_rub} short />
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-[6px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${p * 100}%`, background: over ? "#EF4444" : c.tint }}
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <Link
+          href={txLink}
+          className="mt-4 inline-flex text-[12.5px] font-medium text-[var(--v2-brand-600)] hover:underline"
+        >
+          Смотреть все транзакции →
+        </Link>
       </PfCard>
     </div>
   );
@@ -1213,6 +1320,9 @@ export function PersonalFinanceClient() {
   const [error, setError] = useState<string | null>(null);
   const [masked, setMasked] = useState(false);
   const [operationOpen, setOperationOpen] = useState(false);
+  const [taxEditOpen, setTaxEditOpen] = useState(false);
+  const [taxSaving, setTaxSaving] = useState(false);
+  const [taxError, setTaxError] = useState<string | null>(null);
   const [monthReady, setMonthReady] = useState(false);
   const skipMonthReload = useRef(true);
 
@@ -1262,17 +1372,39 @@ export function PersonalFinanceClient() {
 
   const reload = useCallback(() => load(year, month), [load, year, month]);
 
-  const toggleIncome = async (id: string, status: PersonalIncomeRow["status"]) => {
-    const next = status === "received" ? "expected" : "received";
+  const saveTax = async (form: TaxFormState) => {
+    const parseNum = (raw: string) => {
+      const n = Number(raw.trim().replace(/\s/g, "").replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
+    const ratePct = parseNum(form.taxRatePct);
+    const yearIncome = parseNum(form.yearIncome);
+    const insurance = parseNum(form.insuranceDeduction);
+    const paid = parseNum(form.paidAdvances);
+    if (ratePct == null || yearIncome == null || insurance == null || paid == null) {
+      setTaxError("Проверьте числовые поля");
+      return;
+    }
+    setTaxSaving(true);
+    setTaxError(null);
     try {
-      await fetchJson(`/api/v2/personal/finance/incomes/${id}`, {
+      await fetchJson("/api/v2/personal/finance/tax", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: next }),
+        body: JSON.stringify({
+          scheme: form.scheme.trim() || "ИП",
+          tax_rate: Math.max(ratePct, 0) / 100,
+          year_income_rub: Math.max(Math.round(yearIncome), 0),
+          insurance_deduction_rub: Math.max(Math.round(insurance), 0),
+          paid_advances_rub: Math.max(Math.round(paid), 0),
+        }),
       });
+      setTaxEditOpen(false);
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось обновить поступление");
+      setTaxError(e instanceof Error ? e.message : "Не удалось сохранить");
+    } finally {
+      setTaxSaving(false);
     }
   };
 
@@ -1295,7 +1427,7 @@ export function PersonalFinanceClient() {
 
   if (!data) return null;
 
-  const { summary, accounts, capital, incomes, tax, taxAdvances, budget, budgetCategories, history } = data;
+  const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, history, incomeHistory } = data;
 
   return (
     <PersonalMaskProvider masked={masked}>
@@ -1331,19 +1463,26 @@ export function PersonalFinanceClient() {
               <PfForecastCard summary={summary} budgetLimit={budget.limit_rub} year={year} month={month} />
               <PfAccountsAndCapital accounts={accounts} capital={capital} summary={summary} />
               <PfChartsSection history={history} masked={masked} year={year} month={month} />
-              <PfHistoryTable history={history} year={year} month={month} />
+              <PfHistoryTable incomeHistory={incomeHistory} year={year} month={month} />
               <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
-                <PfIncomeList incomes={incomes} summary={summary} onToggle={(id, status) => void toggleIncome(id, status)} />
-                <PfTaxCard tax={tax} taxAdvances={taxAdvances} summary={summary} />
+                <PfBudgetCard
+                  budget={budget}
+                  budgetCategories={budgetCategories}
+                  summary={summary}
+                  year={year}
+                  month={month}
+                  today={today}
+                />
+                <PfTaxCard
+                  tax={tax}
+                  taxAdvances={taxAdvances}
+                  summary={summary}
+                  onEdit={() => {
+                    setTaxError(null);
+                    setTaxEditOpen(true);
+                  }}
+                />
               </div>
-              <PfBudgetCard
-                budget={budget}
-                budgetCategories={budgetCategories}
-                summary={summary}
-                year={year}
-                month={month}
-                today={today}
-              />
             </div>
           </div>
         </div>
@@ -1356,6 +1495,15 @@ export function PersonalFinanceClient() {
           accounts={accounts}
           budgetCategories={budgetCategories}
           onDone={() => void reload()}
+        />
+
+        <PfTaxModal
+          open={taxEditOpen}
+          tax={tax}
+          saving={taxSaving}
+          error={taxError}
+          onClose={() => setTaxEditOpen(false)}
+          onSave={(form) => void saveTax(form)}
         />
       </div>
     </PersonalMaskProvider>

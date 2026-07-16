@@ -20,7 +20,7 @@ export function groupInboxTodosByPriority(todos: PersonalTodoRow[]): InboxTodoSe
   const low = todos.filter((t) => t.priority === "low");
   const unset = todos.filter((t) => !t.priority);
 
-  const sections: InboxTodoSection[] = [
+  return [
     {
       id: "urgent",
       title: "Срочные",
@@ -59,8 +59,11 @@ export function groupInboxTodosByPriority(todos: PersonalTodoRow[]): InboxTodoSe
       todos: unset,
     },
   ];
+}
 
-  return sections.filter((s) => s.todos.length > 0);
+export function inboxSectionPriority(sectionId: InboxTodoSectionId): V2TaskPriority | null {
+  if (sectionId === "unset") return null;
+  return sectionId;
 }
 
 export const INBOX_IMPORTANT_SECTION_IDS: InboxTodoSectionId[] = ["urgent", "high"];

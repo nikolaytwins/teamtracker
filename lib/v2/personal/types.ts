@@ -80,6 +80,29 @@ export type PersonalBudgetCategoryRow = {
   sort_order: number;
 };
 
+export type PersonalTransactionRow = {
+  id: string;
+  user_id: string;
+  txn_date: string;
+  txn_type: PersonalTxnType;
+  amount_rub: number;
+  category: string | null;
+  description: string | null;
+  from_account_id: string | null;
+  to_account_id: string | null;
+  budget_category_id: string | null;
+  year: number;
+  month: number;
+  external_id: string | null;
+  import_batch_id: string | null;
+  created_at: string;
+  /** Joined for UI */
+  from_account_name?: string | null;
+  to_account_name?: string | null;
+  budget_category_name?: string | null;
+  budget_category_tint?: string | null;
+};
+
 export type PersonalMonthSnapshotRow = {
   user_id: string;
   year: number;
@@ -109,7 +132,10 @@ export type PersonalFinanceDashboard = {
   taxAdvances: PersonalTaxAdvanceRow[];
   budget: PersonalBudgetMonthRow;
   budgetCategories: PersonalBudgetCategoryRow[];
+  /** Снапшоты для совместимости (графики/hero) */
   history: PersonalMonthSnapshotRow[];
+  /** История дохода — та же, что во вкладке «История дохода» */
+  incomeHistory: PersonalIncomeHistoryRow[];
   summary: {
     disposable: number;
     reserves: number;
@@ -118,6 +144,14 @@ export type PersonalFinanceDashboard = {
     incomeExpected: number;
     incomeReceived: number;
     incomePending: number;
+    /** Выручка проектов месяца (Проекты и финансы) */
+    projectExpectedRevenue: number;
+    projectActualRevenue: number;
+    projectCount: number;
+    /** Средняя выручка за прошлые 6 месяцев (история / проекты) */
+    avgIncome6m: number;
+    /** Динамика капитала с начала года, ₽ */
+    capitalYearDelta: number | null;
     taxAccrued: number;
     taxRemaining: number;
     budgetSpent: number;

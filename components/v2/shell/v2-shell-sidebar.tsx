@@ -303,8 +303,14 @@ export function V2ShellSidebar({
           </div>
           <nav className="space-y-0.5">
             {personalNav.map((item) => {
-              const active =
-                pathname === appPath(item.href) || (pathname?.startsWith(appPath("/v2/personal")) ?? false);
+              const href = appPath(item.href);
+              let active = pathname === href || (pathname?.startsWith(`${href}/`) ?? false);
+              // Не подсвечивать оба пункта разом: матчим секцию, а не весь /v2/personal
+              if (item.href.startsWith("/v2/personal/tasks")) {
+                active = pathname?.startsWith(appPath("/v2/personal/tasks")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/finance")) {
+                active = pathname?.startsWith(appPath("/v2/personal/finance")) ?? false;
+              }
               return <NavLink key={item.href} item={item} active={!!active} />;
             })}
           </nav>
