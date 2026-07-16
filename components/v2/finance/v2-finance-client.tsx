@@ -273,10 +273,13 @@ export function V2FinanceClient() {
 
   useEffect(() => {
     void (async () => {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth() + 1;
       setLoading(true);
       setError(null);
       try {
-        const payload = await fetchJson<DashboardPayload>("/api/v2/finance/dashboard");
+        const payload = await fetchJson<DashboardPayload>(`/api/v2/finance/dashboard?year=${y}&month=${m}`);
         setData(payload);
         setYear(payload.year);
         setMonth(payload.month);

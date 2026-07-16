@@ -34,7 +34,7 @@ export function TaskModalSubtaskRow({
   const [editingTitle, setEditingTitle] = useState(false);
   const [openField, setOpenField] = useState<Field>(null);
   const member = memberFromTeam(sub.assignee_user_id, null, team);
-  const pm = PRIORITY_META[sub.priority];
+  const pm = PRIORITY_META[sub.priority ?? "medium"];
 
   async function toggleComplete() {
     await fetchJson(`/api/v2/tasks/${sub.id}`, {

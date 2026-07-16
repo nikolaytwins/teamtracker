@@ -96,6 +96,8 @@ export function TaskCardModal({
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [personalLinked, setPersonalLinked] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (!taskId) return;
@@ -103,8 +105,15 @@ export function TaskCardModal({
     try {
       const data = await fetchJson<Detail>(`/api/v2/tasks/${taskId}/detail`);
       setDetail(data);
+      try {
+        const link = await fetchJson<{ personalTodoId: string | null }>(`/api/v2/tasks/${taskId}/personal-link`);
+        setPersonalLinked(Boolean(link.personalTodoId));
+      } catch {
+        setPersonalLinked(false);
+      }
     } catch {
       setDetail(null);
+      setPersonalLinked(false);
     } finally {
       setLoading(false);
     }
@@ -116,6 +125,7 @@ export function TaskCardModal({
       setReplyTo(null);
       setCommentDraft("");
       setDeleteConfirm(false);
+      setPersonalLinked(false);
       return;
     }
     void loadDetail();
@@ -189,6 +199,21 @@ export function TaskCardModal({
       onUpdated();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Ошибка");
+    }
+  }
+
+  async function cloneToPersonal() {
+    if (!taskId || linkBusy || personalLinked) return;
+    setLinkBusy(true);
+    setActionError(null);
+    try {
+      await fetchJson(`/api/v2/tasks/${taskId}/clone-to-personal`, { method: "POST" });
+      setPersonalLinked(true);
+      onUpdated();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Не удалось перенести в личные");
+    } finally {
+      setLinkBusy(false);
     }
   }
 
@@ -323,6 +348,11 @@ export function TaskCardModal({
                     {t.assignee_name ? (
                       <span className="v2-tight text-[12px] text-[var(--v2-ink-600)]">{t.assignee_name}</span>
                     ) : null}
+                    {personalLinked ? (
+                      <span className="v2-tight inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                        <V2Icons.check className="h-3 w-3" /> в личных
+                      </span>
+                    ) : null}
                   </div>
                 </>
               ) : (
@@ -330,6 +360,22 @@ export function TaskCardModal({
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {t && t.project_id ? (
+                <button
+                  type="button"
+                  disabled={linkBusy || personalLinked}
+                  title={personalLinked ? "Уже связана с личными входящими" : "Создать дубль во входящих личных задач"}
+                  onClick={() => void cloneToPersonal()}
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition ${
+                    personalLinked
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+                  } disabled:opacity-60`}
+                >
+                  <V2Icons.inbox className="h-4 w-4" />
+                  {personalLinked ? "В личных" : "В личные"}
+                </button>
+              ) : null}
               {t ? (
                 <>
                   <TimerButton running={runningTaskId === t.id} onClick={() => onToggleTimer(t.id)} />

@@ -34,7 +34,7 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
           : body.estimateSeconds !== undefined
             ? body.estimateSeconds
             : undefined,
-      priority: body.priority,
+      priority: body.priority === null ? null : body.priority,
       status: body.status,
       scope: body.scope,
       inboxBucket: body.inboxBucket !== undefined ? body.inboxBucket : undefined,

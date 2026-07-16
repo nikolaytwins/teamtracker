@@ -3,7 +3,6 @@ import { requireV2Admin } from "@/lib/v2/auth/require-v2-session";
 import {
   computeFinanceMonthSummary,
   computeFinanceServiceStats,
-  getLatestFinanceProjectMonth,
   listFinanceGeneralExpenses,
   listFinanceProjectsForMonth,
 } from "@/lib/v2/finance/finance-repo";
@@ -20,10 +19,9 @@ export async function GET(request: NextRequest) {
 
   const monthValid = Number.isFinite(year) && Number.isFinite(month) && month >= 1 && month <= 12;
   if (!monthValid) {
-    const latest = await getLatestFinanceProjectMonth(auth.ctx);
     const now = new Date();
-    year = latest?.year ?? now.getFullYear();
-    month = latest?.month ?? now.getMonth() + 1;
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
   }
 
   const [projects, generalExpenses] = await Promise.all([

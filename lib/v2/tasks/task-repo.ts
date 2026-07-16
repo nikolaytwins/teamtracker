@@ -25,7 +25,7 @@ export type CreateTaskInput = {
   deadlineAt?: string | null;
   plannedAt?: string | null;
   estimateSeconds?: number | null;
-  priority?: V2TaskPriority;
+  priority?: V2TaskPriority | null;
   description?: string | null;
   inboxBucket?: V2InboxBucket | null;
   homeBucket?: V2HomeBucket | null;
@@ -42,7 +42,7 @@ export type UpdateTaskInput = Partial<{
   deadlineAt: string | null;
   plannedAt: string | null;
   estimateSeconds: number | null;
-  priority: V2TaskPriority;
+  priority: V2TaskPriority | null;
   status: V2TaskStatus;
   scope: V2TaskScope;
   inboxBucket: V2InboxBucket | null;
@@ -374,7 +374,7 @@ export async function createTask(ctx: V2SessionContext, input: CreateTaskInput):
     title: input.title.trim(),
     description: input.description ?? null,
     status: "todo",
-    priority: input.priority ?? "medium",
+    priority: input.priority !== undefined ? input.priority : "medium",
     assignee_user_id: input.assigneeUserId ?? ctx.userId,
     created_by: ctx.userId,
     deadline_at: input.deadlineAt ?? null,
@@ -459,7 +459,12 @@ export async function updateTask(
   return updated;
 }
 
-export async function completeTask(ctx: V2SessionContext, taskId: string, completed: boolean): Promise<V2TaskWithMeta> {
+export async function completeTask(
+  ctx: V2SessionContext,
+  taskId: string,
+  completed: boolean,
+  opts?: { skipLinkSync?: boolean }
+): Promise<V2TaskWithMeta> {
   const existing = await getTaskById(ctx, taskId);
   if (!existing) throw new Error("Task not found");
   if (!(await editPermission(ctx, existing))) throw new Error("Forbidden");
@@ -487,6 +492,11 @@ export async function completeTask(ctx: V2SessionContext, taskId: string, comple
   await logActivity(ctx, completed ? "task.completed" : "task.reopened", "task", taskId, {
     title: existing.title,
   });
+
+  if (!opts?.skipLinkSync) {
+    const { syncLinkedCompletionFromProjectTask } = await import("@/lib/v2/tasks/task-personal-link-repo");
+    await syncLinkedCompletionFromProjectTask(ctx, taskId, completed, patch.completed_at);
+  }
 
   const updated = await getTaskById(ctx, taskId);
   if (!updated) throw new Error("Task not found");

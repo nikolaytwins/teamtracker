@@ -39,7 +39,15 @@ export function ProjectChip({
   );
 }
 
-export function PriorityDot({ priority }: { priority: V2TaskPriority }) {
+export function PriorityDot({ priority }: { priority: V2TaskPriority | null }) {
+  if (!priority) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <V2Icons.flag className="h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-400)]" />
+        <span className="v2-tight text-[12px] text-[var(--v2-ink-500)]">Не задан</span>
+      </span>
+    );
+  }
   const m = PRIORITY_META[priority];
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -90,18 +98,21 @@ export function IconBtn({
   onClick,
   title,
   className = "",
+  disabled,
 }: {
   children: React.ReactNode;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   title?: string;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)] ${className}`}
+      disabled={disabled}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)] disabled:opacity-40 ${className}`}
     >
       {children}
     </button>

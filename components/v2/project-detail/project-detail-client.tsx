@@ -15,6 +15,8 @@ import { ProjectDetailHeader } from "@/components/v2/project-detail/project-deta
 import { ProjectDetailSidebar } from "@/components/v2/project-detail/project-detail-sidebar";
 import { ProjectDetailStages } from "@/components/v2/project-detail/project-detail-stages";
 import { ProjectDetailTasks } from "@/components/v2/project-detail/project-detail-tasks";
+import { QmagicProjectInbox } from "@/components/v2/project-detail/qmagic-project-inbox";
+import { isQmagicProject } from "@/lib/v2/projects/qmagic";
 import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
 import { V2NotificationsBell } from "@/components/v2/shell/notifications-bell";
 import { TaskDrawer } from "@/components/v2/tasks/task-drawer";
@@ -38,6 +40,13 @@ const TABS: { id: TabId; label: string; icon: keyof typeof V2Icons; count?: (d: 
   { id: "activity", label: "Активность", icon: "history", count: (d) => d.activity.length },
   { id: "files", label: "Файлы и ссылки", icon: "folder", count: (d) => d.links.length + d.files.length },
 ];
+
+function tabsForProject(detail: ProjectDetailPayload) {
+  if (!isQmagicProject(detail)) return TABS;
+  return TABS.filter((t) => t.id !== "kanban").map((t) =>
+    t.id === "tasks" ? { ...t, label: "Входящие", icon: "inbox" as const } : t
+  );
+}
 
 const KANBAN_COLUMNS: { key: V2TaskStatus; label: string; dot: string }[] = [
   { key: "todo", label: "К выполнению", dot: "#A1A1AA" },
@@ -87,7 +96,7 @@ function ProjectDetailKanban({
             </div>
             <div className="space-y-2">
               {grouped[key].map((t) => {
-                const pm = PRIORITY_META[t.priority];
+                const pm = PRIORITY_META[t.priority ?? "medium"];
                 const running = runningTaskId === t.id;
                 return (
                   <button
@@ -393,7 +402,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
 
           <div className="mt-6 flex flex-wrap items-end justify-between gap-3 border-b border-[var(--v2-ink-200)] px-1 pb-0">
             <div className="flex items-end gap-1">
-            {TABS.map((t) => {
+            {tabsForProject(detail).map((t) => {
               const Icon = V2Icons[t.icon];
               const activeTab = tab === t.id;
               const count = t.count?.(detail);
@@ -430,7 +439,15 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
           <div className="mt-5 grid grid-cols-12 gap-6">
             <div className="col-span-12 min-w-0 xl:col-span-9">
               {tab === "tasks" ? (
-                detail.engagementType === "retainer" ? (
+                isQmagicProject(detail) ? (
+                  <QmagicProjectInbox
+                    projectId={projectId}
+                    tasks={detail.tasks}
+                    canCreateTasks={detail.canCreateTasks}
+                    onOpenTask={setDrawerTaskId}
+                    onReload={reload}
+                  />
+                ) : detail.engagementType === "retainer" ? (
                   <ProjectDetailTasks
                     projectId={projectId}
                     tasks={detail.tasks}
@@ -457,7 +474,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
                   />
                 )
               ) : null}
-              {tab === "kanban" ? (
+              {tab === "kanban" && !isQmagicProject(detail) ? (
                 <ProjectDetailKanban detail={detail} runningTaskId={runningTaskId} onOpenTask={setDrawerTaskId} />
               ) : null}
               {tab === "activity" ? <ProjectDetailActivity activity={detail.activity} /> : null}

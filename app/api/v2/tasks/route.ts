@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         deadlineAt: typeof body.deadlineAt === "string" ? body.deadlineAt : null,
       plannedAt: typeof body.plannedAt === "string" ? body.plannedAt : null,
         estimateSeconds: typeof body.estimateHours === "number" ? Math.round(body.estimateHours * 3600) : null,
-        priority: body.priority,
+        priority: body.priority === null ? null : body.priority,
       });
       return NextResponse.json({ tasks });
     }
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
           : typeof body.estimateSeconds === "number"
             ? body.estimateSeconds
             : null,
-      priority: body.priority,
+      priority: body.priority === null ? null : body.priority,
       description: typeof body.description === "string" ? body.description : null,
       inboxBucket: body.inboxBucket ?? null,
       parentId: typeof body.parentId === "string" ? body.parentId : null,

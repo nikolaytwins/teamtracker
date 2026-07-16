@@ -33,7 +33,7 @@ export function TaskRow({
   const totalOnTask = task.logged_seconds + live;
   const est = task.estimate_seconds ?? 0;
   const pct = est > 0 ? Math.min(totalOnTask / est, 1) : 0;
-  const priority = PRIORITY_META[task.priority];
+  const priority = PRIORITY_META[task.priority ?? "medium"];
   const overdue = task.bucket === "overdue";
   const dueLabel = formatDueLabel(task.planned_at ?? task.deadline_at, task.bucket, undefined, task.completed_at);
   const isMeeting = /синк|встреч|дейли|созвон/i.test(task.title);

@@ -72,7 +72,7 @@ export function UnassignedTasksSection({
           </div>
           <div className="divide-y divide-[var(--v2-ink-100)]/70">
             {tasks.map((task) => {
-              const pm = PRIORITY_META[task.priority];
+              const pm = PRIORITY_META[task.priority ?? "medium"];
               const kind = unassignedKind(task);
               const canDrag = isHomeTaskDraggable(task);
               return (

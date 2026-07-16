@@ -27,6 +27,7 @@ import {
   normalizeWorkMonth,
   workMonthsBetween,
 } from "@/lib/v2/projects/retainer-utils";
+import { listLinksForTaskIds } from "@/lib/v2/tasks/task-personal-link-repo";
 import type { V2SessionContext, V2TaskPriority, V2TaskRow, V2TaskStatus } from "@/lib/v2/types";
 
 const PRIORITY_RANK: Record<V2TaskPriority, number> = {
@@ -88,7 +89,7 @@ function maxPriority(tasks: V2TaskRow[]): V2TaskPriority {
   let best: V2TaskPriority = "low";
   let rank = 0;
   for (const t of tasks) {
-    if (t.completed_at) continue;
+    if (t.completed_at || !t.priority) continue;
     const r = PRIORITY_RANK[t.priority];
     if (r > rank) {
       rank = r;
@@ -187,6 +188,8 @@ export async function buildProjectDetail(
     for (const l of links ?? []) linkCount.set(l.task_id as string, (linkCount.get(l.task_id as string) ?? 0) + 1);
   }
 
+  const personalLinks = await listLinksForTaskIds(parentTasks.map((t) => t.id));
+
   function mapSubtask(t: V2TaskRow): ProjectDetailSubtask {
     return {
       id: t.id,
@@ -225,6 +228,7 @@ export async function buildProjectDetail(
       commentCount: commentCount.get(t.id) ?? 0,
       linkCount: linkCount.get(t.id) ?? 0,
       subtasks: (subtasksByParent.get(t.id) ?? []).map(mapSubtask),
+      personalTodoId: personalLinks.get(t.id)?.personal_todo_id ?? null,
     };
   }
 

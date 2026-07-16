@@ -352,7 +352,7 @@ export function TaskRow({
   const subsDone = task.subtasks.filter((s) => s.status === "done").length;
   const running = runningTaskId === task.id;
   const completed = !!task.completedAt || task.status === "done";
-  const pm = PRIORITY_META[task.priority];
+  const pm = PRIORITY_META[task.priority ?? "medium"];
   const [editingTitle, setEditingTitle] = useState(false);
 
   return (

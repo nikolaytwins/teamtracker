@@ -71,13 +71,13 @@ export function InlinePriorityEditor({
   onClose,
 }: {
   taskId: string;
-  value: V2TaskPriority;
+  value: V2TaskPriority | null;
   onReload?: () => Promise<void>;
   onClose: () => void;
 }) {
   const [saving, setSaving] = useState(false);
 
-  async function pick(priority: V2TaskPriority) {
+  async function pick(priority: V2TaskPriority | null) {
     if (priority === value || saving) return;
     setSaving(true);
     try {
@@ -90,6 +90,15 @@ export function InlinePriorityEditor({
 
   return (
     <div className="flex flex-col gap-0.5">
+      <button
+        type="button"
+        disabled={saving}
+        onClick={() => void pick(null)}
+        className={`v2-tight flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition hover:bg-[var(--v2-ink-50)] ${value == null ? "bg-[var(--v2-brand-50)]" : ""}`}
+      >
+        <V2Icons.flag className="h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-400)]" />
+        <span className="text-[12px] font-medium text-[var(--v2-ink-600)]">Не задан</span>
+      </button>
       {(["urgent", "high", "medium", "low"] as V2TaskPriority[]).map((key) => {
         const m = PRIORITY_META[key];
         const active = value === key;

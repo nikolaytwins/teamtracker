@@ -35,7 +35,7 @@ export type ProjectDetailSubtask = {
   id: string;
   title: string;
   status: V2TaskStatus;
-  priority: V2TaskPriority;
+  priority: V2TaskPriority | null;
   assigneeUserId: string | null;
   assigneeName: string | null;
   plannedAt: string | null;
@@ -53,7 +53,7 @@ export type ProjectDetailTask = {
   id: string;
   title: string;
   status: V2TaskStatus;
-  priority: V2TaskPriority;
+  priority: V2TaskPriority | null;
   assigneeUserId: string | null;
   assigneeName: string | null;
   plannedAt: string | null;
@@ -66,6 +66,8 @@ export type ProjectDetailTask = {
   commentCount: number;
   linkCount: number;
   subtasks: ProjectDetailSubtask[];
+  /** Связанная личная задача (дубль во «Входящих»). */
+  personalTodoId?: string | null;
 };
 
 export type ProjectDetailMemberHours = {

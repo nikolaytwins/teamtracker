@@ -334,3 +334,8 @@ export const PRIORITY_META = {
   medium: { label: "Средний", dot: "#3B6FF7", soft: "#E6EDFF", ink: "#1F3AAF" },
   low: { label: "Низкий", dot: "#A1A1AA", soft: "#F1F1F4", ink: "#52525B" },
 } as const;
+
+export const PRIORITY_META_OR_UNSET = {
+  ...PRIORITY_META,
+  unset: { label: "Не задан", dot: "#A1A1AA", soft: "#F4F4F5", ink: "#71717A" },
+} as const;

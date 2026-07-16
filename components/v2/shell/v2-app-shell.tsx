@@ -65,6 +65,7 @@ const NAV: NavItem[] = [
   { href: "/v2/home", label: "Главная", icon: "home", countKey: "open" },
   { href: "/v2/projects", label: "Проекты", icon: "projects" },
   { href: "/v2/agency", label: "Проекты и финансы", icon: "reports", agency: true },
+  { href: "/v2/admin/leads", label: "Лиды", icon: "spark", admin: true },
   { href: "/v2/admin/people", label: "Команда", icon: "team", admin: true },
 ];
 

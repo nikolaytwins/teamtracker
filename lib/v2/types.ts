@@ -89,7 +89,7 @@ export type V2TaskRow = {
   title: string;
   description: string | null;
   status: V2TaskStatus;
-  priority: V2TaskPriority;
+  priority: V2TaskPriority | null;
   assignee_user_id: string | null;
   created_by: string;
   deadline_at: string | null;

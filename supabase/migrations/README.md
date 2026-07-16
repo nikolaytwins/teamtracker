@@ -41,8 +41,10 @@
 | 020 | `020_v2_timer_unique_active.sql` | Один активный таймер на пользователя |
 | 021 | `021_agency_general_expense_nullable_employee.sql` | NULL employee_name/role для произвольных общих расходов agency |
 | 022 | `022_v2_personal_todo_priority_nullable.sql` | NULL priority = без приоритета у личных задач |
+| 023 | `023_v2_task_personal_links.sql` | Связь задач проекта с личными todos, nullable priority у v2_tasks |
+| 024 | `024_v2_leads.sql` | v2 админ-канбан лидов (статусы, тип агентство/курс) |
 
-**Следующий свободный номер:** `023`
+**Следующий свободный номер:** `025`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

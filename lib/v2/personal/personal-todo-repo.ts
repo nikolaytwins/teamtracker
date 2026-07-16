@@ -431,10 +431,12 @@ export async function createPersonalTodo(
 export async function updatePersonalTodo(
   ctx: V2SessionContext,
   id: string,
-  patch: Partial<PersonalTodoRow>
+  patch: Partial<PersonalTodoRow>,
+  opts?: { skipLinkSync?: boolean }
 ): Promise<PersonalTodoRow | null> {
   const sb = getV2Supabase();
   const userId = uid(ctx);
+  const before = opts?.skipLinkSync ? null : await getPersonalTodo(ctx, id);
   const safe: Record<string, unknown> = { updated_at: nowIso() };
   if (patch.title !== undefined) {
     const title = String(patch.title).trim();
@@ -463,6 +465,16 @@ export async function updatePersonalTodo(
 
   const { error } = await sb.from("v2_personal_todos").update(safe).eq("id", id).eq("user_id", userId);
   if (error) throw error;
+
+  if (!opts?.skipLinkSync && patch.completed_at !== undefined) {
+    const wasCompleted = Boolean(before?.todo.completed_at);
+    const nowCompleted = patch.completed_at != null;
+    if (wasCompleted !== nowCompleted) {
+      const { syncLinkedCompletionFromPersonalTodo } = await import("@/lib/v2/tasks/task-personal-link-repo");
+      await syncLinkedCompletionFromPersonalTodo(ctx, id, nowCompleted);
+    }
+  }
+
   const detail = await getPersonalTodo(ctx, id);
   return detail?.todo ?? null;
 }

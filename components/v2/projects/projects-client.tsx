@@ -74,10 +74,18 @@ export function V2ProjectsClient() {
   }, []);
 
   useEffect(() => {
-    load()
-      .catch((e) => setError(e instanceof Error ? e.message : "Ошибка"))
-      .finally(() => setLoading(false));
-  }, [load]);
+    void (async () => {
+      try {
+        await fetchJson("/api/v2/projects/qmagic/ensure", { method: "POST" }).catch(() => null);
+        await refreshBoot();
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Ошибка");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [load, refreshBoot]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

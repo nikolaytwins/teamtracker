@@ -118,20 +118,6 @@ export async function listFinanceProjectsForMonth(
     });
 }
 
-export async function getLatestFinanceProjectMonth(ctx: V2SessionContext): Promise<{
-  year: number;
-  month: number;
-} | null> {
-  const all = await listFinanceProjects(ctx);
-  if (!all.length) return null;
-  let best = all[0]!.created_at;
-  for (const p of all) {
-    if (p.created_at > best) best = p.created_at;
-  }
-  const d = new Date(best);
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
-}
-
 export async function createFinanceProject(
   ctx: V2SessionContext,
   input: {
