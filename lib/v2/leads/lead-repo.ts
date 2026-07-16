@@ -1,16 +1,36 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import type { V2SessionContext } from "@/lib/v2/types";
 import {
+  isV2LeadSource,
   isV2LeadStatus,
   isV2LeadType,
   type V2LeadRow,
+  type V2LeadSource,
   type V2LeadStatus,
   type V2LeadType,
 } from "@/lib/v2/leads/lead-types";
 
+function parseAmount(raw: unknown): number | null {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
+  return Math.round(raw);
+}
+
+function normalizeSource(
+  source: V2LeadSource | undefined,
+  sourceCustom: string | null | undefined
+): { source: V2LeadSource; source_custom: string | null } {
+  const src = source && isV2LeadSource(source) ? source : "";
+  if (src === "custom") {
+    return { source: "custom", source_custom: sourceCustom?.trim() || null };
+  }
+  return { source: src, source_custom: null };
+}
+
 function mapLead(raw: Record<string, unknown>): V2LeadRow {
   const leadType = isV2LeadType(raw.lead_type) ? raw.lead_type : "agency";
   const status = isV2LeadStatus(raw.status) ? raw.status : "correspondence";
+  const sourceRaw = typeof raw.source === "string" ? raw.source : "";
+  const source = isV2LeadSource(sourceRaw) ? sourceRaw : "";
   return {
     id: String(raw.id),
     workspace_id: String(raw.workspace_id),
@@ -20,10 +40,10 @@ function mapLead(raw: Record<string, unknown>): V2LeadRow {
     lead_type: leadType,
     status,
     reminder_at: raw.reminder_at ? String(raw.reminder_at).slice(0, 10) : null,
-    estimated_amount:
-      typeof raw.estimated_amount === "number" && Number.isFinite(raw.estimated_amount)
-        ? Math.round(raw.estimated_amount)
-        : null,
+    estimated_amount: parseAmount(raw.estimated_amount),
+    source,
+    source_custom: raw.source_custom != null ? String(raw.source_custom) : null,
+    taken_into_work_at: raw.taken_into_work_at ? String(raw.taken_into_work_at).slice(0, 10) : null,
     sort_order: Number(raw.sort_order) || 0,
     archived_at: raw.archived_at ? String(raw.archived_at) : null,
     created_by: String(raw.created_by),
@@ -66,6 +86,10 @@ export type CreateLeadInput = {
   status?: V2LeadStatus;
   reminderAt?: string | null;
   estimatedAmount?: number | null;
+  source?: V2LeadSource;
+  sourceCustom?: string | null;
+  takenIntoWorkAt?: string | null;
+  createdAt?: string | null;
 };
 
 export async function createLead(ctx: V2SessionContext, input: CreateLeadInput): Promise<V2LeadRow> {
@@ -77,7 +101,12 @@ export async function createLead(ctx: V2SessionContext, input: CreateLeadInput):
       ? Math.round(input.estimatedAmount)
       : null;
 
+  const { source, source_custom } = normalizeSource(input.source, input.sourceCustom);
   const ts = nowIso();
+  const createdAt = input.createdAt?.trim()
+    ? new Date(`${input.createdAt.trim().slice(0, 10)}T12:00:00.000Z`).toISOString()
+    : ts;
+
   const row = {
     id: newV2Id(),
     workspace_id: ctx.workspaceId,
@@ -88,10 +117,13 @@ export async function createLead(ctx: V2SessionContext, input: CreateLeadInput):
     status: input.status && isV2LeadStatus(input.status) ? input.status : "correspondence",
     reminder_at: input.reminderAt?.trim() || null,
     estimated_amount: estimatedAmount,
+    source,
+    source_custom,
+    taken_into_work_at: input.takenIntoWorkAt?.trim() || null,
     sort_order: Math.floor(Date.now() / 1000),
     archived_at: null,
     created_by: ctx.userId,
-    created_at: ts,
+    created_at: createdAt,
     updated_at: ts,
   };
 
@@ -109,6 +141,10 @@ export type UpdateLeadInput = Partial<{
   status: V2LeadStatus;
   reminderAt: string | null;
   estimatedAmount: number | null;
+  source: V2LeadSource;
+  sourceCustom: string | null;
+  takenIntoWorkAt: string | null;
+  createdAt: string | null;
   sortOrder: number;
 }>;
 
@@ -142,6 +178,23 @@ export async function updateLead(
       input.estimatedAmount != null && Number.isFinite(input.estimatedAmount) && input.estimatedAmount >= 0
         ? Math.round(input.estimatedAmount)
         : null;
+  }
+  if (input.source !== undefined || input.sourceCustom !== undefined) {
+    const next = normalizeSource(
+      input.source !== undefined ? input.source : existing.source,
+      input.sourceCustom !== undefined ? input.sourceCustom : existing.source_custom
+    );
+    patch.source = next.source;
+    patch.source_custom = next.source_custom;
+  }
+  if (input.takenIntoWorkAt !== undefined) {
+    patch.taken_into_work_at = input.takenIntoWorkAt?.trim() || null;
+  }
+  if (input.createdAt !== undefined) {
+    const ymd = input.createdAt?.trim().slice(0, 10);
+    if (ymd) {
+      patch.created_at = new Date(`${ymd}T12:00:00.000Z`).toISOString();
+    }
   }
   if (input.sortOrder !== undefined) patch.sort_order = input.sortOrder;
 

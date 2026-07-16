@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Admin } from "@/lib/v2/auth/require-v2-session";
 import { archiveLead, updateLead } from "@/lib/v2/leads/lead-repo";
-import { isV2LeadStatus, isV2LeadType } from "@/lib/v2/leads/lead-types";
+import { isV2LeadSource, isV2LeadStatus, isV2LeadType } from "@/lib/v2/leads/lead-types";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -31,6 +31,20 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
           : typeof body.estimatedAmount === "number"
             ? body.estimatedAmount
             : undefined,
+      source: isV2LeadSource(body.source) ? body.source : undefined,
+      sourceCustom:
+        body.sourceCustom === null
+          ? null
+          : typeof body.sourceCustom === "string"
+            ? body.sourceCustom
+            : undefined,
+      takenIntoWorkAt:
+        body.takenIntoWorkAt === null
+          ? null
+          : typeof body.takenIntoWorkAt === "string"
+            ? body.takenIntoWorkAt
+            : undefined,
+      createdAt: typeof body.createdAt === "string" ? body.createdAt : undefined,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : undefined,
     });
     return NextResponse.json({ lead });
