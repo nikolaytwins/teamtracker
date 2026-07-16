@@ -21,6 +21,8 @@ import type {
   V2FinanceServiceType,
 } from "@/lib/v2/finance/types";
 import { V2Icons } from "@/components/v2/ui/icons";
+import { appPath } from "@/lib/api-url";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type DashboardPayload = {
@@ -242,6 +244,7 @@ export function V2FinanceClient() {
   const [error, setError] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectAmount, setNewProjectAmount] = useState("");
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [expenseWho, setExpenseWho] = useState("");
   const [expenseRole, setExpenseRole] = useState<string>(FINANCE_EMPLOYEE_ROLES[0]!.label);
@@ -326,14 +329,17 @@ export function V2FinanceClient() {
   const handleCreateProject = async () => {
     const name = newProjectName.trim();
     if (!name) return;
+    const parsed = newProjectAmount.trim() ? Number(newProjectAmount.replace(/\s/g, "").replace(",", ".")) : 0;
+    const totalAmount = Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : 0;
     try {
       setActionError(null);
       await fetchJson("/api/v2/finance/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, year, month }),
+        body: JSON.stringify({ name, totalAmount, year, month }),
       });
       setNewProjectName("");
+      setNewProjectAmount("");
       setNewProjectOpen(false);
       await load(year, month);
     } catch (e) {
@@ -560,10 +566,26 @@ export function V2FinanceClient() {
                             >
                               {p.name[0]}
                             </span>
-                            <span className="v2-tight truncate text-[14px] font-medium text-[var(--v2-ink-900)]">
-                              {p.name}
-                            </span>
+                            <div className="min-w-0 flex-1">
+                              <Link
+                                href={appPath(`/v2/agency/projects/${p.id}`)}
+                                className="v2-tight block truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline"
+                                title="Открыть проект и детализацию"
+                              >
+                                {p.name}
+                              </Link>
+                              {p.total_details_amount > 0 ? (
+                                <span className="v2-tight text-[11px] text-[var(--v2-ink-400)]">есть детализация</span>
+                              ) : null}
+                            </div>
                             <span className="ml-0.5 hidden items-center gap-0.5 group-hover:flex">
+                              <Link
+                                href={appPath(`/v2/agency/projects/${p.id}`)}
+                                title="Детализация"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                              >
+                                <V2Icons.list className="h-3.5 w-3.5" />
+                              </Link>
                               <button
                                 type="button"
                                 title="Дублировать в след. месяц"
@@ -932,18 +954,41 @@ export function V2FinanceClient() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
             <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Новый проект</h2>
-            <input
-              autoFocus
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void handleCreateProject()}
-              placeholder="Название проекта"
-              className="mt-4 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
-            />
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                Название
+              </span>
+              <input
+                autoFocus
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void handleCreateProject()}
+                placeholder="Название проекта"
+                className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+              />
+            </label>
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                Сумма, ₽
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={newProjectAmount}
+                onChange={(e) => setNewProjectAmount(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void handleCreateProject()}
+                placeholder="0"
+                className="v2-tnum h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+              />
+            </label>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setNewProjectOpen(false)}
+                onClick={() => {
+                  setNewProjectOpen(false);
+                  setNewProjectName("");
+                  setNewProjectAmount("");
+                }}
                 className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
               >
                 Отмена
