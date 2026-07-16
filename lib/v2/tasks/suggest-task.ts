@@ -22,7 +22,7 @@ export function pickSuggestedTask(tasks: V2TaskWithMeta[]): V2TaskWithMeta | nul
   return [...open].sort((a, b) => {
     const br = bucketRank(a.bucket) - bucketRank(b.bucket);
     if (br !== 0) return br;
-    const pr = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    const pr = PRIORITY_RANK[a.priority ?? "medium"] - PRIORITY_RANK[b.priority ?? "medium"];
     if (pr !== 0) return pr;
     if (a.deadline_at && b.deadline_at) return a.deadline_at.localeCompare(b.deadline_at);
     if (a.deadline_at) return -1;
@@ -45,7 +45,7 @@ export function pickSuggestedProjectDetailTask(
     if (userId && t.assigneeUserId === userId) s += 50;
     if (t.status === "review") s += 20;
     if (t.status === "todo") s += 10;
-    s -= PRIORITY_RANK[t.priority] * 5;
+    s -= PRIORITY_RANK[t.priority ?? "medium"] * 5;
     return s;
   };
 

@@ -104,7 +104,7 @@ export function InboxTaskCard({
               {PRIORITY_META[project.priority].label} проект
             </span>
           ) : null}
-          {!showProjectPriority && task.priority !== "medium" ? (
+          {!showProjectPriority && task.priority && task.priority !== "medium" ? (
             <PriorityDot priority={task.priority} />
           ) : null}
         </div>

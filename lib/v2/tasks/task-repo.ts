@@ -284,7 +284,7 @@ export async function listUnassignedTasks(ctx: V2SessionContext): Promise<V2Task
   return tasks
     .map((t) => enrichTask(t, logged, projects, users, counts))
     .sort((a, b) => {
-      const pr = PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority];
+      const pr = PRIORITY_RANK[b.priority ?? "medium"] - PRIORITY_RANK[a.priority ?? "medium"];
       if (pr !== 0) return pr;
       return a.created_at.localeCompare(b.created_at);
     });

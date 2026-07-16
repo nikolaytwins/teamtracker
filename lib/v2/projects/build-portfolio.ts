@@ -33,7 +33,7 @@ function maxPriorityFromTasks(tasks: V2TaskRow[]): V2TaskPriority {
   let best: V2TaskPriority = "low";
   let rank = 0;
   for (const t of tasks) {
-    if (t.completed_at) continue;
+    if (t.completed_at || !t.priority) continue;
     const r = PRIORITY_RANK[t.priority];
     if (r > rank) {
       rank = r;

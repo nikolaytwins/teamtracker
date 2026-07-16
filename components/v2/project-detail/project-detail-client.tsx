@@ -16,7 +16,7 @@ import { ProjectDetailSidebar } from "@/components/v2/project-detail/project-det
 import { ProjectDetailStages } from "@/components/v2/project-detail/project-detail-stages";
 import { ProjectDetailTasks } from "@/components/v2/project-detail/project-detail-tasks";
 import { QmagicProjectInbox } from "@/components/v2/project-detail/qmagic-project-inbox";
-import { isQmagicProject } from "@/lib/v2/projects/qmagic";
+import { isQmagicProject } from "@/lib/v2/projects/qmagic-meta";
 import { useV2Bootstrap } from "@/components/v2/shell/v2-app-shell";
 import { V2NotificationsBell } from "@/components/v2/shell/notifications-bell";
 import { TaskDrawer } from "@/components/v2/tasks/task-drawer";

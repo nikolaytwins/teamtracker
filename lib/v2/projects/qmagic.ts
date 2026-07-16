@@ -1,12 +1,9 @@
 import { getV2Supabase } from "@/lib/v2/db/client";
 import { createProject, getProjectById, listProjects } from "@/lib/v2/projects/project-repo";
+import { isQmagicProject, QMAGIC_PROJECT_NAME } from "@/lib/v2/projects/qmagic-meta";
 import type { V2ProjectRow, V2SessionContext } from "@/lib/v2/types";
 
-export const QMAGIC_PROJECT_NAME = "Qmagic";
-
-export function isQmagicProject(project: Pick<V2ProjectRow, "name"> | { name: string } | null | undefined): boolean {
-  return Boolean(project?.name?.trim().toLowerCase() === QMAGIC_PROJECT_NAME.toLowerCase());
-}
+export { isQmagicProject, QMAGIC_PROJECT_NAME } from "@/lib/v2/projects/qmagic-meta";
 
 function normalizeProject(raw: Record<string, unknown>): V2ProjectRow {
   return {

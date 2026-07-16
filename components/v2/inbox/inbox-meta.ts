@@ -41,7 +41,7 @@ export function inboxSortScore(task: V2TaskWithMeta, project: PortfolioProject |
     score += HEALTH_RANK[project.health] * 1000;
     score += PRIORITY_RANK[project.priority] * 100;
   }
-  score += PRIORITY_RANK[task.priority] * 10;
+  score += PRIORITY_RANK[task.priority ?? "medium"] * 10;
   return score;
 }
 
