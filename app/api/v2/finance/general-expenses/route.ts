@@ -4,6 +4,7 @@ import {
   copyFinanceGeneralExpensesFromMonth,
   createFinanceGeneralExpense,
   deleteFinanceGeneralExpense,
+  updateFinanceGeneralExpense,
 } from "@/lib/v2/finance/finance-repo";
 
 export async function POST(request: NextRequest) {
@@ -48,6 +49,34 @@ export async function DELETE(request: NextRequest) {
   } catch (e) {
     console.error("v2 finance delete general expense:", e);
     return NextResponse.json({ error: "Failed to delete expense" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const auth = await requireV2Admin();
+  if (!auth.ok) return auth.response;
+
+  try {
+    const body = await request.json();
+    const id = typeof body.id === "string" ? body.id : "";
+    const employeeName = typeof body.employeeName === "string" ? body.employeeName.trim() : "";
+    const employeeRole = typeof body.employeeRole === "string" ? body.employeeRole.trim() : "";
+    const amount = typeof body.amount === "number" ? body.amount : NaN;
+    if (!id || !employeeName || !employeeRole || !Number.isFinite(amount)) {
+      return NextResponse.json({ error: "id, employeeName, employeeRole, amount required" }, { status: 400 });
+    }
+
+    const expense = await updateFinanceGeneralExpense(auth.ctx, id, {
+      employeeName,
+      employeeRole,
+      amount,
+      notes: typeof body.notes === "string" ? body.notes : null,
+    });
+    return NextResponse.json({ expense });
+  } catch (e) {
+    console.error("v2 finance update general expense:", e);
+    const message = e instanceof Error ? e.message : "Failed to update expense";
+    return NextResponse.json({ error: message }, { status: message === "Expense not found" ? 404 : 500 });
   }
 }
 

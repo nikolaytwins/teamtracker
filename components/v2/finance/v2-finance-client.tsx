@@ -249,6 +249,8 @@ export function V2FinanceClient() {
   const [expenseWho, setExpenseWho] = useState("");
   const [expenseRole, setExpenseRole] = useState<string>(FINANCE_EMPLOYEE_ROLES[0]!.label);
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseNotes, setExpenseNotes] = useState("");
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [moveProjectId, setMoveProjectId] = useState<string | null>(null);
   const [monthReady, setMonthReady] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -347,29 +349,50 @@ export function V2FinanceClient() {
     }
   };
 
-  const handleAddExpense = async () => {
+  const handleSaveExpense = async () => {
     const amount = parseFloat(expenseAmount);
     if (!expenseWho.trim() || !Number.isFinite(amount)) return;
     try {
       setActionError(null);
       await fetchJson("/api/v2/finance/general-expenses", {
-        method: "POST",
+        method: editingExpenseId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: editingExpenseId,
           employeeName: expenseWho.trim(),
           employeeRole: expenseRole,
           amount,
+          notes: expenseNotes.trim() || null,
           year,
           month,
         }),
       });
       setExpenseWho("");
       setExpenseAmount("");
+      setExpenseNotes("");
+      setEditingExpenseId(null);
       setExpenseFormOpen(false);
       await load(year, month);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Не удалось добавить расход");
     }
+  };
+
+  const startEditingExpense = (expense: V2FinanceGeneralExpenseRow) => {
+    setEditingExpenseId(expense.id);
+    setExpenseWho(expense.employee_name);
+    setExpenseRole(expense.employee_role);
+    setExpenseAmount(String(expense.amount));
+    setExpenseNotes(expense.notes ?? "");
+    setExpenseFormOpen(true);
+  };
+
+  const closeExpenseForm = () => {
+    setExpenseFormOpen(false);
+    setEditingExpenseId(null);
+    setExpenseWho("");
+    setExpenseAmount("");
+    setExpenseNotes("");
   };
 
   const reload = useCallback(() => load(year, month), [load, year, month]);
@@ -791,7 +814,10 @@ export function V2FinanceClient() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setExpenseFormOpen((v) => !v)}
+                      onClick={() => {
+                        if (expenseFormOpen) closeExpenseForm();
+                        else setExpenseFormOpen(true);
+                      }}
                       className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
                     >
                       <V2Icons.plus className="h-4 w-4" />
@@ -802,6 +828,11 @@ export function V2FinanceClient() {
 
                 {expenseFormOpen ? (
                   <div className="mx-5 mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/60 p-4">
+                    {editingExpenseId ? (
+                      <div className="v2-tight w-full text-[13px] font-semibold text-[var(--v2-ink-800)]">
+                        Редактирование расхода
+                      </div>
+                    ) : null}
                     <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
                       Сотрудник
                       <input
@@ -833,13 +864,30 @@ export function V2FinanceClient() {
                         className="v2-tnum h-9 w-32 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
                       />
                     </label>
+                    <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                      Примечание
+                      <input
+                        value={expenseNotes}
+                        onChange={(e) => setExpenseNotes(e.target.value)}
+                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                      />
+                    </label>
                     <button
                       type="button"
-                      onClick={() => void handleAddExpense()}
+                      onClick={() => void handleSaveExpense()}
                       className="h-9 rounded-xl bg-[var(--v2-brand-600)] px-4 text-sm font-medium text-white"
                     >
-                      Сохранить
+                      {editingExpenseId ? "Сохранить изменения" : "Сохранить"}
                     </button>
+                    {editingExpenseId ? (
+                      <button
+                        type="button"
+                        onClick={closeExpenseForm}
+                        className="h-9 rounded-xl px-3 text-sm text-[var(--v2-ink-600)] hover:bg-white"
+                      >
+                        Отмена
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -885,7 +933,16 @@ export function V2FinanceClient() {
                     return (
                       <div
                         key={e.id}
-                        className={`group ${EXPENSE_COLS} items-center px-5 py-3.5 transition hover:bg-[var(--v2-ink-50)]/60`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => startEditingExpense(e)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            startEditingExpense(e);
+                          }
+                        }}
+                        className={`group ${EXPENSE_COLS} cursor-pointer items-center px-5 py-3.5 transition hover:bg-[var(--v2-ink-50)]/60`}
                       >
                         <div className="flex items-center gap-2.5">
                           <span
@@ -908,11 +965,12 @@ export function V2FinanceClient() {
                         <div className="text-right">
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={(event) => {
+                              event.stopPropagation();
                               void fetchJson(`/api/v2/finance/general-expenses?id=${e.id}`, {
                                 method: "DELETE",
-                              }).then(reload)
-                            }
+                              }).then(reload);
+                            }}
                             className="v2-tight text-[12.5px] font-medium text-[var(--v2-ink-400)] opacity-0 transition hover:text-red-500 group-hover:opacity-100"
                           >
                             Удалить

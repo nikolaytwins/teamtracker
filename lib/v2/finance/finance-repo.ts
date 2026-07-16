@@ -272,6 +272,30 @@ export async function createFinanceGeneralExpense(
   return mapAgencyGeneralExpense(row, ctx.workspaceId);
 }
 
+export async function updateFinanceGeneralExpense(
+  ctx: V2SessionContext,
+  id: string,
+  input: {
+    employeeName: string;
+    employeeRole: string;
+    amount: number;
+    notes?: string | null;
+  }
+): Promise<V2FinanceGeneralExpenseRow> {
+  const existing = await repo().getGeneralExpenseById(id);
+  if (!existing) throw new Error("Expense not found");
+
+  const updated = await repo().updateGeneralExpenseById(
+    id,
+    input.employeeName.trim(),
+    input.employeeRole.trim(),
+    input.amount,
+    input.notes?.trim() || null
+  );
+  if (!updated) throw new Error("Expense not found after update");
+  return mapAgencyGeneralExpense(updated, ctx.workspaceId);
+}
+
 export async function deleteFinanceGeneralExpense(_ctx: V2SessionContext, id: string): Promise<void> {
   await repo().deleteGeneralExpenseById(id);
 }
