@@ -5,6 +5,7 @@ import {
   type V2LeadType,
 } from "@/lib/v2/leads/lead-types";
 import type { V2FinanceMonthSummary } from "@/lib/v2/finance/types";
+import { FINANCE_MONTH_NAMES } from "@/lib/v2/finance/meta";
 
 export type LeadAnalyticsSlice = {
   count: number;
@@ -17,54 +18,53 @@ export type LeadAnalyticsSourceSlice = LeadAnalyticsSlice & {
   label: string;
 };
 
-export type LeadAnalyticsMonth = {
+/** Одна точка ряда — месяц. Финансы совпадают с дашбордом «Проекты и финансы». */
+export type LeadAnalyticsMonthPoint = {
   year: number;
   month: number;
+  /** Короткий ярлык: «июл» */
+  shortLabel: string;
+  /** Полный: «Июль 2026» */
   label: string;
   leadsCount: number;
   estimatedAmount: number;
   takenIntoWorkCount: number;
+  /** Сумма ориентиров у лидов с «взяли в работу» — «закрыто продаж» */
+  takenIntoWorkAmount: number;
   conversionRate: number;
   byType: Record<V2LeadType, LeadAnalyticsSlice>;
   bySource: LeadAnalyticsSourceSlice[];
+  /** Фактические деньги из «Проекты и финансы» за тот же календарный месяц */
   finance: {
     projectCount: number;
-    /** Полная сумма проектов месяца (ожидаемая выручка) */
-    closedSalesAmount: number;
-    /** Фактически оплачено */
-    actualRevenue: number;
-    profit: number;
-  } | null;
-};
-
-export type LeadAnalyticsPayload = {
-  months: LeadAnalyticsMonth[];
-  totals: {
-    leadsCount: number;
-    estimatedAmount: number;
-    takenIntoWorkCount: number;
-    conversionRate: number;
-    closedSalesAmount: number;
     actualRevenue: number;
     profit: number;
   };
+};
+
+export type LeadAnalyticsPayload = {
+  /** Хронологически: старые → новые (для графиков) */
+  series: LeadAnalyticsMonthPoint[];
 };
 
 function monthKey(year: number, month: number) {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
-function parseLeadMonth(iso: string): { year: number; month: number } | null {
+/** Локальный календарный месяц — как isInFinanceMonth. */
+function parseLocalMonth(iso: string): { year: number; month: number } | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
 function monthLabel(year: number, month: number) {
-  return new Date(year, month - 1, 1).toLocaleDateString("ru-RU", {
-    month: "long",
-    year: "numeric",
-  });
+  return `${FINANCE_MONTH_NAMES[month - 1] ?? month} ${year}`;
+}
+
+function shortMonthLabel(month: number) {
+  const full = FINANCE_MONTH_NAMES[month - 1] ?? "";
+  return full.slice(0, 3).toLowerCase();
 }
 
 function emptySlice(): LeadAnalyticsSlice {
@@ -81,66 +81,48 @@ function conversionRate(taken: number, total: number) {
   return total > 0 ? Math.round((taken / total) * 1000) / 10 : 0;
 }
 
-/** Собирает помесячную аналитику лидов и склеивает с финансами за те же месяцы. */
+export function lastNMonthKeys(n: number, from = new Date()): { year: number; month: number }[] {
+  const out: { year: number; month: number }[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(from.getFullYear(), from.getMonth() - i, 1);
+    out.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+  }
+  return out;
+}
+
 export function buildLeadAnalytics(
   leads: V2LeadRow[],
-  financeByMonth: Map<string, V2FinanceMonthSummary>
+  financeByMonth: Map<string, V2FinanceMonthSummary>,
+  months: { year: number; month: number }[]
 ): LeadAnalyticsPayload {
-  const now = new Date();
-  const endYear = now.getFullYear();
-  const endMonth = now.getMonth() + 1;
-
-  let startYear = endYear;
-  let startMonth = endMonth;
-  // По умолчанию — 12 месяцев назад
-  startMonth -= 11;
-  while (startMonth <= 0) {
-    startMonth += 12;
-    startYear -= 1;
-  }
-
-  for (const lead of leads) {
-    const m = parseLeadMonth(lead.created_at);
-    if (!m) continue;
-    const leadKey = m.year * 12 + m.month;
-    const startKey = startYear * 12 + startMonth;
-    if (leadKey < startKey) {
-      startYear = m.year;
-      startMonth = m.month;
-    }
-  }
-
-  const months: LeadAnalyticsMonth[] = [];
-  let y = startYear;
-  let m = startMonth;
-  while (y < endYear || (y === endYear && m <= endMonth)) {
-    months.push({
-      year: y,
-      month: m,
-      label: monthLabel(y, m),
+  const series: LeadAnalyticsMonthPoint[] = months.map(({ year, month }) => {
+    const key = monthKey(year, month);
+    const fin = financeByMonth.get(key);
+    return {
+      year,
+      month,
+      shortLabel: shortMonthLabel(month),
+      label: monthLabel(year, month),
       leadsCount: 0,
       estimatedAmount: 0,
       takenIntoWorkCount: 0,
+      takenIntoWorkAmount: 0,
       conversionRate: 0,
-      byType: {
-        agency: emptySlice(),
-        course: emptySlice(),
-      },
+      byType: { agency: emptySlice(), course: emptySlice() },
       bySource: [],
-      finance: null,
-    });
-    m += 1;
-    if (m > 12) {
-      m = 1;
-      y += 1;
-    }
-  }
+      finance: {
+        projectCount: fin?.projectCount ?? 0,
+        actualRevenue: fin?.actualRevenue ?? 0,
+        profit: fin?.profit ?? 0,
+      },
+    };
+  });
 
-  const byKey = new Map(months.map((row) => [monthKey(row.year, row.month), row]));
+  const byKey = new Map(series.map((row) => [monthKey(row.year, row.month), row]));
   const sourceMaps = new Map<string, Map<string, LeadAnalyticsSourceSlice>>();
 
   for (const lead of leads) {
-    const parsed = parseLeadMonth(lead.created_at);
+    const parsed = parseLocalMonth(lead.created_at);
     if (!parsed) continue;
     const key = monthKey(parsed.year, parsed.month);
     const row = byKey.get(key);
@@ -148,7 +130,10 @@ export function buildLeadAnalytics(
 
     row.leadsCount += 1;
     row.estimatedAmount += lead.estimated_amount ?? 0;
-    if (lead.taken_into_work_at) row.takenIntoWorkCount += 1;
+    if (lead.taken_into_work_at) {
+      row.takenIntoWorkCount += 1;
+      row.takenIntoWorkAmount += lead.estimated_amount ?? 0;
+    }
     addLeadToSlice(row.byType[lead.lead_type], lead);
 
     let srcMap = sourceMaps.get(key);
@@ -169,66 +154,16 @@ export function buildLeadAnalytics(
     addLeadToSlice(src, lead);
   }
 
-  for (const row of months) {
+  for (const row of series) {
     const key = monthKey(row.year, row.month);
     row.conversionRate = conversionRate(row.takenIntoWorkCount, row.leadsCount);
     const srcMap = sourceMaps.get(key);
     row.bySource = srcMap
       ? Array.from(srcMap.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "ru"))
       : [];
-    const fin = financeByMonth.get(key);
-    if (fin) {
-      row.finance = {
-        projectCount: fin.projectCount,
-        closedSalesAmount: fin.expectedRevenue,
-        actualRevenue: fin.actualRevenue,
-        profit: fin.profit,
-      };
-    }
   }
 
-  const totals = months.reduce(
-    (acc, row) => {
-      acc.leadsCount += row.leadsCount;
-      acc.estimatedAmount += row.estimatedAmount;
-      acc.takenIntoWorkCount += row.takenIntoWorkCount;
-      acc.closedSalesAmount += row.finance?.closedSalesAmount ?? 0;
-      acc.actualRevenue += row.finance?.actualRevenue ?? 0;
-      acc.profit += row.finance?.profit ?? 0;
-      return acc;
-    },
-    {
-      leadsCount: 0,
-      estimatedAmount: 0,
-      takenIntoWorkCount: 0,
-      conversionRate: 0,
-      closedSalesAmount: 0,
-      actualRevenue: 0,
-      profit: 0,
-    }
-  );
-  totals.conversionRate = conversionRate(totals.takenIntoWorkCount, totals.leadsCount);
-
-  return { months: months.reverse(), totals };
-}
-
-export function collectMonthKeysFromLeads(leads: V2LeadRow[], monthsBack = 12): { year: number; month: number }[] {
-  const now = new Date();
-  const set = new Set<string>();
-  for (let i = 0; i < monthsBack; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    set.add(monthKey(d.getFullYear(), d.getMonth() + 1));
-  }
-  for (const lead of leads) {
-    const m = parseLeadMonth(lead.created_at);
-    if (m) set.add(monthKey(m.year, m.month));
-  }
-  return Array.from(set)
-    .map((k) => {
-      const [ys, ms] = k.split("-");
-      return { year: Number(ys), month: Number(ms) };
-    })
-    .sort((a, b) => a.year - b.year || a.month - b.month);
+  return { series };
 }
 
 export { monthKey as leadAnalyticsMonthKey };

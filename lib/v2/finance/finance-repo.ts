@@ -94,28 +94,52 @@ export async function listFinanceProjects(ctx: V2SessionContext): Promise<V2Fina
   return rows.map((r) => mapAgencyProject(r, ctx.workspaceId));
 }
 
+async function loadEnrichedFinanceProjects(ctx: V2SessionContext): Promise<V2FinanceProjectView[]> {
+  const rawProjects = await repo().listProjectsWithTotalExpenses();
+  const ids = rawProjects.map((r) => String(r.id));
+  const detailTotals = await loadDetailsTotals(ids);
+  const expenseTotals = new Map<string, number>();
+  for (const r of rawProjects) {
+    expenseTotals.set(String(r.id), Number(r.totalExpenses) || 0);
+  }
+  return rawProjects.map((r) => enrichProject(mapAgencyProject(r, ctx.workspaceId), expenseTotals, detailTotals));
+}
+
 export async function listFinanceProjectsForMonth(
   ctx: V2SessionContext,
   year: number,
   month: number
 ): Promise<V2FinanceProjectView[]> {
-  const rawProjects = await repo().listProjectsWithTotalExpenses();
-  const filteredRaw = rawProjects.filter((r) => isInFinanceMonth(String(r.createdAt), year, month));
-  const ids = filteredRaw.map((r) => String(r.id));
-  const [detailTotals] = await Promise.all([loadDetailsTotals(ids)]);
-  const expenseTotals = new Map<string, number>();
-  for (const r of filteredRaw) {
-    expenseTotals.set(String(r.id), Number(r.totalExpenses) || 0);
-  }
-  return filteredRaw
-    .map((r) => {
-      const base = mapAgencyProject(r, ctx.workspaceId);
-      return enrichProject(base, expenseTotals, detailTotals);
-    })
+  const all = await loadEnrichedFinanceProjects(ctx);
+  return all
+    .filter((p) => isInFinanceMonth(p.created_at, year, month))
     .sort((a, b) => {
       const order: Record<V2FinancePaymentStatus, number> = { paid: 0, prepaid: 1, not_paid: 2 };
       return order[a.status] - order[b.status];
     });
+}
+
+/** Сводки по месяцам за один проход — те же формулы, что в дашборде финансов. */
+export async function listFinanceMonthSummaries(
+  ctx: V2SessionContext,
+  months: { year: number; month: number }[]
+): Promise<Map<string, V2FinanceMonthSummary>> {
+  const out = new Map<string, V2FinanceMonthSummary>();
+  if (!months.length) return out;
+
+  const [allProjects, allExpensesRaw] = await Promise.all([
+    loadEnrichedFinanceProjects(ctx),
+    repo().listGeneralExpenses(),
+  ]);
+  const allExpenses = allExpensesRaw.map((r) => mapAgencyGeneralExpense(r, ctx.workspaceId));
+
+  for (const { year, month } of months) {
+    const key = `${year}-${String(month).padStart(2, "0")}`;
+    const projects = allProjects.filter((p) => isInFinanceMonth(p.created_at, year, month));
+    const generalExpenses = allExpenses.filter((e) => isInFinanceMonth(e.created_at, year, month));
+    out.set(key, computeFinanceMonthSummary(projects, generalExpenses, year, month));
+  }
+  return out;
 }
 
 export async function createFinanceProject(
