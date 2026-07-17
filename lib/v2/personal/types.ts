@@ -44,11 +44,19 @@ export type PersonalIncomeRow = {
 export type PersonalTaxProfileRow = {
   user_id: string;
   scheme: string;
+  /** Выручка за год, ₽ */
   year_income_rub: number;
   tax_rate: number;
+  /** Фиксированные взносы за год, ₽ */
   insurance_rub: number;
   insurance_deduction_rub: number;
   paid_advances_rub: number;
+  /** Стоимость патента за год, ₽ */
+  patent_cost_rub: number;
+  /** Порог выручки для налога 1% (по умолчанию 300 000) */
+  revenue_threshold_rub: number;
+  /** Ставка налога с выручки сверх порога (по умолчанию 0.01) */
+  revenue_rate: number;
 };
 
 export type PersonalTaxAdvanceRow = {
@@ -66,6 +74,18 @@ export type PersonalBudgetMonthRow = {
   year: number;
   month: number;
   limit_rub: number;
+  /** Базовые ожидаемые расходы для прогноза (по умолчанию 180 000) */
+  expected_expenses_rub: number;
+};
+
+export type PersonalForecastExtraExpenseRow = {
+  id: string;
+  user_id: string;
+  year: number;
+  month: number;
+  label: string;
+  amount_rub: number;
+  sort_order: number;
 };
 
 export type PersonalBudgetCategoryRow = {
@@ -132,6 +152,7 @@ export type PersonalFinanceDashboard = {
   taxAdvances: PersonalTaxAdvanceRow[];
   budget: PersonalBudgetMonthRow;
   budgetCategories: PersonalBudgetCategoryRow[];
+  forecastExtras: PersonalForecastExtraExpenseRow[];
   /** Снапшоты для совместимости (графики/hero) */
   history: PersonalMonthSnapshotRow[];
   /** История дохода — та же, что во вкладке «История дохода» */
@@ -148,14 +169,35 @@ export type PersonalFinanceDashboard = {
     projectExpectedRevenue: number;
     projectActualRevenue: number;
     projectCount: number;
-    /** Средняя выручка за прошлые 6 месяцев (история / проекты) */
+    /** Прибыль месяца из «Проекты и финансы» / истории */
+    monthProfit: number;
+    /** Средняя прибыль за прошлые 6 месяцев */
+    avgProfit6m: number;
+    /** @deprecated — то же, что avgProfit6m */
     avgIncome6m: number;
     /** Динамика капитала с начала года, ₽ */
     capitalYearDelta: number | null;
     taxAccrued: number;
     taxRemaining: number;
+    /** ПСН, шаг 1 — фиксированные взносы за год */
+    taxFixedContributions: number;
+    /** ПСН, шаг 1 — оплаченные взносы (сумма списка) */
+    taxPaidContributions: number;
+    /** ПСН, шаг 2 — налог с выручки: max(выручка − порог, 0) × ставка */
+    taxRevenueTax: number;
+    /** ПСН, шаг 3 — стоимость патента */
+    taxPatentCost: number;
+    /** ПСН, шаг 3 — остаток патента после вычета (шаг1 + шаг2), не меньше 0 */
+    taxPatentRemaining: number;
     budgetSpent: number;
     budgetLeft: number;
+    /** База + доп. ожидаемые расходы месяца */
+    expectedExpenses: number;
+    /** Ожидаемая прибыль − ожидаемые расходы */
+    forecastDelta: number;
+    /** Капитал после месяца: netWorth + forecastDelta */
+    expectedCapital: number;
+    /** @deprecated — то же, что forecastDelta */
     forecastEnd: number;
   };
 };

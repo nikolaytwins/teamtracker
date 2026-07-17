@@ -3,13 +3,14 @@
 import { PersonalAmt, PersonalMaskProvider } from "./personal-finance-mask";
 import {
   PersonalCapitalChart,
-  PersonalIncomeBars,
+  PersonalIncomeChart,
   PersonalSpark,
 } from "./personal-finance-charts";
 import { PersonalOperationModal } from "./personal-operation-modal";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
   formatPersonalPct,
+  formatPersonalRub,
   PERSONAL_MONTH_NAMES,
 } from "@/lib/v2/personal/formatters";
 import type {
@@ -486,10 +487,10 @@ function PfHeroCards({
       </StatCard>
 
       <StatCard
-        label={`Доход за ${monthName}`}
+        label={`Прибыль за ${monthName}`}
         icon={PfUiIcons.coin}
         accent="#F59E0B"
-        value={incomeExpected}
+        value={summary.monthProfit}
         footer={
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -510,9 +511,9 @@ function PfHeroCards({
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>
-                Ср. за 6 мес.{" "}
+                Ср. прибыль 6 мес.{" "}
                 <span className="font-medium text-[var(--v2-ink-700)]">
-                  <PersonalAmt v={summary.avgIncome6m} short />
+                  <PersonalAmt v={summary.avgProfit6m} short />
                 </span>
               </span>
               <Link
@@ -536,79 +537,280 @@ function PfHeroCards({
 
 function PfForecastCard({
   summary,
-  budgetLimit,
+  budget,
+  forecastExtras,
   year,
   month,
+  onReload,
 }: {
   summary: PersonalFinanceDashboard["summary"];
-  budgetLimit: number;
+  budget: PersonalFinanceDashboard["budget"];
+  forecastExtras: PersonalFinanceDashboard["forecastExtras"];
   year: number;
   month: number;
+  onReload: () => void;
 }) {
-  const positive = summary.forecastEnd >= 0;
-  const steps = [
-    { label: "Сейчас на счетах", v: summary.disposable, op: "" },
-    { label: "Ожидаемые поступления", v: summary.incomePending, op: "+" },
-    { label: "Плановые траты", v: -summary.budgetLeft, op: "−" },
-    { label: "Налог в этом месяце", v: 0, op: "−" },
-  ];
+  const [editOpen, setEditOpen] = useState(false);
+  const [baseDraft, setBaseDraft] = useState(String(budget.expected_expenses_rub));
+  const [extras, setExtras] = useState(forecastExtras);
+  const [newLabel, setNewLabel] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editOpen) {
+      setBaseDraft(String(Math.round(budget.expected_expenses_rub)));
+      setExtras(forecastExtras);
+      setNewLabel("");
+      setNewAmount("");
+      setError(null);
+    }
+  }, [editOpen, budget.expected_expenses_rub, forecastExtras]);
+
+  const delta = summary.forecastDelta;
+  const positive = delta >= 0;
   const monthName = PERSONAL_MONTH_NAMES[month - 1]?.toLowerCase() ?? "";
 
+  const tiles = [
+    {
+      label: "Ожидаемая прибыль",
+      v: summary.monthProfit,
+      hint: "из проектов",
+    },
+    {
+      label: "Ожидаемые расходы",
+      v: summary.expectedExpenses,
+      hint: forecastExtras.length
+        ? `база + ${forecastExtras.length} доп.`
+        : "база 180 000 ₽ · клик — настроить",
+      editable: true,
+    },
+    {
+      label: "Ожидаемый капитал",
+      v: summary.expectedCapital,
+      hint: "после этого месяца",
+    },
+  ];
+
+  const saveBase = async () => {
+    const n = Number(baseDraft.trim().replace(/\s/g, "").replace(",", "."));
+    if (!Number.isFinite(n) || n < 0) {
+      setError("Проверьте базовую сумму");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await fetchJson("/api/v2/personal/finance/forecast", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ year, month, expected_expenses_rub: n }),
+      });
+      onReload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось сохранить");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addExtra = async () => {
+    const amount = Number(newAmount.trim().replace(/\s/g, "").replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Укажите сумму доп. расхода");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await fetchJson("/api/v2/personal/finance/forecast", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          year,
+          month,
+          extra: { label: newLabel.trim() || "Доп. расход", amount_rub: amount },
+        }),
+      });
+      setNewLabel("");
+      setNewAmount("");
+      onReload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось добавить");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeExtra = async (id: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await fetchJson(`/api/v2/personal/finance/forecast/${id}`, { method: "DELETE" });
+      onReload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <PfCard className="relative overflow-hidden p-6">
-      <div
-        className="pointer-events-none absolute -right-20 -top-20 h-[360px] w-[360px] rounded-full blur-3xl"
-        style={{ background: positive ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)" }}
-      />
-      <div className="relative grid grid-cols-12 items-center gap-6">
-        <div className="col-span-12 lg:col-span-4">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-500)]">
-            <V2Icons.clock className="h-4 w-4" />
-            Прогноз на конец {monthName} {year}
-          </div>
-          <div
-            className={`v2-tighter mt-3 text-[44px] font-semibold leading-none ${positive ? "text-emerald-600" : "text-red-500"}`}
-          >
-            <PersonalAmt v={summary.forecastEnd} signed />
-          </div>
-          <div className="mt-2 inline-flex items-center gap-2 text-[12.5px]">
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${
-                positive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
-              }`}
+    <>
+      <PfCard className="relative overflow-hidden p-6">
+        <div
+          className="pointer-events-none absolute -right-20 -top-20 h-[360px] w-[360px] rounded-full blur-3xl"
+          style={{ background: positive ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)" }}
+        />
+        <div className="relative grid grid-cols-12 items-center gap-6">
+          <div className="col-span-12 lg:col-span-4">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-500)]">
+              <V2Icons.clock className="h-4 w-4" />
+              Прогноз на конец {monthName} {year}
+            </div>
+            <div
+              className={`v2-tighter mt-3 text-[44px] font-semibold leading-none ${positive ? "text-emerald-600" : "text-red-500"}`}
             >
-              {positive ? "Месяц в плюсе" : "Месяц в минусе"}
-            </span>
-            <span className="text-[var(--v2-ink-500)]">после всех платежей</span>
+              <PersonalAmt v={delta} signed />
+            </div>
+            <div className="mt-2 inline-flex items-center gap-2 text-[12.5px]">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${
+                  positive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+                }`}
+              >
+                {positive ? "Месяц в плюсе" : "Месяц в минусе"}
+              </span>
+              <span className="text-[var(--v2-ink-500)]">прибыль − расходы</span>
+            </div>
           </div>
-        </div>
-        <div className="col-span-12 lg:col-span-8">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {steps.map((s, i) => (
-              <div key={i} className="relative rounded-xl bg-[var(--v2-ink-50)]/70 px-3.5 py-3">
-                {i > 0 ? (
-                  <span className="absolute -left-[11px] top-1/2 hidden -translate-y-1/2 text-[15px] font-medium text-[var(--v2-ink-300)] sm:block">
-                    {s.op}
-                  </span>
-                ) : null}
-                <div className="v2-tight min-h-[28px] text-[11px] leading-tight text-[var(--v2-ink-500)]">{s.label}</div>
-                <div
-                  className={`v2-tight mt-1 text-[16px] font-semibold ${s.v < 0 ? "text-[var(--v2-ink-700)]" : "text-[var(--v2-ink-900)]"}`}
+          <div className="col-span-12 lg:col-span-8">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {tiles.map((t) => (
+                <button
+                  key={t.label}
+                  type="button"
+                  disabled={!t.editable}
+                  onClick={() => t.editable && setEditOpen(true)}
+                  className={`rounded-xl bg-[var(--v2-ink-50)]/70 px-3.5 py-3 text-left transition ${
+                    t.editable ? "hover:bg-[var(--v2-ink-100)] cursor-pointer" : "cursor-default"
+                  }`}
                 >
-                  <PersonalAmt v={s.v} short signed={i > 0} />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="v2-tight mt-3 flex items-center gap-1.5 text-[12px] text-[var(--v2-ink-500)]">
-            <PfUiIcons.info className="h-3.5 w-3.5 text-[var(--v2-ink-400)]" />
-            Расчёт по плановому бюджету{" "}
-            <PersonalAmt v={budgetLimit} short className="font-medium text-[var(--v2-ink-700)]" /> и подтверждённым
-            счетам. Подушка и капитал не учитываются.
+                  <div className="v2-tight flex items-center justify-between gap-2 text-[11px] leading-tight text-[var(--v2-ink-500)]">
+                    <span>{t.label}</span>
+                    {t.editable ? <V2Icons.edit className="h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-400)]" /> : null}
+                  </div>
+                  <div className="v2-tight mt-1 text-[18px] font-semibold text-[var(--v2-ink-900)]">
+                    <PersonalAmt v={t.v} short />
+                  </div>
+                  <div className="v2-tight mt-1 text-[11px] text-[var(--v2-ink-400)]">{t.hint}</div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    </PfCard>
+      </PfCard>
+
+      {editOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
+            <h3 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">
+              Ожидаемые расходы · {PERSONAL_MONTH_NAMES[month - 1]} {year}
+            </h3>
+            <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
+              База по умолчанию 180 000 ₽. Доп. расходы действуют только в этом месяце.
+            </p>
+
+            <label className="mt-4 block text-[12px] font-medium text-[var(--v2-ink-600)]">
+              Базовые расходы, ₽
+              <div className="mt-1 flex gap-2">
+                <input
+                  className="v2-tnum h-10 flex-1 rounded-xl border border-[var(--v2-ink-200)] px-3 text-[14px] outline-none focus:border-[var(--v2-brand-300)]"
+                  value={baseDraft}
+                  inputMode="decimal"
+                  onChange={(e) => setBaseDraft(e.target.value)}
+                />
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void saveBase()}
+                  className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-3 text-[13px] font-medium text-white disabled:opacity-50"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </label>
+
+            <div className="mt-5">
+              <div className="text-[12px] font-medium text-[var(--v2-ink-600)]">Дополнительно в этом месяце</div>
+              {extras.length === 0 ? (
+                <p className="mt-2 text-[12.5px] text-[var(--v2-ink-400)]">Пока нет доп. расходов</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {extras.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center gap-2 rounded-xl bg-[var(--v2-ink-50)] px-3 py-2"
+                    >
+                      <span className="v2-tight flex-1 truncate text-[13px] text-[var(--v2-ink-800)]">{e.label}</span>
+                      <span className="v2-tnum text-[13px] font-semibold text-[var(--v2-ink-900)]">
+                        <PersonalAmt v={e.amount_rub} short />
+                      </span>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void removeExtra(e.id)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
+                        title="Удалить"
+                      >
+                        <V2Icons.trash className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 flex gap-2">
+                <input
+                  placeholder="Название"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  className="h-9 flex-1 rounded-lg border border-[var(--v2-ink-200)] px-2.5 text-[13px]"
+                />
+                <input
+                  placeholder="Сумма"
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
+                  inputMode="decimal"
+                  className="v2-tnum h-9 w-24 rounded-lg border border-[var(--v2-ink-200)] px-2.5 text-[13px]"
+                />
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void addExtra()}
+                  className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-3 text-[12.5px] font-medium text-white disabled:opacity-50"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setEditOpen(false)}
+                className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -813,24 +1015,9 @@ function PfChartsSection({
         </PfCard>
       </div>
       <div>
-        <PfSectionTitle
-          accent="#0A0A0B"
-          title="Доход и расход"
-          right={
-            <div className="flex items-center gap-3 text-[11.5px] text-[var(--v2-ink-500)]">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-sm bg-[var(--v2-brand-500)]" />
-                доход
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-sm bg-[var(--v2-ink-200)]" />
-                расход
-              </span>
-            </div>
-          }
-        />
+        <PfSectionTitle accent="#F59E0B" title="Доход по месяцам" />
         <PfCard className="p-4 pt-5">
-          <PersonalIncomeBars data={history} masked={masked} currentYear={year} currentMonth={month} />
+          <PersonalIncomeChart data={history} masked={masked} currentYear={year} currentMonth={month} />
         </PfCard>
       </div>
     </div>
@@ -911,7 +1098,7 @@ function PfHistoryTable({
                           <span
                             className={`v2-tnum text-[11px] ${delta >= 0 ? "text-emerald-600/80" : "text-red-500/80"}`}
                           >
-                            <PersonalAmt v={delta} signed short />
+                            <PersonalAmt v={delta} signed />
                           </span>
                         ) : null}
                       </span>
@@ -920,10 +1107,10 @@ function PfHistoryTable({
                     )}
                   </div>
                   <div className="v2-tnum text-right font-medium text-[var(--v2-ink-800)]">
-                    {h.earned_rub != null ? <PersonalAmt v={h.earned_rub} short /> : "—"}
+                    {h.earned_rub != null ? <PersonalAmt v={h.earned_rub} /> : "—"}
                   </div>
                   <div className="v2-tnum text-right font-medium text-emerald-600">
-                    {h.profit_rub != null ? <PersonalAmt v={h.profit_rub} short /> : "—"}
+                    {h.profit_rub != null ? <PersonalAmt v={h.profit_rub} /> : "—"}
                   </div>
                 </div>
               );
@@ -949,48 +1136,118 @@ function PfHistoryTable({
 
 type TaxFormState = {
   scheme: string;
-  taxRatePct: string;
-  yearIncome: string;
-  insuranceDeduction: string;
-  paidAdvances: string;
+  yearRevenue: string;
+  fixedContributions: string;
+  patentCost: string;
 };
+
+function parseTaxNum(raw: string): number {
+  const n = Number(raw.trim().replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(n) ? Math.max(n, 0) : 0;
+}
 
 function PfTaxModal({
   open,
   tax,
+  taxAdvances,
   saving,
   error,
   onClose,
   onSave,
+  onReload,
 }: {
   open: boolean;
   tax: PersonalFinanceDashboard["tax"];
+  taxAdvances: PersonalFinanceDashboard["taxAdvances"];
   saving: boolean;
   error: string | null;
   onClose: () => void;
   onSave: (form: TaxFormState) => void;
+  onReload: () => void;
 }) {
   const [form, setForm] = useState<TaxFormState>(() => ({
     scheme: tax.scheme,
-    taxRatePct: String(Math.round(tax.tax_rate * 1000) / 10),
-    yearIncome: String(tax.year_income_rub),
-    insuranceDeduction: String(tax.insurance_deduction_rub),
-    paidAdvances: String(tax.paid_advances_rub),
+    yearRevenue: String(tax.year_income_rub),
+    fixedContributions: String(tax.insurance_rub),
+    patentCost: String(tax.patent_cost_rub),
   }));
+  const [advLabel, setAdvLabel] = useState("");
+  const [advAmount, setAdvAmount] = useState("");
+  const [advDate, setAdvDate] = useState("");
+  const [advBusy, setAdvBusy] = useState(false);
+  const [advError, setAdvError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setForm({
         scheme: tax.scheme,
-        taxRatePct: String(Math.round(tax.tax_rate * 1000) / 10),
-        yearIncome: String(tax.year_income_rub),
-        insuranceDeduction: String(tax.insurance_deduction_rub),
-        paidAdvances: String(tax.paid_advances_rub),
+        yearRevenue: String(tax.year_income_rub),
+        fixedContributions: String(tax.insurance_rub),
+        patentCost: String(tax.patent_cost_rub),
       });
+      setAdvLabel("");
+      setAdvAmount("");
+      setAdvDate("");
+      setAdvError(null);
     }
   }, [open, tax]);
 
   if (!open) return null;
+
+  const paidContributions = taxAdvances
+    .filter((a) => !a.planned)
+    .reduce((s, a) => s + a.amount_rub, 0);
+
+  // Живой предпросчёт по введённым в форме числам
+  const yearRevenue = parseTaxNum(form.yearRevenue);
+  const fixedContributions = parseTaxNum(form.fixedContributions);
+  const patentCost = parseTaxNum(form.patentCost);
+  const revenueTax = Math.max(yearRevenue - tax.revenue_threshold_rub, 0) * tax.revenue_rate;
+  const patentRemaining = Math.max(patentCost - (fixedContributions + revenueTax), 0);
+  const totalTax = Math.max(fixedContributions - paidContributions + revenueTax + patentRemaining, 0);
+
+  const addAdvance = async () => {
+    const amount = parseTaxNum(advAmount);
+    if (amount <= 0) {
+      setAdvError("Укажите сумму взноса");
+      return;
+    }
+    setAdvBusy(true);
+    setAdvError(null);
+    try {
+      await fetchJson("/api/v2/personal/finance/tax/advances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: advLabel.trim() || "Взнос",
+          amount_rub: Math.round(amount),
+          advance_date: advDate.trim() || null,
+          planned: false,
+        }),
+      });
+      setAdvLabel("");
+      setAdvAmount("");
+      setAdvDate("");
+      onReload();
+    } catch (e) {
+      setAdvError(e instanceof Error ? e.message : "Не удалось добавить взнос");
+    } finally {
+      setAdvBusy(false);
+    }
+  };
+
+  const deleteAdvance = async (id: string) => {
+    setAdvBusy(true);
+    setAdvError(null);
+    try {
+      await fetchJson(`/api/v2/personal/finance/tax/advances/${id}`, { method: "DELETE" });
+      onReload();
+    } catch (e) {
+      setAdvError(e instanceof Error ? e.message : "Не удалось удалить взнос");
+    } finally {
+      setAdvBusy(false);
+    }
+  };
 
   const field = (label: string, key: keyof TaxFormState, opts?: { suffix?: string; placeholder?: string }) => (
     <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
@@ -1014,10 +1271,11 @@ function PfTaxModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
-        <h3 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Настройка налогов ИП</h3>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
+        <h3 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Настройка налогов ИП · Патент</h3>
         <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
-          Схема, ставка и вычеты. «К уплате» пересчитается автоматически.
+          Фикс. взносы, налог с выручки ({Math.round(tax.revenue_rate * 100)}% с суммы свыше{" "}
+          {Math.round(tax.revenue_threshold_rub / 1000)} тыс) и патент. «К уплате» считается автоматически.
         </p>
         <div className="mt-4 space-y-3">
           <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
@@ -1025,19 +1283,120 @@ function PfTaxModal({
             <input
               className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px] outline-none focus:border-[var(--v2-brand-300)] focus:ring-2 focus:ring-[var(--v2-brand-100)]"
               value={form.scheme}
-              placeholder="ИП · УСН «Доходы» 6 %"
+              placeholder="ИП · Патент (ПСН)"
               onChange={(e) => setForm((f) => ({ ...f, scheme: e.target.value }))}
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            {field("Ставка налога", "taxRatePct", { suffix: "%", placeholder: "6" })}
-            {field("Доход с начала года", "yearIncome", { suffix: "₽" })}
+            {field("Выручка за год", "yearRevenue", { suffix: "₽" })}
+            {field("Фикс. взносы за год", "fixedContributions", { suffix: "₽", placeholder: "57390" })}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {field("Вычет страховых", "insuranceDeduction", { suffix: "₽" })}
-            {field("Оплачено авансами", "paidAdvances", { suffix: "₽" })}
+          {field("Стоимость патента за год", "patentCost", { suffix: "₽", placeholder: "84000" })}
+        </div>
+
+        {/* Живой предпросмотр расчёта */}
+        <div className="mt-4 space-y-1.5 rounded-xl bg-[var(--v2-ink-50)] px-4 py-3 text-[12.5px]">
+          <div className="flex items-center justify-between text-[var(--v2-ink-600)]">
+            <span>Шаг 1 · Фикс. взносы − оплачено</span>
+            <span className="v2-tnum">
+              {formatPersonalRub(Math.max(fixedContributions - paidContributions, 0))}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-[var(--v2-ink-600)]">
+            <span>Шаг 2 · Налог с выручки {Math.round(tax.revenue_rate * 100)}%</span>
+            <span className="v2-tnum">{formatPersonalRub(revenueTax)}</span>
+          </div>
+          <div className="flex items-center justify-between text-[var(--v2-ink-600)]">
+            <span>Шаг 3 · Патент после вычета</span>
+            <span className="v2-tnum">{formatPersonalRub(patentRemaining)}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between border-t border-[var(--v2-ink-200)]/70 pt-1.5 font-semibold text-[var(--v2-ink-900)]">
+            <span>Итого к уплате</span>
+            <span className="v2-tnum">{formatPersonalRub(totalTax)}</span>
           </div>
         </div>
+
+        {/* Оплаченные взносы (транзакциями) */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+              Оплаченные взносы
+            </span>
+            <span className="v2-tnum text-[12px] text-[var(--v2-ink-600)]">
+              всего {formatPersonalRub(paidContributions)}
+            </span>
+          </div>
+
+          {taxAdvances.length > 0 ? (
+            <div className="mt-2 space-y-1.5">
+              {taxAdvances.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-2 rounded-lg border border-[var(--v2-ink-100)] px-3 py-2 text-[13px]"
+                >
+                  <span className="flex-1 truncate text-[var(--v2-ink-800)]">{a.label}</span>
+                  {a.advance_date ? (
+                    <span className="text-[11.5px] text-[var(--v2-ink-400)]">{a.advance_date}</span>
+                  ) : null}
+                  <span className="v2-tnum font-medium text-[var(--v2-ink-800)]">{formatPersonalRub(a.amount_rub)}</span>
+                  <button
+                    type="button"
+                    disabled={advBusy}
+                    onClick={() => void deleteAdvance(a.id)}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                    aria-label="Удалить взнос"
+                  >
+                    <V2Icons.trash className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-[12.5px] text-[var(--v2-ink-400)]">Пока нет оплаченных взносов.</p>
+          )}
+
+          <div className="mt-2 flex items-end gap-2">
+            <label className="flex-1 text-[11px] font-medium text-[var(--v2-ink-500)]">
+              Комментарий
+              <input
+                className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--v2-brand-300)]"
+                value={advLabel}
+                placeholder="1 квартал"
+                onChange={(e) => setAdvLabel(e.target.value)}
+              />
+            </label>
+            <label className="w-24 text-[11px] font-medium text-[var(--v2-ink-500)]">
+              Дата
+              <input
+                type="date"
+                className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-2 py-1.5 text-[12px] outline-none focus:border-[var(--v2-brand-300)]"
+                value={advDate}
+                onChange={(e) => setAdvDate(e.target.value)}
+              />
+            </label>
+            <label className="w-28 text-[11px] font-medium text-[var(--v2-ink-500)]">
+              Сумма
+              <input
+                className="v2-tnum mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--v2-brand-300)]"
+                value={advAmount}
+                inputMode="decimal"
+                placeholder="₽"
+                onChange={(e) => setAdvAmount(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={advBusy}
+              onClick={() => void addAdvance()}
+              className="inline-flex h-[34px] items-center gap-1 rounded-lg bg-[var(--v2-ink-900)] px-3 text-[12.5px] font-medium text-white transition hover:bg-black disabled:opacity-50"
+            >
+              <V2Icons.plus className="h-3.5 w-3.5" />
+              Добавить
+            </button>
+          </div>
+          {advError ? <p className="mt-1.5 text-[12px] text-red-600">{advError}</p> : null}
+        </div>
+
         {error ? (
           <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
             {error}
@@ -1049,7 +1408,7 @@ function PfTaxModal({
             onClick={onClose}
             className="h-9 rounded-lg px-4 text-[13px] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
           >
-            Отмена
+            Закрыть
           </button>
           <button
             type="button"
@@ -1076,22 +1435,25 @@ function PfTaxCard({
   summary: PersonalFinanceDashboard["summary"];
   onEdit: () => void;
 }) {
-  const accrued = summary.taxAccrued;
-  const reducedPayable = Math.max(accrued - tax.insurance_deduction_rub, 0);
-  const paidPct = reducedPayable > 0 ? Math.min(tax.paid_advances_rub / reducedPayable, 1) : 1;
+  const contribLeft = Math.max(summary.taxFixedContributions - summary.taxPaidContributions, 0);
+  const paidPct =
+    summary.taxFixedContributions > 0
+      ? Math.min(summary.taxPaidContributions / summary.taxFixedContributions, 1)
+      : 1;
 
-  const rows: { label: string; value: number; bold?: boolean }[] = [
-    { label: "Доход с начала года", value: tax.year_income_rub },
-    { label: `Налог ${Math.round(tax.tax_rate * 100)}\u202F%`, value: accrued },
-    { label: "− вычет страховых взносов", value: -tax.insurance_deduction_rub },
-    { label: "К уплате за год", value: reducedPayable, bold: true },
+  const rows: { label: string; value: number; bold?: boolean; muted?: boolean }[] = [
+    { label: "Фикс. взносы за год", value: summary.taxFixedContributions },
+    { label: "− оплачено взносов", value: -summary.taxPaidContributions, muted: true },
+    { label: "Налог с выручки 1 %", value: summary.taxRevenueTax },
+    { label: "Патент после вычета", value: summary.taxPatentRemaining },
+    { label: "Итого к уплате", value: summary.taxRemaining, bold: true },
   ];
 
   return (
     <div>
       <PfSectionTitle
         accent="#EF4444"
-        title="Налоги ИП"
+        title="Налоги ИП · Патент"
         right={
           <div className="flex items-center gap-2">
             <span className="hidden text-[12px] text-[var(--v2-ink-500)] sm:inline">{tax.scheme}</span>
@@ -1122,24 +1484,34 @@ function PfTaxCard({
         </div>
 
         <div className="mt-4 flex h-[7px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
-          <div className="h-full bg-emerald-500" style={{ width: `${paidPct * 100}%` }} title="оплачено" />
+          <div className="h-full bg-emerald-500" style={{ width: `${paidPct * 100}%` }} title="оплачено взносов" />
         </div>
         <div className="mt-2 flex items-center justify-between text-[12px]">
           <span className="inline-flex items-center gap-1.5 text-[var(--v2-ink-500)]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Оплачено авансами{" "}
+            Взносы оплачены{" "}
             <span className="font-medium text-[var(--v2-ink-800)]">
-              <PersonalAmt v={tax.paid_advances_rub} short />
+              <PersonalAmt v={summary.taxPaidContributions} short />
             </span>
           </span>
-          <span className="v2-tnum text-[var(--v2-ink-400)]">{Math.round(paidPct * 100)}%</span>
+          <span className="v2-tnum text-[var(--v2-ink-400)]">
+            осталось <PersonalAmt v={contribLeft} short />
+          </span>
         </div>
 
         <div className="mt-4 space-y-2 border-t border-[var(--v2-ink-100)]/80 pt-4 text-[13px]">
           {rows.map((row) => (
             <div key={row.label} className="flex items-center justify-between">
               <span className="v2-tight text-[var(--v2-ink-500)]">{row.label}</span>
-              <span className={`v2-tnum ${row.bold ? "font-semibold text-[var(--v2-ink-900)]" : "text-[var(--v2-ink-700)]"}`}>
+              <span
+                className={`v2-tnum ${
+                  row.bold
+                    ? "font-semibold text-[var(--v2-ink-900)]"
+                    : row.muted
+                      ? "text-emerald-600"
+                      : "text-[var(--v2-ink-700)]"
+                }`}
+              >
                 {row.value < 0 ? (
                   <>
                     −<PersonalAmt v={Math.abs(row.value)} />
@@ -1373,18 +1745,6 @@ export function PersonalFinanceClient() {
   const reload = useCallback(() => load(year, month), [load, year, month]);
 
   const saveTax = async (form: TaxFormState) => {
-    const parseNum = (raw: string) => {
-      const n = Number(raw.trim().replace(/\s/g, "").replace(",", "."));
-      return Number.isFinite(n) ? n : null;
-    };
-    const ratePct = parseNum(form.taxRatePct);
-    const yearIncome = parseNum(form.yearIncome);
-    const insurance = parseNum(form.insuranceDeduction);
-    const paid = parseNum(form.paidAdvances);
-    if (ratePct == null || yearIncome == null || insurance == null || paid == null) {
-      setTaxError("Проверьте числовые поля");
-      return;
-    }
     setTaxSaving(true);
     setTaxError(null);
     try {
@@ -1392,11 +1752,10 @@ export function PersonalFinanceClient() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          scheme: form.scheme.trim() || "ИП",
-          tax_rate: Math.max(ratePct, 0) / 100,
-          year_income_rub: Math.max(Math.round(yearIncome), 0),
-          insurance_deduction_rub: Math.max(Math.round(insurance), 0),
-          paid_advances_rub: Math.max(Math.round(paid), 0),
+          scheme: form.scheme.trim() || "ИП · Патент (ПСН)",
+          year_income_rub: Math.round(parseTaxNum(form.yearRevenue)),
+          insurance_rub: Math.round(parseTaxNum(form.fixedContributions)),
+          patent_cost_rub: Math.round(parseTaxNum(form.patentCost)),
         }),
       });
       setTaxEditOpen(false);
@@ -1427,7 +1786,8 @@ export function PersonalFinanceClient() {
 
   if (!data) return null;
 
-  const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, history, incomeHistory } = data;
+  const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, forecastExtras, history, incomeHistory } =
+    data;
 
   return (
     <PersonalMaskProvider masked={masked}>
@@ -1460,7 +1820,14 @@ export function PersonalFinanceClient() {
 
             <div className="space-y-7">
               <PfHeroCards summary={summary} accounts={accounts} history={history} year={year} month={month} />
-              <PfForecastCard summary={summary} budgetLimit={budget.limit_rub} year={year} month={month} />
+              <PfForecastCard
+                summary={summary}
+                budget={budget}
+                forecastExtras={forecastExtras}
+                year={year}
+                month={month}
+                onReload={() => void reload()}
+              />
               <PfAccountsAndCapital accounts={accounts} capital={capital} summary={summary} />
               <PfChartsSection history={history} masked={masked} year={year} month={month} />
               <PfHistoryTable incomeHistory={incomeHistory} year={year} month={month} />
@@ -1500,10 +1867,12 @@ export function PersonalFinanceClient() {
         <PfTaxModal
           open={taxEditOpen}
           tax={tax}
+          taxAdvances={taxAdvances}
           saving={taxSaving}
           error={taxError}
           onClose={() => setTaxEditOpen(false)}
           onSave={(form) => void saveTax(form)}
+          onReload={() => void reload()}
         />
       </div>
     </PersonalMaskProvider>

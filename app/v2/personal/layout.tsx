@@ -16,6 +16,11 @@ const TABS = [
     match: (p: string) => p === appPath("/v2/personal/finance"),
   },
   {
+    href: "/v2/personal/finance/transactions",
+    label: "Транзакции",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/finance/transactions")),
+  },
+  {
     href: "/v2/personal/finance/accounts",
     label: "Счета и активы",
     match: (p: string) => p.startsWith(appPath("/v2/personal/finance/accounts")),

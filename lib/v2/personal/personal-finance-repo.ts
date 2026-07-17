@@ -12,6 +12,7 @@ import type {
   PersonalBudgetMonthRow,
   PersonalCapitalRow,
   PersonalFinanceDashboard,
+  PersonalForecastExtraExpenseRow,
   PersonalIncomeHistoryRow,
   PersonalIncomeRow,
   PersonalMonthSnapshotRow,
@@ -20,6 +21,8 @@ import type {
   PersonalTransactionRow,
   PersonalTxnType,
 } from "@/lib/v2/personal/types";
+
+export const DEFAULT_EXPECTED_EXPENSES_RUB = 180_000;
 import type { V2SessionContext } from "@/lib/v2/types";
 
 export class PersonalFinanceValidationError extends Error {
@@ -91,16 +94,22 @@ async function ensureTaxProfile(userId: string): Promise<PersonalTaxProfileRow> 
       insurance_rub: Number(data.insurance_rub) || 0,
       insurance_deduction_rub: Number(data.insurance_deduction_rub) || 0,
       paid_advances_rub: Number(data.paid_advances_rub) || 0,
+      patent_cost_rub: Number(data.patent_cost_rub) || 0,
+      revenue_threshold_rub: data.revenue_threshold_rub != null ? Number(data.revenue_threshold_rub) : 300000,
+      revenue_rate: data.revenue_rate != null ? Number(data.revenue_rate) : 0.01,
     };
   }
   const row = {
     user_id: userId,
-    scheme: "ИП · УСН «Доходы» 6 %",
+    scheme: "ИП · Патент (ПСН)",
     year_income_rub: 0,
     tax_rate: 0.06,
-    insurance_rub: 49500,
-    insurance_deduction_rub: 49500,
+    insurance_rub: 57390,
+    insurance_deduction_rub: 0,
     paid_advances_rub: 0,
+    patent_cost_rub: 0,
+    revenue_threshold_rub: 300000,
+    revenue_rate: 0.01,
     updated_at: nowIso(),
   };
   await sb.from("v2_personal_tax_profile").insert(row);
@@ -122,10 +131,21 @@ async function ensureBudgetMonth(userId: string, year: number, month: number): P
       year,
       month,
       limit_rub: Number(data.limit_rub) || 0,
+      expected_expenses_rub:
+        data.expected_expenses_rub == null
+          ? DEFAULT_EXPECTED_EXPENSES_RUB
+          : Number(data.expected_expenses_rub) || 0,
     };
   }
   const limit = DEFAULT_BUDGET_CATEGORIES.reduce((s, c) => s + c.limit, 0);
-  const row = { user_id: userId, year, month, limit_rub: limit, updated_at: nowIso() };
+  const row = {
+    user_id: userId,
+    year,
+    month,
+    limit_rub: limit,
+    expected_expenses_rub: DEFAULT_EXPECTED_EXPENSES_RUB,
+    updated_at: nowIso(),
+  };
   await sb.from("v2_personal_budget_months").insert(row);
   const { data: cats } = await sb
     .from("v2_personal_budget_categories")
@@ -150,7 +170,47 @@ async function ensureBudgetMonth(userId: string, year: number, month: number): P
     }));
     await sb.from("v2_personal_budget_categories").insert(inserts);
   }
-  return row;
+  return {
+    user_id: userId,
+    year,
+    month,
+    limit_rub: limit,
+    expected_expenses_rub: DEFAULT_EXPECTED_EXPENSES_RUB,
+  };
+}
+
+function mapForecastExtra(r: Record<string, unknown>): PersonalForecastExtraExpenseRow {
+  return {
+    id: String(r.id),
+    user_id: String(r.user_id),
+    year: Number(r.year),
+    month: Number(r.month),
+    label: String(r.label || "Доп. расход"),
+    amount_rub: Number(r.amount_rub) || 0,
+    sort_order: Number(r.sort_order) || 0,
+  };
+}
+
+async function listForecastExtras(
+  userId: string,
+  year: number,
+  month: number
+): Promise<PersonalForecastExtraExpenseRow[]> {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_forecast_extra_expenses")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("year", year)
+    .eq("month", month)
+    .order("sort_order")
+    .order("created_at");
+  if (error) {
+    // Миграция 029 ещё не применена — не валим дашборд
+    console.warn("forecast extras:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => mapForecastExtra(r as Record<string, unknown>));
 }
 
 function buildSummary(
@@ -159,7 +219,8 @@ function buildSummary(
   incomes: PersonalIncomeRow[],
   tax: PersonalTaxProfileRow,
   budget: PersonalBudgetMonthRow,
-  budgetCategories: PersonalBudgetCategoryRow[]
+  budgetCategories: PersonalBudgetCategoryRow[],
+  paidContributions: number
 ) {
   const disposable = accounts.filter((a) => a.disposable).reduce((s, a) => s + a.balance_rub, 0);
   const reserves = accounts.filter((a) => !a.disposable).reduce((s, a) => s + a.balance_rub, 0);
@@ -168,11 +229,25 @@ function buildSummary(
   const incomeExpected = incomes.reduce((s, i) => s + i.amount_rub, 0);
   const incomeReceived = incomes.filter((i) => i.status === "received").reduce((s, i) => s + i.amount_rub, 0);
   const incomePending = incomeExpected - incomeReceived;
-  const taxAccrued = tax.year_income_rub * tax.tax_rate;
-  const taxRemaining = Math.max(taxAccrued - tax.insurance_deduction_rub - tax.paid_advances_rub, 0);
+
+  // Налоги ИП на патенте (ПСН)
+  // Шаг 1 — фиксированные взносы за год минус уже оплаченные (списком).
+  // Шаг 2 — налог с выручки: max(выручка − порог, 0) × ставка (1%).
+  // Шаг 3 — патент, уменьшенный на (шаг1 + шаг2), остаток не может быть меньше 0.
+  const taxFixedContributions = tax.insurance_rub;
+  const taxPaidContributions = paidContributions;
+  const taxRevenueTax =
+    Math.max(tax.year_income_rub - tax.revenue_threshold_rub, 0) * tax.revenue_rate;
+  const taxPatentCost = tax.patent_cost_rub;
+  const patentReduction = taxFixedContributions + taxRevenueTax;
+  const taxPatentRemaining = Math.max(taxPatentCost - patentReduction, 0);
+  const taxAccrued = taxFixedContributions + taxRevenueTax + taxPatentRemaining;
+  const taxRemaining = Math.max(
+    taxFixedContributions - taxPaidContributions + taxRevenueTax + taxPatentRemaining,
+    0
+  );
   const budgetSpent = budgetCategories.reduce((s, c) => s + c.spent_rub, 0);
   const budgetLeft = budget.limit_rub - budgetSpent;
-  const forecastEnd = disposable + incomePending - budgetLeft;
   return {
     disposable,
     reserves,
@@ -183,9 +258,14 @@ function buildSummary(
     incomePending,
     taxAccrued,
     taxRemaining,
+    taxFixedContributions,
+    taxPaidContributions,
+    taxRevenueTax,
+    taxPatentCost,
+    taxPatentRemaining,
     budgetSpent,
     budgetLeft,
-    forecastEnd,
+    forecastEnd: 0,
   };
 }
 
@@ -225,6 +305,7 @@ export async function loadPersonalFinanceDashboard(
     advancesRes,
     categoriesRes,
     historyRes,
+    forecastExtras,
   ] = await Promise.all([
     sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order"),
     sb.from("v2_personal_capital_items").select("*").eq("user_id", userId).order("sort_order"),
@@ -249,6 +330,7 @@ export async function loadPersonalFinanceDashboard(
       .eq("user_id", userId)
       .order("year")
       .order("month"),
+    listForecastExtras(userId, year, month),
   ]);
 
   if (accountsRes.error) throw accountsRes.error;
@@ -299,12 +381,16 @@ export async function loadPersonalFinanceDashboard(
       }) satisfies PersonalMonthSnapshotRow
   );
 
-  const summary = buildSummary(accounts, capital, incomes, tax, budget, budgetCategories);
+  const paidContributions = taxAdvances
+    .filter((a) => !a.planned)
+    .reduce((s, a) => s + a.amount_rub, 0);
+  const summary = buildSummary(accounts, capital, incomes, tax, budget, budgetCategories, paidContributions);
 
-  // Доход из «Проекты и финансы» за выбранный месяц + среднее за 6 мес. из истории
+  // Прибыль / выручка из «Проекты и финансы» + среднее за 6 мес. из истории
   let projectExpectedRevenue = 0;
   let projectActualRevenue = 0;
   let projectCount = 0;
+  let monthProfit = 0;
   try {
     const [projects, generalExpenses] = await Promise.all([
       listFinanceProjectsForMonth(ctx, year, month),
@@ -314,15 +400,24 @@ export async function loadPersonalFinanceDashboard(
     projectExpectedRevenue = fin.expectedRevenue;
     projectActualRevenue = fin.actualRevenue;
     projectCount = fin.projectCount;
+    monthProfit = fin.profit;
   } catch (e) {
     console.warn("personal finance: agency month summary unavailable", e);
   }
 
-  let avgIncome6m = 0;
+  let avgProfit6m = 0;
   let capitalYearDelta: number | null = null;
   let incomeHistory: PersonalIncomeHistoryRow[] = [];
   try {
     incomeHistory = await listPersonalIncomeHistory(ctx);
+    const historyProfit = incomeHistory.find((r) => r.year === year && r.month === month)?.profit_rub;
+    if (
+      (projectCount === 0 && projectExpectedRevenue === 0 && projectActualRevenue === 0) &&
+      historyProfit != null
+    ) {
+      monthProfit = historyProfit;
+    }
+
     const past: number[] = [];
     for (let i = 1; i <= 6; i++) {
       let m = month - i;
@@ -332,10 +427,10 @@ export async function loadPersonalFinanceDashboard(
         y -= 1;
       }
       const row = incomeHistory.find((r) => r.year === y && r.month === m);
-      if (row?.earned_rub != null && row.earned_rub > 0) past.push(row.earned_rub);
+      if (row?.profit_rub != null) past.push(row.profit_rub);
     }
     if (past.length > 0) {
-      avgIncome6m = Math.round(past.reduce((s, v) => s + v, 0) / past.length);
+      avgProfit6m = Math.round(past.reduce((s, v) => s + v, 0) / past.length);
     }
 
     const yearRows = [...incomeHistory]
@@ -354,7 +449,7 @@ export async function loadPersonalFinanceDashboard(
     console.warn("personal finance: income history unavailable", e);
   }
 
-  // Основной доход на дашборде — из «Проекты и финансы»
+  // Выручка на дашборде — из «Проекты и финансы»
   if (projectCount > 0 || projectExpectedRevenue > 0 || projectActualRevenue > 0) {
     summary.incomeExpected = projectExpectedRevenue;
     summary.incomeReceived = projectActualRevenue;
@@ -401,10 +496,18 @@ export async function loadPersonalFinanceDashboard(
     month,
     accounts_total_rub: summary.disposable + summary.reserves,
     earned_rub: projectExpectedRevenue || summary.incomeReceived || null,
-    profit_rub: incomeHistory.find((r) => r.year === year && r.month === month)?.profit_rub ?? null,
+    profit_rub:
+      monthProfit ||
+      incomeHistory.find((r) => r.year === year && r.month === month)?.profit_rub ||
+      null,
     spent_rub: summary.budgetSpent,
   });
   incomeHistoryForUi.sort((a, b) => b.year - a.year || b.month - a.month);
+
+  const extrasSum = forecastExtras.reduce((s, e) => s + e.amount_rub, 0);
+  const expectedExpenses = budget.expected_expenses_rub + extrasSum;
+  const forecastDelta = monthProfit - expectedExpenses;
+  const expectedCapital = summary.netWorth + forecastDelta;
 
   return {
     year,
@@ -416,6 +519,7 @@ export async function loadPersonalFinanceDashboard(
     taxAdvances,
     budget,
     budgetCategories,
+    forecastExtras,
     history: historyWithCurrent,
     incomeHistory: incomeHistoryForUi,
     summary: {
@@ -423,8 +527,14 @@ export async function loadPersonalFinanceDashboard(
       projectExpectedRevenue,
       projectActualRevenue,
       projectCount,
-      avgIncome6m,
+      monthProfit,
+      avgProfit6m,
+      avgIncome6m: avgProfit6m,
       capitalYearDelta,
+      expectedExpenses,
+      forecastDelta,
+      expectedCapital,
+      forecastEnd: forecastDelta,
     },
   };
 }
@@ -522,6 +632,9 @@ function taxPatch(patch: Partial<PersonalTaxProfileRow>): Partial<PersonalTaxPro
   if (patch.insurance_rub !== undefined) out.insurance_rub = patch.insurance_rub;
   if (patch.insurance_deduction_rub !== undefined) out.insurance_deduction_rub = patch.insurance_deduction_rub;
   if (patch.paid_advances_rub !== undefined) out.paid_advances_rub = patch.paid_advances_rub;
+  if (patch.patent_cost_rub !== undefined) out.patent_cost_rub = patch.patent_cost_rub;
+  if (patch.revenue_threshold_rub !== undefined) out.revenue_threshold_rub = patch.revenue_threshold_rub;
+  if (patch.revenue_rate !== undefined) out.revenue_rate = patch.revenue_rate;
   return out;
 }
 
@@ -1209,6 +1322,62 @@ export async function updatePersonalTaxProfile(
   return ensureTaxProfile(userId);
 }
 
+function mapTaxAdvance(r: Record<string, unknown>): PersonalTaxAdvanceRow {
+  return {
+    id: String(r.id),
+    user_id: String(r.user_id),
+    label: String(r.label ?? ""),
+    amount_rub: Number(r.amount_rub) || 0,
+    advance_date: r.advance_date ? String(r.advance_date) : null,
+    planned: Boolean(r.planned),
+    sort_order: Number(r.sort_order) || 0,
+  };
+}
+
+export async function createPersonalTaxAdvance(
+  ctx: V2SessionContext,
+  input: { label?: string; amount_rub: number; advance_date?: string | null; planned?: boolean }
+): Promise<PersonalTaxAdvanceRow> {
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+  if (!Number.isFinite(input.amount_rub) || input.amount_rub <= 0) {
+    throw new PersonalFinanceValidationError("Сумма взноса должна быть больше нуля");
+  }
+  const { data: last } = await sb
+    .from("v2_personal_tax_advances")
+    .select("sort_order")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const now = nowIso();
+  const row = {
+    id: newV2Id(),
+    user_id: userId,
+    label: (input.label ?? "").trim() || "Взнос",
+    amount_rub: input.amount_rub,
+    advance_date: input.advance_date ?? null,
+    planned: input.planned ?? false,
+    sort_order: (Number(last?.sort_order) || 0) + 1,
+    created_at: now,
+    updated_at: now,
+  };
+  const { error } = await sb.from("v2_personal_tax_advances").insert(row);
+  if (error) throw error;
+  return mapTaxAdvance(row);
+}
+
+export async function deletePersonalTaxAdvance(ctx: V2SessionContext, id: string): Promise<boolean> {
+  const sb = getV2Supabase();
+  const { error } = await sb
+    .from("v2_personal_tax_advances")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", uid(ctx));
+  if (error) throw error;
+  return true;
+}
+
 export async function updateBudgetCategorySpent(
   ctx: V2SessionContext,
   id: string,
@@ -1218,6 +1387,100 @@ export async function updateBudgetCategorySpent(
   const { error } = await sb
     .from("v2_personal_budget_categories")
     .update({ spent_rub, updated_at: nowIso() })
+    .eq("id", id)
+    .eq("user_id", uid(ctx));
+  if (error) throw error;
+}
+
+export async function updatePersonalExpectedExpenses(
+  ctx: V2SessionContext,
+  year: number,
+  month: number,
+  expected_expenses_rub: number
+): Promise<PersonalBudgetMonthRow> {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new PersonalFinanceValidationError("Некорректный месяц");
+  }
+  if (!Number.isFinite(expected_expenses_rub) || expected_expenses_rub < 0) {
+    throw new PersonalFinanceValidationError("Сумма расходов должна быть ≥ 0");
+  }
+  const userId = uid(ctx);
+  await ensureBudgetMonth(userId, year, month);
+  const sb = getV2Supabase();
+  const { error } = await sb
+    .from("v2_personal_budget_months")
+    .update({ expected_expenses_rub: Math.round(expected_expenses_rub), updated_at: nowIso() })
+    .eq("user_id", userId)
+    .eq("year", year)
+    .eq("month", month);
+  if (error) throw error;
+  return ensureBudgetMonth(userId, year, month);
+}
+
+export async function createForecastExtraExpense(
+  ctx: V2SessionContext,
+  input: { year: number; month: number; label?: string; amount_rub: number }
+): Promise<PersonalForecastExtraExpenseRow> {
+  const { year, month } = input;
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new PersonalFinanceValidationError("Некорректный месяц");
+  }
+  const amount = Number(input.amount_rub);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new PersonalFinanceValidationError("Укажите сумму доп. расхода");
+  }
+  const userId = uid(ctx);
+  await ensureBudgetMonth(userId, year, month);
+  const sb = getV2Supabase();
+  const existing = await listForecastExtras(userId, year, month);
+  const row = {
+    id: newV2Id(),
+    user_id: userId,
+    year,
+    month,
+    label: (input.label ?? "").trim() || "Доп. расход",
+    amount_rub: Math.round(amount),
+    sort_order: existing.length,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  const { error } = await sb.from("v2_personal_forecast_extra_expenses").insert(row);
+  if (error) throw error;
+  return mapForecastExtra(row);
+}
+
+export async function updateForecastExtraExpense(
+  ctx: V2SessionContext,
+  id: string,
+  patch: { label?: string; amount_rub?: number }
+): Promise<PersonalForecastExtraExpenseRow> {
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+  const safe: Record<string, unknown> = { updated_at: nowIso() };
+  if (patch.label !== undefined) safe.label = patch.label.trim() || "Доп. расход";
+  if (patch.amount_rub !== undefined) {
+    if (!Number.isFinite(patch.amount_rub) || patch.amount_rub < 0) {
+      throw new PersonalFinanceValidationError("Некорректная сумма");
+    }
+    safe.amount_rub = Math.round(patch.amount_rub);
+  }
+  const { data, error } = await sb
+    .from("v2_personal_forecast_extra_expenses")
+    .update(safe)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new PersonalFinanceValidationError("Расход не найден");
+  return mapForecastExtra(data as Record<string, unknown>);
+}
+
+export async function deleteForecastExtraExpense(ctx: V2SessionContext, id: string): Promise<void> {
+  const sb = getV2Supabase();
+  const { error } = await sb
+    .from("v2_personal_forecast_extra_expenses")
+    .delete()
     .eq("id", id)
     .eq("user_id", uid(ctx));
   if (error) throw error;

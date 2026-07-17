@@ -47,8 +47,10 @@
 | 026 | `026_v2_leads_awaiting_start_status.sql` | Статус лидов «Ожидает начала работы» |
 | 027 | `027_v2_leads_source_and_taken_into_work.sql` | Источник лида и дата «взяли в работу» |
 | 028 | `028_v2_personal_transactions_import.sql` | Импорт выписок: external_id / import_batch_id у транзакций |
+| 029 | `029_v2_personal_forecast_expenses.sql` | Прогноз: expected_expenses_rub + доп. расходы месяца |
+| 030 | `030_v2_personal_tax_patent.sql` | Налоги ИП на патенте (ПСН): patent_cost_rub, порог/ставка выручки |
 
-**Следующий свободный номер:** `029`
+**Следующий свободный номер:** `031`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 
