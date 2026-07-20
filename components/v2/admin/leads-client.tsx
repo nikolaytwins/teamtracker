@@ -1,7 +1,9 @@
 "use client";
 
+import { LeadsAllTimeAnalyticsPanel } from "@/components/v2/admin/leads-all-time-analytics-panel";
 import { LeadsAnalyticsPanel } from "@/components/v2/admin/leads-analytics-panel";
 import { V2Icons } from "@/components/v2/ui/icons";
+import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
   V2_LEAD_SOURCES,
@@ -13,7 +15,17 @@ import {
   type V2LeadStatus,
   type V2LeadType,
 } from "@/lib/v2/leads/lead-types";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+type LeadsTab = "board" | "analytics" | "all-time";
+
+function resolveTab(initialTab: LeadsTab, viewParam: string | null): LeadsTab {
+  if (initialTab === "all-time") return "all-time";
+  if (viewParam === "analytics") return "analytics";
+  if (viewParam === "all-time") return "all-time";
+  return "board";
+}
 
 function todayYmd() {
   const today = new Date();
@@ -516,8 +528,18 @@ function formPayload(form: LeadFormState) {
   };
 }
 
-export function V2AdminLeadsClient() {
-  const [tab, setTab] = useState<"board" | "analytics">("board");
+export function V2AdminLeadsClient({
+  initialTab = "board",
+}: {
+  initialTab?: LeadsTab;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<LeadsTab>(() => resolveTab(initialTab, searchParams.get("view")));
+
+  useEffect(() => {
+    setTab(resolveTab(initialTab, searchParams.get("view")));
+  }, [initialTab, searchParams]);
   const [leads, setLeads] = useState<V2LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -554,6 +576,7 @@ export function V2AdminLeadsClient() {
     const g: Record<V2LeadStatus, V2LeadRow[]> = {
       correspondence: [],
       thinking: [],
+      taken_into_work: [],
       awaiting_start: [],
       pause: [],
       lost: [],
@@ -572,12 +595,27 @@ export function V2AdminLeadsClient() {
   async function moveLead(id: string, status: V2LeadStatus) {
     const current = leads.find((l) => l.id === id);
     if (!current || current.status === status) return;
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+    const takenIntoWorkAt =
+      status === "taken_into_work" && !current.taken_into_work_at ? todayYmd() : undefined;
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              status,
+              taken_into_work_at: takenIntoWorkAt ?? l.taken_into_work_at,
+            }
+          : l
+      )
+    );
     try {
       await fetchJson(`/api/v2/admin/leads/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          ...(takenIntoWorkAt ? { takenIntoWorkAt } : {}),
+        }),
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось переместить");
@@ -685,13 +723,19 @@ export function V2AdminLeadsClient() {
           {(
             [
               { key: "board", label: "Канбан" },
-              { key: "analytics", label: "Аналитика" },
+              { key: "analytics", label: "По месяцам" },
+              { key: "all-time", label: "За всё время" },
             ] as const
           ).map(({ key, label }) => (
             <button
               key={key}
               type="button"
-              onClick={() => setTab(key)}
+              onClick={() => {
+                setTab(key);
+                if (key === "all-time") router.push(appPath("/v2/admin/leads/all-time"));
+                else if (key === "analytics") router.push(appPath("/v2/admin/leads?view=analytics"));
+                else router.push(appPath("/v2/admin/leads"));
+              }}
               className={`relative pb-3 text-[13.5px] font-medium transition ${
                 tab === key ? "text-[var(--v2-ink-900)]" : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-800)]"
               }`}
@@ -707,7 +751,9 @@ export function V2AdminLeadsClient() {
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-6">
         <div className="mx-auto max-w-[1600px]">
-          {tab === "analytics" ? (
+          {tab === "all-time" ? (
+            <LeadsAllTimeAnalyticsPanel />
+          ) : tab === "analytics" ? (
             <LeadsAnalyticsPanel />
           ) : (
             <>

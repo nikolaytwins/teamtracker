@@ -1,4 +1,10 @@
-export type V2LeadStatus = "correspondence" | "thinking" | "awaiting_start" | "pause" | "lost";
+export type V2LeadStatus =
+  | "correspondence"
+  | "thinking"
+  | "taken_into_work"
+  | "awaiting_start"
+  | "pause"
+  | "lost";
 export type V2LeadType = "agency" | "course";
 export type V2LeadSource = "regular" | "referral" | "profi_ru" | "custom" | "";
 
@@ -29,6 +35,7 @@ export const V2_LEAD_STATUSES: {
 }[] = [
   { key: "correspondence", label: "Переписка", dot: "#3B6FF7" },
   { key: "thinking", label: "Думает", dot: "#F59E0B" },
+  { key: "taken_into_work", label: "Взято в работу", dot: "#059669" },
   { key: "awaiting_start", label: "Ожидает начала работы", dot: "#10B981" },
   { key: "pause", label: "Пауза", dot: "#7C3AED" },
   { key: "lost", label: "Слив", dot: "#A1A1AA" },
@@ -55,7 +62,14 @@ export const V2_LEAD_SOURCES: {
 ];
 
 export function isV2LeadStatus(v: unknown): v is V2LeadStatus {
-  return v === "correspondence" || v === "thinking" || v === "awaiting_start" || v === "pause" || v === "lost";
+  return (
+    v === "correspondence" ||
+    v === "thinking" ||
+    v === "taken_into_work" ||
+    v === "awaiting_start" ||
+    v === "pause" ||
+    v === "lost"
+  );
 }
 
 export function isV2LeadType(v: unknown): v is V2LeadType {

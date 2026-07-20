@@ -1,0 +1,8 @@
+-- 031 — статус лидов «Взято в работу».
+
+ALTER TABLE v2_leads
+  DROP CONSTRAINT IF EXISTS v2_leads_status_check;
+
+ALTER TABLE v2_leads
+  ADD CONSTRAINT v2_leads_status_check
+  CHECK (status IN ('correspondence', 'thinking', 'taken_into_work', 'awaiting_start', 'pause', 'lost'));

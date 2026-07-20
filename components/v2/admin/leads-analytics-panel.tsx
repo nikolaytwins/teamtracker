@@ -75,12 +75,9 @@ function MoneyTrendChart({
   const leadsAmt = series.map((d) => d.estimatedAmount);
   const closed = series.map((d) => d.takenIntoWorkAmount);
   const actual = series.map((d) => d.finance.actualRevenue);
-  const profit = series.map((d) => d.finance.profit);
-  const rawMax = Math.max(...leadsAmt, ...closed, ...actual, ...profit, 1);
-  const rawMin = Math.min(0, ...profit);
-  const span = rawMax - rawMin || 1;
-  const min = rawMin - span * 0.04;
-  const max = rawMax + span * 0.08;
+  const rawMax = Math.max(...leadsAmt, ...closed, ...actual, 1);
+  const min = 0;
+  const max = rawMax * 1.08 || 1;
 
   const X = (i: number) =>
     series.length <= 1 ? W / 2 : padX + (i * (W - padX * 2)) / (series.length - 1);
@@ -89,11 +86,9 @@ function MoneyTrendChart({
   const leadPts = series.map((d, i) => ({ x: X(i), y: Y(d.estimatedAmount) }));
   const closedPts = series.map((d, i) => ({ x: X(i), y: Y(d.takenIntoWorkAmount) }));
   const actualPts = series.map((d, i) => ({ x: X(i), y: Y(d.finance.actualRevenue) }));
-  const profitPts = series.map((d, i) => ({ x: X(i), y: Y(d.finance.profit) }));
   const leadLine = smoothPath(leadPts);
   const closedLine = smoothPath(closedPts);
   const actualLine = smoothPath(actualPts);
-  const profitLine = smoothPath(profitPts);
   const closedArea =
     closedPts.length > 1
       ? `${closedLine} L ${closedPts[closedPts.length - 1]!.x} ${H - padBot} L ${closedPts[0]!.x} ${H - padBot} Z`
@@ -114,9 +109,6 @@ function MoneyTrendChart({
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-teal-500" /> Факт. выручка
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" /> Прибыль
-        </span>
       </div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
@@ -136,21 +128,9 @@ function MoneyTrendChart({
             <line key={i} x1={padX} x2={W - padX} y1={y} y2={y} stroke="#0A0A0B" strokeOpacity="0.06" />
           );
         })}
-        {rawMin < 0 ? (
-          <line
-            x1={padX}
-            x2={W - padX}
-            y1={Y(0)}
-            y2={Y(0)}
-            stroke="#0A0A0B"
-            strokeOpacity="0.12"
-            strokeDasharray="4 4"
-          />
-        ) : null}
         {closedArea ? <path d={closedArea} fill="url(#laClosedFill)" /> : null}
         <path d={closedLine} fill="none" stroke="#3B6FF7" strokeWidth="2.6" strokeLinecap="round" />
         <path d={actualLine} fill="none" stroke="#0EA5A4" strokeWidth="2.2" strokeLinecap="round" />
-        <path d={profitLine} fill="none" stroke="#10B981" strokeWidth="2.2" strokeLinecap="round" />
         <path
           d={leadLine}
           fill="none"
@@ -189,7 +169,6 @@ function MoneyTrendChart({
               <circle cx={x} cy={Y(d.takenIntoWorkAmount)} r={active ? 4.5 : 0} fill="#fff" stroke="#3B6FF7" strokeWidth="2.2" />
               <circle cx={x} cy={Y(d.estimatedAmount)} r={active ? 4 : 0} fill="#fff" stroke="#F59E0B" strokeWidth="2" />
               <circle cx={x} cy={Y(d.finance.actualRevenue)} r={active ? 4 : 0} fill="#fff" stroke="#0EA5A4" strokeWidth="2" />
-              <circle cx={x} cy={Y(d.finance.profit)} r={active ? 4 : 0} fill="#fff" stroke="#10B981" strokeWidth="2" />
               <text
                 x={x}
                 y={H - 12}
@@ -483,8 +462,8 @@ export function LeadsAnalyticsPanel() {
         <div>
           <h2 className="v2-tight text-[18px] font-semibold text-[var(--v2-ink-900)]">Аналитика за месяц</h2>
           <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-500)]">
-            Лиды — по дате добавления. «Закрыто продаж» — сумма лидов с галкой «взяли в работу». Выручка и
-            прибыль — из финансов за тот же месяц.
+            Лиды — по дате добавления. «Закрыто продаж» — сумма лидов с галкой «взяли в работу». Выручка —
+            из финансов за тот же месяц.
           </p>
         </div>
         <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--v2-ink-200)] bg-white p-1">
@@ -510,7 +489,7 @@ export function LeadsAnalyticsPanel() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
         <Kpi label="Лидов" value={String(point.leadsCount)} hint="добавлено за месяц" accent="#3B6FF7" />
         <Kpi label="Сумма лидов" value={formatRub(point.estimatedAmount)} hint="ориентир по всем лидам" accent="#F59E0B" />
         <Kpi
@@ -534,12 +513,6 @@ export function LeadsAnalyticsPanel() {
               : "оплачено в финансах"
           }
           accent="#0EA5A4"
-        />
-        <Kpi
-          label="Прибыль"
-          value={formatRub(fin.profit)}
-          hint="из проектов и финансов"
-          accent={fin.profit >= 0 ? "#10B981" : "#EF4444"}
         />
       </div>
 
@@ -591,8 +564,7 @@ export function LeadsAnalyticsPanel() {
           </span>
           <span className="text-[var(--v2-ink-400)]">→</span>
           <span className="rounded-xl bg-white px-3 py-2 shadow-sm">
-            оплачено <span className="v2-tnum font-semibold">{formatRub(fin.actualRevenue)}</span> · прибыль{" "}
-            <span className="v2-tnum font-semibold">{formatRub(fin.profit)}</span>
+            оплачено <span className="v2-tnum font-semibold">{formatRub(fin.actualRevenue)}</span>
           </span>
         </div>
       </div>

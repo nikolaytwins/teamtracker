@@ -59,6 +59,16 @@ function formatDate(ymd: string) {
   }).format(new Date(year!, month! - 1, day));
 }
 
+function formatDeadlineDay(ymd: string) {
+  const [year, month, day] = ymd.split("-").map(Number);
+  const date = new Date(year!, month! - 1, day);
+  return {
+    day: String(day),
+    weekday: new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(date),
+    month: new Intl.DateTimeFormat("ru-RU", { month: "short" }).format(date),
+  };
+}
+
 function monthGrid(year: number, month: number) {
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -82,9 +92,11 @@ function monthGrid(year: number, month: number) {
 function CalendarEventCard({
   item,
   onComplete,
+  hideDate = false,
 }: {
   item: PersonalCalendarItem;
   onComplete: (item: PersonalCalendarItem) => void;
+  hideDate?: boolean;
 }) {
   return (
     <article
@@ -113,10 +125,14 @@ function CalendarEventCard({
           >
             {item.category}
           </span>
-          <span className="v2-tnum text-[11px] text-[var(--v2-ink-500)]">
-            {formatDate(item.date)}
-            {item.time ? ` · ${item.time}` : ""}
-          </span>
+          {!hideDate ? (
+            <span className="v2-tnum text-[11px] text-[var(--v2-ink-500)]">
+              {formatDate(item.date)}
+              {item.time ? ` · ${item.time}` : ""}
+            </span>
+          ) : item.time ? (
+            <span className="v2-tnum text-[11px] text-[var(--v2-ink-500)]">до {item.time}</span>
+          ) : null}
         </div>
       </div>
       <button
@@ -189,6 +205,16 @@ export function PersonalCalendarClient() {
       list.push(item);
       grouped.set(item.date, list);
     }
+    for (const [date, list] of grouped) {
+      grouped.set(
+        date,
+        [...list].sort((a, b) => {
+          const done = Number(Boolean(a.completed_at)) - Number(Boolean(b.completed_at));
+          if (done !== 0) return done;
+          return (a.time ?? "").localeCompare(b.time ?? "") || a.title.localeCompare(b.title, "ru");
+        })
+      );
+    }
     return grouped;
   }, [items]);
 
@@ -201,11 +227,22 @@ export function PersonalCalendarClient() {
         .slice(0, 8),
     [items, today]
   );
+  const upcomingByDate = useMemo(() => {
+    const groups: { date: string; items: PersonalCalendarItem[] }[] = [];
+    for (const item of upcoming) {
+      const last = groups[groups.length - 1];
+      if (last?.date === item.date) last.items.push(item);
+      else groups.push({ date: item.date, items: [item] });
+    }
+    return groups;
+  }, [upcoming]);
   const weeklyItems = useMemo(
     () =>
       items
-        .filter((item) => !item.completed_at && item.date >= week.from && item.date <= week.to)
+        .filter((item) => item.date >= week.from && item.date <= week.to)
         .sort((a, b) => {
+          const done = Number(Boolean(a.completed_at)) - Number(Boolean(b.completed_at));
+          if (done !== 0) return done;
           const aImportance = IMPORTANCE[a.priority ?? "none"];
           const bImportance = IMPORTANCE[b.priority ?? "none"];
           return aImportance.rank - bImportance.rank || a.date.localeCompare(b.date);
@@ -229,14 +266,20 @@ export function PersonalCalendarClient() {
   }
 
   async function toggleComplete(item: PersonalCalendarItem) {
+    const nextCompleted = item.completed_at ? null : new Date().toISOString();
+    setItems((prev) =>
+      prev.map((row) => (row.id === item.id ? { ...row, completed_at: nextCompleted } : row))
+    );
     try {
       await fetchJson(`/api/v2/personal/todos/${item.id}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ completed: !item.completed_at }),
       });
-      await load();
     } catch (reason) {
+      setItems((prev) =>
+        prev.map((row) => (row.id === item.id ? { ...row, completed_at: item.completed_at } : row))
+      );
       setError(reason instanceof Error ? reason.message : "Не удалось обновить дедлайн");
     }
   }
@@ -356,13 +399,16 @@ export function PersonalCalendarClient() {
                       <div
                         key={item.id}
                         className={`truncate rounded-md px-1.5 py-1 text-[9px] font-semibold leading-none sm:text-[10px] ${
-                          item.completed_at ? "line-through opacity-50" : ""
+                          item.completed_at ? "line-through decoration-[1.5px] opacity-45" : ""
                         }`}
-                        style={{ color: item.color, background: `${item.color}14` }}
+                        style={{
+                          color: item.completed_at ? "#71717A" : item.color,
+                          background: item.completed_at ? "#F4F4F5" : `${item.color}14`,
+                        }}
                       >
                         <span
                           className="mr-1 inline-block h-1.5 w-1.5 rounded-full"
-                          style={{ background: item.color }}
+                          style={{ background: item.completed_at ? "#A1A1AA" : item.color }}
                         />
                         {item.title}
                       </div>
@@ -422,11 +468,50 @@ export function PersonalCalendarClient() {
                 <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--v2-brand-500)]" />
               ) : null}
             </div>
-            {upcoming.length ? (
-              <div className="space-y-2">
-                {upcoming.map((item) => (
-                  <CalendarEventCard key={item.id} item={item} onComplete={toggleComplete} />
-                ))}
+            {upcomingByDate.length ? (
+              <div className="space-y-4">
+                {upcomingByDate.map((group) => {
+                  const stamp = formatDeadlineDay(group.date);
+                  const isToday = group.date === today;
+                  return (
+                    <div key={group.date}>
+                      <div className="mb-2 flex items-center gap-2.5">
+                        <div
+                          className={`flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl ${
+                            isToday
+                              ? "bg-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]"
+                              : "bg-[var(--v2-ink-900)] text-white"
+                          }`}
+                        >
+                          <span className="v2-tnum text-[16px] font-bold leading-none">{stamp.day}</span>
+                          <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide opacity-80">
+                            {stamp.month.replace(".", "")}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="v2-tight text-[14px] font-bold capitalize text-[var(--v2-ink-900)]">
+                            {stamp.weekday}
+                            {isToday ? " · сегодня" : ""}
+                          </p>
+                          <p className="v2-tnum text-[11px] text-[var(--v2-ink-500)]">
+                            {formatDate(group.date)}
+                            {group.items.length > 1 ? ` · ${group.items.length}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {group.items.map((item) => (
+                          <CalendarEventCard
+                            key={item.id}
+                            item={item}
+                            onComplete={toggleComplete}
+                            hideDate
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="rounded-xl bg-[var(--v2-ink-50)] px-3 py-5 text-center text-[12px] text-[var(--v2-ink-500)]">
@@ -518,27 +603,38 @@ export function PersonalCalendarClient() {
           <div className="divide-y divide-[var(--v2-ink-100)]">
             {weeklyItems.map((item, index) => {
               const importance = IMPORTANCE[item.priority ?? "none"];
+              const done = Boolean(item.completed_at);
               return (
                 <div
                   key={item.id}
-                  className="v2-row-in group flex items-center gap-3 px-4 py-3.5 transition hover:bg-[var(--v2-ink-50)]/70 sm:px-5"
+                  className={`v2-row-in group flex items-center gap-3 px-4 py-3.5 transition hover:bg-[var(--v2-ink-50)]/70 sm:px-5 ${
+                    done ? "opacity-60" : ""
+                  }`}
                   style={{ animationDelay: `${index * 35}ms` }}
                 >
                   <span
                     className="h-9 w-1 shrink-0 rounded-full"
-                    style={{ background: importance.color }}
+                    style={{ background: done ? "#A1A1AA" : importance.color }}
                     aria-hidden
                   />
                   <button
                     type="button"
                     onClick={() => void toggleComplete(item)}
-                    aria-label="Выполнить задачу"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--v2-ink-200)] text-transparent transition hover:border-[var(--v2-brand-300)] hover:text-[var(--v2-brand-500)]"
+                    aria-label={done ? "Вернуть задачу" : "Выполнить задачу"}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition ${
+                      done
+                        ? "border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
+                        : "border-[var(--v2-ink-200)] text-transparent hover:border-[var(--v2-brand-300)] hover:text-[var(--v2-brand-500)]"
+                    }`}
                   >
                     <V2Icons.check className="h-4 w-4" />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="v2-tight truncate text-[14px] font-semibold text-[var(--v2-ink-900)]">
+                    <p
+                      className={`v2-tight truncate text-[14px] font-semibold text-[var(--v2-ink-900)] ${
+                        done ? "line-through decoration-[1.5px]" : ""
+                      }`}
+                    >
                       {item.title}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--v2-ink-500)]">
@@ -549,9 +645,12 @@ export function PersonalCalendarClient() {
                   </div>
                   <span
                     className="hidden rounded-lg px-2 py-1 text-[10px] font-semibold sm:inline-flex"
-                    style={{ color: importance.color, background: importance.background }}
+                    style={{
+                      color: done ? "#71717A" : importance.color,
+                      background: done ? "#F4F4F5" : importance.background,
+                    }}
                   >
-                    {importance.label}
+                    {done ? "Сделано" : importance.label}
                   </span>
                 </div>
               );
