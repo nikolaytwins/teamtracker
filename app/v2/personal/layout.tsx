@@ -11,6 +11,11 @@ const TABS = [
     match: (p: string) => p.includes(appPath("/v2/personal/tasks")),
   },
   {
+    href: "/v2/personal/calendar",
+    label: "Календарь",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/calendar")),
+  },
+  {
     href: "/v2/personal/finance",
     label: "Финансы",
     match: (p: string) => p === appPath("/v2/personal/finance"),
