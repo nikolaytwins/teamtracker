@@ -50,8 +50,9 @@
 | 029 | `029_v2_personal_forecast_expenses.sql` | Прогноз: expected_expenses_rub + доп. расходы месяца |
 | 030 | `030_v2_personal_tax_patent.sql` | Налоги ИП на патенте (ПСН): patent_cost_rub, порог/ставка выручки |
 | 031 | `031_v2_leads_taken_into_work_status.sql` | Статус лидов «Взято в работу» |
+| 032 | `032_v2_personal_forecast_daily_spend.sql` | Прогноз: daily_spend_rub у бюджета месяца |
 
-**Следующий свободный номер:** `032`
+**Следующий свободный номер:** `033`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

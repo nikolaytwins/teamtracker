@@ -3,6 +3,7 @@ import {
   computeFinanceMonthSummary,
   listFinanceGeneralExpenses,
   listFinanceProjectsForMonth,
+  listUnpaidFinanceRemainders,
 } from "@/lib/v2/finance/finance-repo";
 import { listPersonalIncomeHistory } from "@/lib/v2/personal/income-history-repo";
 import { DEFAULT_BUDGET_CATEGORIES } from "@/lib/v2/personal/formatters";
@@ -11,6 +12,8 @@ import type {
   PersonalBudgetCategoryRow,
   PersonalBudgetMonthRow,
   PersonalCapitalRow,
+  PersonalCashForecast,
+  PersonalCashForecastPlannedIncome,
   PersonalFinanceDashboard,
   PersonalForecastExtraExpenseRow,
   PersonalIncomeHistoryRow,
@@ -135,6 +138,7 @@ async function ensureBudgetMonth(userId: string, year: number, month: number): P
         data.expected_expenses_rub == null
           ? DEFAULT_EXPECTED_EXPENSES_RUB
           : Number(data.expected_expenses_rub) || 0,
+      daily_spend_rub: Number(data.daily_spend_rub) || 0,
     };
   }
   const limit = DEFAULT_BUDGET_CATEGORIES.reduce((s, c) => s + c.limit, 0);
@@ -144,6 +148,7 @@ async function ensureBudgetMonth(userId: string, year: number, month: number): P
     month,
     limit_rub: limit,
     expected_expenses_rub: DEFAULT_EXPECTED_EXPENSES_RUB,
+    daily_spend_rub: 0,
     updated_at: nowIso(),
   };
   await sb.from("v2_personal_budget_months").insert(row);
@@ -176,6 +181,7 @@ async function ensureBudgetMonth(userId: string, year: number, month: number): P
     month,
     limit_rub: limit,
     expected_expenses_rub: DEFAULT_EXPECTED_EXPENSES_RUB,
+    daily_spend_rub: 0,
   };
 }
 
@@ -1415,6 +1421,85 @@ export async function updatePersonalExpectedExpenses(
     .eq("month", month);
   if (error) throw error;
   return ensureBudgetMonth(userId, year, month);
+}
+
+export async function updatePersonalDailySpend(
+  ctx: V2SessionContext,
+  year: number,
+  month: number,
+  daily_spend_rub: number
+): Promise<PersonalBudgetMonthRow> {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new PersonalFinanceValidationError("Некорректный месяц");
+  }
+  if (!Number.isFinite(daily_spend_rub) || daily_spend_rub < 0) {
+    throw new PersonalFinanceValidationError("Сумма в день должна быть ≥ 0");
+  }
+  const userId = uid(ctx);
+  await ensureBudgetMonth(userId, year, month);
+  const sb = getV2Supabase();
+  const { error } = await sb
+    .from("v2_personal_budget_months")
+    .update({ daily_spend_rub: Math.round(daily_spend_rub), updated_at: nowIso() })
+    .eq("user_id", userId)
+    .eq("year", year)
+    .eq("month", month);
+  if (error) throw error;
+  return ensureBudgetMonth(userId, year, month);
+}
+
+function remainingDaysInMonth(year: number, month: number, now = new Date()): number {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const nowY = now.getFullYear();
+  const nowM = now.getMonth() + 1;
+  const nowD = now.getDate();
+  if (year < nowY || (year === nowY && month < nowM)) return 0;
+  if (year > nowY || (year === nowY && month > nowM)) return daysInMonth;
+  return Math.max(0, daysInMonth - nowD + 1);
+}
+
+export async function loadPersonalCashForecast(
+  ctx: V2SessionContext,
+  year: number,
+  month: number
+): Promise<PersonalCashForecast> {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new PersonalFinanceValidationError("Некорректный месяц");
+  }
+  const userId = uid(ctx);
+  const budget = await ensureBudgetMonth(userId, year, month);
+  const sb = getV2Supabase();
+  const [accountsRes, one_time_expenses, unpaid] = await Promise.all([
+    sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order"),
+    listForecastExtras(userId, year, month),
+    listUnpaidFinanceRemainders(ctx),
+  ]);
+  if (accountsRes.error) throw accountsRes.error;
+  const accounts = (accountsRes.data ?? []).map((r) => mapAccount(r as Record<string, unknown>));
+  const disposable = accounts.filter((a) => a.disposable).reduce((s, a) => s + a.balance_rub, 0);
+  const planned_incomes: PersonalCashForecastPlannedIncome[] = unpaid.map((p) => ({
+    project_id: p.project_id,
+    name: p.name,
+    remaining_rub: p.remaining_rub,
+    status: p.status,
+  }));
+  const one_time_total = one_time_expenses.reduce((s, e) => s + e.amount_rub, 0);
+  const planned_incomes_total = planned_incomes.reduce((s, p) => s + p.remaining_rub, 0);
+  const days_in_month = new Date(year, month, 0).getDate();
+  const days_left = remainingDaysInMonth(year, month);
+
+  return {
+    year,
+    month,
+    disposable,
+    daily_spend_rub: budget.daily_spend_rub,
+    days_in_month,
+    days_left,
+    one_time_expenses,
+    one_time_total,
+    planned_incomes,
+    planned_incomes_total,
+  };
 }
 
 export async function createForecastExtraExpense(

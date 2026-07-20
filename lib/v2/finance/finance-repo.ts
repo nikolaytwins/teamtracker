@@ -119,6 +119,28 @@ export async function listFinanceProjectsForMonth(
     });
 }
 
+/** Неоплаченные проекты с остатком к получению — для личного кассового прогноза. */
+export async function listUnpaidFinanceRemainders(ctx: V2SessionContext): Promise<
+  Array<{
+    project_id: string;
+    name: string;
+    remaining_rub: number;
+    status: V2FinancePaymentStatus;
+  }>
+> {
+  const all = await loadEnrichedFinanceProjects(ctx);
+  return all
+    .filter((p) => p.status !== "paid")
+    .map((p) => ({
+      project_id: p.id,
+      name: p.name,
+      remaining_rub: Math.max(0, Math.round(p.effective_total_amount - p.paid_amount)),
+      status: p.status,
+    }))
+    .filter((p) => p.remaining_rub > 0)
+    .sort((a, b) => b.remaining_rub - a.remaining_rub || a.name.localeCompare(b.name, "ru"));
+}
+
 /** Сводки по месяцам за один проход — те же формулы, что в дашборде финансов. */
 export async function listFinanceMonthSummaries(
   ctx: V2SessionContext,

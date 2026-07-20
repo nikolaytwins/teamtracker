@@ -76,6 +76,8 @@ export type PersonalBudgetMonthRow = {
   limit_rub: number;
   /** Базовые ожидаемые расходы для прогноза (по умолчанию 180 000) */
   expected_expenses_rub: number;
+  /** Планируемые траты в день для кассового прогноза */
+  daily_spend_rub: number;
 };
 
 export type PersonalForecastExtraExpenseRow = {
@@ -86,6 +88,28 @@ export type PersonalForecastExtraExpenseRow = {
   label: string;
   amount_rub: number;
   sort_order: number;
+};
+
+/** Планируемое поступление из неоплаченного проекта агентства */
+export type PersonalCashForecastPlannedIncome = {
+  project_id: string;
+  name: string;
+  remaining_rub: number;
+  status: "not_paid" | "prepaid" | "paid";
+};
+
+/** Кассовый прогноз до конца месяца */
+export type PersonalCashForecast = {
+  year: number;
+  month: number;
+  disposable: number;
+  daily_spend_rub: number;
+  days_in_month: number;
+  days_left: number;
+  one_time_expenses: PersonalForecastExtraExpenseRow[];
+  one_time_total: number;
+  planned_incomes: PersonalCashForecastPlannedIncome[];
+  planned_incomes_total: number;
 };
 
 export type PersonalBudgetCategoryRow = {
