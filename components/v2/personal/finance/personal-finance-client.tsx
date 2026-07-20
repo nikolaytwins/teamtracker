@@ -6,6 +6,10 @@ import {
   PersonalIncomeChart,
   PersonalSpark,
 } from "./personal-finance-charts";
+import {
+  PersonalAccountBalanceInline,
+  PersonalCapitalAmountInline,
+} from "./personal-money-inline";
 import { PersonalOperationModal } from "./personal-operation-modal";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
@@ -814,7 +818,15 @@ function PfForecastCard({
   );
 }
 
-function PfAccountRow({ a }: { a: PersonalAccountRow }) {
+function PfAccountRow({
+  a,
+  onSaved,
+  onError,
+}: {
+  a: PersonalAccountRow;
+  onSaved: () => void;
+  onError: (msg: string) => void;
+}) {
   const goalPct = a.goal_amount_rub ? Math.min(a.balance_rub / a.goal_amount_rub, 1) : null;
   return (
     <div className="group flex items-center gap-3.5 px-4 py-3 transition hover:bg-[var(--v2-ink-50)]/70">
@@ -845,14 +857,27 @@ function PfAccountRow({ a }: { a: PersonalAccountRow }) {
           </div>
         ) : null}
       </div>
-      <div className="v2-tight shrink-0 text-right text-[15px] font-semibold text-[var(--v2-ink-900)]">
-        <PersonalAmt v={a.balance_rub} />
+      <div className="v2-tight shrink-0 text-right">
+        <PersonalAccountBalanceInline
+          accountId={a.id}
+          value={a.balance_rub}
+          onSaved={() => onSaved()}
+          onError={onError}
+        />
       </div>
     </div>
   );
 }
 
-function PfCapitalRow({ c }: { c: PersonalCapitalRow }) {
+function PfCapitalRow({
+  c,
+  onSaved,
+  onError,
+}: {
+  c: PersonalCapitalRow;
+  onSaved: () => void;
+  onError: (msg: string) => void;
+}) {
   const tint = c.tint || "#52525B";
   return (
     <div className="flex items-center gap-3.5 px-4 py-3 transition hover:bg-[var(--v2-ink-50)]/70">
@@ -873,8 +898,13 @@ function PfCapitalRow({ c }: { c: PersonalCapitalRow }) {
         </div>
         {c.meta ? <div className="v2-tight mt-0.5 text-[12px] text-[var(--v2-ink-500)]">{c.meta}</div> : null}
       </div>
-      <div className="v2-tight shrink-0 text-right text-[15px] font-semibold text-[var(--v2-ink-900)]">
-        <PersonalAmt v={c.amount_rub} />
+      <div className="v2-tight shrink-0 text-right">
+        <PersonalCapitalAmountInline
+          capitalId={c.id}
+          value={c.amount_rub}
+          onSaved={() => onSaved()}
+          onError={onError}
+        />
       </div>
     </div>
   );
@@ -884,10 +914,14 @@ function PfAccountsAndCapital({
   accounts,
   capital,
   summary,
+  onReload,
+  onError,
 }: {
   accounts: PersonalAccountRow[];
   capital: PersonalCapitalRow[];
   summary: PersonalFinanceDashboard["summary"];
+  onReload: () => void;
+  onError: (msg: string) => void;
 }) {
   const accountsTotal = summary.disposable + summary.reserves;
   const manageLink = appPath("/v2/personal/finance/accounts");
@@ -931,7 +965,7 @@ function PfAccountsAndCapital({
         ) : (
           <PfCard className="divide-y divide-[var(--v2-ink-100)]/70 overflow-hidden">
             {accounts.map((a) => (
-              <PfAccountRow key={a.id} a={a} />
+              <PfAccountRow key={a.id} a={a} onSaved={onReload} onError={onError} />
             ))}
           </PfCard>
         )}
@@ -973,7 +1007,7 @@ function PfAccountsAndCapital({
         ) : (
           <PfCard className="divide-y divide-[var(--v2-ink-100)]/70 overflow-hidden">
             {capital.map((c) => (
-              <PfCapitalRow key={c.id} c={c} />
+              <PfCapitalRow key={c.id} c={c} onSaved={onReload} onError={onError} />
             ))}
           </PfCard>
         )}
@@ -1828,7 +1862,13 @@ export function PersonalFinanceClient() {
                 month={month}
                 onReload={() => void reload()}
               />
-              <PfAccountsAndCapital accounts={accounts} capital={capital} summary={summary} />
+              <PfAccountsAndCapital
+                accounts={accounts}
+                capital={capital}
+                summary={summary}
+                onReload={() => void reload()}
+                onError={setError}
+              />
               <PfChartsSection history={history} masked={masked} year={year} month={month} />
               <PfHistoryTable incomeHistory={incomeHistory} year={year} month={month} />
               <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">

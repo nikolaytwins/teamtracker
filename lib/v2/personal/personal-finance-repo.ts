@@ -611,7 +611,7 @@ function capitalPatch(patch: Partial<PersonalCapitalRow>): Partial<PersonalCapit
   const out: Partial<PersonalCapitalRow> = {};
   if (patch.name !== undefined) out.name = String(patch.name).trim() || "Актив";
   if (patch.icon_key !== undefined) out.icon_key = patch.icon_key;
-  if (patch.amount_rub !== undefined) out.amount_rub = patch.amount_rub;
+  if (patch.amount_rub !== undefined) out.amount_rub = Math.round(Number(patch.amount_rub) || 0);
   if (patch.meta !== undefined) out.meta = patch.meta;
   if (patch.unit_label !== undefined) out.unit_label = patch.unit_label;
   if (patch.tint !== undefined) out.tint = patch.tint;

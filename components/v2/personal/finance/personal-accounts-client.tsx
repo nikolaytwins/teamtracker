@@ -1,6 +1,10 @@
 "use client";
 
 import { PersonalAmt, PersonalMaskProvider } from "./personal-finance-mask";
+import {
+  PersonalAccountBalanceInline,
+  PersonalCapitalAmountInline,
+} from "./personal-money-inline";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type {
   PersonalAccountRow,
@@ -11,103 +15,7 @@ import type {
 import { V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-
-function parseMoneyInput(raw: string): number | null {
-  const t = raw.trim();
-  if (!t || t === "—" || t === "-") return null;
-  const cleaned = t.replace(/\s/g, "").replace(/₽/g, "").replace(/,/g, ".").replace(/^\+/, "");
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? Math.round(n) : null;
-}
-
-function formatDraft(v: number) {
-  return String(Math.round(v));
-}
-
-function AccountBalanceInline({
-  accountId,
-  value,
-  onSaved,
-  onError,
-}: {
-  accountId: string;
-  value: number;
-  onSaved: (balance: number) => void;
-  onError: (msg: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing) {
-      setDraft(formatDraft(value));
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [editing, value]);
-
-  const commit = async () => {
-    const parsed = parseMoneyInput(draft);
-    if (parsed == null) {
-      onError("Некорректная сумма");
-      return;
-    }
-    setEditing(false);
-    if (parsed === value) return;
-
-    setSaving(true);
-    try {
-      const { account } = await fetchJson<{ account: PersonalAccountRow }>(
-        `/api/v2/personal/finance/accounts/${accountId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ balance_rub: parsed }),
-        }
-      );
-      onSaved(account.balance_rub);
-    } catch (e) {
-      onError(e instanceof Error ? e.message : "Не удалось сохранить баланс");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => void commit()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            void commit();
-          }
-          if (e.key === "Escape") setEditing(false);
-        }}
-        className="v2-tnum w-[120px] rounded-lg border border-[var(--v2-brand-300)] bg-white px-2.5 py-1.5 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] outline-none ring-2 ring-[var(--v2-brand-100)]"
-        inputMode="numeric"
-      />
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => setEditing(true)}
-      disabled={saving}
-      title="Нажмите, чтобы изменить баланс"
-      className="v2-tnum rounded-lg px-2 py-1 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] transition hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)] disabled:opacity-50"
-    >
-      <PersonalAmt v={value} />
-    </button>
-  );
-}
+import { useCallback, useEffect, useState } from "react";
 
 const ACCOUNT_TYPES: { value: PersonalAccountType; label: string }[] = [
   { value: "card", label: "Карта" },
@@ -391,7 +299,7 @@ export function PersonalAccountsClient() {
                         {a.note ? ` · ${a.note}` : ""}
                       </div>
                     </div>
-                    <AccountBalanceInline
+                    <PersonalAccountBalanceInline
                       accountId={a.id}
                       value={a.balance_rub}
                       onSaved={(balance) => {
@@ -467,9 +375,23 @@ export function PersonalAccountsClient() {
                       <div className="v2-tight font-medium text-[var(--v2-ink-900)]">{c.name}</div>
                       {c.meta ? <div className="text-[12px] text-[var(--v2-ink-500)]">{c.meta}</div> : null}
                     </div>
-                    <div className="v2-tnum text-right text-[15px] font-semibold text-[var(--v2-ink-900)]">
-                      <PersonalAmt v={c.amount_rub} />
-                    </div>
+                    <PersonalCapitalAmountInline
+                      capitalId={c.id}
+                      value={c.amount_rub}
+                      onSaved={(amount) => {
+                        setData((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                capital: prev.capital.map((x) =>
+                                  x.id === c.id ? { ...x, amount_rub: amount } : x
+                                ),
+                              }
+                            : prev
+                        );
+                      }}
+                      onError={setError}
+                    />
                     <div className="flex shrink-0 gap-1">
                       <button
                         type="button"
