@@ -114,8 +114,38 @@ export async function ensureIdeaTag(
     updated_at: now,
   };
   const { error } = await sb.from("v2_personal_idea_tags").insert(row);
-  if (error) throw error;
+  if (error) {
+    // Гонка / unique lower(name) — перечитаем
+    const again = await listTagsRaw(userId);
+    const retry = again.find((t) => String(t.name).toLowerCase() === name.toLowerCase());
+    if (retry) return mapTag(retry);
+    throw error;
+  }
   return mapTag(row);
+}
+
+async function setIdeaTagNames(
+  ctx: V2SessionContext,
+  ideaId: string,
+  tagNames: string[]
+): Promise<void> {
+  const sb = getV2Supabase();
+  const { error: delErr } = await sb.from("v2_personal_idea_tag_links").delete().eq("idea_id", ideaId);
+  if (delErr) throw delErr;
+
+  const seen = new Set<string>();
+  const links: { idea_id: string; tag_id: string }[] = [];
+  for (const raw of tagNames) {
+    const name = normalizeTagName(raw);
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const tag = await ensureIdeaTag(ctx, name);
+    links.push({ idea_id: ideaId, tag_id: tag.id });
+  }
+  if (!links.length) return;
+
+  const { error } = await sb.from("v2_personal_idea_tag_links").insert(links);
+  if (error) throw error;
 }
 
 async function ownIdea(userId: string, ideaId: string): Promise<boolean> {
@@ -242,10 +272,8 @@ export async function createPersonalIdea(
   const { error } = await sb.from("v2_personal_ideas").insert(row);
   if (error) throw error;
 
-  const tagNames = input.tagNames ?? [];
-  for (const name of tagNames) {
-    const tag = await ensureIdeaTag(ctx, name);
-    await sb.from("v2_personal_idea_tag_links").upsert({ idea_id: row.id, tag_id: tag.id });
+  if (input.tagNames?.length) {
+    await setIdeaTagNames(ctx, row.id, input.tagNames);
   }
 
   const board = await loadPersonalIdeasBoard(ctx);
@@ -281,16 +309,7 @@ export async function updatePersonalIdea(
   if (error) throw error;
 
   if (input.tagNames !== undefined) {
-    const { error: delErr } = await sb.from("v2_personal_idea_tag_links").delete().eq("idea_id", id);
-    if (delErr) throw delErr;
-    const seen = new Set<string>();
-    for (const raw of input.tagNames) {
-      const name = normalizeTagName(raw);
-      if (!name || seen.has(name.toLowerCase())) continue;
-      seen.add(name.toLowerCase());
-      const tag = await ensureIdeaTag(ctx, name);
-      await sb.from("v2_personal_idea_tag_links").upsert({ idea_id: id, tag_id: tag.id });
-    }
+    await setIdeaTagNames(ctx, id, input.tagNames);
   }
 
   const board = await loadPersonalIdeasBoard(ctx);

@@ -161,12 +161,21 @@ function IdeaEditorModal({
   const addTag = (name: string) => {
     const n = name.trim().replace(/^#/, "");
     if (!n) return;
-    if (tagNames.some((x) => x.toLowerCase() === n.toLowerCase())) {
-      setTagDraft("");
-      return;
-    }
-    setTagNames((prev) => [...prev, n]);
+    setTagNames((prev) => {
+      if (prev.some((x) => x.toLowerCase() === n.toLowerCase())) return prev;
+      return [...prev, n];
+    });
     setTagDraft("");
+  };
+
+  /** Тег из поля ввода тоже уходит на сервер (если забыли Enter). */
+  const resolvedTagNames = () => {
+    const draft = tagDraft.trim().replace(/^#/, "");
+    const list = [...tagNames];
+    if (draft && !list.some((x) => x.toLowerCase() === draft.toLowerCase())) {
+      list.push(draft);
+    }
+    return list;
   };
 
   const reloadBoard = async () => {
@@ -179,17 +188,20 @@ function IdeaEditorModal({
     setSaving(true);
     setError(null);
     try {
+      const tags = resolvedTagNames();
+      setTagNames(tags);
+      setTagDraft("");
       if (ideaId) {
         await fetchJson(`/api/v2/personal/ideas/${ideaId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, body, pinned, tagNames }),
+          body: JSON.stringify({ title, body, pinned, tagNames: tags }),
         });
       } else {
         await fetchJson("/api/v2/personal/ideas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, body, pinned, tagNames }),
+          body: JSON.stringify({ title, body, pinned, tagNames: tags }),
         });
       }
       await reloadBoard();
@@ -202,18 +214,21 @@ function IdeaEditorModal({
   };
 
   const ensureSavedId = async (): Promise<string> => {
+    const tags = resolvedTagNames();
+    setTagNames(tags);
+    setTagDraft("");
     if (ideaId) {
       await fetchJson(`/api/v2/personal/ideas/${ideaId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, body, pinned, tagNames }),
+        body: JSON.stringify({ title, body, pinned, tagNames: tags }),
       });
       return ideaId;
     }
     const { idea: created } = await fetchJson<{ idea: PersonalIdea }>("/api/v2/personal/ideas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, body, pinned, tagNames }),
+      body: JSON.stringify({ title, body, pinned, tagNames: tags }),
     });
     setIdeaId(created.id);
     return created.id;
@@ -358,7 +373,7 @@ function IdeaEditorModal({
                     addTag(tagDraft);
                   }
                 }}
-                placeholder="Напишите тег и Enter — или выберите из списка"
+                placeholder="Тег и Enter — или Сохранить с текстом в поле"
                 className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-[13px] outline-none focus:border-[var(--v2-brand-300)]"
               />
               {tagFocus && suggestions.length > 0 ? (
