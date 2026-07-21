@@ -21,16 +21,17 @@ export type UploadedAttachment = {
   contentType: string;
 };
 
-function storagePath(prefix: "projects" | "tasks", entityId: string, filename: string): string {
+function storagePath(prefix: "projects" | "tasks" | "ideas", entityId: string, filename: string): string {
   const safeEntity = entityId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
   const safeName = sanitizeUploadFilename(filename);
   return `${prefix}/${safeEntity}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
 }
 
 export async function uploadAttachmentFiles(
-  prefix: "projects" | "tasks",
+  prefix: "projects" | "tasks" | "ideas",
   entityId: string,
-  files: File[]
+  files: File[],
+  opts?: { imagesOnly?: boolean }
 ): Promise<{ ok: true; uploaded: UploadedAttachment[] } | { ok: false; error: string }> {
   if (!files.length) return { ok: false, error: "Выберите хотя бы один файл" };
   if (!isAttachmentUploadConfigured()) {
@@ -46,15 +47,19 @@ export async function uploadAttachmentFiles(
 
   const bucket = getAttachmentStorageBucket();
   const uploaded: UploadedAttachment[] = [];
+  const imagesOnly = opts?.imagesOnly ?? prefix === "ideas";
 
   for (const file of files) {
     if (file.size <= 0) continue;
     if (file.size > MAX_BYTES) {
       return { ok: false, error: `«${file.name}» больше 50 МБ` };
     }
+    const contentType = file.type?.trim() || "application/octet-stream";
+    if (imagesOnly && !contentType.startsWith("image/")) {
+      return { ok: false, error: `«${file.name}» — нужен файл изображения` };
+    }
 
     const name = sanitizeUploadFilename(file.name);
-    const contentType = file.type?.trim() || "application/octet-stream";
     const buffer = Buffer.from(await file.arrayBuffer());
     const path = storagePath(prefix, entityId, name);
 

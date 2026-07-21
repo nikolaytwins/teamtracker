@@ -36,7 +36,12 @@ export async function PATCH(request: NextRequest) {
     if (e instanceof PersonalFinanceValidationError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
+    const detail =
+      e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : null;
     console.error("forecast expenses:", e);
-    return NextResponse.json({ error: "Failed to update forecast expenses" }, { status: 500 });
+    return NextResponse.json(
+      { error: detail || "Failed to update forecast expenses" },
+      { status: 500 }
+    );
   }
 }

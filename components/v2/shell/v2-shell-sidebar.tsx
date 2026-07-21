@@ -310,6 +310,10 @@ export function V2ShellSidebar({
                 active = pathname?.startsWith(appPath("/v2/personal/tasks")) ?? false;
               } else if (item.href.startsWith("/v2/personal/finance")) {
                 active = pathname?.startsWith(appPath("/v2/personal/finance")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/ideas")) {
+                active = pathname?.startsWith(appPath("/v2/personal/ideas")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/calendar")) {
+                active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
               }
               return <NavLink key={item.href} item={item} active={!!active} />;
             })}

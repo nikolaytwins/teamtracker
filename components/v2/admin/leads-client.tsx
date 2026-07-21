@@ -576,8 +576,8 @@ export function V2AdminLeadsClient({
     const g: Record<V2LeadStatus, V2LeadRow[]> = {
       correspondence: [],
       thinking: [],
-      taken_into_work: [],
       awaiting_start: [],
+      taken_into_work: [],
       pause: [],
       lost: [],
     };

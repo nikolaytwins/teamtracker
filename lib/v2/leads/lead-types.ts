@@ -1,8 +1,8 @@
 export type V2LeadStatus =
   | "correspondence"
   | "thinking"
-  | "taken_into_work"
   | "awaiting_start"
+  | "taken_into_work"
   | "pause"
   | "lost";
 export type V2LeadType = "agency" | "course";
@@ -35,8 +35,8 @@ export const V2_LEAD_STATUSES: {
 }[] = [
   { key: "correspondence", label: "Переписка", dot: "#3B6FF7" },
   { key: "thinking", label: "Думает", dot: "#F59E0B" },
-  { key: "taken_into_work", label: "Взято в работу", dot: "#059669" },
   { key: "awaiting_start", label: "Ожидает начала работы", dot: "#10B981" },
+  { key: "taken_into_work", label: "Взято в работу", dot: "#059669" },
   { key: "pause", label: "Пауза", dot: "#7C3AED" },
   { key: "lost", label: "Слив", dot: "#A1A1AA" },
 ];

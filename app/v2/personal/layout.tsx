@@ -4,7 +4,7 @@ import { appPath } from "@/lib/api-url";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const TABS = [
+const PERSONAL_TABS = [
   {
     href: "/v2/personal/tasks/inbox",
     label: "Задачи",
@@ -15,6 +15,14 @@ const TABS = [
     label: "Календарь",
     match: (p: string) => p.startsWith(appPath("/v2/personal/calendar")),
   },
+  {
+    href: "/v2/personal/ideas",
+    label: "Идеи",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/ideas")),
+  },
+] as const;
+
+const FINANCE_TABS = [
   {
     href: "/v2/personal/finance",
     label: "Финансы",
@@ -44,12 +52,14 @@ const TABS = [
 
 export default function PersonalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
+  const inFinance = pathname.startsWith(appPath("/v2/personal/finance"));
+  const tabs = inFinance ? FINANCE_TABS : PERSONAL_TABS;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="shrink-0 border-b border-[var(--v2-ink-100)] bg-white px-6">
         <div className="flex gap-1 py-2">
-          {TABS.map((tab) => {
+          {tabs.map((tab) => {
             const active = tab.match(pathname);
             return (
               <Link

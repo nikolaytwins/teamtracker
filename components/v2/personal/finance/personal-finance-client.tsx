@@ -542,35 +542,27 @@ function PfHeroCards({
 function PfForecastCard({
   summary,
   budget,
-  forecastExtras,
   year,
   month,
   onReload,
 }: {
   summary: PersonalFinanceDashboard["summary"];
   budget: PersonalFinanceDashboard["budget"];
-  forecastExtras: PersonalFinanceDashboard["forecastExtras"];
   year: number;
   month: number;
   onReload: () => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [baseDraft, setBaseDraft] = useState(String(budget.expected_expenses_rub));
-  const [extras, setExtras] = useState(forecastExtras);
-  const [newLabel, setNewLabel] = useState("");
-  const [newAmount, setNewAmount] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (editOpen) {
       setBaseDraft(String(Math.round(budget.expected_expenses_rub)));
-      setExtras(forecastExtras);
-      setNewLabel("");
-      setNewAmount("");
       setError(null);
     }
-  }, [editOpen, budget.expected_expenses_rub, forecastExtras]);
+  }, [editOpen, budget.expected_expenses_rub]);
 
   const delta = summary.forecastDelta;
   const positive = delta >= 0;
@@ -585,9 +577,7 @@ function PfForecastCard({
     {
       label: "Ожидаемые расходы",
       v: summary.expectedExpenses,
-      hint: forecastExtras.length
-        ? `база + ${forecastExtras.length} доп.`
-        : "база 180 000 ₽ · клик — настроить",
+      hint: "клик — изменить",
       editable: true,
     },
     {
@@ -611,50 +601,10 @@ function PfForecastCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ year, month, expected_expenses_rub: n }),
       });
+      setEditOpen(false);
       onReload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось сохранить");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addExtra = async () => {
-    const amount = Number(newAmount.trim().replace(/\s/g, "").replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setError("Укажите сумму доп. расхода");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await fetchJson("/api/v2/personal/finance/forecast", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          year,
-          month,
-          extra: { label: newLabel.trim() || "Доп. расход", amount_rub: amount },
-        }),
-      });
-      setNewLabel("");
-      setNewAmount("");
-      onReload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось добавить");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const removeExtra = async (id: string) => {
-    setSaving(true);
-    setError(null);
-    try {
-      await fetchJson(`/api/v2/personal/finance/forecast/${id}`, { method: "DELETE" });
-      onReload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось удалить");
     } finally {
       setSaving(false);
     }
@@ -723,17 +673,23 @@ function PfForecastCard({
               Ожидаемые расходы · {PERSONAL_MONTH_NAMES[month - 1]} {year}
             </h3>
             <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
-              База по умолчанию 180 000 ₽. Доп. расходы действуют только в этом месяце.
+              Для расчёта «прибыль − расходы». Разовые траты из вкладки «Прогноз» сюда не входят.
             </p>
 
             <label className="mt-4 block text-[12px] font-medium text-[var(--v2-ink-600)]">
-              Базовые расходы, ₽
+              Ожидаемые расходы, ₽
               <div className="mt-1 flex gap-2">
                 <input
                   className="v2-tnum h-10 flex-1 rounded-xl border border-[var(--v2-ink-200)] px-3 text-[14px] outline-none focus:border-[var(--v2-brand-300)]"
                   value={baseDraft}
                   inputMode="decimal"
                   onChange={(e) => setBaseDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void saveBase();
+                    }
+                  }}
                 />
                 <button
                   type="button"
@@ -745,60 +701,6 @@ function PfForecastCard({
                 </button>
               </div>
             </label>
-
-            <div className="mt-5">
-              <div className="text-[12px] font-medium text-[var(--v2-ink-600)]">Дополнительно в этом месяце</div>
-              {extras.length === 0 ? (
-                <p className="mt-2 text-[12.5px] text-[var(--v2-ink-400)]">Пока нет доп. расходов</p>
-              ) : (
-                <div className="mt-2 space-y-2">
-                  {extras.map((e) => (
-                    <div
-                      key={e.id}
-                      className="flex items-center gap-2 rounded-xl bg-[var(--v2-ink-50)] px-3 py-2"
-                    >
-                      <span className="v2-tight flex-1 truncate text-[13px] text-[var(--v2-ink-800)]">{e.label}</span>
-                      <span className="v2-tnum text-[13px] font-semibold text-[var(--v2-ink-900)]">
-                        <PersonalAmt v={e.amount_rub} short />
-                      </span>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void removeExtra(e.id)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
-                        title="Удалить"
-                      >
-                        <V2Icons.trash className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-3 flex gap-2">
-                <input
-                  placeholder="Название"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  className="h-9 flex-1 rounded-lg border border-[var(--v2-ink-200)] px-2.5 text-[13px]"
-                />
-                <input
-                  placeholder="Сумма"
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  inputMode="decimal"
-                  className="v2-tnum h-9 w-24 rounded-lg border border-[var(--v2-ink-200)] px-2.5 text-[13px]"
-                />
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void addExtra()}
-                  className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-3 text-[12.5px] font-medium text-white disabled:opacity-50"
-                >
-                  +
-                </button>
-              </div>
-            </div>
 
             {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
 
@@ -1820,7 +1722,7 @@ export function PersonalFinanceClient() {
 
   if (!data) return null;
 
-  const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, forecastExtras, history, incomeHistory } =
+  const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, history, incomeHistory } =
     data;
 
   return (
@@ -1857,7 +1759,6 @@ export function PersonalFinanceClient() {
               <PfForecastCard
                 summary={summary}
                 budget={budget}
-                forecastExtras={forecastExtras}
                 year={year}
                 month={month}
                 onReload={() => void reload()}

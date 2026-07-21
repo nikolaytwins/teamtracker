@@ -148,10 +148,10 @@ async function ensureBudgetMonth(userId: string, year: number, month: number): P
     month,
     limit_rub: limit,
     expected_expenses_rub: DEFAULT_EXPECTED_EXPENSES_RUB,
-    daily_spend_rub: 0,
     updated_at: nowIso(),
   };
-  await sb.from("v2_personal_budget_months").insert(row);
+  const { error: insertErr } = await sb.from("v2_personal_budget_months").insert(row);
+  if (insertErr) throw insertErr;
   const { data: cats } = await sb
     .from("v2_personal_budget_categories")
     .select("id")
@@ -510,8 +510,7 @@ export async function loadPersonalFinanceDashboard(
   });
   incomeHistoryForUi.sort((a, b) => b.year - a.year || b.month - a.month);
 
-  const extrasSum = forecastExtras.reduce((s, e) => s + e.amount_rub, 0);
-  const expectedExpenses = budget.expected_expenses_rub + extrasSum;
+  const expectedExpenses = budget.expected_expenses_rub;
   const forecastDelta = monthProfit - expectedExpenses;
   const expectedCapital = summary.netWorth + forecastDelta;
 
@@ -1530,7 +1529,15 @@ export async function createForecastExtraExpense(
     updated_at: nowIso(),
   };
   const { error } = await sb.from("v2_personal_forecast_extra_expenses").insert(row);
-  if (error) throw error;
+  if (error) {
+    const msg = error.message || "";
+    if (/does not exist|schema cache|Could not find the table/i.test(msg)) {
+      throw new PersonalFinanceValidationError(
+        "Таблица разовых трат ещё не создана в БД. Примените миграцию 029_v2_personal_forecast_expenses.sql в Supabase."
+      );
+    }
+    throw error;
+  }
   return mapForecastExtra(row);
 }
 
