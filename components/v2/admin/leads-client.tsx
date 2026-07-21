@@ -94,12 +94,14 @@ function LeadCard({
   lead,
   dragging,
   onOpen,
+  onCalled,
   onDragStart,
   onDragEnd,
 }: {
   lead: V2LeadRow;
   dragging: boolean;
   onOpen: () => void;
+  onCalled: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
@@ -110,8 +112,9 @@ function LeadCard({
   const added = formatAddedDate(lead.created_at);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
@@ -120,7 +123,13 @@ function LeadCard({
       }}
       onDragEnd={onDragEnd}
       onClick={onOpen}
-      className={`relative w-full overflow-hidden rounded-xl p-3 text-left transition ${
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`relative w-full cursor-pointer overflow-hidden rounded-xl p-3 text-left transition ${
         dragging ? "opacity-40" : ""
       } ${
         overdue
@@ -163,13 +172,28 @@ function LeadCard({
       </div>
 
       {hot ? (
-        <div
-          className={`mb-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11.5px] font-semibold ${
-            overdue ? "bg-red-500 text-white" : "bg-amber-500 text-white"
-          }`}
-        >
-          <V2Icons.bell className="h-3.5 w-3.5" />
-          {overdue ? "Просрочено — напиши" : "Сегодня — напиши"}
+        <div className="mb-2 flex items-stretch gap-1.5">
+          <div
+            className={`inline-flex flex-1 items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-semibold ${
+              overdue ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+            }`}
+          >
+            <V2Icons.bell className="h-3.5 w-3.5 shrink-0" />
+            {overdue ? "Просрочено — напиши" : "Сегодня — напиши"}
+          </div>
+          <button
+            type="button"
+            title="Снять напоминание"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCalled();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[var(--v2-ink-900)] px-2.5 py-1.5 text-[11.5px] font-semibold text-white transition hover:bg-[var(--v2-ink-700)]"
+          >
+            <V2Icons.check className="h-3.5 w-3.5" />
+            Созвонился
+          </button>
         </div>
       ) : null}
 
@@ -191,7 +215,7 @@ function LeadCard({
       {lead.comment ? (
         <div className="v2-tight mt-2 line-clamp-2 text-[12px] leading-snug text-[var(--v2-ink-500)]">{lead.comment}</div>
       ) : null}
-    </button>
+    </div>
   );
 }
 
@@ -623,6 +647,22 @@ export function V2AdminLeadsClient({
     }
   }
 
+  async function markCalled(id: string) {
+    const current = leads.find((l) => l.id === id);
+    if (!current?.reminder_at) return;
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, reminder_at: null } : l)));
+    try {
+      await fetchJson(`/api/v2/admin/leads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reminderAt: null }),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось снять напоминание");
+      await load().catch(() => null);
+    }
+  }
+
   async function saveCreate(form: LeadFormState) {
     setSaving(true);
     setFormError(null);
@@ -835,6 +875,7 @@ export function V2AdminLeadsClient({
                                     setFormError(null);
                                     setEditLead(lead);
                                   }}
+                                  onCalled={() => void markCalled(lead.id)}
                                   onDragStart={() => setDragId(lead.id)}
                                   onDragEnd={() => {
                                     setDragId(null);
