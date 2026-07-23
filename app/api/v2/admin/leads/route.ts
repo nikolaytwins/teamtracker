@@ -50,6 +50,18 @@ export async function POST(request: NextRequest) {
           : typeof body.takenIntoWorkAt === "string"
             ? body.takenIntoWorkAt
             : undefined,
+      lostReason:
+        body.lostReason === null
+          ? null
+          : typeof body.lostReason === "string"
+            ? body.lostReason
+            : undefined,
+      lostAt:
+        body.lostAt === null
+          ? null
+          : typeof body.lostAt === "string"
+            ? body.lostAt
+            : undefined,
       createdAt: typeof body.createdAt === "string" ? body.createdAt : undefined,
     });
     return NextResponse.json({ lead });

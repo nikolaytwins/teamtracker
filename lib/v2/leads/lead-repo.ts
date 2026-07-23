@@ -44,6 +44,8 @@ function mapLead(raw: Record<string, unknown>): V2LeadRow {
     source,
     source_custom: raw.source_custom != null ? String(raw.source_custom) : null,
     taken_into_work_at: raw.taken_into_work_at ? String(raw.taken_into_work_at).slice(0, 10) : null,
+    lost_reason: raw.lost_reason != null ? String(raw.lost_reason) : null,
+    lost_at: raw.lost_at ? String(raw.lost_at).slice(0, 10) : null,
     sort_order: Number(raw.sort_order) || 0,
     archived_at: raw.archived_at ? String(raw.archived_at) : null,
     created_by: String(raw.created_by),
@@ -89,6 +91,8 @@ export type CreateLeadInput = {
   source?: V2LeadSource;
   sourceCustom?: string | null;
   takenIntoWorkAt?: string | null;
+  lostReason?: string | null;
+  lostAt?: string | null;
   createdAt?: string | null;
 };
 
@@ -102,6 +106,7 @@ export async function createLead(ctx: V2SessionContext, input: CreateLeadInput):
       : null;
 
   const { source, source_custom } = normalizeSource(input.source, input.sourceCustom);
+  const status = input.status && isV2LeadStatus(input.status) ? input.status : "correspondence";
   const ts = nowIso();
   const createdAt = input.createdAt?.trim()
     ? new Date(`${input.createdAt.trim().slice(0, 10)}T12:00:00.000Z`).toISOString()
@@ -114,12 +119,14 @@ export async function createLead(ctx: V2SessionContext, input: CreateLeadInput):
     contact: (input.contact ?? "").trim(),
     comment: input.comment?.trim() || null,
     lead_type: input.leadType && isV2LeadType(input.leadType) ? input.leadType : "agency",
-    status: input.status && isV2LeadStatus(input.status) ? input.status : "correspondence",
+    status,
     reminder_at: input.reminderAt?.trim() || null,
     estimated_amount: estimatedAmount,
     source,
     source_custom,
     taken_into_work_at: input.takenIntoWorkAt?.trim() || null,
+    lost_reason: status === "lost" ? input.lostReason?.trim() || null : null,
+    lost_at: status === "lost" ? input.lostAt?.trim() || new Date().toISOString().slice(0, 10) : null,
     sort_order: Math.floor(Date.now() / 1000),
     archived_at: null,
     created_by: ctx.userId,
@@ -144,6 +151,8 @@ export type UpdateLeadInput = Partial<{
   source: V2LeadSource;
   sourceCustom: string | null;
   takenIntoWorkAt: string | null;
+  lostReason: string | null;
+  lostAt: string | null;
   createdAt: string | null;
   sortOrder: number;
 }>;
@@ -190,6 +199,24 @@ export async function updateLead(
   if (input.takenIntoWorkAt !== undefined) {
     patch.taken_into_work_at = input.takenIntoWorkAt?.trim() || null;
   }
+  if (input.lostReason !== undefined) {
+    patch.lost_reason = input.lostReason?.trim() || null;
+  }
+  if (input.lostAt !== undefined) {
+    patch.lost_at = input.lostAt?.trim() || null;
+  }
+
+  const nextStatus =
+    input.status !== undefined ? input.status : (patch.status as V2LeadStatus | undefined) ?? existing.status;
+  if (nextStatus === "lost") {
+    if (input.lostAt === undefined && !existing.lost_at && patch.lost_at === undefined) {
+      patch.lost_at = new Date().toISOString().slice(0, 10);
+    }
+  } else if (input.status !== undefined && input.status !== "lost") {
+    // Ушли из «Слив» — дату слива очищаем; причину оставляем для истории, если не передали явно
+    if (input.lostAt === undefined) patch.lost_at = null;
+  }
+
   if (input.createdAt !== undefined) {
     const ymd = input.createdAt?.trim().slice(0, 10);
     if (ymd) {

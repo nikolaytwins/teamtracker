@@ -52,8 +52,9 @@
 | 031 | `031_v2_leads_taken_into_work_status.sql` | Статус лидов «Взято в работу» |
 | 032 | `032_v2_personal_forecast_daily_spend.sql` | Прогноз: daily_spend_rub у бюджета месяца |
 | 033 | `033_v2_personal_ideas.sql` | Личные идеи: стикеры, теги, фото |
+| 034 | `034_v2_leads_lost_reason.sql` | Лиды: lost_reason + lost_at |
 
-**Следующий свободный номер:** `034`
+**Следующий свободный номер:** `035`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

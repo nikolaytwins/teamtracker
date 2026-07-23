@@ -21,6 +21,10 @@ export type V2LeadRow = {
   source: V2LeadSource;
   source_custom: string | null;
   taken_into_work_at: string | null;
+  /** Причина слива */
+  lost_reason: string | null;
+  /** Дата перевода в «Слив» */
+  lost_at: string | null;
   sort_order: number;
   archived_at: string | null;
   created_by: string;

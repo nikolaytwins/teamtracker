@@ -27,9 +27,62 @@ function resolveTab(initialTab: LeadsTab, viewParam: string | null): LeadsTab {
   return "board";
 }
 
+const MONTH_NAMES_RU = [
+  "январь",
+  "февраль",
+  "март",
+  "апрель",
+  "май",
+  "июнь",
+  "июль",
+  "август",
+  "сентябрь",
+  "октябрь",
+  "ноябрь",
+  "декабрь",
+] as const;
+
 function todayYmd() {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+function currentYearMonth() {
+  const today = new Date();
+  return { year: today.getFullYear(), month: today.getMonth() + 1 };
+}
+
+function shiftYearMonth(year: number, month: number, delta: -1 | 1) {
+  let m = month + delta;
+  let y = year;
+  if (m < 1) {
+    m = 12;
+    y -= 1;
+  } else if (m > 12) {
+    m = 1;
+    y += 1;
+  }
+  return { year: y, month: m };
+}
+
+function ymdInYearMonth(ymd: string | null, year: number, month: number): boolean {
+  const key = `${year}-${String(month).padStart(2, "0")}`;
+  if (!ymd) {
+    const now = currentYearMonth();
+    return year === now.year && month === now.month;
+  }
+  return ymd.startsWith(key);
+}
+
+/** «Взято в работу» и «Слив» фильтруются по месяцу; остальные колонки — всегда. */
+function leadVisibleInBoardMonth(lead: V2LeadRow, year: number, month: number): boolean {
+  if (lead.status === "taken_into_work") {
+    return ymdInYearMonth(lead.taken_into_work_at, year, month);
+  }
+  if (lead.status === "lost") {
+    return ymdInYearMonth(lead.lost_at, year, month);
+  }
+  return true;
 }
 
 function formatRubShort(n: number) {
@@ -231,6 +284,9 @@ type LeadFormState = {
   sourceCustom: string;
   takenIntoWork: boolean;
   takenIntoWorkAt: string;
+  lost: boolean;
+  lostReason: string;
+  lostAt: string;
   createdAt: string;
 };
 
@@ -246,6 +302,9 @@ const EMPTY_FORM: LeadFormState = {
   sourceCustom: "",
   takenIntoWork: false,
   takenIntoWorkAt: "",
+  lost: false,
+  lostReason: "",
+  lostAt: "",
   createdAt: todayYmd(),
 };
 
@@ -447,7 +506,15 @@ function LeadModal({
               </span>
               <select
                 value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as V2LeadStatus }))}
+                onChange={(e) => {
+                  const status = e.target.value as V2LeadStatus;
+                  setForm((f) => ({
+                    ...f,
+                    status,
+                    lost: status === "lost",
+                    lostAt: status === "lost" ? f.lostAt || todayYmd() : f.lostAt,
+                  }));
+                }}
                 className="v2-input w-full"
               >
                 {V2_LEAD_STATUSES.map((s) => (
@@ -487,6 +554,48 @@ function LeadModal({
                 />
               ) : null}
             </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 rounded-xl border border-[var(--v2-ink-200)] px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={form.lost}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setForm((f) => ({
+                    ...f,
+                    lost: checked,
+                    status: checked ? "lost" : f.status === "lost" ? "correspondence" : f.status,
+                    lostAt: checked ? f.lostAt || todayYmd() : f.lostAt,
+                  }));
+                }}
+                className="h-4 w-4 rounded border-[var(--v2-ink-300)]"
+              />
+              <span className="text-[13px] font-medium text-[var(--v2-ink-800)]">Слив</span>
+              <span className="text-[12px] text-[var(--v2-ink-500)]">— карточка уйдёт в колонку «Слив»</span>
+            </label>
+            {form.lost ? (
+              <div className="mt-2 space-y-2">
+                <textarea
+                  value={form.lostReason}
+                  onChange={(e) => setForm((f) => ({ ...f, lostReason: e.target.value }))}
+                  className="v2-input min-h-[72px] w-full resize-y"
+                  placeholder="Причина слива (для аналитики)"
+                />
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                    Дата слива
+                  </span>
+                  <input
+                    type="date"
+                    value={form.lostAt}
+                    onChange={(e) => setForm((f) => ({ ...f, lostAt: e.target.value }))}
+                    className="v2-input w-full"
+                  />
+                </label>
+              </div>
+            ) : null}
           </div>
 
           {error ? (
@@ -537,17 +646,20 @@ function reminderRank(lead: V2LeadRow) {
 }
 
 function formPayload(form: LeadFormState) {
+  const status: V2LeadStatus = form.lost ? "lost" : form.status === "lost" ? "correspondence" : form.status;
   return {
     name: form.name,
     contact: form.contact,
     comment: form.comment || null,
     leadType: form.leadType,
-    status: form.status,
+    status,
     reminderAt: form.reminderAt || null,
     estimatedAmount: parseAmountInput(form.estimatedAmount),
     source: form.source,
     sourceCustom: form.source === "custom" ? form.sourceCustom || null : null,
     takenIntoWorkAt: form.takenIntoWork ? form.takenIntoWorkAt || todayYmd() : null,
+    lostReason: form.lostReason.trim() || null,
+    lostAt: form.lost ? form.lostAt || todayYmd() : null,
     createdAt: form.createdAt || undefined,
   };
 }
@@ -575,6 +687,9 @@ export function V2AdminLeadsClient({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [createDefaults, setCreateDefaults] = useState<LeadFormState>(EMPTY_FORM);
+  const nowYm = currentYearMonth();
+  const [boardYear, setBoardYear] = useState(nowYm.year);
+  const [boardMonth, setBoardMonth] = useState(nowYm.month);
 
   const load = useCallback(async () => {
     const data = await fetchJson<{ leads: V2LeadRow[] }>("/api/v2/admin/leads");
@@ -587,13 +702,18 @@ export function V2AdminLeadsClient({
       .finally(() => setLoading(false));
   }, [load]);
 
+  const boardLeads = useMemo(
+    () => leads.filter((l) => leadVisibleInBoardMonth(l, boardYear, boardMonth)),
+    [leads, boardYear, boardMonth]
+  );
+
   const dueNow = useMemo(
     () =>
-      leads.filter((l) => {
+      boardLeads.filter((l) => {
         const s = reminderState(l.reminder_at);
         return s === "today" || s === "overdue";
       }),
-    [leads]
+    [boardLeads]
   );
 
   const grouped = useMemo(() => {
@@ -605,7 +725,7 @@ export function V2AdminLeadsClient({
       pause: [],
       lost: [],
     };
-    for (const lead of leads) g[lead.status].push(lead);
+    for (const lead of boardLeads) g[lead.status].push(lead);
     for (const key of Object.keys(g) as V2LeadStatus[]) {
       g[key].sort((a, b) => {
         const rr = reminderRank(a) - reminderRank(b);
@@ -614,13 +734,14 @@ export function V2AdminLeadsClient({
       });
     }
     return g;
-  }, [leads]);
+  }, [boardLeads]);
 
   async function moveLead(id: string, status: V2LeadStatus) {
     const current = leads.find((l) => l.id === id);
     if (!current || current.status === status) return;
     const takenIntoWorkAt =
       status === "taken_into_work" && !current.taken_into_work_at ? todayYmd() : undefined;
+    const lostAt = status === "lost" && !current.lost_at ? todayYmd() : status !== "lost" ? null : undefined;
     setLeads((prev) =>
       prev.map((l) =>
         l.id === id
@@ -628,6 +749,7 @@ export function V2AdminLeadsClient({
               ...l,
               status,
               taken_into_work_at: takenIntoWorkAt ?? l.taken_into_work_at,
+              lost_at: lostAt === undefined ? l.lost_at : lostAt,
             }
           : l
       )
@@ -639,6 +761,7 @@ export function V2AdminLeadsClient({
         body: JSON.stringify({
           status,
           ...(takenIntoWorkAt ? { takenIntoWorkAt } : {}),
+          ...(lostAt !== undefined ? { lostAt } : {}),
         }),
       });
     } catch (e) {
@@ -729,6 +852,9 @@ export function V2AdminLeadsClient({
         sourceCustom: editLead.source_custom ?? "",
         takenIntoWork: !!editLead.taken_into_work_at,
         takenIntoWorkAt: editLead.taken_into_work_at ?? "",
+        lost: editLead.status === "lost",
+        lostReason: editLead.lost_reason ?? "",
+        lostAt: editLead.lost_at ?? "",
         createdAt: isoToYmd(editLead.created_at),
       }
     : EMPTY_FORM;
@@ -797,6 +923,52 @@ export function V2AdminLeadsClient({
             <LeadsAnalyticsPanel />
           ) : (
             <>
+              <div className="mb-3 flex items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  title="Предыдущий месяц"
+                  onClick={() => {
+                    const prev = shiftYearMonth(boardYear, boardMonth, -1);
+                    setBoardYear(prev.year);
+                    setBoardMonth(prev.month);
+                  }}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--v2-ink-300)] opacity-40 transition hover:opacity-80 hover:text-[var(--v2-ink-600)]"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden>
+                    <path
+                      d="M15 6 9 12l6 6"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <span className="v2-tight min-w-[7.5rem] text-center text-[12px] font-medium capitalize tracking-wide text-[var(--v2-ink-400)] opacity-70">
+                  {MONTH_NAMES_RU[boardMonth - 1]} {boardYear}
+                </span>
+                <button
+                  type="button"
+                  title="Следующий месяц"
+                  onClick={() => {
+                    const next = shiftYearMonth(boardYear, boardMonth, 1);
+                    setBoardYear(next.year);
+                    setBoardMonth(next.month);
+                  }}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--v2-ink-300)] opacity-40 transition hover:opacity-80 hover:text-[var(--v2-ink-600)]"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden>
+                    <path
+                      d="m9 6 6 6-6 6"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+
               {dueNow.length > 0 ? (
                 <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-950">
                   <V2Icons.bell className="h-4 w-4 shrink-0 text-amber-600" />
@@ -851,7 +1023,13 @@ export function V2AdminLeadsClient({
                             type="button"
                             title={`Добавить в «${label}»`}
                             onClick={() => {
-                              setCreateDefaults({ ...EMPTY_FORM, status: key, createdAt: todayYmd() });
+                              setCreateDefaults({
+                                ...EMPTY_FORM,
+                                status: key,
+                                lost: key === "lost",
+                                lostAt: key === "lost" ? todayYmd() : "",
+                                createdAt: todayYmd(),
+                              });
                               setFormError(null);
                               setCreateOpen(true);
                             }}

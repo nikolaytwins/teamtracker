@@ -44,6 +44,18 @@ export async function PATCH(request: NextRequest, { params }: RouteCtx) {
           : typeof body.takenIntoWorkAt === "string"
             ? body.takenIntoWorkAt
             : undefined,
+      lostReason:
+        body.lostReason === null
+          ? null
+          : typeof body.lostReason === "string"
+            ? body.lostReason
+            : undefined,
+      lostAt:
+        body.lostAt === null
+          ? null
+          : typeof body.lostAt === "string"
+            ? body.lostAt
+            : undefined,
       createdAt: typeof body.createdAt === "string" ? body.createdAt : undefined,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : undefined,
     });
