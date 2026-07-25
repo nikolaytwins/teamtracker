@@ -56,8 +56,9 @@
 | 035 | `035_agency_project_business_line.sql` | Проекты и финансы: agency / impulse |
 | 036 | `036_v2_personal_week_focus.sql` | Личный календарь: редактируемый фокус недели |
 | 037 | `037_v2_week_focus_goal_priority.sql` | Фокус недели: приоритет целей |
+| 038 | `038_v2_personal_ideas_corporate_colors.sql` | Идеи и заметки: корпоративная палитра |
 
-**Следующий свободный номер:** `038`
+**Следующий свободный номер:** `039`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

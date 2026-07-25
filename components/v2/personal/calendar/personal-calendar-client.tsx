@@ -9,7 +9,7 @@ import type {
   WeekFocusPayload,
   WeekFocusPriority,
 } from "@/lib/v2/personal/week-focus-repo";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MONTHS = [
   "Январь",
@@ -45,6 +45,136 @@ const DEADLINE_PRIORITY: Record<WeekFocusPriority, string> = {
   medium: "high",
   low: "low",
 };
+
+function PriorityPicker({
+  value,
+  onSelect,
+  variant,
+}: {
+  value: WeekFocusPriority;
+  onSelect: (priority: WeekFocusPriority) => void;
+  variant: "chip" | "field";
+}) {
+  const [menu, setMenu] = useState<{ top: number; left: number; width: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const meta = PRIORITY_META[value];
+  const open = menu !== null;
+
+  const toggle = () => {
+    if (open) {
+      setMenu(null);
+      return;
+    }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = variant === "field" ? rect.width : 200;
+    const height = 132;
+    const openUpwards = rect.bottom + height + 8 > window.innerHeight;
+    const rawLeft = variant === "field" ? rect.left : rect.right - width;
+    setMenu({
+      top: openUpwards ? rect.top - height - 6 : rect.bottom + 6,
+      left: Math.min(Math.max(8, rawLeft), Math.max(8, window.innerWidth - width - 8)),
+      width,
+    });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setMenu(null);
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", close);
+    // Меню позиционируется от viewport — при скролле любого контейнера закрываем.
+    window.addEventListener("scroll", close, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [open]);
+
+  return (
+    <>
+      {variant === "chip" ? (
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={toggle}
+          title={`Приоритет: ${meta.label}`}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition hover:brightness-95"
+          style={{ background: meta.soft, color: meta.ink }}
+        >
+          <i className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
+          {meta.short}
+        </button>
+      ) : (
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={toggle}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className="v2-input flex h-10 w-full items-center gap-2 text-left text-[14px]"
+        >
+          <i className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: meta.color }} />
+          <span className="min-w-0 flex-1 truncate font-medium text-[var(--v2-ink-800)]">
+            {meta.label}
+          </span>
+          <V2Icons.chev className="h-4 w-4 shrink-0 text-[var(--v2-ink-400)]" />
+        </button>
+      )}
+
+      {menu ? (
+        <div
+          ref={menuRef}
+          role="listbox"
+          style={{ top: menu.top, left: menu.left, width: menu.width }}
+          className="fixed z-[60] overflow-hidden rounded-xl border border-[var(--v2-ink-100)] bg-white p-1 shadow-[0_16px_40px_rgba(15,23,42,0.18)]"
+        >
+          {PRIORITY_ORDER.map((key) => {
+            const option = PRIORITY_META[key];
+            const active = key === value;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  setMenu(null);
+                  if (key !== value) onSelect(key);
+                }}
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[13px] transition ${
+                  active ? "bg-[var(--v2-ink-100)]" : "hover:bg-[var(--v2-ink-50)]"
+                }`}
+              >
+                <i className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: option.color }} />
+                <span className="min-w-0 flex-1 truncate font-medium text-[var(--v2-ink-800)]">
+                  {option.label}
+                </span>
+                {active ? (
+                  <V2Icons.check className="h-3.5 w-3.5 shrink-0 text-[var(--v2-brand-600)]" />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -404,10 +534,8 @@ export function PersonalCalendarClient() {
     }
   }
 
-  async function cycleGoalPriority(goal: WeekFocusGoalRow) {
-    if (!weekFocus) return;
-    const next =
-      PRIORITY_ORDER[(PRIORITY_ORDER.indexOf(goal.priority) + 1) % PRIORITY_ORDER.length]!;
+  async function setGoalPriority(goal: WeekFocusGoalRow, next: WeekFocusPriority) {
+    if (!weekFocus || next === goal.priority) return;
     setWeekFocus({
       ...weekFocus,
       goals: weekFocus.goals.map((row) => (row.id === goal.id ? { ...row, priority: next } : row)),
@@ -529,8 +657,8 @@ export function PersonalCalendarClient() {
         </div>
       ) : null}
 
-      <div className="flex min-h-[650px] flex-none flex-col gap-4 lg:h-[calc(100vh-190px)] lg:min-h-0 lg:flex-row">
-        <section className="v2-card flex min-h-[650px] min-w-0 flex-col overflow-hidden lg:min-h-0 lg:shrink lg:grow-0 lg:basis-[820px]">
+      <div className="flex min-h-[650px] flex-none flex-col gap-4 lg:min-h-0 lg:flex-row lg:items-start">
+        <section className="v2-card flex min-h-[650px] min-w-0 flex-col overflow-hidden lg:h-[calc(100vh-190px)] lg:min-h-[560px] lg:shrink lg:grow-0 lg:basis-[820px]">
           <div className="flex items-center justify-between border-b border-[var(--v2-ink-100)] px-4 py-3 sm:px-5">
             <div>
               <h2 className="v2-tight text-[18px] font-bold text-[var(--v2-ink-900)]">
@@ -665,8 +793,8 @@ export function PersonalCalendarClient() {
           </div>
         </section>
 
-        <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto lg:min-w-[372px] lg:max-w-[600px] lg:grow lg:basis-[372px] lg:pr-1">
-          <section className="v2-card p-4">
+        <aside className="flex flex-col gap-4 overscroll-contain lg:sticky lg:top-0 lg:max-h-[calc(100vh-190px)] lg:min-w-[372px] lg:max-w-[600px] lg:grow lg:basis-[372px] lg:overflow-y-auto lg:pr-1">
+          <section className="v2-card shrink-0 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">
@@ -704,7 +832,7 @@ export function PersonalCalendarClient() {
             )}
           </section>
 
-          <section className="v2-card overflow-hidden">
+          <section className="v2-card shrink-0 overflow-hidden">
             <div className="bg-gradient-to-br from-[var(--v2-brand-600)] to-[var(--v2-brand-500)] px-4 pb-4 pt-3.5 text-white">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
@@ -833,15 +961,11 @@ export function PersonalCalendarClient() {
                           </span>
                         </button>
                         <div className="flex shrink-0 items-center gap-1 pr-2">
-                          <button
-                            type="button"
-                            title={`Приоритет: ${meta.label} — нажми, чтобы сменить`}
-                            onClick={() => void cycleGoalPriority(goal)}
-                            className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition hover:brightness-95"
-                            style={{ background: meta.soft, color: meta.ink }}
-                          >
-                            {meta.short}
-                          </button>
+                          <PriorityPicker
+                            value={goal.priority}
+                            onSelect={(next) => void setGoalPriority(goal, next)}
+                            variant="chip"
+                          />
                           <button
                             type="button"
                             title="Удалить"
@@ -1034,34 +1158,7 @@ export function PersonalCalendarClient() {
                 <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
                   Приоритет
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {PRIORITY_ORDER.map((key) => {
-                    const meta = PRIORITY_META[key];
-                    const active = addPriority === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setAddPriority(key)}
-                        className="flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[12px] font-semibold transition"
-                        style={{
-                          borderColor: active ? meta.color : "var(--v2-ink-200)",
-                          background: active ? meta.soft : "#fff",
-                          color: active ? meta.ink : "var(--v2-ink-600)",
-                        }}
-                      >
-                        <i
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ background: meta.color }}
-                        />
-                        <span className="truncate">{meta.short}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mt-1.5 text-[11px] text-[var(--v2-ink-400)]">
-                  {PRIORITY_META[addPriority].label}
-                </p>
+                <PriorityPicker value={addPriority} onSelect={setAddPriority} variant="field" />
               </div>
 
               <div className="flex justify-end gap-2 pt-1">

@@ -11,7 +11,7 @@ import type {
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const DEFAULT_ACCENT = "#F59E0B";
+const DEFAULT_ACCENT = "#2A56EB";
 
 function snippet(text: string, max = 120) {
   const t = text.trim().replace(/\s+/g, " ");
@@ -75,7 +75,12 @@ function IdeaCard({
       className="group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-card)] transition-all duration-200 hover:shadow-[var(--v2-shadow-cardHv)]"
       style={{ animation: `v2-idea-card-in .4s cubic-bezier(.2,.7,.2,1) both`, animationDelay: `${index * 25}ms` }}
     >
-      <span aria-hidden className="absolute bottom-0 left-0 top-0 w-[3px]" style={{ background: accent }} />
+      <span aria-hidden className="absolute bottom-0 left-0 top-0 w-[4px]" style={{ background: accent }} />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-24"
+        style={{ background: `linear-gradient(180deg, ${accent}14, transparent)` }}
+      />
 
       <div className="absolute right-3 top-3 z-10 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
         <button
@@ -91,11 +96,15 @@ function IdeaCard({
         </button>
       </div>
 
-      <button type="button" onClick={onOpen} className="flex flex-1 flex-col py-4 pl-5 pr-4 text-left">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="relative flex flex-1 flex-col py-4 pl-5 pr-4 text-left"
+      >
         <div className="flex items-center gap-2 pr-14">
           <span
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] v2-tight"
-            style={{ color: accent }}
+            className="v2-tight inline-flex items-center gap-1.5 rounded-md px-1.5 py-[3px] text-[11px] font-semibold uppercase tracking-[0.04em]"
+            style={{ background: `${accent}1F`, color: accent }}
           >
             <V2Icons.spark className="h-[13px] w-[13px]" />
             {primary?.name ?? "Идея"}
@@ -117,7 +126,8 @@ function IdeaCard({
             {(idea.tags.length === 1 ? idea.tags : restTags).map((t) => (
               <span
                 key={t.id}
-                className="v2-tight rounded-md bg-[var(--v2-ink-100)] px-1.5 py-[3px] text-[11px] font-medium text-[var(--v2-ink-600)]"
+                className="v2-tight rounded-md px-1.5 py-[3px] text-[11px] font-semibold"
+                style={{ background: `${t.color}14`, color: t.color }}
               >
                 {t.name}
               </span>
@@ -210,6 +220,9 @@ function IdeaEditorModal({
       )
       .slice(0, 6);
   }, [allTags, tagDraft, tagNames]);
+
+  const tagColor = (name: string) =>
+    allTags.find((t) => t.name.toLowerCase() === name.toLowerCase())?.color ?? DEFAULT_ACCENT;
 
   const addTag = (name: string) => {
     const n = name.trim().replace(/^#/, "");
@@ -400,18 +413,22 @@ function IdeaEditorModal({
           <div>
             <div className="text-[12px] font-medium text-[var(--v2-ink-600)]">Теги</div>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {tagNames.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => setTagNames((prev) => prev.filter((n) => n !== name))}
-                  className="inline-flex items-center gap-1 rounded-md bg-[var(--v2-ink-100)] px-1.5 py-[3px] text-[11px] font-medium text-[var(--v2-ink-600)] hover:bg-red-50 hover:text-red-600"
-                  title="Убрать тег"
-                >
-                  {name}
-                  <span aria-hidden>×</span>
-                </button>
-              ))}
+              {tagNames.map((name) => {
+                const color = tagColor(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setTagNames((prev) => prev.filter((n) => n !== name))}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-[3px] text-[11px] font-semibold transition hover:opacity-75"
+                    style={{ background: `${color}1F`, color }}
+                    title="Убрать тег"
+                  >
+                    {name}
+                    <span aria-hidden>×</span>
+                  </button>
+                );
+              })}
             </div>
             <div className="relative mt-2">
               <input

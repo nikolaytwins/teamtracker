@@ -42,8 +42,10 @@ export type PersonalIdeasBoard = {
   tags: PersonalIdeaTag[];
 };
 
-const TAG_COLORS = ["#FDE68A", "#BFDBFE", "#FECACA", "#E9D5FF", "#FED7AA", "#BBF7D0", "#FBCFE8", "#A5F3FC"];
-const CARD_ACCENTS = ["#FEF3C7", "#DBEAFE", "#FEE2E2", "#F3E8FF", "#FFEDD5", "#DCFCE7", "#FCE7F3", "#CFFAFE"];
+/** Насыщенная корпоративная палитра: первый цвет — бренд. */
+const TAG_COLORS = ["#2A56EB", "#7C3AED", "#0F766E", "#D97706", "#DC2626", "#059669", "#DB2777", "#EA580C"];
+/** Мягкие подложки под теми же оттенками, порядок совпадает с TAG_COLORS. */
+const CARD_ACCENTS = ["#E7EDFD", "#F0E9FE", "#DBF0EE", "#FCEFD9", "#FCE4E4", "#DBF2E8", "#FCE3EE", "#FDE9DB"];
 
 function uid(ctx: V2SessionContext) {
   return ctx.userId;
