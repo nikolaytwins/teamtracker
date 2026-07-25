@@ -3,7 +3,7 @@
 import { V2Icons } from "@/components/v2/ui/icons";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PersonalCalendarItem } from "@/lib/v2/personal/personal-calendar-repo";
-import { weekMondayYmd } from "@/lib/v2/personal/week-focus-plan";
+import { formatWeekRangeShort, weekMondayYmd } from "@/lib/v2/personal/week-focus-plan";
 import type { WeekFocusGoalRow, WeekFocusPayload } from "@/lib/v2/personal/week-focus-repo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -37,15 +37,10 @@ function localTodayYmd() {
   return toYmd(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-function currentWeekBounds() {
-  const now = new Date();
-  const mondayOffset = (now.getDay() + 6) % 7;
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset);
-  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
-  return {
-    from: toYmd(monday.getFullYear(), monday.getMonth(), monday.getDate()),
-    to: toYmd(sunday.getFullYear(), sunday.getMonth(), sunday.getDate()),
-  };
+function addDays(ymd: string, amount: number) {
+  const [year, month, day] = ymd.split("-").map(Number);
+  const date = new Date(year!, month! - 1, day! + amount);
+  return toYmd(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function addMonths(year: number, month: number, amount: number) {
@@ -62,12 +57,14 @@ function formatDate(ymd: string) {
   }).format(new Date(year!, month! - 1, day));
 }
 
-function formatDeadlineShort(ymd: string) {
+function formatDeadlineDay(ymd: string) {
   const [year, month, day] = ymd.split("-").map(Number);
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-  }).format(new Date(year!, month! - 1, day));
+  const date = new Date(year!, month! - 1, day);
+  return {
+    day: String(day),
+    weekday: new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(date),
+    month: new Intl.DateTimeFormat("ru-RU", { month: "short" }).format(date),
+  };
 }
 
 function monthGrid(year: number, month: number) {
@@ -93,6 +90,7 @@ function monthGrid(year: number, month: number) {
 function CalendarEventCard({
   item,
   onComplete,
+  onDelete,
   onDragStart,
   onDragEnd,
   dragging,
@@ -100,6 +98,7 @@ function CalendarEventCard({
 }: {
   item: PersonalCalendarItem;
   onComplete: (item: PersonalCalendarItem) => void;
+  onDelete?: (item: PersonalCalendarItem) => void;
   onDragStart?: (item: PersonalCalendarItem) => void;
   onDragEnd?: () => void;
   dragging?: boolean;
@@ -151,18 +150,30 @@ function CalendarEventCard({
           ) : null}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={() => onComplete(item)}
-        aria-label={item.completed_at ? "Вернуть задачу" : "Выполнить задачу"}
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition ${
-          item.completed_at
-            ? "border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
-            : "border-[var(--v2-ink-200)] text-[var(--v2-ink-400)] hover:border-[var(--v2-brand-300)] hover:text-[var(--v2-brand-600)]"
-        }`}
-      >
-        <V2Icons.check className="h-4 w-4" />
-      </button>
+      <div className="flex shrink-0 flex-col items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onComplete(item)}
+          aria-label={item.completed_at ? "Вернуть задачу" : "Выполнить задачу"}
+          className={`flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+            item.completed_at
+              ? "border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
+              : "border-[var(--v2-ink-200)] text-[var(--v2-ink-400)] hover:border-[var(--v2-brand-300)] hover:text-[var(--v2-brand-600)]"
+          }`}
+        >
+          <V2Icons.check className="h-4 w-4" />
+        </button>
+        {onDelete ? (
+          <button
+            type="button"
+            title="Удалить дедлайн"
+            onClick={() => onDelete(item)}
+            className="hidden h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
+          >
+            <V2Icons.trash className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -171,6 +182,7 @@ export function PersonalCalendarClient() {
   const now = new Date();
   const [view, setView] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(localTodayYmd);
+  const [weekAnchor, setWeekAnchor] = useState(localTodayYmd);
   const [items, setItems] = useState<PersonalCalendarItem[]>([]);
   const [weekFocus, setWeekFocus] = useState<WeekFocusPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -180,8 +192,13 @@ export function PersonalCalendarClient() {
   const [newGoal, setNewGoal] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
   const [newDeadlineDate, setNewDeadlineDate] = useState(localTodayYmd);
+  const [deadlineFormOpen, setDeadlineFormOpen] = useState(false);
   const [savingFocus, setSavingFocus] = useState(false);
   const today = localTodayYmd();
+
+  const weekStart = useMemo(() => weekMondayYmd(weekAnchor), [weekAnchor]);
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const isCurrentWeek = weekStart === weekMondayYmd(today);
 
   const range = useMemo(() => {
     const fromMonth = addMonths(view.year, view.month, -1);
@@ -189,12 +206,11 @@ export function PersonalCalendarClient() {
     const lastDay = new Date(toMonth.year, toMonth.month + 1, 0).getDate();
     const monthFrom = toYmd(fromMonth.year, fromMonth.month, 1);
     const monthTo = toYmd(toMonth.year, toMonth.month, lastDay);
-    const currentWeek = currentWeekBounds();
     return {
-      from: monthFrom < currentWeek.from ? monthFrom : currentWeek.from,
-      to: monthTo > currentWeek.to ? monthTo : currentWeek.to,
+      from: [monthFrom, weekStart].sort()[0]!,
+      to: [monthTo, weekEnd].sort().at(-1)!,
     };
-  }, [view]);
+  }, [view, weekStart, weekEnd]);
 
   const loadItems = useCallback(async () => {
     const data = await fetchJson<{ items: PersonalCalendarItem[] }>(
@@ -203,16 +219,11 @@ export function PersonalCalendarClient() {
     setItems(data.items);
   }, [range]);
 
-  const loadWeekFocus = useCallback(async (date: string) => {
+  const loadWeekFocus = useCallback(async (monday: string) => {
     const data = await fetchJson<{ weekFocus: WeekFocusPayload }>(
-      `/api/v2/personal/calendar/week-focus?date=${date}`
+      `/api/v2/personal/calendar/week-focus?date=${monday}`
     );
     setWeekFocus(data.weekFocus);
-    setNewDeadlineDate((prev) => {
-      const focus = data.weekFocus;
-      if (prev >= focus.week_start && prev <= focus.week_end) return prev;
-      return date >= focus.week_start && date <= focus.week_end ? date : focus.week_start;
-    });
   }, []);
 
   useEffect(() => {
@@ -224,10 +235,18 @@ export function PersonalCalendarClient() {
   }, [loadItems]);
 
   useEffect(() => {
-    loadWeekFocus(selectedDate).catch((reason) =>
+    loadWeekFocus(weekStart).catch((reason) =>
       setError(reason instanceof Error ? reason.message : "Не удалось загрузить фокус недели")
     );
-  }, [loadWeekFocus, selectedDate]);
+  }, [loadWeekFocus, weekStart]);
+
+  useEffect(() => {
+    setNewDeadlineDate((prev) => {
+      if (prev >= weekStart && prev <= weekEnd) return prev;
+      if (selectedDate >= weekStart && selectedDate <= weekEnd) return selectedDate;
+      return weekStart;
+    });
+  }, [weekStart, weekEnd, selectedDate]);
 
   const days = useMemo(() => monthGrid(view.year, view.month), [view]);
   const itemsByDate = useMemo(() => {
@@ -251,17 +270,29 @@ export function PersonalCalendarClient() {
   }, [items]);
 
   const selectedItems = itemsByDate.get(selectedDate) ?? [];
-  const weekDeadlines = useMemo(() => {
-    if (!weekFocus) return [];
-    return items
-      .filter((item) => item.date >= weekFocus.week_start && item.date <= weekFocus.week_end)
+
+  const weekDeadlinesByDate = useMemo(() => {
+    const inWeek = items
+      .filter((item) => item.date >= weekStart && item.date <= weekEnd)
       .sort(
         (a, b) =>
           a.date.localeCompare(b.date) ||
           Number(Boolean(a.completed_at)) - Number(Boolean(b.completed_at)) ||
           a.title.localeCompare(b.title, "ru")
       );
-  }, [items, weekFocus]);
+    const groups: { date: string; items: PersonalCalendarItem[] }[] = [];
+    for (const item of inWeek) {
+      const last = groups[groups.length - 1];
+      if (last?.date === item.date) last.items.push(item);
+      else groups.push({ date: item.date, items: [item] });
+    }
+    return groups;
+  }, [items, weekStart, weekEnd]);
+
+  const weekDeadlineCount = weekDeadlinesByDate.reduce((sum, group) => sum + group.items.length, 0);
+  const goals = weekFocus?.goals ?? [];
+  const goalsDone = goals.filter((goal) => goal.completed_at).length;
+  const goalsProgress = goals.length ? Math.round((goalsDone / goals.length) * 100) : 0;
 
   const categories = useMemo(() => {
     const values = new Map<string, string>();
@@ -273,10 +304,25 @@ export function PersonalCalendarClient() {
     setView((current) => addMonths(current.year, current.month, amount));
   }
 
+  function shiftWeek(amount: number) {
+    const nextAnchor = addDays(weekStart, amount * 7);
+    setWeekAnchor(nextAnchor);
+    const [year, month] = nextAnchor.split("-").map(Number);
+    setView({ year: year!, month: month! - 1 });
+  }
+
   function goToday() {
-    const date = new Date();
-    setView({ year: date.getFullYear(), month: date.getMonth() });
-    setSelectedDate(localTodayYmd());
+    const date = localTodayYmd();
+    const [year, month] = date.split("-").map(Number);
+    setView({ year: year!, month: month! - 1 });
+    setSelectedDate(date);
+    setWeekAnchor(date);
+  }
+
+  function selectDay(ymd: string, outside: boolean, monthView: { year: number; month: number }) {
+    setSelectedDate(ymd);
+    setWeekAnchor(ymd);
+    if (outside) setView(monthView);
   }
 
   async function toggleComplete(item: PersonalCalendarItem) {
@@ -331,27 +377,22 @@ export function PersonalCalendarClient() {
       });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось обновить пункт");
-      await loadWeekFocus(selectedDate).catch(() => null);
+      await loadWeekFocus(weekStart).catch(() => null);
     }
   }
 
   async function addGoal() {
     const title = newGoal.trim();
-    if (!title || !weekFocus || savingFocus) return;
+    if (!title || savingFocus) return;
     setSavingFocus(true);
     try {
-      const data = await fetchJson<{ goal: WeekFocusGoalRow }>("/api/v2/personal/calendar/week-focus", {
+      await fetchJson<{ goal: WeekFocusGoalRow }>("/api/v2/personal/calendar/week-focus", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ week_start: weekFocus.week_start, title }),
-      });
-      setWeekFocus({
-        ...weekFocus,
-        id: weekFocus.id ?? "local",
-        goals: [...weekFocus.goals, data.goal],
+        body: JSON.stringify({ week_start: weekStart, title }),
       });
       setNewGoal("");
-      await loadWeekFocus(selectedDate);
+      await loadWeekFocus(weekStart);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось добавить пункт");
     } finally {
@@ -366,7 +407,7 @@ export function PersonalCalendarClient() {
       await fetchJson(`/api/v2/personal/calendar/week-focus/goals/${goalId}`, { method: "DELETE" });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось удалить");
-      await loadWeekFocus(selectedDate).catch(() => null);
+      await loadWeekFocus(weekStart).catch(() => null);
     }
   }
 
@@ -388,11 +429,6 @@ export function PersonalCalendarClient() {
       });
       setNewDeadline("");
       await loadItems();
-      if (weekMondayYmd(date) !== weekMondayYmd(selectedDate)) {
-        setSelectedDate(date);
-        const [y, m] = date.split("-").map(Number);
-        setView({ year: y!, month: m! - 1 });
-      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось добавить дедлайн");
     } finally {
@@ -448,7 +484,7 @@ export function PersonalCalendarClient() {
         </div>
       ) : null}
 
-      <div className="grid min-h-[650px] flex-none gap-4 lg:h-[calc(100vh-190px)] lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid min-h-[650px] flex-none gap-4 lg:h-[calc(100vh-190px)] lg:grid-cols-[minmax(0,1fr)_372px]">
         <section className="v2-card flex min-h-[650px] min-w-0 flex-col overflow-hidden lg:min-h-0">
           <div className="flex items-center justify-between border-b border-[var(--v2-ink-100)] px-4 py-3 sm:px-5">
             <div>
@@ -497,14 +533,12 @@ export function PersonalCalendarClient() {
               const selected = selectedDate === day.ymd;
               const isToday = today === day.ymd;
               const isDropTarget = dropDate === day.ymd;
+              const inFocusWeek = day.ymd >= weekStart && day.ymd <= weekEnd;
               return (
                 <button
                   key={day.ymd}
                   type="button"
-                  onClick={() => {
-                    setSelectedDate(day.ymd);
-                    if (day.outside) setView({ year: day.year, month: day.month });
-                  }}
+                  onClick={() => selectDay(day.ymd, day.outside, { year: day.year, month: day.month })}
                   onDragOver={(e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
@@ -520,13 +554,14 @@ export function PersonalCalendarClient() {
                     if (id) void moveDeadline(id, day.ymd);
                     setDragId(null);
                     setDropDate(null);
-                    setSelectedDate(day.ymd);
-                    if (day.outside) setView({ year: day.year, month: day.month });
+                    selectDay(day.ymd, day.outside, { year: day.year, month: day.month });
                   }}
                   className={`relative min-h-[82px] overflow-hidden border-b border-r border-[var(--v2-ink-100)] p-2 text-left align-top transition sm:min-h-[94px] ${
                     selected
                       ? "z-[1] bg-[var(--v2-brand-50)] shadow-[inset_0_0_0_1px_var(--v2-brand-300)]"
-                      : "bg-white hover:bg-[var(--v2-ink-50)]"
+                      : inFocusWeek
+                        ? "bg-[var(--v2-brand-50)]/35 hover:bg-[var(--v2-brand-50)]/60"
+                        : "bg-white hover:bg-[var(--v2-ink-50)]"
                   } ${isDropTarget ? "bg-[var(--v2-brand-50)] ring-2 ring-inset ring-[var(--v2-brand-400)]" : ""} ${
                     day.outside ? "opacity-40" : ""
                   }`}
@@ -625,60 +660,114 @@ export function PersonalCalendarClient() {
           </section>
 
           <section className="v2-card overflow-hidden">
-            <div className="border-b border-[var(--v2-ink-100)] bg-[var(--v2-brand-50)]/60 px-4 py-3.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
-                Фокус недели
-              </p>
-              <h2 className="v2-tight mt-1 text-[16px] font-bold text-[var(--v2-ink-900)]">
-                Неделя {weekFocus?.label ?? "…"}
-              </h2>
+            <div className="bg-gradient-to-br from-[var(--v2-brand-600)] to-[var(--v2-brand-500)] px-4 pb-4 pt-3.5 text-white">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
+                  Фокус недели
+                </p>
+                {!isCurrentWeek ? (
+                  <button
+                    type="button"
+                    onClick={() => setWeekAnchor(today)}
+                    className="rounded-lg bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-white/25"
+                  >
+                    Текущая
+                  </button>
+                ) : (
+                  <span className="rounded-lg bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white/90">
+                    Сейчас
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => shiftWeek(-1)}
+                  aria-label="Предыдущая неделя"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition hover:bg-white/25"
+                >
+                  <V2Icons.chevL className="h-4 w-4" />
+                </button>
+                <div className="min-w-0 text-center">
+                  <p className="v2-tight truncate text-[17px] font-bold leading-tight">
+                    {formatWeekRangeShort(weekStart, weekEnd)}
+                  </p>
+                  <p className="v2-tnum mt-0.5 text-[11px] text-white/70">
+                    {goals.length ? `${goalsDone} из ${goals.length} целей` : "целей пока нет"}
+                    {weekDeadlineCount ? ` · ${weekDeadlineCount} дедл.` : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => shiftWeek(1)}
+                  aria-label="Следующая неделя"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition hover:bg-white/25"
+                >
+                  <V2Icons.chevR className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/20">
+                <div
+                  className="h-full rounded-full bg-white transition-all duration-300"
+                  style={{ width: `${goalsProgress}%` }}
+                />
+              </div>
             </div>
 
             <div className="px-4 py-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
                 {weekFocus?.result_title ?? "Главный результат недели"}
               </p>
-              <ul className="mt-2.5 space-y-1.5">
-                {(weekFocus?.goals ?? []).map((goal) => {
-                  const done = Boolean(goal.completed_at);
-                  return (
-                    <li key={goal.id} className="group flex items-start gap-1">
-                      <button
-                        type="button"
-                        onClick={() => void toggleGoal(goal)}
-                        className={`flex min-w-0 flex-1 items-start gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-[var(--v2-ink-50)] ${
-                          done ? "opacity-60" : ""
-                        }`}
-                      >
-                        <span
-                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
-                            done
-                              ? "border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
-                              : "border-[var(--v2-ink-200)] text-transparent"
-                          }`}
+              {goals.length ? (
+                <ul className="mt-2.5 space-y-1">
+                  {goals.map((goal) => {
+                    const done = Boolean(goal.completed_at);
+                    return (
+                      <li key={goal.id} className="group flex items-start gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void toggleGoal(goal)}
+                          className="flex min-w-0 flex-1 items-start gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-[var(--v2-ink-50)]"
                         >
-                          <V2Icons.check className="h-3.5 w-3.5" />
-                        </span>
-                        <span
-                          className={`v2-tight text-[13px] font-medium leading-snug text-[var(--v2-ink-800)] ${
-                            done ? "line-through decoration-[1.5px]" : ""
-                          }`}
+                          <span
+                            className={`mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition ${
+                              done
+                                ? "border-[var(--v2-brand-500)] bg-[var(--v2-brand-500)] text-white"
+                                : "border-[var(--v2-ink-300)] text-transparent group-hover:border-[var(--v2-brand-400)]"
+                            }`}
+                          >
+                            <V2Icons.check className="h-3 w-3" />
+                          </span>
+                          <span
+                            className={`v2-tight text-[13px] font-medium leading-snug ${
+                              done
+                                ? "text-[var(--v2-ink-400)] line-through decoration-[1.5px]"
+                                : "text-[var(--v2-ink-800)]"
+                            }`}
+                          >
+                            {goal.title}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          title="Удалить"
+                          onClick={() => void deleteGoal(goal.id)}
+                          className="mt-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
                         >
-                          {goal.title}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        title="Удалить"
-                        onClick={() => void deleteGoal(goal.id)}
-                        className="mt-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
-                      >
-                        <V2Icons.trash className="h-3.5 w-3.5" />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+                          <V2Icons.trash className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="mt-2 rounded-xl bg-[var(--v2-ink-50)] px-3 py-3 text-[12px] text-[var(--v2-ink-500)]">
+                  Опиши главный результат этой недели
+                </p>
+              )}
+
               <form
                 className="mt-2 flex gap-2"
                 onSubmit={(e) => {
@@ -695,112 +784,124 @@ export function PersonalCalendarClient() {
                 <button
                   type="submit"
                   disabled={savingFocus || !newGoal.trim()}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--v2-ink-900)] text-white disabled:opacity-40"
+                  aria-label="Добавить результат"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--v2-ink-900)] text-white transition hover:bg-[var(--v2-ink-800)] disabled:opacity-40"
                 >
                   <V2Icons.plus className="h-4 w-4" />
                 </button>
               </form>
             </div>
 
-            <div className="border-t border-[var(--v2-ink-100)] px-4 py-3.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-                Дедлайны
-              </p>
-              <p className="mt-1 text-[11px] text-[var(--v2-ink-400)]">
-                Перетащи на день в сетке слева
-              </p>
-              {weekDeadlines.length ? (
-                <ul className="mt-2.5 space-y-2">
-                  {weekDeadlines.map((item) => {
-                    const done = Boolean(item.completed_at);
+            <div className="border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/40 px-4 py-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
+                    Дедлайны недели
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[var(--v2-ink-400)]">
+                    Перетащи карточку на день слева
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDeadlineFormOpen((open) => !open)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-semibold text-[var(--v2-ink-700)] transition hover:border-[var(--v2-brand-200)] hover:text-[var(--v2-brand-700)]"
+                >
+                  <V2Icons.plus className="h-3.5 w-3.5" />
+                  Дедлайн
+                </button>
+              </div>
+
+              {deadlineFormOpen ? (
+                <form
+                  className="mt-3 space-y-2 rounded-2xl border border-[var(--v2-ink-100)] bg-white p-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void addDeadline();
+                  }}
+                >
+                  <input
+                    autoFocus
+                    value={newDeadline}
+                    onChange={(e) => setNewDeadline(e.target.value)}
+                    placeholder="Что нужно сделать…"
+                    className="v2-input h-9 w-full text-[13px]"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={newDeadlineDate}
+                      onChange={(e) => setNewDeadlineDate(e.target.value)}
+                      className="v2-input h-9 min-w-0 flex-1 text-[13px]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={savingFocus || !newDeadline.trim()}
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3 text-[12px] font-semibold text-white transition hover:bg-[var(--v2-ink-800)] disabled:opacity-40"
+                    >
+                      Добавить
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+
+              {weekDeadlinesByDate.length ? (
+                <div className="mt-3 space-y-4">
+                  {weekDeadlinesByDate.map((group) => {
+                    const stamp = formatDeadlineDay(group.date);
+                    const isToday = group.date === today;
                     return (
-                      <li key={item.id} className="group relative">
-                        <button
-                          type="button"
-                          draggable
-                          onDragStart={(e) => {
-                            e.dataTransfer.effectAllowed = "move";
-                            e.dataTransfer.setData(DRAG_DEADLINE_TYPE, item.id);
-                            e.dataTransfer.setData("text/plain", item.id);
-                            setDragId(item.id);
-                          }}
-                          onDragEnd={() => {
-                            setDragId(null);
-                            setDropDate(null);
-                          }}
-                          onClick={() => void toggleComplete(item)}
-                          className={`flex w-full cursor-grab items-start gap-2.5 rounded-xl border border-[var(--v2-ink-100)] bg-white px-2.5 py-2.5 text-left transition hover:border-[var(--v2-ink-200)] hover:bg-[var(--v2-ink-50)]/80 active:cursor-grabbing ${
-                            done ? "opacity-55" : ""
-                          } ${dragId === item.id ? "opacity-40" : ""}`}
-                        >
-                          <span
-                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
-                              done
-                                ? "border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
-                                : "border-[var(--v2-ink-200)] text-transparent"
+                      <div key={group.date}>
+                        <div className="mb-2 flex items-center gap-2.5">
+                          <div
+                            className={`flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl ${
+                              isToday
+                                ? "bg-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]"
+                                : "bg-[var(--v2-ink-900)] text-white"
                             }`}
                           >
-                            <V2Icons.check className="h-3.5 w-3.5" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span
-                              className={`v2-tight block text-[13px] font-semibold leading-snug text-[var(--v2-ink-900)] ${
-                                done ? "line-through decoration-[1.5px]" : ""
-                              }`}
-                            >
-                              {item.title}
+                            <span className="v2-tnum text-[16px] font-bold leading-none">{stamp.day}</span>
+                            <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide opacity-80">
+                              {stamp.month.replace(".", "")}
                             </span>
-                            <span className="v2-tnum mt-1 block text-[11px] text-[var(--v2-ink-500)]">
-                              до {formatDeadlineShort(item.date)}
-                            </span>
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          title="Удалить"
-                          onClick={() => void deleteDeadline(item.id)}
-                          className="absolute right-1.5 top-1.5 hidden h-7 w-7 items-center justify-center rounded-lg bg-white/90 text-[var(--v2-ink-300)] shadow-sm transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
-                        >
-                          <V2Icons.trash className="h-3.5 w-3.5" />
-                        </button>
-                      </li>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="v2-tight text-[14px] font-bold capitalize text-[var(--v2-ink-900)]">
+                              {stamp.weekday}
+                              {isToday ? " · сегодня" : ""}
+                            </p>
+                            <p className="v2-tnum text-[11px] text-[var(--v2-ink-500)]">
+                              {formatDate(group.date)}
+                              {group.items.length > 1 ? ` · ${group.items.length}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          {group.items.map((item) => (
+                            <CalendarEventCard
+                              key={item.id}
+                              item={item}
+                              onComplete={toggleComplete}
+                              onDelete={(row) => void deleteDeadline(row.id)}
+                              dragging={dragId === item.id}
+                              onDragStart={(row) => setDragId(row.id)}
+                              onDragEnd={() => {
+                                setDragId(null);
+                                setDropDate(null);
+                              }}
+                              hideDate
+                            />
+                          ))}
+                        </div>
+                      </div>
                     );
                   })}
-                </ul>
-              ) : (
-                <p className="mt-2 text-[12px] text-[var(--v2-ink-500)]">На эту неделю дедлайнов нет</p>
-              )}
-
-              <form
-                className="mt-3 space-y-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void addDeadline();
-                }}
-              >
-                <input
-                  value={newDeadline}
-                  onChange={(e) => setNewDeadline(e.target.value)}
-                  placeholder="Новый дедлайн…"
-                  className="v2-input h-9 w-full text-[13px]"
-                />
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={newDeadlineDate}
-                    onChange={(e) => setNewDeadlineDate(e.target.value)}
-                    className="v2-input h-9 min-w-0 flex-1 text-[13px]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={savingFocus || !newDeadline.trim()}
-                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3 text-[12px] font-semibold text-white disabled:opacity-40"
-                  >
-                    <V2Icons.plus className="h-3.5 w-3.5" />
-                    Добавить
-                  </button>
                 </div>
-              </form>
+              ) : (
+                <p className="mt-3 rounded-xl bg-white px-3 py-5 text-center text-[12px] text-[var(--v2-ink-500)]">
+                  На эту неделю дедлайнов нет
+                </p>
+              )}
             </div>
           </section>
         </aside>
