@@ -4,7 +4,11 @@ import { V2Icons } from "@/components/v2/ui/icons";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PersonalCalendarItem } from "@/lib/v2/personal/personal-calendar-repo";
 import { formatWeekRangeShort, weekMondayYmd } from "@/lib/v2/personal/week-focus-plan";
-import type { WeekFocusGoalRow, WeekFocusPayload } from "@/lib/v2/personal/week-focus-repo";
+import type {
+  WeekFocusGoalRow,
+  WeekFocusPayload,
+  WeekFocusPriority,
+} from "@/lib/v2/personal/week-focus-repo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const MONTHS = [
@@ -23,6 +27,24 @@ const MONTHS = [
 ];
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const DRAG_DEADLINE_TYPE = "application/x-v2-deadline-id";
+
+const PRIORITY_META: Record<
+  WeekFocusPriority,
+  { label: string; short: string; color: string; soft: string; ink: string }
+> = {
+  high: { label: "Обязательно", short: "Важно", color: "#DC2626", soft: "#FEF2F2", ink: "#B42318" },
+  medium: { label: "Желательно", short: "Средне", color: "#EA580C", soft: "#FFF7ED", ink: "#C2410C" },
+  low: { label: "Можно не делать", short: "Низкий", color: "#A1A1AA", soft: "#F4F4F5", ink: "#52525B" },
+};
+
+const PRIORITY_ORDER: WeekFocusPriority[] = ["high", "medium", "low"];
+
+/** Три уровня фокуса недели в шкалу приоритетов задач. */
+const DEADLINE_PRIORITY: Record<WeekFocusPriority, string> = {
+  high: "urgent",
+  medium: "high",
+  low: "low",
+};
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -189,10 +211,11 @@ export function PersonalCalendarClient() {
   const [error, setError] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropDate, setDropDate] = useState<string | null>(null);
-  const [newGoal, setNewGoal] = useState("");
-  const [newDeadline, setNewDeadline] = useState("");
-  const [newDeadlineDate, setNewDeadlineDate] = useState(localTodayYmd);
-  const [deadlineFormOpen, setDeadlineFormOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addKind, setAddKind] = useState<"goal" | "deadline">("goal");
+  const [addTitle, setAddTitle] = useState("");
+  const [addPriority, setAddPriority] = useState<WeekFocusPriority>("high");
+  const [addDate, setAddDate] = useState(localTodayYmd);
   const [savingFocus, setSavingFocus] = useState(false);
   const today = localTodayYmd();
 
@@ -241,7 +264,7 @@ export function PersonalCalendarClient() {
   }, [loadWeekFocus, weekStart]);
 
   useEffect(() => {
-    setNewDeadlineDate((prev) => {
+    setAddDate((prev) => {
       if (prev >= weekStart && prev <= weekEnd) return prev;
       if (selectedDate >= weekStart && selectedDate <= weekEnd) return selectedDate;
       return weekStart;
@@ -381,20 +404,67 @@ export function PersonalCalendarClient() {
     }
   }
 
-  async function addGoal() {
-    const title = newGoal.trim();
+  async function cycleGoalPriority(goal: WeekFocusGoalRow) {
+    if (!weekFocus) return;
+    const next =
+      PRIORITY_ORDER[(PRIORITY_ORDER.indexOf(goal.priority) + 1) % PRIORITY_ORDER.length]!;
+    setWeekFocus({
+      ...weekFocus,
+      goals: weekFocus.goals.map((row) => (row.id === goal.id ? { ...row, priority: next } : row)),
+    });
+    try {
+      await fetchJson(`/api/v2/personal/calendar/week-focus/goals/${goal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priority: next }),
+      });
+      await loadWeekFocus(weekStart);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось сменить приоритет");
+      await loadWeekFocus(weekStart).catch(() => null);
+    }
+  }
+
+  function openAdd(kind: "goal" | "deadline") {
+    setAddKind(kind);
+    setAddTitle("");
+    setAddPriority("high");
+    setAddDate(
+      selectedDate >= weekStart && selectedDate <= weekEnd ? selectedDate : weekStart
+    );
+    setAddOpen(true);
+  }
+
+  async function submitAdd() {
+    const title = addTitle.trim();
     if (!title || savingFocus) return;
     setSavingFocus(true);
     try {
-      await fetchJson<{ goal: WeekFocusGoalRow }>("/api/v2/personal/calendar/week-focus", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ week_start: weekStart, title }),
-      });
-      setNewGoal("");
-      await loadWeekFocus(weekStart);
+      if (addKind === "goal") {
+        await fetchJson<{ goal: WeekFocusGoalRow }>("/api/v2/personal/calendar/week-focus", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ week_start: weekStart, title, priority: addPriority }),
+        });
+        await loadWeekFocus(weekStart);
+      } else {
+        const date = addDate || selectedDate;
+        await fetchJson("/api/v2/personal/todos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            due_date: date,
+            scheduled_date: date,
+            priority: DEADLINE_PRIORITY[addPriority],
+          }),
+        });
+        await loadItems();
+      }
+      setAddTitle("");
+      setAddOpen(false);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось добавить пункт");
+      setError(reason instanceof Error ? reason.message : "Не удалось добавить");
     } finally {
       setSavingFocus(false);
     }
@@ -408,31 +478,6 @@ export function PersonalCalendarClient() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось удалить");
       await loadWeekFocus(weekStart).catch(() => null);
-    }
-  }
-
-  async function addDeadline() {
-    const title = newDeadline.trim();
-    if (!title || savingFocus) return;
-    const date = newDeadlineDate || selectedDate;
-    setSavingFocus(true);
-    try {
-      await fetchJson("/api/v2/personal/todos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          due_date: date,
-          scheduled_date: date,
-          priority: "high",
-        }),
-      });
-      setNewDeadline("");
-      await loadItems();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось добавить дедлайн");
-    } finally {
-      setSavingFocus(false);
     }
   }
 
@@ -484,8 +529,8 @@ export function PersonalCalendarClient() {
         </div>
       ) : null}
 
-      <div className="grid min-h-[650px] flex-none gap-4 lg:h-[calc(100vh-190px)] lg:grid-cols-[minmax(0,1fr)_372px]">
-        <section className="v2-card flex min-h-[650px] min-w-0 flex-col overflow-hidden lg:min-h-0">
+      <div className="flex min-h-[650px] flex-none flex-col gap-4 lg:h-[calc(100vh-190px)] lg:min-h-0 lg:flex-row">
+        <section className="v2-card flex min-h-[650px] min-w-0 flex-col overflow-hidden lg:min-h-0 lg:shrink lg:grow-0 lg:basis-[820px]">
           <div className="flex items-center justify-between border-b border-[var(--v2-ink-100)] px-4 py-3 sm:px-5">
             <div>
               <h2 className="v2-tight text-[18px] font-bold text-[var(--v2-ink-900)]">
@@ -620,7 +665,7 @@ export function PersonalCalendarClient() {
           </div>
         </section>
 
-        <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto lg:pr-1">
+        <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto lg:min-w-[372px] lg:max-w-[600px] lg:grow lg:basis-[372px] lg:pr-1">
           <section className="v2-card p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -665,19 +710,29 @@ export function PersonalCalendarClient() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
                   Фокус недели
                 </p>
-                {!isCurrentWeek ? (
+                <div className="flex items-center gap-1.5">
+                  {!isCurrentWeek ? (
+                    <button
+                      type="button"
+                      onClick={() => setWeekAnchor(today)}
+                      className="rounded-lg bg-white/15 px-2 py-1 text-[10px] font-semibold text-white transition hover:bg-white/25"
+                    >
+                      Текущая
+                    </button>
+                  ) : (
+                    <span className="rounded-lg bg-white/15 px-2 py-1 text-[10px] font-semibold text-white/90">
+                      Сейчас
+                    </span>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setWeekAnchor(today)}
-                    className="rounded-lg bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-white/25"
+                    onClick={() => openAdd("goal")}
+                    className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--v2-brand-700)] shadow-sm transition hover:bg-white/90"
                   >
-                    Текущая
+                    <V2Icons.plus className="h-3.5 w-3.5" />
+                    Добавить
                   </button>
-                ) : (
-                  <span className="rounded-lg bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white/90">
-                    Сейчас
-                  </span>
-                )}
+                </div>
               </div>
 
               <div className="mt-2 flex items-center justify-between gap-2">
@@ -717,26 +772,53 @@ export function PersonalCalendarClient() {
             </div>
 
             <div className="px-4 py-3.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-                {weekFocus?.result_title ?? "Главный результат недели"}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
+                  {weekFocus?.result_title ?? "Главный результат недели"}
+                </p>
+                <div className="flex gap-1.5">
+                  {PRIORITY_ORDER.map((key) => (
+                    <span
+                      key={key}
+                      className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--v2-ink-500)]"
+                    >
+                      <i
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: PRIORITY_META[key].color }}
+                      />
+                      {PRIORITY_META[key].short}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
               {goals.length ? (
-                <ul className="mt-2.5 space-y-1">
+                <ul className="mt-2.5 space-y-1.5">
                   {goals.map((goal) => {
                     const done = Boolean(goal.completed_at);
+                    const meta = PRIORITY_META[goal.priority];
                     return (
-                      <li key={goal.id} className="group flex items-start gap-1">
+                      <li
+                        key={goal.id}
+                        className="group flex items-stretch gap-2 overflow-hidden rounded-xl border border-[var(--v2-ink-100)] bg-white transition hover:border-[var(--v2-ink-200)]"
+                      >
+                        <span
+                          className="w-1 shrink-0 rounded-r"
+                          style={{ background: done ? "#D4D4D8" : meta.color }}
+                          aria-hidden
+                        />
                         <button
                           type="button"
                           onClick={() => void toggleGoal(goal)}
-                          className="flex min-w-0 flex-1 items-start gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-[var(--v2-ink-50)]"
+                          className="flex min-w-0 flex-1 items-start gap-2.5 py-2.5 pr-1 text-left"
                         >
                           <span
-                            className={`mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition ${
-                              done
-                                ? "border-[var(--v2-brand-500)] bg-[var(--v2-brand-500)] text-white"
-                                : "border-[var(--v2-ink-300)] text-transparent group-hover:border-[var(--v2-brand-400)]"
-                            }`}
+                            className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition"
+                            style={{
+                              borderColor: done ? meta.color : "var(--v2-ink-300)",
+                              background: done ? meta.color : "transparent",
+                              color: done ? "#fff" : "transparent",
+                            }}
                           >
                             <V2Icons.check className="h-3 w-3" />
                           </span>
@@ -750,46 +832,34 @@ export function PersonalCalendarClient() {
                             {goal.title}
                           </span>
                         </button>
-                        <button
-                          type="button"
-                          title="Удалить"
-                          onClick={() => void deleteGoal(goal.id)}
-                          className="mt-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
-                        >
-                          <V2Icons.trash className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex shrink-0 items-center gap-1 pr-2">
+                          <button
+                            type="button"
+                            title={`Приоритет: ${meta.label} — нажми, чтобы сменить`}
+                            onClick={() => void cycleGoalPriority(goal)}
+                            className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition hover:brightness-95"
+                            style={{ background: meta.soft, color: meta.ink }}
+                          >
+                            {meta.short}
+                          </button>
+                          <button
+                            type="button"
+                            title="Удалить"
+                            onClick={() => void deleteGoal(goal.id)}
+                            className="hidden h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
+                          >
+                            <V2Icons.trash className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </li>
                     );
                   })}
                 </ul>
               ) : (
-                <p className="mt-2 rounded-xl bg-[var(--v2-ink-50)] px-3 py-3 text-[12px] text-[var(--v2-ink-500)]">
+                <p className="mt-2.5 rounded-xl bg-[var(--v2-ink-50)] px-3 py-3 text-[12px] text-[var(--v2-ink-500)]">
                   Опиши главный результат этой недели
                 </p>
               )}
-
-              <form
-                className="mt-2 flex gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void addGoal();
-                }}
-              >
-                <input
-                  value={newGoal}
-                  onChange={(e) => setNewGoal(e.target.value)}
-                  placeholder="Добавить результат…"
-                  className="v2-input h-9 min-w-0 flex-1 text-[13px]"
-                />
-                <button
-                  type="submit"
-                  disabled={savingFocus || !newGoal.trim()}
-                  aria-label="Добавить результат"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--v2-ink-900)] text-white transition hover:bg-[var(--v2-ink-800)] disabled:opacity-40"
-                >
-                  <V2Icons.plus className="h-4 w-4" />
-                </button>
-              </form>
             </div>
 
             <div className="border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/40 px-4 py-3.5">
@@ -804,46 +874,13 @@ export function PersonalCalendarClient() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setDeadlineFormOpen((open) => !open)}
+                  onClick={() => openAdd("deadline")}
                   className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-semibold text-[var(--v2-ink-700)] transition hover:border-[var(--v2-brand-200)] hover:text-[var(--v2-brand-700)]"
                 >
                   <V2Icons.plus className="h-3.5 w-3.5" />
                   Дедлайн
                 </button>
               </div>
-
-              {deadlineFormOpen ? (
-                <form
-                  className="mt-3 space-y-2 rounded-2xl border border-[var(--v2-ink-100)] bg-white p-3"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void addDeadline();
-                  }}
-                >
-                  <input
-                    autoFocus
-                    value={newDeadline}
-                    onChange={(e) => setNewDeadline(e.target.value)}
-                    placeholder="Что нужно сделать…"
-                    className="v2-input h-9 w-full text-[13px]"
-                  />
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={newDeadlineDate}
-                      onChange={(e) => setNewDeadlineDate(e.target.value)}
-                      className="v2-input h-9 min-w-0 flex-1 text-[13px]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={savingFocus || !newDeadline.trim()}
-                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3 text-[12px] font-semibold text-white transition hover:bg-[var(--v2-ink-800)] disabled:opacity-40"
-                    >
-                      Добавить
-                    </button>
-                  </div>
-                </form>
-              ) : null}
 
               {weekDeadlinesByDate.length ? (
                 <div className="mt-3 space-y-4">
@@ -906,6 +943,147 @@ export function PersonalCalendarClient() {
           </section>
         </aside>
       </div>
+
+      {addOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          onClick={() => setAddOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="v2-tight text-[17px] font-bold text-[var(--v2-ink-900)]">
+                  Добавить в неделю
+                </h3>
+                <p className="v2-tnum mt-0.5 text-[12px] text-[var(--v2-ink-500)]">
+                  {formatWeekRangeShort(weekStart, weekEnd)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddOpen(false)}
+                aria-label="Закрыть"
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-[18px] leading-none text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)]"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-[var(--v2-ink-100)] p-1">
+              {(
+                [
+                  { key: "goal" as const, label: "Цель недели" },
+                  { key: "deadline" as const, label: "Дедлайн" },
+                ]
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setAddKind(tab.key)}
+                  className={`rounded-xl px-3 py-2 text-[13px] font-semibold transition ${
+                    addKind === tab.key
+                      ? "bg-white text-[var(--v2-ink-900)] shadow-sm"
+                      : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-700)]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submitAdd();
+              }}
+            >
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                  {addKind === "goal" ? "Результат" : "Что нужно сделать"}
+                </label>
+                <input
+                  autoFocus
+                  value={addTitle}
+                  onChange={(e) => setAddTitle(e.target.value)}
+                  placeholder={
+                    addKind === "goal" ? "Модуль 3 готов и загружен" : "Монтаж и загрузка модуля"
+                  }
+                  className="v2-input h-10 w-full text-[14px]"
+                />
+              </div>
+
+              {addKind === "deadline" ? (
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                    Дата
+                  </label>
+                  <input
+                    type="date"
+                    value={addDate}
+                    onChange={(e) => setAddDate(e.target.value)}
+                    className="v2-input h-10 w-full text-[14px]"
+                  />
+                </div>
+              ) : null}
+
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                  Приоритет
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PRIORITY_ORDER.map((key) => {
+                    const meta = PRIORITY_META[key];
+                    const active = addPriority === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setAddPriority(key)}
+                        className="flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[12px] font-semibold transition"
+                        style={{
+                          borderColor: active ? meta.color : "var(--v2-ink-200)",
+                          background: active ? meta.soft : "#fff",
+                          color: active ? meta.ink : "var(--v2-ink-600)",
+                        }}
+                      >
+                        <i
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ background: meta.color }}
+                        />
+                        <span className="truncate">{meta.short}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-[11px] text-[var(--v2-ink-400)]">
+                  {PRIORITY_META[addPriority].label}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(false)}
+                  className="h-10 rounded-xl border border-[var(--v2-ink-200)] px-4 text-[13px] font-semibold text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-50)]"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingFocus || !addTitle.trim()}
+                  className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-semibold text-white transition hover:bg-[var(--v2-ink-800)] disabled:opacity-40"
+                >
+                  {savingFocus ? "Сохраняю…" : "Добавить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

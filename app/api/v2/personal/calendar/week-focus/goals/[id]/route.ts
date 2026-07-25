@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Personal } from "@/lib/v2/auth/require-v2-personal";
-import { deleteWeekFocusGoal, updateWeekFocusGoal } from "@/lib/v2/personal/week-focus-repo";
+import {
+  deleteWeekFocusGoal,
+  isWeekFocusPriority,
+  updateWeekFocusGoal,
+} from "@/lib/v2/personal/week-focus-repo";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,6 +18,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     const goal = await updateWeekFocusGoal(auth.ctx, id, {
       title: typeof body.title === "string" ? body.title : undefined,
       completed: typeof body.completed === "boolean" ? body.completed : undefined,
+      priority: isWeekFocusPriority(body.priority) ? body.priority : undefined,
     });
     if (!goal) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ goal });

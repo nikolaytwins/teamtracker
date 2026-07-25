@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireV2Personal } from "@/lib/v2/auth/require-v2-personal";
 import {
   addWeekFocusGoal,
+  isWeekFocusPriority,
   loadWeekFocus,
   updateWeekFocusTitle,
 } from "@/lib/v2/personal/week-focus-repo";
@@ -44,7 +45,12 @@ export async function POST(request: NextRequest) {
 
     const title = typeof body.title === "string" ? body.title.trim() : "";
     if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
-    const goal = await addWeekFocusGoal(auth.ctx, weekStart, title);
+    const goal = await addWeekFocusGoal(
+      auth.ctx,
+      weekStart,
+      title,
+      isWeekFocusPriority(body.priority) ? body.priority : undefined
+    );
     return NextResponse.json({ goal });
   } catch (error) {
     console.error("week focus post:", error);

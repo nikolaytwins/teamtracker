@@ -7,12 +7,26 @@ import {
   formatWeekRangeShort,
 } from "@/lib/v2/personal/week-focus-plan";
 
+/** high — обязательно (красный), medium — желательно (оранжевый), low — можно не делать (серый). */
+export type WeekFocusPriority = "high" | "medium" | "low";
+
 export type WeekFocusGoalRow = {
   id: string;
   title: string;
+  priority: WeekFocusPriority;
   completed_at: string | null;
   sort_order: number;
 };
+
+const PRIORITY_RANK: Record<WeekFocusPriority, number> = { high: 0, medium: 1, low: 2 };
+
+export function isWeekFocusPriority(value: unknown): value is WeekFocusPriority {
+  return value === "high" || value === "medium" || value === "low";
+}
+
+function normPriority(value: unknown): WeekFocusPriority {
+  return isWeekFocusPriority(value) ? value : "medium";
+}
 
 export type WeekFocusPayload = {
   id: string | null;
@@ -130,12 +144,27 @@ export async function loadWeekFocus(
 
   const { data: goals, error: goalsError } = await sb
     .from("v2_personal_week_focus_goals")
-    .select("id, title, completed_at, sort_order")
+    .select("id, title, priority, completed_at, sort_order")
     .eq("focus_id", focus.id)
     .eq("user_id", userId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (goalsError) throw goalsError;
+
+  const mapped: WeekFocusGoalRow[] = (goals ?? []).map((g) => ({
+    id: String(g.id),
+    title: String(g.title),
+    priority: normPriority(g.priority),
+    completed_at: g.completed_at ? String(g.completed_at) : null,
+    sort_order: Number(g.sort_order) || 0,
+  }));
+  mapped.sort((a, b) => {
+    const done = Number(Boolean(a.completed_at)) - Number(Boolean(b.completed_at));
+    if (done !== 0) return done;
+    const rank = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    if (rank !== 0) return rank;
+    return a.sort_order - b.sort_order;
+  });
 
   return {
     id: String(focus.id),
@@ -143,12 +172,7 @@ export async function loadWeekFocus(
     week_end: weekEnd,
     label: formatWeekRangeShort(weekStart, weekEnd),
     result_title: String(focus.result_title),
-    goals: (goals ?? []).map((g) => ({
-      id: String(g.id),
-      title: String(g.title),
-      completed_at: g.completed_at ? String(g.completed_at) : null,
-      sort_order: Number(g.sort_order) || 0,
-    })),
+    goals: mapped,
   };
 }
 
@@ -172,7 +196,8 @@ export async function updateWeekFocusTitle(
 export async function addWeekFocusGoal(
   ctx: V2SessionContext,
   weekStart: string,
-  title: string
+  title: string,
+  priority?: WeekFocusPriority
 ): Promise<WeekFocusGoalRow> {
   const trimmed = title.trim();
   if (!trimmed) throw new Error("title required");
@@ -191,6 +216,7 @@ export async function addWeekFocusGoal(
     focus_id: focus.id,
     user_id: uid(ctx),
     title: trimmed,
+    priority: normPriority(priority),
     completed_at: null,
     sort_order: (Number(maxRow?.sort_order) || 0) + 1,
     created_at: now,
@@ -201,6 +227,7 @@ export async function addWeekFocusGoal(
   return {
     id: row.id,
     title: row.title,
+    priority: row.priority,
     completed_at: null,
     sort_order: row.sort_order,
   };
@@ -209,13 +236,13 @@ export async function addWeekFocusGoal(
 export async function updateWeekFocusGoal(
   ctx: V2SessionContext,
   goalId: string,
-  patch: { title?: string; completed?: boolean }
+  patch: { title?: string; completed?: boolean; priority?: WeekFocusPriority }
 ): Promise<WeekFocusGoalRow | null> {
   const sb = getV2Supabase();
   const userId = uid(ctx);
   const { data: existing, error: findError } = await sb
     .from("v2_personal_week_focus_goals")
-    .select("id, title, completed_at, sort_order")
+    .select("id, title, priority, completed_at, sort_order")
     .eq("id", goalId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -231,6 +258,9 @@ export async function updateWeekFocusGoal(
   if (patch.completed !== undefined) {
     safe.completed_at = patch.completed ? nowIso() : null;
   }
+  if (patch.priority !== undefined) {
+    safe.priority = normPriority(patch.priority);
+  }
 
   const { error } = await sb
     .from("v2_personal_week_focus_goals")
@@ -242,6 +272,7 @@ export async function updateWeekFocusGoal(
   return {
     id: String(existing.id),
     title: typeof safe.title === "string" ? safe.title : String(existing.title),
+    priority: normPriority(safe.priority ?? existing.priority),
     completed_at:
       patch.completed === undefined
         ? existing.completed_at
