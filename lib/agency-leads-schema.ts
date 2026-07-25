@@ -94,6 +94,11 @@ export function ensureAgencyProjectsColumns(db: Database.Database) {
     /* column exists */
   }
   try {
+    db.exec(`ALTER TABLE AgencyProject ADD COLUMN businessLine TEXT NOT NULL DEFAULT 'agency'`);
+  } catch {
+    /* column exists */
+  }
+  try {
     db.exec(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_agency_project_source_lead_id ON AgencyProject(source_lead_id) WHERE source_lead_id IS NOT NULL AND TRIM(source_lead_id) != ''`
     );

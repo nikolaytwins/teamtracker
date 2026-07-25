@@ -3,6 +3,8 @@
 import { V2Icons } from "@/components/v2/ui/icons";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PersonalCalendarItem } from "@/lib/v2/personal/personal-calendar-repo";
+import { weekMondayYmd } from "@/lib/v2/personal/week-focus-plan";
+import type { WeekFocusGoalRow, WeekFocusPayload } from "@/lib/v2/personal/week-focus-repo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const MONTHS = [
@@ -20,6 +22,7 @@ const MONTHS = [
   "Декабрь",
 ];
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const DRAG_DEADLINE_TYPE = "application/x-v2-deadline-id";
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -59,14 +62,12 @@ function formatDate(ymd: string) {
   }).format(new Date(year!, month! - 1, day));
 }
 
-function formatDeadlineDay(ymd: string) {
+function formatDeadlineShort(ymd: string) {
   const [year, month, day] = ymd.split("-").map(Number);
-  const date = new Date(year!, month! - 1, day);
-  return {
-    day: String(day),
-    weekday: new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(date),
-    month: new Intl.DateTimeFormat("ru-RU", { month: "short" }).format(date),
-  };
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+  }).format(new Date(year!, month! - 1, day));
 }
 
 function monthGrid(year: number, month: number) {
@@ -92,17 +93,32 @@ function monthGrid(year: number, month: number) {
 function CalendarEventCard({
   item,
   onComplete,
+  onDragStart,
+  onDragEnd,
+  dragging,
   hideDate = false,
 }: {
   item: PersonalCalendarItem;
   onComplete: (item: PersonalCalendarItem) => void;
+  onDragStart?: (item: PersonalCalendarItem) => void;
+  onDragEnd?: () => void;
+  dragging?: boolean;
   hideDate?: boolean;
 }) {
   return (
     <article
+      draggable={Boolean(onDragStart)}
+      onDragStart={(e) => {
+        if (!onDragStart) return;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData(DRAG_DEADLINE_TYPE, item.id);
+        e.dataTransfer.setData("text/plain", item.id);
+        onDragStart(item);
+      }}
+      onDragEnd={onDragEnd}
       className={`group flex gap-3 rounded-2xl border border-[var(--v2-ink-100)] bg-white p-3.5 transition hover:-translate-y-0.5 hover:shadow-[var(--v2-shadow-cardHv)] ${
         item.completed_at ? "opacity-55" : ""
-      }`}
+      } ${dragging ? "opacity-40" : ""} ${onDragStart ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
       <div
         className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
@@ -151,23 +167,21 @@ function CalendarEventCard({
   );
 }
 
-const IMPORTANCE = {
-  urgent: { rank: 0, label: "Обязательно", color: "#DC2626", background: "#FEF2F2" },
-  high: { rank: 0, label: "Обязательно", color: "#DC2626", background: "#FEF2F2" },
-  medium: { rank: 1, label: "Желательно", color: "#EA580C", background: "#FFF7ED" },
-  low: { rank: 2, label: "Можно не делать", color: "#71717A", background: "#F4F4F5" },
-  none: { rank: 2, label: "Можно не делать", color: "#71717A", background: "#F4F4F5" },
-} as const;
-
 export function PersonalCalendarClient() {
   const now = new Date();
   const [view, setView] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(localTodayYmd);
   const [items, setItems] = useState<PersonalCalendarItem[]>([]);
+  const [weekFocus, setWeekFocus] = useState<WeekFocusPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropDate, setDropDate] = useState<string | null>(null);
+  const [newGoal, setNewGoal] = useState("");
+  const [newDeadline, setNewDeadline] = useState("");
+  const [newDeadlineDate, setNewDeadlineDate] = useState(localTodayYmd);
+  const [savingFocus, setSavingFocus] = useState(false);
   const today = localTodayYmd();
-  const week = currentWeekBounds();
 
   const range = useMemo(() => {
     const fromMonth = addMonths(view.year, view.month, -1);
@@ -182,20 +196,38 @@ export function PersonalCalendarClient() {
     };
   }, [view]);
 
-  const load = useCallback(async () => {
+  const loadItems = useCallback(async () => {
     const data = await fetchJson<{ items: PersonalCalendarItem[] }>(
       `/api/v2/personal/calendar?from=${range.from}&to=${range.to}`
     );
     setItems(data.items);
-    setError(null);
   }, [range]);
+
+  const loadWeekFocus = useCallback(async (date: string) => {
+    const data = await fetchJson<{ weekFocus: WeekFocusPayload }>(
+      `/api/v2/personal/calendar/week-focus?date=${date}`
+    );
+    setWeekFocus(data.weekFocus);
+    setNewDeadlineDate((prev) => {
+      const focus = data.weekFocus;
+      if (prev >= focus.week_start && prev <= focus.week_end) return prev;
+      return date >= focus.week_start && date <= focus.week_end ? date : focus.week_start;
+    });
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-    load()
+    loadItems()
+      .then(() => setError(null))
       .catch((reason) => setError(reason instanceof Error ? reason.message : "Не удалось загрузить календарь"))
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [loadItems]);
+
+  useEffect(() => {
+    loadWeekFocus(selectedDate).catch((reason) =>
+      setError(reason instanceof Error ? reason.message : "Не удалось загрузить фокус недели")
+    );
+  }, [loadWeekFocus, selectedDate]);
 
   const days = useMemo(() => monthGrid(view.year, view.month), [view]);
   const itemsByDate = useMemo(() => {
@@ -219,36 +251,18 @@ export function PersonalCalendarClient() {
   }, [items]);
 
   const selectedItems = itemsByDate.get(selectedDate) ?? [];
-  const upcoming = useMemo(
-    () =>
-      items
-        .filter((item) => !item.completed_at && item.date >= today)
-        .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? "").localeCompare(b.time ?? ""))
-        .slice(0, 8),
-    [items, today]
-  );
-  const upcomingByDate = useMemo(() => {
-    const groups: { date: string; items: PersonalCalendarItem[] }[] = [];
-    for (const item of upcoming) {
-      const last = groups[groups.length - 1];
-      if (last?.date === item.date) last.items.push(item);
-      else groups.push({ date: item.date, items: [item] });
-    }
-    return groups;
-  }, [upcoming]);
-  const weeklyItems = useMemo(
-    () =>
-      items
-        .filter((item) => item.date >= week.from && item.date <= week.to)
-        .sort((a, b) => {
-          const done = Number(Boolean(a.completed_at)) - Number(Boolean(b.completed_at));
-          if (done !== 0) return done;
-          const aImportance = IMPORTANCE[a.priority ?? "none"];
-          const bImportance = IMPORTANCE[b.priority ?? "none"];
-          return aImportance.rank - bImportance.rank || a.date.localeCompare(b.date);
-        }),
-    [items, week.from, week.to]
-  );
+  const weekDeadlines = useMemo(() => {
+    if (!weekFocus) return [];
+    return items
+      .filter((item) => item.date >= weekFocus.week_start && item.date <= weekFocus.week_end)
+      .sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) ||
+          Number(Boolean(a.completed_at)) - Number(Boolean(b.completed_at)) ||
+          a.title.localeCompare(b.title, "ru")
+      );
+  }, [items, weekFocus]);
+
   const categories = useMemo(() => {
     const values = new Map<string, string>();
     for (const item of items) values.set(item.category, item.color);
@@ -284,6 +298,118 @@ export function PersonalCalendarClient() {
     }
   }
 
+  async function moveDeadline(id: string, date: string) {
+    const current = items.find((item) => item.id === id);
+    if (!current || current.date === date) return;
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, date } : item)));
+    try {
+      await fetchJson("/api/v2/personal/todos/schedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, scheduled_date: date }),
+      });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось перенести дедлайн");
+      await loadItems().catch(() => null);
+    }
+  }
+
+  async function toggleGoal(goal: WeekFocusGoalRow) {
+    if (!weekFocus) return;
+    const nextCompleted = goal.completed_at ? null : new Date().toISOString();
+    setWeekFocus({
+      ...weekFocus,
+      goals: weekFocus.goals.map((row) =>
+        row.id === goal.id ? { ...row, completed_at: nextCompleted } : row
+      ),
+    });
+    try {
+      await fetchJson(`/api/v2/personal/calendar/week-focus/goals/${goal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: !goal.completed_at }),
+      });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось обновить пункт");
+      await loadWeekFocus(selectedDate).catch(() => null);
+    }
+  }
+
+  async function addGoal() {
+    const title = newGoal.trim();
+    if (!title || !weekFocus || savingFocus) return;
+    setSavingFocus(true);
+    try {
+      const data = await fetchJson<{ goal: WeekFocusGoalRow }>("/api/v2/personal/calendar/week-focus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ week_start: weekFocus.week_start, title }),
+      });
+      setWeekFocus({
+        ...weekFocus,
+        id: weekFocus.id ?? "local",
+        goals: [...weekFocus.goals, data.goal],
+      });
+      setNewGoal("");
+      await loadWeekFocus(selectedDate);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось добавить пункт");
+    } finally {
+      setSavingFocus(false);
+    }
+  }
+
+  async function deleteGoal(goalId: string) {
+    if (!weekFocus) return;
+    setWeekFocus({ ...weekFocus, goals: weekFocus.goals.filter((g) => g.id !== goalId) });
+    try {
+      await fetchJson(`/api/v2/personal/calendar/week-focus/goals/${goalId}`, { method: "DELETE" });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось удалить");
+      await loadWeekFocus(selectedDate).catch(() => null);
+    }
+  }
+
+  async function addDeadline() {
+    const title = newDeadline.trim();
+    if (!title || savingFocus) return;
+    const date = newDeadlineDate || selectedDate;
+    setSavingFocus(true);
+    try {
+      await fetchJson("/api/v2/personal/todos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          due_date: date,
+          scheduled_date: date,
+          priority: "high",
+        }),
+      });
+      setNewDeadline("");
+      await loadItems();
+      if (weekMondayYmd(date) !== weekMondayYmd(selectedDate)) {
+        setSelectedDate(date);
+        const [y, m] = date.split("-").map(Number);
+        setView({ year: y!, month: m! - 1 });
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось добавить дедлайн");
+    } finally {
+      setSavingFocus(false);
+    }
+  }
+
+  async function deleteDeadline(id: string) {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+    try {
+      await fetchJson(`/api/v2/personal/todos/${id}`, { method: "DELETE" });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось удалить дедлайн");
+      await loadItems().catch(() => null);
+    }
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-auto px-4 py-5 sm:px-6">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -293,7 +419,7 @@ export function PersonalCalendarClient() {
           </p>
           <h1 className="v2-tighter text-[26px] font-bold text-[var(--v2-ink-900)]">Календарь</h1>
           <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
-            События, съёмки и дедлайны в одном месте
+            Добавляй цели и дедлайны, перетаскивай их по дням
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -322,7 +448,7 @@ export function PersonalCalendarClient() {
         </div>
       ) : null}
 
-      <div className="grid min-h-[650px] flex-none gap-4 lg:h-[calc(100vh-190px)] lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid min-h-[650px] flex-none gap-4 lg:h-[calc(100vh-190px)] lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="v2-card flex min-h-[650px] min-w-0 flex-col overflow-hidden lg:min-h-0">
           <div className="flex items-center justify-between border-b border-[var(--v2-ink-100)] px-4 py-3 sm:px-5">
             <div>
@@ -330,7 +456,8 @@ export function PersonalCalendarClient() {
                 {MONTHS[view.month]} {view.year}
               </h2>
               <p className="mt-0.5 text-[11px] text-[var(--v2-ink-400)]">
-                Выберите день, чтобы увидеть его задачи
+                Перетащи дедлайн на день · клик — детали
+                {loading ? " · обновление…" : ""}
               </p>
             </div>
             <div className="flex gap-1.5">
@@ -369,6 +496,7 @@ export function PersonalCalendarClient() {
               const dayItems = itemsByDate.get(day.ymd) ?? [];
               const selected = selectedDate === day.ymd;
               const isToday = today === day.ymd;
+              const isDropTarget = dropDate === day.ymd;
               return (
                 <button
                   key={day.ymd}
@@ -377,11 +505,31 @@ export function PersonalCalendarClient() {
                     setSelectedDate(day.ymd);
                     if (day.outside) setView({ year: day.year, month: day.month });
                   }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDropDate(day.ymd);
+                  }}
+                  onDragLeave={() => setDropDate((current) => (current === day.ymd ? null : current))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const id =
+                      dragId ||
+                      e.dataTransfer.getData(DRAG_DEADLINE_TYPE) ||
+                      e.dataTransfer.getData("text/plain");
+                    if (id) void moveDeadline(id, day.ymd);
+                    setDragId(null);
+                    setDropDate(null);
+                    setSelectedDate(day.ymd);
+                    if (day.outside) setView({ year: day.year, month: day.month });
+                  }}
                   className={`relative min-h-[82px] overflow-hidden border-b border-r border-[var(--v2-ink-100)] p-2 text-left align-top transition sm:min-h-[94px] ${
                     selected
                       ? "z-[1] bg-[var(--v2-brand-50)] shadow-[inset_0_0_0_1px_var(--v2-brand-300)]"
                       : "bg-white hover:bg-[var(--v2-ink-50)]"
-                  } ${day.outside ? "opacity-40" : ""}`}
+                  } ${isDropTarget ? "bg-[var(--v2-brand-50)] ring-2 ring-inset ring-[var(--v2-brand-400)]" : ""} ${
+                    day.outside ? "opacity-40" : ""
+                  }`}
                 >
                   <span
                     className={`v2-tnum inline-flex h-7 min-w-7 items-center justify-center rounded-lg px-1 text-[12px] font-semibold ${
@@ -398,9 +546,21 @@ export function PersonalCalendarClient() {
                     {dayItems.slice(0, 2).map((item) => (
                       <div
                         key={item.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData(DRAG_DEADLINE_TYPE, item.id);
+                          e.dataTransfer.setData("text/plain", item.id);
+                          setDragId(item.id);
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDropDate(null);
+                        }}
                         className={`truncate rounded-md px-1.5 py-1 text-[9px] font-semibold leading-none sm:text-[10px] ${
                           item.completed_at ? "line-through decoration-[1.5px] opacity-45" : ""
-                        }`}
+                        } ${dragId === item.id ? "opacity-40" : ""}`}
                         style={{
                           color: item.completed_at ? "#71717A" : item.color,
                           background: item.completed_at ? "#F4F4F5" : `${item.color}14`,
@@ -443,7 +603,17 @@ export function PersonalCalendarClient() {
             {selectedItems.length ? (
               <div className="space-y-2">
                 {selectedItems.map((item) => (
-                  <CalendarEventCard key={item.id} item={item} onComplete={toggleComplete} />
+                  <CalendarEventCard
+                    key={item.id}
+                    item={item}
+                    onComplete={toggleComplete}
+                    dragging={dragId === item.id}
+                    onDragStart={(row) => setDragId(row.id)}
+                    onDragEnd={() => {
+                      setDragId(null);
+                      setDropDate(null);
+                    }}
+                  />
                 ))}
               </div>
             ) : (
@@ -454,220 +624,187 @@ export function PersonalCalendarClient() {
             )}
           </section>
 
-          <section className="v2-card p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
-                  На горизонте
-                </p>
-                <h2 className="v2-tight mt-1 text-[16px] font-bold text-[var(--v2-ink-900)]">
-                  Ближайшие дедлайны
-                </h2>
-              </div>
-              {loading ? (
-                <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--v2-brand-500)]" />
-              ) : null}
-            </div>
-            {upcomingByDate.length ? (
-              <div className="space-y-4">
-                {upcomingByDate.map((group) => {
-                  const stamp = formatDeadlineDay(group.date);
-                  const isToday = group.date === today;
-                  return (
-                    <div key={group.date}>
-                      <div className="mb-2 flex items-center gap-2.5">
-                        <div
-                          className={`flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl ${
-                            isToday
-                              ? "bg-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]"
-                              : "bg-[var(--v2-ink-900)] text-white"
-                          }`}
-                        >
-                          <span className="v2-tnum text-[16px] font-bold leading-none">{stamp.day}</span>
-                          <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide opacity-80">
-                            {stamp.month.replace(".", "")}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="v2-tight text-[14px] font-bold capitalize text-[var(--v2-ink-900)]">
-                            {stamp.weekday}
-                            {isToday ? " · сегодня" : ""}
-                          </p>
-                          <p className="v2-tnum text-[11px] text-[var(--v2-ink-500)]">
-                            {formatDate(group.date)}
-                            {group.items.length > 1 ? ` · ${group.items.length}` : ""}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        {group.items.map((item) => (
-                          <CalendarEventCard
-                            key={item.id}
-                            item={item}
-                            onComplete={toggleComplete}
-                            hideDate
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="rounded-xl bg-[var(--v2-ink-50)] px-3 py-5 text-center text-[12px] text-[var(--v2-ink-500)]">
-                Ближайших дедлайнов нет
-              </p>
-            )}
-          </section>
-
           <section className="v2-card overflow-hidden">
-            <div className="border-b border-[var(--v2-ink-100)] bg-[var(--v2-brand-50)]/70 px-4 py-3.5">
+            <div className="border-b border-[var(--v2-ink-100)] bg-[var(--v2-brand-50)]/60 px-4 py-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
-                Рабочий ритм
+                Фокус недели
               </p>
               <h2 className="v2-tight mt-1 text-[16px] font-bold text-[var(--v2-ink-900)]">
-                Курс — спринты не более 3 часов
+                Неделя {weekFocus?.label ?? "…"}
               </h2>
             </div>
-            <div className="p-4">
-              <ol className="space-y-2.5">
-                {[
-                  ["1 спринт", "Подготовка материала и ТЗ"],
-                  ["2 спринта", "Съёмки"],
-                  ["1 спринт", "Подготовка и выкладка"],
-                ].map(([count, description], index) => (
-                  <li key={count} className="flex items-start gap-3">
-                    <span className="v2-tnum flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--v2-brand-50)] text-[11px] font-bold text-[var(--v2-brand-700)]">
-                      {index + 1}
-                    </span>
-                    <div className="pt-0.5">
-                      <p className="text-[12px] font-semibold text-[var(--v2-ink-800)]">{count}</p>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--v2-ink-500)]">
-                        {description}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
 
-              <div className="mt-4 grid gap-2">
-                <div className="rounded-xl bg-violet-50 px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600">Будущее</p>
-                  <p className="mt-1 text-[12px] font-medium text-violet-950">
-                    Обязательно 2–3 слота в неделю
-                  </p>
+            <div className="px-4 py-3.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
+                {weekFocus?.result_title ?? "Главный результат недели"}
+              </p>
+              <ul className="mt-2.5 space-y-1.5">
+                {(weekFocus?.goals ?? []).map((goal) => {
+                  const done = Boolean(goal.completed_at);
+                  return (
+                    <li key={goal.id} className="group flex items-start gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void toggleGoal(goal)}
+                        className={`flex min-w-0 flex-1 items-start gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-[var(--v2-ink-50)] ${
+                          done ? "opacity-60" : ""
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
+                            done
+                              ? "border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
+                              : "border-[var(--v2-ink-200)] text-transparent"
+                          }`}
+                        >
+                          <V2Icons.check className="h-3.5 w-3.5" />
+                        </span>
+                        <span
+                          className={`v2-tight text-[13px] font-medium leading-snug text-[var(--v2-ink-800)] ${
+                            done ? "line-through decoration-[1.5px]" : ""
+                          }`}
+                        >
+                          {goal.title}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        title="Удалить"
+                        onClick={() => void deleteGoal(goal.id)}
+                        className="mt-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
+                      >
+                        <V2Icons.trash className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <form
+                className="mt-2 flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void addGoal();
+                }}
+              >
+                <input
+                  value={newGoal}
+                  onChange={(e) => setNewGoal(e.target.value)}
+                  placeholder="Добавить результат…"
+                  className="v2-input h-9 min-w-0 flex-1 text-[13px]"
+                />
+                <button
+                  type="submit"
+                  disabled={savingFocus || !newGoal.trim()}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--v2-ink-900)] text-white disabled:opacity-40"
+                >
+                  <V2Icons.plus className="h-4 w-4" />
+                </button>
+              </form>
+            </div>
+
+            <div className="border-t border-[var(--v2-ink-100)] px-4 py-3.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
+                Дедлайны
+              </p>
+              <p className="mt-1 text-[11px] text-[var(--v2-ink-400)]">
+                Перетащи на день в сетке слева
+              </p>
+              {weekDeadlines.length ? (
+                <ul className="mt-2.5 space-y-2">
+                  {weekDeadlines.map((item) => {
+                    const done = Boolean(item.completed_at);
+                    return (
+                      <li key={item.id} className="group relative">
+                        <button
+                          type="button"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData(DRAG_DEADLINE_TYPE, item.id);
+                            e.dataTransfer.setData("text/plain", item.id);
+                            setDragId(item.id);
+                          }}
+                          onDragEnd={() => {
+                            setDragId(null);
+                            setDropDate(null);
+                          }}
+                          onClick={() => void toggleComplete(item)}
+                          className={`flex w-full cursor-grab items-start gap-2.5 rounded-xl border border-[var(--v2-ink-100)] bg-white px-2.5 py-2.5 text-left transition hover:border-[var(--v2-ink-200)] hover:bg-[var(--v2-ink-50)]/80 active:cursor-grabbing ${
+                            done ? "opacity-55" : ""
+                          } ${dragId === item.id ? "opacity-40" : ""}`}
+                        >
+                          <span
+                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
+                              done
+                                ? "border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
+                                : "border-[var(--v2-ink-200)] text-transparent"
+                            }`}
+                          >
+                            <V2Icons.check className="h-3.5 w-3.5" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`v2-tight block text-[13px] font-semibold leading-snug text-[var(--v2-ink-900)] ${
+                                done ? "line-through decoration-[1.5px]" : ""
+                              }`}
+                            >
+                              {item.title}
+                            </span>
+                            <span className="v2-tnum mt-1 block text-[11px] text-[var(--v2-ink-500)]">
+                              до {formatDeadlineShort(item.date)}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          title="Удалить"
+                          onClick={() => void deleteDeadline(item.id)}
+                          className="absolute right-1.5 top-1.5 hidden h-7 w-7 items-center justify-center rounded-lg bg-white/90 text-[var(--v2-ink-300)] shadow-sm transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
+                        >
+                          <V2Icons.trash className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="mt-2 text-[12px] text-[var(--v2-ink-500)]">На эту неделю дедлайнов нет</p>
+              )}
+
+              <form
+                className="mt-3 space-y-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void addDeadline();
+                }}
+              >
+                <input
+                  value={newDeadline}
+                  onChange={(e) => setNewDeadline(e.target.value)}
+                  placeholder="Новый дедлайн…"
+                  className="v2-input h-9 w-full text-[13px]"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={newDeadlineDate}
+                    onChange={(e) => setNewDeadlineDate(e.target.value)}
+                    className="v2-input h-9 min-w-0 flex-1 text-[13px]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingFocus || !newDeadline.trim()}
+                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3 text-[12px] font-semibold text-white disabled:opacity-40"
+                  >
+                    <V2Icons.plus className="h-3.5 w-3.5" />
+                    Добавить
+                  </button>
                 </div>
-                <div className="rounded-xl bg-orange-50 px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-600">Каждый день</p>
-                  <p className="mt-1 text-[12px] font-medium text-orange-950">
-                    Утром и вечером — поиск клиентов
-                  </p>
-                </div>
-              </div>
+              </form>
             </div>
           </section>
         </aside>
       </div>
-
-      <section className="v2-card mt-4 overflow-hidden">
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--v2-ink-100)] px-4 py-4 sm:px-5">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
-              Фокус недели
-            </p>
-            <h2 className="v2-tight mt-1 text-[18px] font-bold text-[var(--v2-ink-900)]">
-              Задачи на эту неделю
-            </h2>
-            <p className="mt-1 text-[11px] text-[var(--v2-ink-500)]">
-              {formatDate(week.from)} — {formatDate(week.to)}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              ["#DC2626", "Обязательно"],
-              ["#EA580C", "Желательно"],
-              ["#71717A", "Можно не делать"],
-            ].map(([color, label]) => (
-              <span
-                key={label}
-                className="flex items-center gap-1.5 rounded-full bg-[var(--v2-ink-50)] px-2.5 py-1 text-[10px] font-medium text-[var(--v2-ink-600)]"
-              >
-                <i className="h-2 w-2 rounded-full" style={{ background: color }} />
-                {label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {weeklyItems.length ? (
-          <div className="divide-y divide-[var(--v2-ink-100)]">
-            {weeklyItems.map((item, index) => {
-              const importance = IMPORTANCE[item.priority ?? "none"];
-              const done = Boolean(item.completed_at);
-              return (
-                <div
-                  key={item.id}
-                  className={`v2-row-in group flex items-center gap-3 px-4 py-3.5 transition hover:bg-[var(--v2-ink-50)]/70 sm:px-5 ${
-                    done ? "opacity-60" : ""
-                  }`}
-                  style={{ animationDelay: `${index * 35}ms` }}
-                >
-                  <span
-                    className="h-9 w-1 shrink-0 rounded-full"
-                    style={{ background: done ? "#A1A1AA" : importance.color }}
-                    aria-hidden
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void toggleComplete(item)}
-                    aria-label={done ? "Вернуть задачу" : "Выполнить задачу"}
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition ${
-                      done
-                        ? "border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
-                        : "border-[var(--v2-ink-200)] text-transparent hover:border-[var(--v2-brand-300)] hover:text-[var(--v2-brand-500)]"
-                    }`}
-                  >
-                    <V2Icons.check className="h-4 w-4" />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`v2-tight truncate text-[14px] font-semibold text-[var(--v2-ink-900)] ${
-                        done ? "line-through decoration-[1.5px]" : ""
-                      }`}
-                    >
-                      {item.title}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--v2-ink-500)]">
-                      <span className="v2-tnum capitalize">{formatDate(item.date)}</span>
-                      {item.time ? <span className="v2-tnum">до {item.time}</span> : null}
-                      <span>{item.category}</span>
-                    </div>
-                  </div>
-                  <span
-                    className="hidden rounded-lg px-2 py-1 text-[10px] font-semibold sm:inline-flex"
-                    style={{
-                      color: done ? "#71717A" : importance.color,
-                      background: done ? "#F4F4F5" : importance.background,
-                    }}
-                  >
-                    {done ? "Сделано" : importance.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="px-5 py-10 text-center">
-            <V2Icons.tasks className="mx-auto h-7 w-7 text-[var(--v2-ink-300)]" />
-            <p className="mt-2 text-[13px] font-medium text-[var(--v2-ink-600)]">
-              На эту неделю задач пока нет
-            </p>
-            <p className="mt-1 text-[11px] text-[var(--v2-ink-400)]">
-              Задачи появятся здесь после назначения даты
-            </p>
-          </div>
-        )}
-      </section>
     </div>
   );
 }

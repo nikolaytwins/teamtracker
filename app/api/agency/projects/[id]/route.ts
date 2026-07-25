@@ -33,6 +33,10 @@ export async function PUT(
     const deadline = body.deadline ?? null;
     const status = body.status != null ? String(body.status) : "not_paid";
     const serviceType = body.serviceType != null ? String(body.serviceType) : "site";
+    const businessLine =
+      body.businessLine === "impulse" || body.businessLine === "agency"
+        ? String(body.businessLine)
+        : "agency";
     const clientType = body.clientType != null && body.clientType !== "" ? String(body.clientType) : null;
     const paymentMethod =
       body.paymentMethod != null && body.paymentMethod !== "" ? String(body.paymentMethod) : null;
@@ -46,6 +50,7 @@ export async function PUT(
       deadline,
       status,
       serviceType,
+      businessLine,
       clientType,
       paymentMethod,
       clientContact,

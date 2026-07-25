@@ -16,6 +16,7 @@ interface Project {
   deadline: string | null
   status: string
   serviceType: string
+  businessLine?: string
   clientType: string | null
   paymentMethod: string | null
   clientContact: string | null
@@ -647,6 +648,12 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
           <div>
             <div className="text-sm text-[var(--muted-foreground)]">Услуга</div>
             <div className="font-medium">{serviceLabels[project.serviceType] || project.serviceType}</div>
+          </div>
+          <div>
+            <div className="text-sm text-[var(--muted-foreground)]">Направление</div>
+            <div className="font-medium">
+              {project.businessLine === "impulse" ? "Импульс" : "Агентство"}
+            </div>
           </div>
           <div>
             <div className="text-sm text-[var(--muted-foreground)]">Тип клиента</div>

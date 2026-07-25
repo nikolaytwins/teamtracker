@@ -53,8 +53,10 @@
 | 032 | `032_v2_personal_forecast_daily_spend.sql` | Прогноз: daily_spend_rub у бюджета месяца |
 | 033 | `033_v2_personal_ideas.sql` | Личные идеи: стикеры, теги, фото |
 | 034 | `034_v2_leads_lost_reason.sql` | Лиды: lost_reason + lost_at |
+| 035 | `035_agency_project_business_line.sql` | Проекты и финансы: agency / impulse |
+| 036 | `036_v2_personal_week_focus.sql` | Личный календарь: редактируемый фокус недели |
 
-**Следующий свободный номер:** `035`
+**Следующий свободный номер:** `037`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

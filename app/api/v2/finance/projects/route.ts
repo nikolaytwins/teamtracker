@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Admin } from "@/lib/v2/auth/require-v2-session";
 import { createFinanceProject } from "@/lib/v2/finance/finance-repo";
+import { isFinanceBusinessLine } from "@/lib/v2/finance/meta";
 import type { V2FinancePaymentStatus, V2FinanceServiceType } from "@/lib/v2/finance/types";
 
 export async function POST(request: NextRequest) {
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
       paidAmount: typeof body.paidAmount === "number" ? body.paidAmount : 0,
       status,
       serviceType,
+      businessLine: isFinanceBusinessLine(body.businessLine) ? body.businessLine : "agency",
       clientType: typeof body.clientType === "string" ? body.clientType : null,
       paymentMethod: typeof body.paymentMethod === "string" ? body.paymentMethod : null,
       clientContact: typeof body.clientContact === "string" ? body.clientContact : null,

@@ -5,7 +5,7 @@ import {
   updateFinanceProject,
 } from "@/lib/v2/finance/finance-repo";
 import type { V2FinancePaymentStatus, V2FinanceServiceType } from "@/lib/v2/finance/types";
-import { isFinanceServiceType } from "@/lib/v2/finance/meta";
+import { isFinanceBusinessLine, isFinanceServiceType } from "@/lib/v2/finance/meta";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -26,6 +26,9 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     }
     if (isFinanceServiceType(body.serviceType)) {
       patch.service_type = body.serviceType;
+    }
+    if (isFinanceBusinessLine(body.businessLine)) {
+      patch.business_line = body.businessLine;
     }
     if (body.clientType === null || typeof body.clientType === "string") patch.client_type = body.clientType;
     if (body.paymentMethod === null || body.paymentMethod === "card" || body.paymentMethod === "account") {

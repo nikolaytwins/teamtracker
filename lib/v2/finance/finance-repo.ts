@@ -1,7 +1,12 @@
 import { getAgencyRepoV2 } from "@/lib/agency-store";
 import { isInFinanceMonth } from "@/lib/v2/finance/meta";
-import { FINANCE_SERVICE_META, isFinanceServiceType } from "@/lib/v2/finance/meta";
+import {
+  FINANCE_SERVICE_META,
+  isFinanceBusinessLine,
+  isFinanceServiceType,
+} from "@/lib/v2/finance/meta";
 import type {
+  V2FinanceBusinessLine,
   V2FinanceGeneralExpenseRow,
   V2FinanceMonthSummary,
   V2FinancePaymentStatus,
@@ -24,6 +29,9 @@ function mapAgencyProject(raw: Record<string, unknown>, workspaceId: string): V2
   const status: V2FinancePaymentStatus =
     statusRaw === "paid" || statusRaw === "prepaid" ? statusRaw : "not_paid";
   const pm = raw.paymentMethod;
+  const business_line: V2FinanceBusinessLine = isFinanceBusinessLine(raw.businessLine)
+    ? raw.businessLine
+    : "agency";
   return {
     id: String(raw.id),
     workspace_id: workspaceId,
@@ -33,6 +41,7 @@ function mapAgencyProject(raw: Record<string, unknown>, workspaceId: string): V2
     deadline: raw.deadline ? String(raw.deadline) : null,
     status,
     service_type,
+    business_line,
     client_type: raw.clientType ? String(raw.clientType) : null,
     payment_method: pm === "card" || pm === "account" ? pm : null,
     client_contact: raw.clientContact ? String(raw.clientContact) : null,
@@ -172,6 +181,7 @@ export async function createFinanceProject(
     paidAmount?: number;
     status?: V2FinancePaymentStatus;
     serviceType?: V2FinanceServiceType;
+    businessLine?: V2FinanceBusinessLine;
     clientType?: string | null;
     paymentMethod?: string | null;
     clientContact?: string | null;
@@ -186,6 +196,7 @@ export async function createFinanceProject(
     paidAmount: input.paidAmount ?? 0,
     status: input.status ?? "not_paid",
     serviceType: input.serviceType ?? "site",
+    businessLine: input.businessLine ?? "agency",
     clientType: input.clientType ?? null,
     paymentMethod: input.paymentMethod ?? null,
     clientContact: input.clientContact ?? null,
@@ -208,6 +219,7 @@ export async function updateFinanceProject(
     paid_amount: number;
     status: V2FinancePaymentStatus;
     service_type: V2FinanceServiceType;
+    business_line: V2FinanceBusinessLine;
     client_type: string | null;
     payment_method: string | null;
     client_contact: string | null;
@@ -230,6 +242,9 @@ export async function updateFinanceProject(
     deadline: cur.deadline ?? null,
     status,
     serviceType: patch.service_type ?? String(cur.serviceType ?? "site"),
+    businessLine:
+      patch.business_line ??
+      (isFinanceBusinessLine(cur.businessLine) ? cur.businessLine : "agency"),
     clientType:
       patch.client_type !== undefined ? patch.client_type : (cur.clientType as string | null) ?? null,
     paymentMethod:

@@ -513,6 +513,9 @@ function LeadModal({
                     status,
                     lost: status === "lost",
                     lostAt: status === "lost" ? f.lostAt || todayYmd() : f.lostAt,
+                    takenIntoWork: status === "taken_into_work",
+                    takenIntoWorkAt:
+                      status === "taken_into_work" ? f.takenIntoWorkAt || todayYmd() : "",
                   }));
                 }}
                 className="v2-input w-full"
@@ -539,11 +542,18 @@ function LeadModal({
                       ...f,
                       takenIntoWork: checked,
                       takenIntoWorkAt: checked ? f.takenIntoWorkAt || todayYmd() : "",
+                      status: checked
+                        ? "taken_into_work"
+                        : f.status === "taken_into_work"
+                          ? "correspondence"
+                          : f.status,
+                      lost: checked ? false : f.lost,
                     }));
                   }}
                   className="h-4 w-4 rounded border-[var(--v2-ink-300)]"
                 />
                 <span className="text-[13px] text-[var(--v2-ink-800)]">Да, клиент в работе</span>
+                <span className="text-[12px] text-[var(--v2-ink-500)]">— колонка «Взято в работу»</span>
               </label>
               {form.takenIntoWork ? (
                 <input
@@ -568,6 +578,8 @@ function LeadModal({
                     lost: checked,
                     status: checked ? "lost" : f.status === "lost" ? "correspondence" : f.status,
                     lostAt: checked ? f.lostAt || todayYmd() : f.lostAt,
+                    takenIntoWork: checked ? false : f.takenIntoWork,
+                    takenIntoWorkAt: checked ? "" : f.takenIntoWorkAt,
                   }));
                 }}
                 className="h-4 w-4 rounded border-[var(--v2-ink-300)]"
@@ -646,7 +658,13 @@ function reminderRank(lead: V2LeadRow) {
 }
 
 function formPayload(form: LeadFormState) {
-  const status: V2LeadStatus = form.lost ? "lost" : form.status === "lost" ? "correspondence" : form.status;
+  const status: V2LeadStatus = form.lost
+    ? "lost"
+    : form.takenIntoWork
+      ? "taken_into_work"
+      : form.status === "lost" || form.status === "taken_into_work"
+        ? "correspondence"
+        : form.status;
   return {
     name: form.name,
     contact: form.contact,
@@ -740,7 +758,11 @@ export function V2AdminLeadsClient({
     const current = leads.find((l) => l.id === id);
     if (!current || current.status === status) return;
     const takenIntoWorkAt =
-      status === "taken_into_work" && !current.taken_into_work_at ? todayYmd() : undefined;
+      status === "taken_into_work"
+        ? current.taken_into_work_at || todayYmd()
+        : current.status === "taken_into_work"
+          ? null
+          : undefined;
     const lostAt = status === "lost" && !current.lost_at ? todayYmd() : status !== "lost" ? null : undefined;
     setLeads((prev) =>
       prev.map((l) =>
@@ -748,7 +770,8 @@ export function V2AdminLeadsClient({
           ? {
               ...l,
               status,
-              taken_into_work_at: takenIntoWorkAt ?? l.taken_into_work_at,
+              taken_into_work_at:
+                takenIntoWorkAt === undefined ? l.taken_into_work_at : takenIntoWorkAt,
               lost_at: lostAt === undefined ? l.lost_at : lostAt,
             }
           : l
@@ -760,7 +783,7 @@ export function V2AdminLeadsClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status,
-          ...(takenIntoWorkAt ? { takenIntoWorkAt } : {}),
+          ...(takenIntoWorkAt !== undefined ? { takenIntoWorkAt } : {}),
           ...(lostAt !== undefined ? { lostAt } : {}),
         }),
       });
@@ -850,7 +873,7 @@ export function V2AdminLeadsClient({
         estimatedAmount: editLead.estimated_amount != null ? String(editLead.estimated_amount) : "",
         source: editLead.source,
         sourceCustom: editLead.source_custom ?? "",
-        takenIntoWork: !!editLead.taken_into_work_at,
+        takenIntoWork: editLead.status === "taken_into_work" || !!editLead.taken_into_work_at,
         takenIntoWorkAt: editLead.taken_into_work_at ?? "",
         lost: editLead.status === "lost",
         lostReason: editLead.lost_reason ?? "",
@@ -1028,6 +1051,8 @@ export function V2AdminLeadsClient({
                                 status: key,
                                 lost: key === "lost",
                                 lostAt: key === "lost" ? todayYmd() : "",
+                                takenIntoWork: key === "taken_into_work",
+                                takenIntoWorkAt: key === "taken_into_work" ? todayYmd() : "",
                                 createdAt: todayYmd(),
                               });
                               setFormError(null);

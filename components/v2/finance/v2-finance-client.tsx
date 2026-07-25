@@ -3,6 +3,7 @@
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
   adjacentFinanceMonth,
+  FINANCE_BUSINESS_LINE_META,
   FINANCE_CLIENT_TYPE_OPTIONS,
   FINANCE_EMPLOYEE_ROLES,
   FINANCE_MONTH_NAMES,
@@ -13,6 +14,7 @@ import {
   formatRub,
 } from "@/lib/v2/finance/meta";
 import type {
+  V2FinanceBusinessLine,
   V2FinanceGeneralExpenseRow,
   V2FinanceMonthSummary,
   V2FinancePaymentStatus,
@@ -245,6 +247,7 @@ export function V2FinanceClient() {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectAmount, setNewProjectAmount] = useState("");
+  const [newProjectLine, setNewProjectLine] = useState<V2FinanceBusinessLine>("agency");
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [expenseWho, setExpenseWho] = useState("");
   const [expenseRole, setExpenseRole] = useState<string>(FINANCE_EMPLOYEE_ROLES[0]!.label);
@@ -338,10 +341,11 @@ export function V2FinanceClient() {
       await fetchJson("/api/v2/finance/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, totalAmount, year, month }),
+        body: JSON.stringify({ name, totalAmount, businessLine: newProjectLine, year, month }),
       });
       setNewProjectName("");
       setNewProjectAmount("");
+      setNewProjectLine("agency");
       setNewProjectOpen(false);
       await load(year, month);
     } catch (e) {
@@ -589,13 +593,33 @@ export function V2FinanceClient() {
                             >
                               {p.name[0]}
                             </span>
-                            <Link
-                              href={appPath(`/v2/agency/projects/${p.id}`)}
-                              className="v2-tight min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline"
-                              title="Открыть проект и детализацию"
-                            >
-                              {p.name}
-                            </Link>
+                            <div className="min-w-0 flex-1">
+                              <Link
+                                href={appPath(`/v2/agency/projects/${p.id}`)}
+                                className="v2-tight block truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline"
+                                title="Открыть проект и детализацию"
+                              >
+                                {p.name}
+                              </Link>
+                              <select
+                                value={p.business_line}
+                                onChange={(e) =>
+                                  void patchProject(p.id, {
+                                    businessLine: e.target.value as V2FinanceBusinessLine,
+                                  })
+                                }
+                                className="v2-tight mt-0.5 max-w-full rounded border-0 bg-transparent py-0 pl-0 text-[11px] font-medium text-[var(--v2-ink-500)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                                title="Направление"
+                              >
+                                {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map(
+                                  (k) => (
+                                    <option key={k} value={k}>
+                                      {FINANCE_BUSINESS_LINE_META[k].label}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            </div>
                             <span className="ml-0.5 hidden items-center gap-0.5 group-hover:flex">
                               <Link
                                 href={appPath(`/v2/agency/projects/${p.id}`)}
@@ -1034,6 +1058,31 @@ export function V2FinanceClient() {
                 className="v2-tnum h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
               />
             </label>
+            <div className="mt-3">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
+                Направление
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => {
+                  const meta = FINANCE_BUSINESS_LINE_META[k];
+                  const active = newProjectLine === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setNewProjectLine(k)}
+                      className={`v2-tight rounded-xl border px-3 py-2.5 text-[13px] font-medium transition ${
+                        active
+                          ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
+                          : "border-[var(--v2-ink-200)] text-[var(--v2-ink-700)] hover:border-[var(--v2-ink-300)]"
+                      }`}
+                    >
+                      {meta.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
@@ -1041,6 +1090,7 @@ export function V2FinanceClient() {
                   setNewProjectOpen(false);
                   setNewProjectName("");
                   setNewProjectAmount("");
+                  setNewProjectLine("agency");
                 }}
                 className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
               >

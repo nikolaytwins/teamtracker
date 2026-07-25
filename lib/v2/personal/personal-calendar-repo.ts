@@ -1,4 +1,8 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
+import {
+  CALENDAR_SEED_DEADLINES,
+  LEGACY_CALENDAR_SEEDS,
+} from "@/lib/v2/personal/week-focus-plan";
 import type { V2SessionContext, V2TaskPriority } from "@/lib/v2/types";
 
 export type PersonalCalendarItem = {
@@ -16,39 +20,6 @@ const CALENDAR_PROJECTS = [
   { name: "Курс", color: "#3B6FF7", icon_key: "book" },
   { name: "Медийка", color: "#F97316", icon_key: "spark" },
   { name: "Курс + медийка", color: "#8B5CF6", icon_key: "camera" },
-] as const;
-
-const INITIAL_DEADLINES = [
-  {
-    title: "Подготовительный спринт следующего модуля",
-    date: "2026-07-24",
-    project: "Курс",
-    priority: "high",
-  },
-  {
-    title: "Сценарий YouTube",
-    date: "2026-07-24",
-    project: "Медийка",
-    priority: "high",
-  },
-  {
-    title: "Общий съёмочный день: курс + YouTube",
-    date: "2026-07-25",
-    project: "Курс + медийка",
-    priority: "urgent",
-  },
-  {
-    title: "Второй съёмочный спринт курса",
-    date: "2026-07-29",
-    project: "Курс",
-    priority: "high",
-  },
-  {
-    title: "Монтаж, оформление и загрузка модуля",
-    date: "2026-08-01",
-    project: "Курс",
-    priority: "high",
-  },
 ] as const;
 
 function mapItem(row: Record<string, unknown>): PersonalCalendarItem {
@@ -97,18 +68,31 @@ async function ensureInitialCalendarDeadlines(ctx: V2SessionContext) {
     projectIds.set(project.name, id);
   }
 
+  // Удаляем устаревшие сиды (старый план).
+  for (const legacy of LEGACY_CALENDAR_SEEDS) {
+    const { error: legacyError } = await sb
+      .from("v2_personal_todos")
+      .update({ deleted_at: now, updated_at: now })
+      .eq("user_id", ctx.userId)
+      .eq("title", legacy.title)
+      .eq("due_date", legacy.date)
+      .is("deleted_at", null);
+    if (legacyError) throw legacyError;
+  }
+
+  const seedDates = [...new Set(CALENDAR_SEED_DEADLINES.map((item) => item.date))];
   const { data: existingTodos, error: todosError } = await sb
     .from("v2_personal_todos")
     .select("title, due_date")
     .eq("user_id", ctx.userId)
-    .in("due_date", [...new Set(INITIAL_DEADLINES.map((item) => item.date))])
+    .in("due_date", seedDates)
     .is("deleted_at", null);
   if (todosError) throw todosError;
 
   const existingKeys = new Set(
     (existingTodos ?? []).map((todo) => `${String(todo.due_date).slice(0, 10)}:${String(todo.title)}`)
   );
-  const rows = INITIAL_DEADLINES.filter((item) => !existingKeys.has(`${item.date}:${item.title}`)).map(
+  const rows = CALENDAR_SEED_DEADLINES.filter((item) => !existingKeys.has(`${item.date}:${item.title}`)).map(
     (item, index) => ({
       id: newV2Id(),
       user_id: ctx.userId,

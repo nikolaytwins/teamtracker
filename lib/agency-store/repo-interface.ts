@@ -7,6 +7,7 @@ export type CreateProjectBody = {
   deadline?: string | null;
   status?: string;
   serviceType: string;
+  businessLine?: string;
   clientType?: string | null;
   paymentMethod?: string | null;
   clientContact?: string | null;
@@ -20,6 +21,7 @@ export type UpdateProjectBody = {
   deadline: unknown;
   status: string;
   serviceType: string;
+  businessLine: string;
   clientType: string | null;
   paymentMethod: string | null;
   clientContact: string | null;

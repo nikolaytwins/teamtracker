@@ -1,6 +1,8 @@
 export type V2FinanceServiceType = "site" | "presentation" | "small_task" | "subscription" | "ai_development";
 export type V2FinancePaymentStatus = "not_paid" | "prepaid" | "paid";
 export type V2FinancePaymentMethod = "card" | "account" | null;
+/** Направление выручки: агентство или импульс (разбивка — на будущее). */
+export type V2FinanceBusinessLine = "agency" | "impulse";
 
 export type V2FinanceProjectRow = {
   id: string;
@@ -11,6 +13,7 @@ export type V2FinanceProjectRow = {
   deadline: string | null;
   status: V2FinancePaymentStatus;
   service_type: V2FinanceServiceType;
+  business_line: V2FinanceBusinessLine;
   client_type: string | null;
   payment_method: V2FinancePaymentMethod;
   client_contact: string | null;

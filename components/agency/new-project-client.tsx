@@ -26,6 +26,7 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
       deadline: formData.get('deadline') || null,
       status: formData.get('status'),
       serviceType: formData.get('serviceType'),
+      businessLine: formData.get('businessLine') || 'agency',
       clientType: formData.get('clientType') || null,
       paymentMethod: formData.get('paymentMethod') || null,
       clientContact: formData.get('clientContact') || null,
@@ -131,6 +132,20 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
                 <option value="subscription">Подписка</option>
                 <option value="ai_development">AI-разработка</option>
               </select>
+            </div>
+
+            <div>
+              <span className="block text-sm font-medium text-[var(--text)] mb-1">Направление *</span>
+              <div className="flex gap-4">
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                  <input type="radio" name="businessLine" value="agency" defaultChecked />
+                  Агентство
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                  <input type="radio" name="businessLine" value="impulse" />
+                  Импульс
+                </label>
+              </div>
             </div>
 
             <div>

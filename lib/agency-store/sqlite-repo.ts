@@ -82,8 +82,8 @@ export class SqliteAgencyRepo implements AgencyRepo {
       const id = `proj_${Date.now()}`;
       db.prepare(
         `
-      INSERT INTO AgencyProject (id, name, totalAmount, paidAmount, deadline, status, serviceType, clientType, paymentMethod, clientContact, notes, source_lead_id, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'), datetime('now'))
+      INSERT INTO AgencyProject (id, name, totalAmount, paidAmount, deadline, status, serviceType, businessLine, clientType, paymentMethod, clientContact, notes, source_lead_id, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'), datetime('now'))
     `
       ).run(
         id,
@@ -93,6 +93,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         body.deadline || null,
         body.status || "not_paid",
         body.serviceType,
+        body.businessLine === "impulse" ? "impulse" : "agency",
         body.clientType || null,
         body.paymentMethod || null,
         body.clientContact || null,
@@ -132,7 +133,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
       db.prepare(
         `
       UPDATE AgencyProject
-      SET name = ?, totalAmount = ?, paidAmount = ?, deadline = ?, status = ?, serviceType = ?, clientType = ?, paymentMethod = ?, clientContact = ?, notes = ?, updatedAt = datetime('now')
+      SET name = ?, totalAmount = ?, paidAmount = ?, deadline = ?, status = ?, serviceType = ?, businessLine = ?, clientType = ?, paymentMethod = ?, clientContact = ?, notes = ?, updatedAt = datetime('now')
       WHERE id = ?
     `
       ).run(
@@ -142,6 +143,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         body.deadline,
         body.status,
         body.serviceType,
+        body.businessLine === "impulse" ? "impulse" : "agency",
         body.clientType,
         body.paymentMethod,
         body.clientContact,
@@ -180,8 +182,8 @@ export class SqliteAgencyRepo implements AgencyRepo {
       const newDate = `${year}-${String(month).padStart(2, "0")}-01 00:00:00`;
       db.prepare(
         `
-      INSERT INTO AgencyProject (id, name, totalAmount, paidAmount, deadline, status, serviceType, clientType, paymentMethod, clientContact, notes, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      INSERT INTO AgencyProject (id, name, totalAmount, paidAmount, deadline, status, serviceType, businessLine, clientType, paymentMethod, clientContact, notes, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `
       ).run(
         newProjectId,
@@ -191,6 +193,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         project.deadline,
         "not_paid",
         project.serviceType,
+        project.businessLine === "impulse" ? "impulse" : "agency",
         project.clientType,
         project.paymentMethod,
         project.clientContact,
@@ -521,8 +524,8 @@ export class SqliteAgencyRepo implements AgencyRepo {
       ensureAgencyProjectsColumns(db);
       db.prepare(
         `INSERT INTO AgencyProject
-       (id, name, totalAmount, paidAmount, deadline, status, serviceType, clientType, paymentMethod, clientContact, notes, source_lead_id, createdAt, updatedAt)
-       VALUES (?, ?, 0, 0, NULL, 'not_paid', 'site', NULL, NULL, ?, NULL, ?, datetime('now'), datetime('now'))`
+       (id, name, totalAmount, paidAmount, deadline, status, serviceType, businessLine, clientType, paymentMethod, clientContact, notes, source_lead_id, createdAt, updatedAt)
+       VALUES (?, ?, 0, 0, NULL, 'not_paid', 'site', 'agency', NULL, NULL, ?, NULL, ?, datetime('now'), datetime('now'))`
       ).run(input.id, input.name, input.clientContact, input.leadId);
       return db.prepare(`SELECT id, name, deadline FROM AgencyProject WHERE id = ?`).get(input.id) as {
         id: string;

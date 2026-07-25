@@ -9,6 +9,7 @@ export function mapProjectRow(r: Record<string, unknown>): Record<string, unknow
     deadline: r.deadline,
     status: r.status,
     serviceType: r.service_type,
+    businessLine: r.business_line ?? "agency",
     clientType: r.client_type,
     paymentMethod: r.payment_method,
     clientContact: r.client_contact,
@@ -95,6 +96,7 @@ export function projectInsertFromBody(body: {
   deadline: string | null;
   status: string;
   serviceType: string;
+  businessLine?: string;
   clientType: string | null;
   paymentMethod: string | null;
   clientContact: string | null;
@@ -109,6 +111,7 @@ export function projectInsertFromBody(body: {
     deadline: body.deadline,
     status: body.status,
     service_type: body.serviceType,
+    business_line: body.businessLine === "impulse" ? "impulse" : "agency",
     client_type: body.clientType,
     payment_method: body.paymentMethod,
     client_contact: body.clientContact,

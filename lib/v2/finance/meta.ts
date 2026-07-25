@@ -1,4 +1,8 @@
-import type { V2FinancePaymentStatus, V2FinanceServiceType } from "@/lib/v2/finance/types";
+import type {
+  V2FinanceBusinessLine,
+  V2FinancePaymentStatus,
+  V2FinanceServiceType,
+} from "@/lib/v2/finance/types";
 
 export const FINANCE_MONTH_NAMES = [
   "Январь",
@@ -28,6 +32,18 @@ export const FINANCE_SERVICE_META: Record<
 
 export function isFinanceServiceType(v: unknown): v is V2FinanceServiceType {
   return typeof v === "string" && v in FINANCE_SERVICE_META;
+}
+
+export const FINANCE_BUSINESS_LINE_META: Record<
+  V2FinanceBusinessLine,
+  { label: string; tint: string; bg: string }
+> = {
+  agency: { label: "Агентство", tint: "#1F3AAF", bg: "#E6EDFF" },
+  impulse: { label: "Импульс", tint: "#0F766E", bg: "#CCFBF1" },
+};
+
+export function isFinanceBusinessLine(v: unknown): v is V2FinanceBusinessLine {
+  return v === "agency" || v === "impulse";
 }
 
 export const FINANCE_STATUS_META: Record<
