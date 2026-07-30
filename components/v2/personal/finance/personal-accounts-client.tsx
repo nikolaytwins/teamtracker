@@ -1,12 +1,14 @@
 "use client";
 
-import { PersonalAmt, PersonalMaskProvider } from "./personal-finance-mask";
+import { PersonalMaskProvider } from "./personal-finance-mask";
 import {
   PersonalAccountBalanceInline,
   PersonalCapitalAmountInline,
 } from "./personal-money-inline";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { FX_CURRENCY_META } from "@/lib/v2/personal/fx-rates";
 import type {
+  PersonalAccountCurrency,
   PersonalAccountRow,
   PersonalAccountType,
   PersonalCapitalRow,
@@ -24,6 +26,14 @@ const ACCOUNT_TYPES: { value: PersonalAccountType; label: string }[] = [
   { value: "cushion", label: "Подушка" },
   { value: "goal", label: "Цель" },
   { value: "other", label: "Другое" },
+];
+
+const CURRENCY_OPTIONS: { value: PersonalAccountCurrency; label: string }[] = [
+  { value: "RUB", label: "Рубли (₽)" },
+  { value: "USD", label: "Доллары (USD)" },
+  { value: "AED", label: "Дирхамы (AED)" },
+  { value: "GEL", label: "Лари (GEL)" },
+  { value: "EUR", label: "Евро (EUR)" },
 ];
 
 const ICON_KEYS = ["wallet", "bank", "cash", "shield", "target", "coin", "tv", "key"] as const;
@@ -60,7 +70,9 @@ function emptyAccount(): Partial<PersonalAccountRow> {
     account_type: "card",
     icon_key: "wallet",
     accent: ACCENT_PRESETS[0],
+    currency_code: "RUB",
     balance_rub: 0,
+    balance_native: 0,
     note: "",
     disposable: true,
     goal_amount_rub: null,
@@ -112,6 +124,8 @@ export function PersonalAccountsClient() {
     setSaving(true);
     setError(null);
     try {
+      const currency = accountDraft.currency_code ?? "RUB";
+      const isFx = currency !== "RUB";
       const payload = {
         name: accountDraft.name,
         account_type: accountDraft.account_type,
@@ -120,7 +134,11 @@ export function PersonalAccountsClient() {
         note: accountDraft.note,
         disposable: accountDraft.disposable,
         goal_amount_rub: accountDraft.goal_amount_rub,
-        balance_rub: accountDraft.balance_rub,
+        currency_code: currency,
+        balance_native: isFx
+          ? (accountDraft.balance_native ?? 0)
+          : (accountDraft.balance_rub ?? 0),
+        balance_rub: isFx ? undefined : (accountDraft.balance_rub ?? 0),
       };
       if (accountDraft.id) {
         await fetchJson(`/api/v2/personal/finance/accounts/${accountDraft.id}`, {
@@ -132,7 +150,7 @@ export function PersonalAccountsClient() {
         await fetchJson("/api/v2/personal/finance/accounts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, balance_rub: accountDraft.balance_rub ?? 0 }),
+          body: JSON.stringify(payload),
         });
       }
       setAccountDraft(null);
@@ -254,7 +272,8 @@ export function PersonalAccountsClient() {
               <div>
                 <h1 className="v2-tight text-2xl font-semibold text-[var(--v2-ink-900)]">Счета</h1>
                 <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
-                  Карты, наличные, подушки и цели — клик по сумме, чтобы поправить баланс
+                  Карты, наличные, валюта — клик по сумме, чтобы поправить баланс. Валютные счета
+                  пересчитываются в ₽ по курсу ЦБ раз в сутки
                 </p>
               </div>
               <button
@@ -280,7 +299,13 @@ export function PersonalAccountsClient() {
               </div>
             ) : (
               <div className="space-y-2">
-                {accounts.map((a) => (
+                {accounts.map((a) => {
+                  const isFx = a.currency_code !== "RUB";
+                  const fxMeta =
+                    isFx && a.currency_code in FX_CURRENCY_META
+                      ? FX_CURRENCY_META[a.currency_code as keyof typeof FX_CURRENCY_META]
+                      : null;
+                  return (
                   <div
                     key={a.id}
                     className="flex items-center gap-4 rounded-2xl bg-white px-4 py-3 shadow-[var(--v2-shadow-soft)]"
@@ -292,23 +317,35 @@ export function PersonalAccountsClient() {
                       <V2Icons.ruble className="h-5 w-5" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="v2-tight font-medium text-[var(--v2-ink-900)]">{a.name}</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="v2-tight font-medium text-[var(--v2-ink-900)]">{a.name}</div>
+                        {isFx ? (
+                          <span className="rounded-md bg-[var(--v2-brand-50)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--v2-brand-700)]">
+                            {a.currency_code}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-[12px] text-[var(--v2-ink-500)]">
                         {ACCOUNT_TYPES.find((t) => t.value === a.account_type)?.label ?? a.account_type}
                         {a.disposable ? " · в обороте" : " · резерв"}
+                        {fxMeta && a.fx_rate
+                          ? ` · 1 ${a.currency_code} = ${a.fx_rate.toFixed(2).replace(".", ",")} ₽`
+                          : ""}
                         {a.note ? ` · ${a.note}` : ""}
                       </div>
                     </div>
                     <PersonalAccountBalanceInline
                       accountId={a.id}
-                      value={a.balance_rub}
-                      onSaved={(balance) => {
+                      value={isFx ? a.balance_native : a.balance_rub}
+                      currencyCode={a.currency_code}
+                      rubValue={isFx ? a.balance_rub : undefined}
+                      onSaved={(account) => {
                         setData((prev) =>
                           prev
                             ? {
                                 ...prev,
                                 accounts: prev.accounts.map((x) =>
-                                  x.id === a.id ? { ...x, balance_rub: balance } : x
+                                  x.id === a.id ? account : x
                                 ),
                               }
                             : prev
@@ -333,7 +370,8 @@ export function PersonalAccountsClient() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -447,16 +485,69 @@ export function PersonalAccountsClient() {
                   </select>
                 </label>
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
-                  {accountDraft.id ? "Баланс, ₽" : "Начальный баланс, ₽"}
-                  <input
-                    type="number"
+                  Валюта
+                  <select
                     className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
-                    value={accountDraft.balance_rub ?? 0}
-                    onChange={(e) =>
-                      setAccountDraft({ ...accountDraft, balance_rub: Number(e.target.value) || 0 })
-                    }
-                  />
+                    value={accountDraft.currency_code ?? "RUB"}
+                    onChange={(e) => {
+                      const currency_code = e.target.value as PersonalAccountCurrency;
+                      setAccountDraft({
+                        ...accountDraft,
+                        currency_code,
+                        ...(currency_code === "RUB"
+                          ? {
+                              balance_rub: accountDraft.balance_native ?? accountDraft.balance_rub ?? 0,
+                              balance_native: accountDraft.balance_native ?? accountDraft.balance_rub ?? 0,
+                            }
+                          : {}),
+                      });
+                    }}
+                  >
+                    {CURRENCY_OPTIONS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
+                {(accountDraft.currency_code ?? "RUB") === "RUB" ? (
+                  <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
+                    {accountDraft.id ? "Баланс, ₽" : "Начальный баланс, ₽"}
+                    <input
+                      type="number"
+                      className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                      value={accountDraft.balance_rub ?? 0}
+                      onChange={(e) =>
+                        setAccountDraft({
+                          ...accountDraft,
+                          balance_rub: Number(e.target.value) || 0,
+                          balance_native: Number(e.target.value) || 0,
+                        })
+                      }
+                    />
+                  </label>
+                ) : (
+                  <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
+                    {accountDraft.id
+                      ? `Остаток, ${accountDraft.currency_code}`
+                      : `Начальный остаток, ${accountDraft.currency_code}`}
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                      value={accountDraft.balance_native ?? 0}
+                      onChange={(e) =>
+                        setAccountDraft({
+                          ...accountDraft,
+                          balance_native: Number(e.target.value) || 0,
+                        })
+                      }
+                    />
+                    <span className="mt-1 block text-[11px] font-normal text-[var(--v2-ink-400)]">
+                      В капитале будет сумма в ₽ по актуальному курсу ЦБ
+                    </span>
+                  </label>
+                )}
                 <label className="flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)]">
                   <input
                     type="checkbox"

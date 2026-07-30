@@ -741,6 +741,11 @@ function PfAccountRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="v2-tight truncate text-[14px] font-medium text-[var(--v2-ink-900)]">{a.name}</span>
+          {a.currency_code !== "RUB" ? (
+            <span className="rounded bg-[var(--v2-brand-50)] px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wide text-[var(--v2-brand-700)]">
+              {a.currency_code}
+            </span>
+          ) : null}
           {!a.disposable ? (
             <span className="rounded bg-[var(--v2-ink-100)] px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wide text-[var(--v2-ink-400)]">
               резерв
@@ -762,7 +767,9 @@ function PfAccountRow({
       <div className="v2-tight shrink-0 text-right">
         <PersonalAccountBalanceInline
           accountId={a.id}
-          value={a.balance_rub}
+          value={a.currency_code !== "RUB" ? a.balance_native : a.balance_rub}
+          currencyCode={a.currency_code}
+          rubValue={a.currency_code !== "RUB" ? a.balance_rub : undefined}
           onSaved={() => onSaved()}
           onError={onError}
         />

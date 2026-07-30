@@ -99,6 +99,16 @@ export function ensureAgencyProjectsColumns(db: Database.Database) {
     /* column exists */
   }
   try {
+    db.exec(`ALTER TABLE AgencyProject ADD COLUMN workStatus TEXT NOT NULL DEFAULT 'not_started'`);
+  } catch {
+    /* column exists */
+  }
+  try {
+    db.exec(`ALTER TABLE AgencyProject ADD COLUMN kanbanSortOrder INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    /* column exists */
+  }
+  try {
     db.exec(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_agency_project_source_lead_id ON AgencyProject(source_lead_id) WHERE source_lead_id IS NOT NULL AND TRIM(source_lead_id) != ''`
     );

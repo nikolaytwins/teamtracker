@@ -7,6 +7,17 @@ import {
 } from "@/lib/v2/finance/finance-repo";
 import { listPersonalIncomeHistory } from "@/lib/v2/personal/income-history-repo";
 import { DEFAULT_BUDGET_CATEGORIES } from "@/lib/v2/personal/formatters";
+import {
+  ensureFxRatesFresh,
+  getFxRateMap,
+  isPersonalAccountCurrency,
+  isPersonalFxCurrency,
+  rubFromNative,
+  roundMoney,
+  type FxRateRow,
+  type PersonalAccountCurrency,
+  type PersonalFxCurrency,
+} from "@/lib/v2/personal/fx-rates";
 import type {
   PersonalAccountRow,
   PersonalBudgetCategoryRow,
@@ -39,7 +50,19 @@ function uid(ctx: V2SessionContext) {
   return ctx.userId;
 }
 
-function mapAccount(r: Record<string, unknown>): PersonalAccountRow {
+function mapAccount(
+  r: Record<string, unknown>,
+  rateByCode?: Map<PersonalFxCurrency, { rate: number; asOf: string }>
+): PersonalAccountRow {
+  const currency_code = isPersonalAccountCurrency(r.currency_code)
+    ? r.currency_code
+    : "RUB";
+  const balance_native =
+    r.balance_native != null ? Number(r.balance_native) || 0 : Number(r.balance_rub) || 0;
+  const fx =
+    currency_code !== "RUB" && isPersonalFxCurrency(currency_code)
+      ? rateByCode?.get(currency_code)
+      : undefined;
   return {
     id: String(r.id),
     user_id: String(r.user_id),
@@ -48,11 +71,22 @@ function mapAccount(r: Record<string, unknown>): PersonalAccountRow {
     icon_key: String(r.icon_key),
     accent: String(r.accent),
     balance_rub: Number(r.balance_rub) || 0,
+    balance_native,
+    currency_code,
+    fx_rate: fx?.rate ?? null,
+    fx_as_of: fx?.asOf ?? null,
     note: r.note ? String(r.note) : null,
     disposable: Boolean(r.disposable),
     goal_amount_rub: r.goal_amount_rub == null ? null : Number(r.goal_amount_rub),
     sort_order: Number(r.sort_order) || 0,
   };
+}
+
+async function loadFxRateLookup(): Promise<Map<PersonalFxCurrency, { rate: number; asOf: string }>> {
+  const rates = await ensureFxRatesFresh();
+  return new Map(
+    rates.map((r) => [r.currency_code, { rate: r.rate_to_rub, asOf: r.as_of_date }])
+  );
 }
 
 function mapCapital(r: Record<string, unknown>): PersonalCapitalRow {
@@ -301,6 +335,16 @@ export async function loadPersonalFinanceDashboard(
   const sb = getV2Supabase();
   const userId = uid(ctx);
 
+  // Курсы ЦБ раз в сутки + пересчёт balance_rub у валютных счетов.
+  const rateLookup = await loadFxRateLookup();
+  const fxRates: FxRateRow[] = [...rateLookup.entries()].map(([currency_code, v]) => ({
+    currency_code,
+    rate_to_rub: v.rate,
+    as_of_date: v.asOf,
+    source: "cbr",
+    updated_at: nowIso(),
+  }));
+
   const tax = await ensureTaxProfile(userId);
   const budget = await ensureBudgetMonth(userId, year, month);
 
@@ -346,7 +390,9 @@ export async function loadPersonalFinanceDashboard(
   if (categoriesRes.error) throw categoriesRes.error;
   if (historyRes.error) throw historyRes.error;
 
-  const accounts = (accountsRes.data ?? []).map((r) => mapAccount(r as Record<string, unknown>));
+  const accounts = (accountsRes.data ?? []).map((r) =>
+    mapAccount(r as Record<string, unknown>, rateLookup)
+  );
   const capital = (capitalRes.data ?? []).map((r) => mapCapital(r as Record<string, unknown>));
   const incomes = (incomesRes.data ?? []).map((r) => mapIncome(r as Record<string, unknown>));
   const taxAdvances = (advancesRes.data ?? []).map(
@@ -525,6 +571,7 @@ export async function loadPersonalFinanceDashboard(
     budget,
     budgetCategories,
     forecastExtras,
+    fxRates,
     history: historyWithCurrent,
     incomeHistory: incomeHistoryForUi,
     summary: {
@@ -602,8 +649,90 @@ function accountPatch(patch: Partial<PersonalAccountRow>): Partial<PersonalAccou
   if (patch.disposable !== undefined) out.disposable = patch.disposable;
   if (patch.goal_amount_rub !== undefined) out.goal_amount_rub = patch.goal_amount_rub;
   if (patch.sort_order !== undefined) out.sort_order = patch.sort_order;
-  if (patch.balance_rub !== undefined) out.balance_rub = Math.round(Number(patch.balance_rub) || 0);
+  if (patch.currency_code !== undefined && isPersonalAccountCurrency(patch.currency_code)) {
+    out.currency_code = patch.currency_code;
+  }
+  if (patch.balance_native !== undefined) {
+    out.balance_native = roundMoney(Number(patch.balance_native) || 0);
+  }
+  if (patch.balance_rub !== undefined) {
+    out.balance_rub = Math.round(Number(patch.balance_rub) || 0);
+  }
   return out;
+}
+
+async function resolveRubBalance(
+  currency: PersonalAccountCurrency,
+  balanceNative: number,
+  balanceRubHint?: number
+): Promise<{ balance_native: number; balance_rub: number }> {
+  const native = roundMoney(balanceNative);
+  if (currency === "RUB") {
+    const rub = Math.round(balanceRubHint ?? native);
+    return { balance_native: rub, balance_rub: rub };
+  }
+  const rates = await getFxRateMap();
+  const rate = rates.get(currency);
+  if (rate == null || rate <= 0) {
+    return { balance_native: native, balance_rub: Math.round(native) };
+  }
+  return { balance_native: native, balance_rub: rubFromNative(native, rate) };
+}
+
+/** Сдвиг баланса счёта на deltaRub с поддержкой валютных счетов. */
+async function adjustAccountBalanceRub(
+  accountId: string,
+  userId: string,
+  deltaRub: number
+): Promise<void> {
+  if (!deltaRub) return;
+  const sb = getV2Supabase();
+  const { data: acc } = await sb
+    .from("v2_personal_accounts")
+    .select("balance_rub, balance_native, currency_code")
+    .eq("id", accountId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!acc) return;
+
+  const currency = isPersonalAccountCurrency(acc.currency_code) ? acc.currency_code : "RUB";
+  const now = nowIso();
+
+  if (currency === "RUB") {
+    const next = Math.round(Number(acc.balance_rub) || 0) + deltaRub;
+    await sb
+      .from("v2_personal_accounts")
+      .update({
+        balance_rub: next,
+        balance_native: next,
+        updated_at: now,
+      })
+      .eq("id", accountId);
+    return;
+  }
+
+  const rates = await getFxRateMap();
+  const rate = rates.get(currency);
+  if (rate == null || rate <= 0) {
+    await sb
+      .from("v2_personal_accounts")
+      .update({
+        balance_rub: Math.round(Number(acc.balance_rub) || 0) + deltaRub,
+        updated_at: now,
+      })
+      .eq("id", accountId);
+    return;
+  }
+
+  const nextNative = roundMoney((Number(acc.balance_native) || 0) + deltaRub / rate);
+  await sb
+    .from("v2_personal_accounts")
+    .update({
+      balance_native: nextNative,
+      balance_rub: rubFromNative(nextNative, rate),
+      updated_at: now,
+    })
+    .eq("id", accountId);
 }
 
 function capitalPatch(patch: Partial<PersonalCapitalRow>): Partial<PersonalCapitalRow> {
@@ -650,6 +779,12 @@ export async function createPersonalAccount(
   const sb = getV2Supabase();
   const id = newV2Id();
   const now = nowIso();
+  const currency: PersonalAccountCurrency = isPersonalAccountCurrency(input.currency_code)
+    ? input.currency_code
+    : "RUB";
+  const nativeInput =
+    input.balance_native != null ? Number(input.balance_native) : Number(input.balance_rub ?? 0);
+  const balances = await resolveRubBalance(currency, nativeInput, input.balance_rub);
   const row = {
     id,
     user_id: uid(ctx),
@@ -657,7 +792,9 @@ export async function createPersonalAccount(
     account_type: input.account_type ?? "card",
     icon_key: input.icon_key ?? "wallet",
     accent: input.accent ?? "#3B6FF7",
-    balance_rub: input.balance_rub ?? 0,
+    currency_code: currency,
+    balance_native: balances.balance_native,
+    balance_rub: balances.balance_rub,
     note: input.note ?? null,
     disposable: input.disposable ?? true,
     goal_amount_rub: input.goal_amount_rub ?? null,
@@ -667,7 +804,8 @@ export async function createPersonalAccount(
   };
   const { error } = await sb.from("v2_personal_accounts").insert(row);
   if (error) throw error;
-  return mapAccount(row);
+  const rateLookup = await loadFxRateLookup();
+  return mapAccount(row, rateLookup);
 }
 
 export async function updatePersonalAccount(
@@ -676,19 +814,73 @@ export async function updatePersonalAccount(
   patch: Partial<PersonalAccountRow>
 ): Promise<PersonalAccountRow | null> {
   const sb = getV2Supabase();
+  const userId = uid(ctx);
+  const { data: existing } = await sb
+    .from("v2_personal_accounts")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!existing) return null;
+
   const safe = accountPatch(patch);
-  if (Object.keys(safe).length === 0) {
-    const { data } = await sb.from("v2_personal_accounts").select("*").eq("id", id).eq("user_id", uid(ctx)).maybeSingle();
-    return data ? mapAccount(data as Record<string, unknown>) : null;
+  const nextCurrency: PersonalAccountCurrency = isPersonalAccountCurrency(safe.currency_code)
+    ? safe.currency_code
+    : isPersonalAccountCurrency(existing.currency_code)
+      ? existing.currency_code
+      : "RUB";
+
+  const touchingBalance =
+    patch.balance_native !== undefined ||
+    patch.balance_rub !== undefined ||
+    patch.currency_code !== undefined;
+
+  if (touchingBalance) {
+    let native: number;
+    if (patch.balance_native !== undefined) {
+      native = Number(patch.balance_native) || 0;
+    } else if (nextCurrency === "RUB" && patch.balance_rub !== undefined) {
+      native = Number(patch.balance_rub) || 0;
+    } else if (
+      nextCurrency !== "RUB" &&
+      patch.balance_rub !== undefined &&
+      patch.balance_native === undefined
+    ) {
+      const rates = await getFxRateMap();
+      const rate = rates.get(nextCurrency);
+      native =
+        rate && rate > 0
+          ? roundMoney((Number(patch.balance_rub) || 0) / rate)
+          : Number(existing.balance_native) || 0;
+    } else {
+      native = Number(existing.balance_native ?? existing.balance_rub) || 0;
+    }
+    const balances = await resolveRubBalance(nextCurrency, native, patch.balance_rub);
+    safe.currency_code = nextCurrency;
+    safe.balance_native = balances.balance_native;
+    safe.balance_rub = balances.balance_rub;
   }
+
+  const dbPatch: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(safe)) {
+    if (key === "fx_rate" || key === "fx_as_of" || key === "user_id" || key === "id") continue;
+    dbPatch[key] = value;
+  }
+
+  if (Object.keys(dbPatch).length === 0) {
+    const rateLookup = await loadFxRateLookup();
+    return mapAccount(existing as Record<string, unknown>, rateLookup);
+  }
+
   const { error } = await sb
     .from("v2_personal_accounts")
-    .update({ ...safe, updated_at: nowIso() })
+    .update({ ...dbPatch, updated_at: nowIso() })
     .eq("id", id)
-    .eq("user_id", uid(ctx));
+    .eq("user_id", userId);
   if (error) throw error;
-  const { data } = await sb.from("v2_personal_accounts").select("*").eq("id", id).eq("user_id", uid(ctx)).maybeSingle();
-  return data ? mapAccount(data as Record<string, unknown>) : null;
+  const { data } = await sb.from("v2_personal_accounts").select("*").eq("id", id).eq("user_id", userId).maybeSingle();
+  const rateLookup = await loadFxRateLookup();
+  return data ? mapAccount(data as Record<string, unknown>, rateLookup) : null;
 }
 
 export async function deletePersonalAccount(ctx: V2SessionContext, id: string): Promise<void> {
@@ -933,18 +1125,7 @@ export async function createPersonalTransaction(
   }
 
   if (input.txn_type === "expense" && input.from_account_id) {
-    const { data: acc } = await sb
-      .from("v2_personal_accounts")
-      .select("balance_rub")
-      .eq("id", input.from_account_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (acc) {
-      await sb
-        .from("v2_personal_accounts")
-        .update({ balance_rub: Number(acc.balance_rub) - input.amount_rub, updated_at: now })
-        .eq("id", input.from_account_id);
-    }
+    await adjustAccountBalanceRub(input.from_account_id, userId, -input.amount_rub);
     if (input.budget_category_id) {
       const { data: cat } = await sb
         .from("v2_personal_budget_categories")
@@ -963,47 +1144,12 @@ export async function createPersonalTransaction(
   }
 
   if (input.txn_type === "income" && input.to_account_id) {
-    const { data: acc } = await sb
-      .from("v2_personal_accounts")
-      .select("balance_rub")
-      .eq("id", input.to_account_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (acc) {
-      await sb
-        .from("v2_personal_accounts")
-        .update({ balance_rub: Number(acc.balance_rub) + input.amount_rub, updated_at: now })
-        .eq("id", input.to_account_id);
-    }
+    await adjustAccountBalanceRub(input.to_account_id, userId, input.amount_rub);
   }
 
   if (input.txn_type === "transfer" && input.from_account_id && input.to_account_id) {
-    const [{ data: fromAcc }, { data: toAcc }] = await Promise.all([
-      sb
-        .from("v2_personal_accounts")
-        .select("balance_rub")
-        .eq("id", input.from_account_id)
-        .eq("user_id", userId)
-        .maybeSingle(),
-      sb
-        .from("v2_personal_accounts")
-        .select("balance_rub")
-        .eq("id", input.to_account_id)
-        .eq("user_id", userId)
-        .maybeSingle(),
-    ]);
-    if (fromAcc) {
-      await sb
-        .from("v2_personal_accounts")
-        .update({ balance_rub: Number(fromAcc.balance_rub) - input.amount_rub, updated_at: now })
-        .eq("id", input.from_account_id);
-    }
-    if (toAcc) {
-      await sb
-        .from("v2_personal_accounts")
-        .update({ balance_rub: Number(toAcc.balance_rub) + input.amount_rub, updated_at: now })
-        .eq("id", input.to_account_id);
-    }
+    await adjustAccountBalanceRub(input.from_account_id, userId, -input.amount_rub);
+    await adjustAccountBalanceRub(input.to_account_id, userId, input.amount_rub);
   }
 
   return {
@@ -1130,18 +1276,7 @@ export async function deletePersonalTransaction(ctx: V2SessionContext, id: strin
   const txnType = String(data.txn_type) as PersonalTxnType;
 
   if (txnType === "expense" && data.from_account_id) {
-    const { data: acc } = await sb
-      .from("v2_personal_accounts")
-      .select("balance_rub")
-      .eq("id", data.from_account_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (acc) {
-      await sb
-        .from("v2_personal_accounts")
-        .update({ balance_rub: Number(acc.balance_rub) + amount, updated_at: now })
-        .eq("id", data.from_account_id);
-    }
+    await adjustAccountBalanceRub(String(data.from_account_id), userId, amount);
     if (data.budget_category_id) {
       const { data: cat } = await sb
         .from("v2_personal_budget_categories")
@@ -1160,47 +1295,12 @@ export async function deletePersonalTransaction(ctx: V2SessionContext, id: strin
   }
 
   if (txnType === "income" && data.to_account_id) {
-    const { data: acc } = await sb
-      .from("v2_personal_accounts")
-      .select("balance_rub")
-      .eq("id", data.to_account_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (acc) {
-      await sb
-        .from("v2_personal_accounts")
-        .update({ balance_rub: Number(acc.balance_rub) - amount, updated_at: now })
-        .eq("id", data.to_account_id);
-    }
+    await adjustAccountBalanceRub(String(data.to_account_id), userId, -amount);
   }
 
   if (txnType === "transfer" && data.from_account_id && data.to_account_id) {
-    const [{ data: fromAcc }, { data: toAcc }] = await Promise.all([
-      sb
-        .from("v2_personal_accounts")
-        .select("balance_rub")
-        .eq("id", data.from_account_id)
-        .eq("user_id", userId)
-        .maybeSingle(),
-      sb
-        .from("v2_personal_accounts")
-        .select("balance_rub")
-        .eq("id", data.to_account_id)
-        .eq("user_id", userId)
-        .maybeSingle(),
-    ]);
-    if (fromAcc) {
-      await sb
-        .from("v2_personal_accounts")
-        .update({ balance_rub: Number(fromAcc.balance_rub) + amount, updated_at: now })
-        .eq("id", data.from_account_id);
-    }
-    if (toAcc) {
-      await sb
-        .from("v2_personal_accounts")
-        .update({ balance_rub: Number(toAcc.balance_rub) - amount, updated_at: now })
-        .eq("id", data.to_account_id);
-    }
+    await adjustAccountBalanceRub(String(data.from_account_id), userId, amount);
+    await adjustAccountBalanceRub(String(data.to_account_id), userId, -amount);
   }
 
   const { error: delErr } = await sb.from("v2_personal_transactions").delete().eq("id", id).eq("user_id", userId);
@@ -1272,34 +1372,10 @@ export async function importPersonalTransactions(
 
     // If user doesn't want balances touched (statement already reflected on account), reverse balance delta.
     if (!input.apply_balances) {
-      const sb = getV2Supabase();
-      const now = nowIso();
       if (item.txn_type === "expense") {
-        const { data: acc } = await sb
-          .from("v2_personal_accounts")
-          .select("balance_rub")
-          .eq("id", input.from_account_id)
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (acc) {
-          await sb
-            .from("v2_personal_accounts")
-            .update({ balance_rub: Number(acc.balance_rub) + item.amount_rub, updated_at: now })
-            .eq("id", input.from_account_id);
-        }
+        await adjustAccountBalanceRub(input.from_account_id, userId, item.amount_rub);
       } else {
-        const { data: acc } = await sb
-          .from("v2_personal_accounts")
-          .select("balance_rub")
-          .eq("id", toId)
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (acc) {
-          await sb
-            .from("v2_personal_accounts")
-            .update({ balance_rub: Number(acc.balance_rub) - item.amount_rub, updated_at: now })
-            .eq("id", toId);
-        }
+        await adjustAccountBalanceRub(toId, userId, -item.amount_rub);
       }
     }
 

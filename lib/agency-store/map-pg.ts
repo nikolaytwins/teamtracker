@@ -15,6 +15,8 @@ export function mapProjectRow(r: Record<string, unknown>): Record<string, unknow
     clientContact: r.client_contact,
     notes: r.notes,
     source_lead_id: r.source_lead_id,
+    workStatus: r.work_status ?? "not_started",
+    kanbanSortOrder: Number(r.kanban_sort_order) || 0,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

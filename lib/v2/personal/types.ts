@@ -1,6 +1,7 @@
 export type PersonalAccountType = "card" | "cash" | "bank" | "cushion" | "goal" | "other";
 export type PersonalIncomeStatus = "expected" | "received";
 export type PersonalTxnType = "income" | "expense" | "transfer";
+export type PersonalAccountCurrency = "RUB" | "USD" | "AED" | "GEL" | "EUR" | "GBP" | "CNY";
 
 export type PersonalAccountRow = {
   id: string;
@@ -9,7 +10,14 @@ export type PersonalAccountRow = {
   account_type: PersonalAccountType;
   icon_key: string;
   accent: string;
+  /** Рублёвая оценка — участвует в сумме капитала */
   balance_rub: number;
+  /** Остаток в исходной валюте (для RUB = balance_rub) */
+  balance_native: number;
+  currency_code: PersonalAccountCurrency;
+  /** Курс ЦБ ₽ за 1 ед. валюты (null для RUB) */
+  fx_rate: number | null;
+  fx_as_of: string | null;
   note: string | null;
   disposable: boolean;
   goal_amount_rub: number | null;
@@ -177,6 +185,14 @@ export type PersonalFinanceDashboard = {
   budget: PersonalBudgetMonthRow;
   budgetCategories: PersonalBudgetCategoryRow[];
   forecastExtras: PersonalForecastExtraExpenseRow[];
+  /** Курсы ЦБ (₽ за 1 ед. валюты), обновляются раз в сутки */
+  fxRates: {
+    currency_code: Exclude<PersonalAccountCurrency, "RUB">;
+    rate_to_rub: number;
+    as_of_date: string;
+    source: string;
+    updated_at: string;
+  }[];
   /** Снапшоты для совместимости (графики/hero) */
   history: PersonalMonthSnapshotRow[];
   /** История дохода — та же, что во вкладке «История дохода» */

@@ -8,6 +8,18 @@ export function formatPersonalRub(n: number): string {
   return `${sign}${s}${NBSP}₽`;
 }
 
+export function formatPersonalNative(n: number, currency: string): string {
+  const sign = n < 0 ? "−" : "";
+  const abs = Math.abs(n);
+  const formatted =
+    abs % 1 === 0
+      ? Math.round(abs)
+          .toString()
+          .replace(/\B(?=(\d{3})+(?!\d))/g, NBSP)
+      : abs.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return `${sign}${formatted}${NBSP}${currency}`;
+}
+
 export function formatPersonalRubSigned(n: number): string {
   const prefix = n > 0 ? "+" : n < 0 ? "−" : "";
   return prefix + formatPersonalRub(Math.abs(n)).replace("−", "");
