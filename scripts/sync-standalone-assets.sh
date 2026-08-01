@@ -13,4 +13,10 @@ mkdir -p "$ST/public"
 if [[ -d "$ROOT/public" ]]; then
   cp -a "$ROOT/public/." "$ST/public/"
 fi
-echo "OK: synced .next/static и public → .next/standalone"
+# Статьи Стратегии (markdown) — runtime fs.read из content/
+if [[ -d "$ROOT/content/strategy/articles" ]]; then
+  mkdir -p "$ST/content/strategy"
+  rm -rf "$ST/content/strategy/articles"
+  cp -a "$ROOT/content/strategy/articles" "$ST/content/strategy/articles"
+fi
+echo "OK: synced .next/static, public и content/strategy → .next/standalone"

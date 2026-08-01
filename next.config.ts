@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   ...(basePath ? { basePath } : {}),
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
+  /** Markdown журнала Стратегии читается с диска в runtime API. */
+  outputFileTracingIncludes: {
+    "/api/v2/personal/strategy": ["./content/strategy/articles/**/*"],
+    "/api/v2/personal/strategy/articles/[slug]": ["./content/strategy/articles/**/*"],
+  },
 };
 
 export default nextConfig;

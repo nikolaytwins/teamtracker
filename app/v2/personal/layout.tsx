@@ -20,6 +20,11 @@ const PERSONAL_TABS = [
     label: "Идеи",
     match: (p: string) => p.startsWith(appPath("/v2/personal/ideas")),
   },
+  {
+    href: "/v2/personal/strategy",
+    label: "Стратегия",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/strategy")),
+  },
 ] as const;
 
 const FINANCE_TABS = [

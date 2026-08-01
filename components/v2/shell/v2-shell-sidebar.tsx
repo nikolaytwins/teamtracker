@@ -314,6 +314,8 @@ export function V2ShellSidebar({
                 active = pathname?.startsWith(appPath("/v2/personal/ideas")) ?? false;
               } else if (item.href.startsWith("/v2/personal/calendar")) {
                 active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/strategy")) {
+                active = pathname?.startsWith(appPath("/v2/personal/strategy")) ?? false;
               }
               return <NavLink key={item.href} item={item} active={!!active} />;
             })}
