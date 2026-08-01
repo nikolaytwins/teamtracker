@@ -13,6 +13,11 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+/** Сохраняем переносы исходника (особенно textutil из .docx), не схлопывая строки в абзац. */
+function preserveSourceLineBreaks(md: string) {
+  return md.replace(/([^\n])\n(?!\n)/g, "$1  \n");
+}
+
 export function StrategyArticleClient({ slug }: { slug: string }) {
   const [article, setArticle] = useState<StrategyArticle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +104,15 @@ export function StrategyArticleClient({ slug }: { slug: string }) {
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                h1: () => null,
+                h1: ({ children }) => {
+                  const text = String(children);
+                  if (text.trim() === article.title.trim()) return null;
+                  return (
+                    <h1 className="v2-tight mb-4 mt-8 text-[24px] font-bold text-[var(--v2-ink-900)] first:mt-0">
+                      {children}
+                    </h1>
+                  );
+                },
                 h2: ({ children }) => (
                   <h2 className="v2-tight mb-3 mt-10 border-b border-[var(--v2-ink-100)] pb-2 text-[20px] font-bold text-[var(--v2-ink-900)] first:mt-0">
                     {children}
@@ -111,7 +124,7 @@ export function StrategyArticleClient({ slug }: { slug: string }) {
                   </h3>
                 ),
                 p: ({ children }) => (
-                  <p className="v2-tight mb-4 text-[15.5px] leading-[1.75] text-[var(--v2-ink-700)]">
+                  <p className="v2-tight mb-4 whitespace-pre-wrap text-[15.5px] leading-[1.75] text-[var(--v2-ink-700)]">
                     {children}
                   </p>
                 ),
@@ -152,7 +165,7 @@ export function StrategyArticleClient({ slug }: { slug: string }) {
                 ),
               }}
             >
-              {article.body}
+              {preserveSourceLineBreaks(article.body)}
             </ReactMarkdown>
           </div>
         </article>
