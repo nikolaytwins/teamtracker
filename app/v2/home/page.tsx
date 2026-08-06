@@ -1,5 +1,5 @@
-import { V2HomeClient } from "@/components/v2/home/v2-home-client";
+import { V2DashboardClient } from "@/components/v2/dashboard/v2-dashboard-client";
 
 export default function V2HomePage() {
-  return <V2HomeClient />;
+  return <V2DashboardClient />;
 }
