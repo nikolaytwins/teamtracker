@@ -2,16 +2,19 @@
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
+  STRATEGY_MONTH_FOCI,
+  STRATEGY_NEAR_PROJECTS,
+  STRATEGY_PRINCIPLES,
+} from "@/lib/v2/strategy/board-content";
+import {
   STRATEGY_TAG_META,
   type StrategyArticleMeta,
   type StrategyArticleTag,
-  type StrategyPinRow,
 } from "@/lib/v2/strategy/types";
-import { V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const TAGS: { key: StrategyArticleTag | "all"; label: string }[] = [
   { key: "all", label: "Все" },
@@ -20,41 +23,27 @@ const TAGS: { key: StrategyArticleTag | "all"; label: string }[] = [
   { key: "sport", label: "Спорт" },
 ];
 
-const MONTH_PRESETS = ["Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь", "Январь"];
-
-function groupPins(pins: StrategyPinRow[]) {
-  const order: string[] = [];
-  const map = new Map<string, StrategyPinRow[]>();
-  for (const pin of pins) {
-    if (!map.has(pin.month_label)) {
-      map.set(pin.month_label, []);
-      order.push(pin.month_label);
-    }
-    map.get(pin.month_label)!.push(pin);
-  }
-  return order.map((month) => ({ month, items: map.get(month)! }));
+function splitParagraphs(text: string) {
+  return text
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 }
 
 export function StrategyClient() {
-  const [pins, setPins] = useState<StrategyPinRow[]>([]);
   const [articles, setArticles] = useState<StrategyArticleMeta[]>([]);
   const [tag, setTag] = useState<StrategyArticleTag | "all">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
-  const [monthLabel, setMonthLabel] = useState("Август");
-  const [title, setTitle] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async (nextTag: StrategyArticleTag | "all" = tag) => {
     setLoading(true);
     setError(null);
     try {
       const q = nextTag === "all" ? "" : `?tag=${nextTag}`;
-      const data = await fetchJson<{ pins: StrategyPinRow[]; articles: StrategyArticleMeta[] }>(
+      const data = await fetchJson<{ articles: StrategyArticleMeta[] }>(
         `/api/v2/personal/strategy${q}`
       );
-      setPins(data.pins);
       setArticles(data.articles);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось загрузить");
@@ -66,38 +55,6 @@ export function StrategyClient() {
   useEffect(() => {
     void load(tag);
   }, [load, tag]);
-
-  const grouped = useMemo(() => groupPins(pins), [pins]);
-
-  async function addPin() {
-    if (!title.trim() || saving) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const { pin } = await fetchJson<{ pin: StrategyPinRow }>("/api/v2/personal/strategy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ monthLabel, title: title.trim() }),
-      });
-      setPins((prev) => [...prev, pin]);
-      setTitle("");
-      setAddOpen(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось добавить");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function removePin(id: string) {
-    if (!confirm("Убрать карточку с доски?")) return;
-    try {
-      await fetchJson(`/api/v2/personal/strategy/pins/${id}`, { method: "DELETE" });
-      setPins((prev) => prev.filter((p) => p.id !== id));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось удалить");
-    }
-  }
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
@@ -111,8 +68,7 @@ export function StrategyClient() {
             Стратегия
           </h1>
           <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-white/80">
-            Фокусы месяцев сверху — живая доска обязательств. Ниже — журнал из Лилы: работа, личная жизнь
-            и спорт.
+            Фокусы месяцев, проекты и принципы рядом. Ниже — журнал из Лилы.
           </p>
         </div>
       </div>
@@ -125,67 +81,152 @@ export function StrategyClient() {
         ) : null}
 
         <section className="mb-12">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="v2-tight text-[20px] font-bold text-[var(--v2-ink-900)]">
-                Закреплённые фокусы
-              </h2>
-              <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
-                Добавляй и снимай карточки — это то, что держишь на виду
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[13px] font-semibold text-white transition hover:bg-[var(--v2-ink-800)]"
-            >
-              <V2Icons.plus className="h-4 w-4" />
-              Карточка
-            </button>
+          <div className="mb-4">
+            <h2 className="v2-tight text-[20px] font-bold text-[var(--v2-ink-900)]">
+              Закреплённые фокусы
+            </h2>
+            <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
+              Три месяца — одна линия: закрыть главу → найти опору → усилить ответ
+            </p>
           </div>
 
-          {loading && !pins.length ? (
-            <p className="text-[13px] text-[var(--v2-ink-400)]">Загрузка…</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-3">
-              {grouped.map((group) => (
-                <div
-                  key={group.month}
-                  className="overflow-hidden rounded-3xl border border-[var(--v2-ink-100)] bg-white shadow-[var(--v2-shadow-card)]"
-                >
-                  <div className="border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/80 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--v2-ink-400)]">
-                      Месяц
-                    </p>
-                    <h3 className="v2-tight mt-0.5 text-[22px] font-bold text-[var(--v2-ink-900)]">
-                      {group.month}
-                    </h3>
-                  </div>
-                  <ul className="space-y-2 p-3">
-                    {group.items.map((pin) => (
-                      <li
-                        key={pin.id}
-                        className="group flex items-start gap-2 rounded-2xl bg-[var(--v2-ink-50)]/70 px-3 py-3"
-                      >
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--v2-brand-500)]" />
-                        <p className="v2-tight min-w-0 flex-1 text-[13.5px] font-medium leading-snug text-[var(--v2-ink-800)]">
-                          {pin.title}
-                        </p>
-                        <button
-                          type="button"
-                          title="Удалить"
-                          onClick={() => void removePin(pin.id)}
-                          className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] opacity-70 transition hover:bg-red-50 hover:text-red-500 sm:opacity-0 sm:group-hover:opacity-100"
-                        >
-                          <V2Icons.trash className="h-3.5 w-3.5" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {STRATEGY_MONTH_FOCI.map((focus) => (
+              <article
+                key={focus.month}
+                className="flex flex-col overflow-hidden rounded-3xl border border-[var(--v2-ink-100)] bg-white shadow-[var(--v2-shadow-card)]"
+              >
+                <div className="border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/80 px-4 py-3.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--v2-ink-400)]">
+                    {focus.month}
+                  </p>
+                  <h3 className="v2-tight mt-1 text-[18px] font-bold leading-snug text-[var(--v2-ink-900)]">
+                    {focus.headline}
+                  </h3>
                 </div>
-              ))}
-            </div>
-          )}
+                <ul className="space-y-2.5 p-4">
+                  {focus.items.map((item) => (
+                    <li key={item} className="flex items-start gap-2.5">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--v2-brand-500)]" />
+                      <p className="v2-tight text-[13.5px] leading-snug text-[var(--v2-ink-800)]">
+                        {item}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                {focus.dont?.length ? (
+                  <div className="mt-auto border-t border-red-100 bg-red-50/70 px-4 py-3.5">
+                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-red-600">
+                      Не делать
+                    </p>
+                    <ul className="mt-2 space-y-1.5">
+                      {focus.dont.map((item) => (
+                        <li key={item} className="flex items-start gap-2">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+                          <p className="v2-tight text-[13px] leading-snug text-red-800/90">
+                            {item}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <div className="mb-4">
+            <h2 className="v2-tight text-[20px] font-bold text-[var(--v2-ink-900)]">
+              Проекты на ближайшие 3 месяца
+            </h2>
+            <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
+              Роли проектов — без требования строить империю
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {STRATEGY_NEAR_PROJECTS.map((card) => (
+              <article
+                key={card.title}
+                className="rounded-3xl border border-[var(--v2-ink-100)] bg-white p-5 shadow-[var(--v2-shadow-card)]"
+              >
+                <h3 className="v2-tight text-[16px] font-bold text-[var(--v2-ink-900)]">
+                  {card.title}
+                </h3>
+                <div className="mt-3 space-y-3">
+                  {splitParagraphs(card.body).map((p) => (
+                    <p
+                      key={p}
+                      className="v2-tight text-[13.5px] leading-relaxed text-[var(--v2-ink-700)]"
+                    >
+                      {p}
+                    </p>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-14">
+          <div className="mb-4">
+            <h2 className="v2-tight text-[20px] font-bold text-[var(--v2-ink-900)]">
+              Принципы и запреты
+            </h2>
+            <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
+              Как двигаться ближайшие месяцы — и чего не делать
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {STRATEGY_PRINCIPLES.map((card) => {
+              const ban = card.emphasis === "ban";
+              return (
+                <article
+                  key={card.title}
+                  className={`rounded-3xl border p-5 shadow-[var(--v2-shadow-card)] ${
+                    ban
+                      ? "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/80"
+                      : "border-[var(--v2-ink-100)] bg-white"
+                  }`}
+                >
+                  <h3
+                    className={`v2-tight text-[16px] font-bold ${
+                      ban ? "text-amber-950" : "text-[var(--v2-ink-900)]"
+                    }`}
+                  >
+                    {card.title}
+                  </h3>
+                  {card.body ? (
+                    <div className="mt-3 space-y-3">
+                      {splitParagraphs(card.body).map((p) => (
+                        <p
+                          key={p}
+                          className={`v2-tight text-[13.5px] leading-relaxed ${
+                            ban ? "text-amber-950/85" : "text-[var(--v2-ink-700)]"
+                          }`}
+                        >
+                          {p}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                  {card.items?.length ? (
+                    <ul className="mt-3 space-y-2">
+                      {card.items.map((item) => (
+                        <li key={item} className="flex items-start gap-2.5">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--v2-brand-500)]" />
+                          <p className="v2-tight text-[13.5px] leading-snug text-[var(--v2-ink-800)]">
+                            {item}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
         </section>
 
         <section>
@@ -225,7 +266,10 @@ export function StrategyClient() {
                   key={article.slug}
                   href={appPath(`/v2/personal/strategy/${article.slug}`)}
                   className="group overflow-hidden rounded-3xl bg-white shadow-[var(--v2-shadow-card)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[var(--v2-shadow-cardHv)]"
-                  style={{ animation: `v2-idea-card-in .45s cubic-bezier(.2,.7,.2,1) both`, animationDelay: `${index * 40}ms` }}
+                  style={{
+                    animation: `v2-idea-card-in .45s cubic-bezier(.2,.7,.2,1) both`,
+                    animationDelay: `${index * 40}ms`,
+                  }}
                 >
                   <div className="relative aspect-[16/10] overflow-hidden bg-[var(--v2-ink-100)]">
                     <Image
@@ -266,70 +310,6 @@ export function StrategyClient() {
           ) : null}
         </section>
       </div>
-
-      {addOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-          onClick={() => setAddOpen(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="v2-tight text-[17px] font-bold text-[var(--v2-ink-900)]">
-              Новая закреплённая карточка
-            </h3>
-            <form
-              className="mt-4 space-y-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void addPin();
-              }}
-            >
-              <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
-                Месяц
-                <select
-                  className="v2-input mt-1 h-10 w-full text-[14px]"
-                  value={monthLabel}
-                  onChange={(e) => setMonthLabel(e.target.value)}
-                >
-                  {MONTH_PRESETS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
-                Формулировка
-                <input
-                  autoFocus
-                  className="v2-input mt-1 h-10 w-full text-[14px]"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Что держим в фокусе…"
-                />
-              </label>
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setAddOpen(false)}
-                  className="h-10 rounded-xl border border-[var(--v2-ink-200)] px-4 text-[13px] font-semibold text-[var(--v2-ink-600)]"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving || !title.trim()}
-                  className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-semibold text-white disabled:opacity-40"
-                >
-                  Добавить
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
 
       <style>{`
         @keyframes v2-idea-card-in {
