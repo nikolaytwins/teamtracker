@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     redirect(appPath("/login"));
   }
   if (!canAccessAgencyRoutes(effectiveUserRole(session))) {
-    redirect(appPath("/home"));
+    redirect(appPath("/v2/home"));
   }
   return <AppShell>{children}</AppShell>;
 }

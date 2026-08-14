@@ -66,6 +66,7 @@ const NAV: NavItem[] = [
   { href: "/v2/personal/tasks/inbox", label: "Задачи", icon: "tasks" },
   { href: "/v2/personal/calendar", label: "Календарь", icon: "cal" },
   // Скрыто: Доска, Проекты, Команда
+  { href: "/v2/agency/overview", label: "Агентство", icon: "reports", agency: true },
   { href: "/v2/agency", label: "Финансы месяца", icon: "reports", agency: true },
   { href: "/v2/personal/finance", label: "Финансы", icon: "ruble" },
   { href: "/v2/admin/leads", label: "Лиды", icon: "spark", admin: true },

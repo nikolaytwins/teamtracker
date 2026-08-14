@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
 export default function V2IndexPage() {
-  redirect("/v2/home");
+  redirect(appPath("/v2/home"));
 }

@@ -2,6 +2,8 @@
 
 import { LeadsAllTimeAnalyticsPanel } from "@/components/v2/admin/leads-all-time-analytics-panel";
 import { LeadsAnalyticsPanel } from "@/components/v2/admin/leads-analytics-panel";
+import { ProfiAnalyticsPanel } from "@/components/v2/admin/profi-analytics-panel";
+import { ProfiResponsesPanel } from "@/components/v2/admin/profi-responses-panel";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
@@ -18,12 +20,16 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type LeadsTab = "board" | "analytics" | "all-time";
+type LeadsTab = "board" | "analytics" | "all-time" | "profi" | "profi-analytics";
 
 function resolveTab(initialTab: LeadsTab, viewParam: string | null): LeadsTab {
   if (initialTab === "all-time") return "all-time";
+  if (initialTab === "profi") return "profi";
+  if (initialTab === "profi-analytics") return "profi-analytics";
   if (viewParam === "analytics") return "analytics";
   if (viewParam === "all-time") return "all-time";
+  if (viewParam === "profi") return "profi";
+  if (viewParam === "profi-analytics") return "profi-analytics";
   return "board";
 }
 
@@ -889,7 +895,7 @@ export function V2AdminLeadsClient({
           <div>
             <h1 className="v2-tight text-[22px] font-semibold text-[var(--v2-ink-900)]">Лиды</h1>
             <p className="v2-tight mt-1 text-[13.5px] text-[var(--v2-ink-500)]">
-              Канбан продаж и аналитика воронки
+              Канбан, аналитика воронки и Profi.ru
             </p>
           </div>
           {tab === "board" ? (
@@ -908,12 +914,14 @@ export function V2AdminLeadsClient({
           ) : null}
         </div>
 
-        <div className="mx-auto mt-4 flex max-w-[1600px] gap-6 border-b border-[var(--v2-ink-100)]">
+        <div className="mx-auto mt-4 flex max-w-[1600px] gap-6 overflow-x-auto border-b border-[var(--v2-ink-100)]">
           {(
             [
               { key: "board", label: "Канбан" },
               { key: "analytics", label: "По месяцам" },
               { key: "all-time", label: "За всё время" },
+              { key: "profi", label: "Profi.ru" },
+              { key: "profi-analytics", label: "Profi · аналитика" },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -923,9 +931,11 @@ export function V2AdminLeadsClient({
                 setTab(key);
                 if (key === "all-time") router.push(appPath("/v2/admin/leads/all-time"));
                 else if (key === "analytics") router.push(appPath("/v2/admin/leads?view=analytics"));
+                else if (key === "profi") router.push(appPath("/v2/admin/leads/profi"));
+                else if (key === "profi-analytics") router.push(appPath("/v2/admin/leads/profi-analytics"));
                 else router.push(appPath("/v2/admin/leads"));
               }}
-              className={`relative pb-3 text-[13.5px] font-medium transition ${
+              className={`relative shrink-0 pb-3 text-[13.5px] font-medium transition ${
                 tab === key ? "text-[var(--v2-ink-900)]" : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-800)]"
               }`}
             >
@@ -944,6 +954,10 @@ export function V2AdminLeadsClient({
             <LeadsAllTimeAnalyticsPanel />
           ) : tab === "analytics" ? (
             <LeadsAnalyticsPanel />
+          ) : tab === "profi" ? (
+            <ProfiResponsesPanel />
+          ) : tab === "profi-analytics" ? (
+            <ProfiAnalyticsPanel />
           ) : (
             <>
               <div className="mb-3 flex items-center justify-center gap-1.5">

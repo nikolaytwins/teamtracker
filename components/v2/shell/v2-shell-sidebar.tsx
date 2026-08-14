@@ -299,6 +299,12 @@ export function V2ShellSidebar({
             active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
           } else if (item.href.startsWith("/v2/personal/finance")) {
             active = pathname?.startsWith(appPath("/v2/personal/finance")) ?? false;
+          } else if (item.href === "/v2/agency/overview") {
+            active = pathname?.startsWith(appPath("/v2/agency/overview")) ?? false;
+          } else if (item.href === "/v2/agency") {
+            active =
+              pathname === appPath("/v2/agency") ||
+              (pathname?.startsWith(appPath("/v2/agency/projects")) ?? false);
           }
           const count = item.countKey === "open" ? taskCounts.open : undefined;
           return <NavLink key={item.href} item={item} active={!!active} count={count} />;

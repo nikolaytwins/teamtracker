@@ -220,7 +220,12 @@ export function ConversionsPanel({ stats }: { stats: ProfiStatsShape }) {
   );
 }
 
-export function ProfiAnalyticsSection() {
+export function ProfiAnalyticsSection({
+  apiPath = "/api/agency/profi-responses",
+}: {
+  /** Базовый путь API списка/статистики Profi */
+  apiPath?: string;
+}) {
   const [stats, setStats] = useState<ProfiStatsShape | null>(null);
   const [byMonth, setByMonth] = useState<Record<string, ProfiStatsShape>>({});
   const [byMonthWeeks, setByMonthWeeks] = useState<Record<string, Record<string, ProfiStatsShape>>>({});
@@ -248,7 +253,7 @@ export function ProfiAnalyticsSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(apiUrl("/api/agency/profi-responses?stats=1&omitItems=1"));
+      const res = await fetch(apiUrl(`${apiPath}?stats=1&omitItems=1`));
       const data = await res.json();
       setStats(data.stats ?? null);
       setByMonth(data.byMonth ?? {});
@@ -261,7 +266,7 @@ export function ProfiAnalyticsSection() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiPath]);
 
   useEffect(() => {
     void load();

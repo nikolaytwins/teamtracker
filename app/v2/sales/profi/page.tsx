@@ -1,5 +1,6 @@
-import { V2LegacyEmbed } from "@/components/v2/shell/legacy-embed";
+import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
 export default function V2SalesProfiPage() {
-  return <V2LegacyEmbed title="Profi.ru (v1)" v1Path="/agency/profi" />;
+  redirect(appPath("/v2/admin/leads/profi"));
 }

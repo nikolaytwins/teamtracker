@@ -5,6 +5,8 @@ import { AGENCY_FINANCE_PATHS } from '@/lib/agency/finance-paths'
 import {
   agencyDetailEffectiveSeconds,
   agencyDetailLineTotal,
+  agencyDetailSessionElapsedSeconds,
+  formatAgencyDetailClock,
   formatAgencyDetailHours,
 } from '@/lib/agency/detail-line-total'
 
@@ -614,7 +616,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
             </button>
           </div>
           <div className="grid grid-cols-12 gap-3 items-end">
-            <div className={addBillingType === 'hourly' ? 'col-span-10' : 'col-span-6'}>
+            <div className="col-span-6">
               <label className="block text-xs font-medium text-[var(--text)] mb-1">Задача / услуга</label>
               <input
                 name="title"
@@ -623,29 +625,27 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                 className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
               />
             </div>
-            {addBillingType === 'fixed' ? (
-              <>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[var(--text)] mb-1">Кол-во</label>
-                  <input
-                    name="quantity"
-                    type="number"
-                    step="0.01"
-                    defaultValue="1"
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm text-right"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-[var(--text)] mb-1">Стоимость</label>
-                  <input
-                    name="unitPrice"
-                    type="number"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm text-right"
-                  />
-                </div>
-              </>
-            ) : null}
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-[var(--text)] mb-1">Кол-во</label>
+              <input
+                name="quantity"
+                type="number"
+                step="0.01"
+                defaultValue="1"
+                disabled={addBillingType === 'hourly'}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm text-right disabled:cursor-not-allowed disabled:bg-[var(--surface)] disabled:opacity-40"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-[var(--text)] mb-1">Стоимость</label>
+              <input
+                name="unitPrice"
+                type="number"
+                step="0.01"
+                disabled={addBillingType === 'hourly'}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm text-right disabled:cursor-not-allowed disabled:bg-[var(--surface)] disabled:opacity-40"
+              />
+            </div>
             <div className="col-span-2 flex justify-end">
               <button
                 type="submit"
@@ -677,6 +677,10 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                       nowMs
                     )
                   : 0
+                const sessionSeconds = isHourly
+                  ? agencyDetailSessionElapsedSeconds(d.timerStartedAt, nowMs)
+                  : 0
+                const fixedSeconds = Math.max(0, Number(d.trackedSeconds) || 0)
                 const lineTotal = agencyDetailLineTotal(
                   {
                     billingType: d.billingType,
@@ -688,7 +692,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                 )
                 const running = Boolean(d.timerStartedAt)
                 return (
-                  <tr key={d.id}>
+                  <tr key={d.id} className={running ? 'bg-emerald-50/40' : undefined}>
                     <td className="px-6 py-3 text-sm">
                       <input
                         type="text"
@@ -700,17 +704,38 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                         <div className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">По времени</div>
                       ) : null}
                     </td>
-                    <td className="px-6 py-3 text-sm text-right">
+                    <td className="px-6 py-3 text-sm">
                       {isHourly ? (
-                        <span className="font-medium tabular-nums">{formatAgencyDetailHours(liveSeconds)}</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <div
+                            className={`font-mono text-[20px] font-semibold tabular-nums leading-none tracking-tight ${
+                              running ? 'text-emerald-700' : 'text-[var(--text)]'
+                            }`}
+                          >
+                            {formatAgencyDetailClock(liveSeconds)}
+                          </div>
+                          {running ? (
+                            <div className="text-[11px] text-emerald-700">
+                              Идёт · сессия {formatAgencyDetailClock(sessionSeconds)}
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-[var(--muted-foreground)]">
+                              {fixedSeconds > 0
+                                ? `На паузе · ${formatAgencyDetailHours(fixedSeconds)}`
+                                : 'Ещё не запускали'}
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <input
-                          type="number"
-                          step="0.01"
-                          defaultValue={d.quantity}
-                          onBlur={(e) => handleUpdateDetail(d.id, 'quantity')(e.target.value)}
-                          className="w-24 px-2 py-1 border border-transparent hover:border-[var(--border)] rounded-md text-sm text-right"
-                        />
+                        <div className="text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            defaultValue={d.quantity}
+                            onBlur={(e) => handleUpdateDetail(d.id, 'quantity')(e.target.value)}
+                            className="w-24 px-2 py-1 border border-transparent hover:border-[var(--border)] rounded-md text-sm text-right"
+                          />
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-3 text-sm text-right">
@@ -735,13 +760,21 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                           <button
                             type="button"
                             onClick={() => void handleDetailTimer(d.id, running ? 'stop' : 'start')}
-                            className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                            className={`inline-flex min-w-[108px] items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                               running
-                                ? 'bg-red-50 text-red-700 hover:bg-red-100'
-                                : 'bg-[var(--primary-soft)] text-[var(--primary)] hover:brightness-95'
+                                ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                                : 'bg-emerald-600 text-white hover:bg-emerald-700'
                             }`}
                           >
-                            {running ? '■ Стоп' : '▶ Таймер'}
+                            {running ? (
+                              <>
+                                <span aria-hidden>❚❚</span> Пауза
+                              </>
+                            ) : (
+                              <>
+                                <span aria-hidden>▶</span> {fixedSeconds > 0 ? 'Продолжить' : 'Старт'}
+                              </>
+                            )}
                           </button>
                         ) : null}
                         <button

@@ -77,7 +77,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/login") {
     if (session) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
     }
     return NextResponse.next();
   }
@@ -104,7 +104,7 @@ export async function middleware(request: NextRequest) {
 
   if (isMemberRestrictedRole(role)) {
     if (pathname.startsWith("/board")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
     }
     if (pathname.startsWith("/api/board/")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -122,7 +122,7 @@ export async function middleware(request: NextRequest) {
       pathname === "/board" ||
       (pathname.startsWith("/board/") && !pathname.startsWith("/board/team-load"));
     if (isProjectsBoardPath) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
     }
     if (pathname.startsWith("/api/board/")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -148,13 +148,13 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/admin") ||
       pathname.startsWith("/v2/agency")
     ) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
     }
     if (pathname.startsWith("/v2/agency")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
     }
     if (pathname.startsWith("/board/team-load")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/home"));
+      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
     }
   }
 

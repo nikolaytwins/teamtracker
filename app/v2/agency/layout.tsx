@@ -6,6 +6,11 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   {
+    href: "/v2/agency/overview",
+    label: "Обзор",
+    match: (p: string) => p.startsWith(appPath("/v2/agency/overview")),
+  },
+  {
     href: "/v2/agency",
     label: "Финансы",
     match: (p: string) =>

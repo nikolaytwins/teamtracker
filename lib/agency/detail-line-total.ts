@@ -42,3 +42,23 @@ export function formatAgencyDetailHours(seconds: number): string {
   if (m === 0) return `${h} ч`;
   return `${h} ч ${m} мин`;
 }
+
+/** Живой таймер ЧЧ:ММ:СС */
+export function formatAgencyDetailClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
+export function agencyDetailSessionElapsedSeconds(
+  timerStartedAt: string | null | undefined,
+  nowMs: number = Date.now()
+): number {
+  if (!timerStartedAt) return 0;
+  const started = Date.parse(timerStartedAt);
+  if (Number.isNaN(started)) return 0;
+  return Math.max(0, Math.floor((nowMs - started) / 1000));
+}
+
