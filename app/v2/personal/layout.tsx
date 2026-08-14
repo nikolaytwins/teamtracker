@@ -16,9 +16,30 @@ const PERSONAL_TABS = [
     match: (p: string) => p.startsWith(appPath("/v2/personal/wishes")),
   },
   {
+    href: "/v2/personal/time",
+    label: "Время",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/time")),
+  },
+  {
+    href: "/v2/personal/brand",
+    label: "Бренд",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/brand")),
+  },
+  {
+    href: "/v2/personal/life-strategy",
+    label: "Стратегия",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/life-strategy")),
+  },
+  {
+    href: "/v2/personal/my-code",
+    label: "Мой код",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/my-code")),
+  },
+  {
     href: "/v2/personal/strategy",
     label: "База данных",
-    match: (p: string) => p.startsWith(appPath("/v2/personal/strategy")),
+    match: (p: string) =>
+      p.startsWith(appPath("/v2/personal/strategy")) && !p.startsWith(appPath("/v2/personal/life-strategy")),
   },
 ] as const;
 

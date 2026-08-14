@@ -2,8 +2,10 @@ import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import type { V2SessionContext } from "@/lib/v2/types";
 import {
   gridSizeForWish,
+  MAX_WISH_IMAGES,
   normalizeWishCategories,
-  type WishCategoryId,
+  pickCustomCatColors,
+  type WishCustomCategory,
 } from "@/lib/v2/personal/wish-cats";
 
 export class PersonalWishesValidationError extends Error {
@@ -27,7 +29,7 @@ export type PersonalWish = {
   title: string;
   description: string;
   note: string;
-  categories: WishCategoryId[];
+  categories: string[];
   grid_col: number;
   grid_row: number;
   sort_order: number;
@@ -251,12 +253,12 @@ export async function addPersonalWishImages(
   if (cErr) throw cErr;
 
   const existing = count ?? 0;
-  if (existing >= 3) {
-    throw new PersonalWishesValidationError("Можно добавить не больше 3 фото");
+  if (existing >= MAX_WISH_IMAGES) {
+    throw new PersonalWishesValidationError(`Можно добавить не больше ${MAX_WISH_IMAGES} фото`);
   }
-  const room = 3 - existing;
+  const room = MAX_WISH_IMAGES - existing;
   const toAdd = files.slice(0, room);
-  if (!toAdd.length) throw new PersonalWishesValidationError("Можно добавить не больше 3 фото");
+  if (!toAdd.length) throw new PersonalWishesValidationError(`Можно добавить не больше ${MAX_WISH_IMAGES} фото`);
 
   const { data: last } = await sb
     .from("v2_personal_wish_images")
@@ -298,4 +300,74 @@ export async function deletePersonalWishImage(
     .eq("wish_id", wishId);
   if (error) throw error;
   await syncWishGrid(userId, wishId);
+}
+
+function mapCustomCat(r: Record<string, unknown>): WishCustomCategory {
+  return {
+    id: String(r.id),
+    name: String(r.name || ""),
+    tint: String(r.tint || "#52525B"),
+    bg: String(r.bg || "#F4F4F5"),
+    sort_order: Number(r.sort_order) || 0,
+  };
+}
+
+export async function loadPersonalWishCategories(ctx: V2SessionContext): Promise<WishCustomCategory[]> {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_wish_categories")
+    .select("*")
+    .eq("user_id", uid(ctx))
+    .order("sort_order")
+    .order("name");
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(mapCustomCat);
+}
+
+export async function loadPersonalWishesBoard(ctx: V2SessionContext): Promise<{
+  wishes: PersonalWish[];
+  categories: WishCustomCategory[];
+}> {
+  const [wishes, categories] = await Promise.all([
+    loadPersonalWishes(ctx),
+    loadPersonalWishCategories(ctx),
+  ]);
+  return { wishes, categories };
+}
+
+export async function createPersonalWishCategory(
+  ctx: V2SessionContext,
+  nameRaw: string
+): Promise<WishCustomCategory> {
+  const name = nameRaw.trim().replace(/\s+/g, " ").slice(0, 48);
+  if (!name) throw new PersonalWishesValidationError("Укажите название категории");
+
+  const userId = uid(ctx);
+  const existing = await loadPersonalWishCategories(ctx);
+  const found = existing.find((c) => c.name.toLowerCase() === name.toLowerCase());
+  if (found) return found;
+
+  const colors = pickCustomCatColors(existing.length);
+  const now = nowIso();
+  const row = {
+    id: newV2Id(),
+    user_id: userId,
+    name,
+    tint: colors.tint,
+    bg: colors.bg,
+    sort_order: existing.length,
+    created_at: now,
+    updated_at: now,
+  };
+  const sb = getV2Supabase();
+  const { error } = await sb.from("v2_personal_wish_categories").insert(row);
+  if (error) {
+    if (String(error.message || "").toLowerCase().includes("unique")) {
+      const again = await loadPersonalWishCategories(ctx);
+      const hit = again.find((c) => c.name.toLowerCase() === name.toLowerCase());
+      if (hit) return hit;
+    }
+    throw error;
+  }
+  return mapCustomCat(row);
 }

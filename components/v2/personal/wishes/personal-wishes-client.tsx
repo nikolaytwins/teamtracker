@@ -4,12 +4,20 @@ import { apiUrl } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PersonalWish, PersonalWishImage } from "@/lib/v2/personal/personal-wishes-repo";
 import {
-  WISH_CAT_ORDER,
+  MAX_WISH_IMAGES,
   WISH_CATS,
-  type WishCategoryId,
+  allWishCatMetas,
+  resolveWishCat,
+  type WishCatMeta,
+  type WishCustomCategory,
 } from "@/lib/v2/personal/wish-cats";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+function filesFromDropOrInput(list: FileList | File[] | null): File[] {
+  if (!list) return [];
+  return Array.from(list).filter((f) => f.type.startsWith("image/") && f.size > 0);
+}
 
 type Mode = "visual" | "text" | "day";
 
@@ -175,14 +183,39 @@ function PhotoSlot({
   placeholder,
   onPick,
   onClear,
+  onFiles,
 }: {
   url?: string | null;
   placeholder: string;
   onPick?: () => void;
   onClear?: () => void;
+  onFiles?: (files: File[]) => void;
 }) {
+  const [dragOver, setDragOver] = useState(false);
   return (
-    <div className="relative h-full min-h-0 min-w-0 w-full overflow-hidden bg-[var(--v2-ink-100)]">
+    <div
+      className={`relative h-full min-h-0 min-w-0 w-full overflow-hidden bg-[var(--v2-ink-100)] transition ${
+        dragOver ? "ring-2 ring-inset ring-[var(--v2-brand-400)]" : ""
+      }`}
+      onDragOver={(e) => {
+        if (!onFiles) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+      }}
+      onDrop={(e) => {
+        if (!onFiles) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOver(false);
+        const files = filesFromDropOrInput(e.dataTransfer.files);
+        if (files.length) onFiles(files);
+      }}
+    >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" />
@@ -286,13 +319,15 @@ function CardImages({
 function WishCard({
   w,
   i,
+  catById,
   onOpen,
   onCat,
 }: {
   w: PersonalWish;
   i: number;
+  catById: Map<string, WishCustomCategory>;
   onOpen: (id: string) => void;
-  onCat: (k: WishCategoryId) => void;
+  onCat: (k: string) => void;
 }) {
   const imgs = w.images.length;
   return (
@@ -337,17 +372,20 @@ function WishCard({
           </p>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {w.categories.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => onCat(k)}
-              className="v2-tight rounded-full px-2 py-[3px] text-[11px] font-medium transition hover:opacity-80"
-              style={{ background: WISH_CATS[k].bg, color: WISH_CATS[k].tint }}
-            >
-              {WISH_CATS[k].label}
-            </button>
-          ))}
+          {w.categories.map((k) => {
+            const meta = resolveWishCat(k, catById);
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => onCat(k)}
+                className="v2-tight rounded-full px-2 py-[3px] text-[11px] font-medium transition hover:opacity-80"
+                style={{ background: meta.bg, color: meta.tint }}
+              >
+                {meta.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </article>
@@ -356,6 +394,7 @@ function WishCard({
 
 function Fullscreen({
   w,
+  catById,
   onClose,
   onPrev,
   onNext,
@@ -365,11 +404,12 @@ function Fullscreen({
   uploading,
 }: {
   w: PersonalWish;
+  catById: Map<string, WishCustomCategory>;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
   onDelete: () => void;
-  onUpload: (files: FileList | null) => void;
+  onUpload: (files: FileList | File[] | null) => void;
   onRemoveImage: (imageId: string) => void;
   uploading: boolean;
 }) {
@@ -392,6 +432,7 @@ function Fullscreen({
 
   const imgs = w.images;
   const current = imgs[n] ?? imgs[0];
+  const canAddMore = imgs.length < MAX_WISH_IMAGES;
 
   return (
     <div
@@ -405,9 +446,14 @@ function Fullscreen({
         <div className="relative min-w-0 flex-1 bg-[var(--v2-ink-100)]">
           <PhotoSlot
             url={current?.url}
-            placeholder="Добавьте фото желания"
-            onPick={() => fileRef.current?.click()}
+            placeholder={
+              canAddMore
+                ? "Перетащите фото или нажмите, чтобы добавить"
+                : "Достигнут лимит фото"
+            }
+            onPick={canAddMore ? () => fileRef.current?.click() : undefined}
             onClear={current ? () => onRemoveImage(current.id) : undefined}
+            onFiles={canAddMore ? (files) => onUpload(files) : undefined}
           />
           <input
             ref={fileRef}
@@ -421,13 +467,13 @@ function Fullscreen({
             }}
           />
           {imgs.length > 1 ? (
-            <div className="absolute bottom-5 left-5 flex gap-2">
+            <div className="absolute bottom-5 left-5 right-5 flex gap-2 overflow-x-auto pb-1">
               {imgs.map((img, k) => (
                 <button
                   key={img.id}
                   type="button"
                   onClick={() => setN(k)}
-                  className={`h-12 w-12 overflow-hidden rounded-xl ring-2 transition ${
+                  className={`h-12 w-12 shrink-0 overflow-hidden rounded-xl ring-2 transition ${
                     n === k ? "ring-white" : "ring-white/40 opacity-70 hover:opacity-100"
                   }`}
                 >
@@ -445,15 +491,18 @@ function Fullscreen({
         </div>
         <div className="flex w-[400px] shrink-0 flex-col px-9 py-8">
           <div className="flex flex-wrap gap-1.5">
-            {w.categories.map((k) => (
-              <span
-                key={k}
-                className="v2-tight rounded-full px-2.5 py-[4px] text-[11px] font-medium"
-                style={{ background: WISH_CATS[k].bg, color: WISH_CATS[k].tint }}
-              >
-                {WISH_CATS[k].label}
-              </span>
-            ))}
+            {w.categories.map((k) => {
+              const meta = resolveWishCat(k, catById);
+              return (
+                <span
+                  key={k}
+                  className="v2-tight rounded-full px-2.5 py-[4px] text-[11px] font-medium"
+                  style={{ background: meta.bg, color: meta.tint }}
+                >
+                  {meta.label}
+                </span>
+              );
+            })}
           </div>
           <h2
             className="v2-tighter mt-5 text-[32px] font-light leading-[1.12] text-[var(--v2-ink-900)]"
@@ -511,23 +560,30 @@ function AddModal({
   onClose,
   onSave,
   saving,
+  catOptions,
+  onCreateCategory,
 }: {
   onClose: () => void;
   onSave: (payload: {
     title: string;
     description: string;
-    categories: WishCategoryId[];
+    categories: string[];
     files: File[];
   }) => Promise<void>;
   saving: boolean;
+  catOptions: WishCatMeta[];
+  onCreateCategory: (name: string) => Promise<WishCatMeta | null>;
 }) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const [cats, setCats] = useState<WishCategoryId[]>([]);
-  const [slotCount, setSlotCount] = useState(1);
-  const [files, setFiles] = useState<(File | null)[]>([null]);
-  const [previews, setPreviews] = useState<(string | null)[]>([null]);
-  const fileRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [cats, setCats] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [addingCat, setAddingCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [catBusy, setCatBusy] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -538,38 +594,51 @@ function AddModal({
   }, [onClose]);
 
   useEffect(() => {
-    setFiles((prev) => {
-      const next = Array.from({ length: slotCount }, (_, i) => prev[i] ?? null);
-      return next;
-    });
-    setPreviews((prev) => Array.from({ length: slotCount }, (_, i) => prev[i] ?? null));
-  }, [slotCount]);
-
-  useEffect(() => {
     return () => {
-      previews.forEach((p) => {
-        if (p) URL.revokeObjectURL(p);
-      });
+      previews.forEach((p) => URL.revokeObjectURL(p));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const setFileAt = (index: number, file: File | null) => {
+  const appendFiles = (incoming: File[]) => {
+    if (!incoming.length) return;
     setFiles((prev) => {
-      const next = [...prev];
-      next[index] = file;
-      return next;
-    });
-    setPreviews((prev) => {
-      const next = [...prev];
-      if (next[index]) URL.revokeObjectURL(next[index]!);
-      next[index] = file ? URL.createObjectURL(file) : null;
-      return next;
+      const room = MAX_WISH_IMAGES - prev.length;
+      if (room <= 0) return prev;
+      const added = incoming.slice(0, room);
+      const urls = added.map((f) => URL.createObjectURL(f));
+      setPreviews((p) => [...p, ...urls]);
+      return [...prev, ...added];
     });
   };
 
-  const toggle = (k: WishCategoryId) =>
+  const removeAt = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setPreviews((prev) => {
+      const url = prev[index];
+      if (url) URL.revokeObjectURL(url);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const toggle = (k: string) =>
     setCats((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
+
+  const submitCat = async () => {
+    const name = newCatName.trim();
+    if (!name || catBusy) return;
+    setCatBusy(true);
+    try {
+      const created = await onCreateCategory(name);
+      if (created) {
+        setCats((c) => (c.includes(created.id) ? c : [...c, created.id]));
+        setNewCatName("");
+        setAddingCat(false);
+      }
+    } finally {
+      setCatBusy(false);
+    }
+  };
 
   const submit = async () => {
     if (!title.trim() || saving) return;
@@ -577,7 +646,7 @@ function AddModal({
       title: title.trim(),
       description: desc.trim(),
       categories: cats.length ? cats : ["life"],
-      files: files.filter((f): f is File => Boolean(f)),
+      files,
     });
   };
 
@@ -587,7 +656,7 @@ function AddModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[560px] overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
+        className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto overflow-x-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-8 pb-6 pt-7">
@@ -608,85 +677,76 @@ function AddModal({
           </div>
 
           <div
-            className={`mt-6 overflow-hidden rounded-2xl bg-[var(--v2-ink-100)] ${
-              slotCount === 1 ? "h-[168px]" : slotCount === 2 ? "h-[200px]" : "h-[220px]"
+            className={`mt-6 rounded-2xl bg-[var(--v2-ink-100)] transition ${
+              dragOver ? "ring-2 ring-[var(--v2-brand-400)]" : ""
             }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              appendFiles(filesFromDropOrInput(e.dataTransfer.files));
+            }}
           >
-            {slotCount === 1 ? (
-              <PhotoSlot
-                url={previews[0]}
-                placeholder="Перетащите изображение желания"
-                onPick={() => fileRefs.current[0]?.click()}
-                onClear={files[0] ? () => setFileAt(0, null) : undefined}
-              />
-            ) : slotCount === 2 ? (
-              <div className="grid h-full" style={{ gridTemplateRows: "1.4fr 1fr", gap: "2px" }}>
-                {[0, 1].map((i) => (
-                  <PhotoSlot
-                    key={i}
-                    url={previews[i]}
-                    placeholder={i === 0 ? "Перетащите изображение желания" : "фото"}
-                    onPick={() => fileRefs.current[i]?.click()}
-                    onClear={files[i] ? () => setFileAt(i, null) : undefined}
-                  />
-                ))}
-              </div>
+            {files.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="flex h-[168px] w-full flex-col items-center justify-center gap-2 px-4 text-center hover:bg-[var(--v2-ink-200)]/40"
+              >
+                <V2Icons.upload className="h-6 w-6 text-[var(--v2-ink-400)]" />
+                <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">
+                  Перетащите фото сюда или нажмите, чтобы выбрать
+                </span>
+                <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">до {MAX_WISH_IMAGES} изображений</span>
+              </button>
             ) : (
-              <div className="grid h-full" style={{ gridTemplateColumns: "2fr 1fr", gap: "2px" }}>
-                <PhotoSlot
-                  url={previews[0]}
-                  placeholder="Перетащите изображение желания"
-                  onPick={() => fileRefs.current[0]?.click()}
-                  onClear={files[0] ? () => setFileAt(0, null) : undefined}
-                />
-                <div className="grid" style={{ gridTemplateRows: "1fr 1fr", gap: "2px" }}>
-                  {[1, 2].map((i) => (
-                    <PhotoSlot
-                      key={i}
-                      url={previews[i]}
-                      placeholder="фото"
-                      onPick={() => fileRefs.current[i]?.click()}
-                      onClear={files[i] ? () => setFileAt(i, null) : undefined}
-                    />
+              <div className="p-3">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {previews.map((url, i) => (
+                    <div key={url} className="relative aspect-square overflow-hidden rounded-xl bg-[var(--v2-ink-200)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeAt(i)}
+                        className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)]"
+                      >
+                        <IcClose className="h-3 w-3" />
+                      </button>
+                    </div>
                   ))}
+                  {files.length < MAX_WISH_IMAGES ? (
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--v2-ink-300)] text-[var(--v2-ink-400)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-600)]"
+                    >
+                      <V2Icons.plus className="h-5 w-5" />
+                      <span className="text-[11px]">Ещё</span>
+                    </button>
+                  ) : null}
                 </div>
+                <p className="v2-tnum mt-2 text-[11.5px] text-[var(--v2-ink-400)]">
+                  {files.length} из {MAX_WISH_IMAGES}
+                </p>
               </div>
             )}
           </div>
-          {[0, 1, 2].map((i) => (
-            <input
-              key={i}
-              ref={(el) => {
-                fileRefs.current[i] = el;
-              }}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                if (f) setFileAt(i, f);
-                e.target.value = "";
-              }}
-            />
-          ))}
-
-          <div className="v2-tight mt-2 flex items-center gap-2 text-[12px] text-[var(--v2-ink-500)]">
-            <span>Изображений в желании:</span>
-            {[1, 2, 3].map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setSlotCount(k)}
-                className={`v2-tnum h-6 w-6 rounded-lg text-[11.5px] transition ${
-                  slotCount === k
-                    ? "bg-[var(--v2-ink-900)] text-white"
-                    : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-200)]"
-                }`}
-              >
-                {k}
-              </button>
-            ))}
-          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              appendFiles(filesFromDropOrInput(e.target.files));
+              e.target.value = "";
+            }}
+          />
 
           <label className="mt-5 block">
             <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
@@ -716,24 +776,61 @@ function AddModal({
               Категории
             </span>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {WISH_CAT_ORDER.map((k) => {
-                const on = cats.includes(k);
+              {catOptions.map((meta) => {
+                const on = cats.includes(meta.id);
                 return (
                   <button
-                    key={k}
+                    key={meta.id}
                     type="button"
-                    onClick={() => toggle(k)}
+                    onClick={() => toggle(meta.id)}
                     className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition"
                     style={
                       on
-                        ? { background: WISH_CATS[k].tint, color: "#fff", borderColor: WISH_CATS[k].tint }
+                        ? { background: meta.tint, color: "#fff", borderColor: meta.tint }
                         : { background: "#fff", color: "#52525B", borderColor: "#E4E4E7" }
                     }
                   >
-                    {WISH_CATS[k].label}
+                    {meta.label}
                   </button>
                 );
               })}
+              {addingCat ? (
+                <span className="inline-flex h-8 items-center gap-1">
+                  <input
+                    autoFocus
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void submitCat();
+                      }
+                      if (e.key === "Escape") {
+                        setAddingCat(false);
+                        setNewCatName("");
+                      }
+                    }}
+                    placeholder="Название"
+                    className="v2-tight h-8 w-[140px] rounded-full border border-[var(--v2-ink-200)] px-3 text-[12.5px] outline-none focus:border-[var(--v2-brand-400)]"
+                  />
+                  <button
+                    type="button"
+                    disabled={!newCatName.trim() || catBusy}
+                    onClick={() => void submitCat()}
+                    className="h-8 rounded-full bg-[var(--v2-ink-900)] px-3 text-[12px] font-medium text-white disabled:opacity-40"
+                  >
+                    Ок
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddingCat(true)}
+                  className="v2-tight inline-flex h-8 items-center gap-1 rounded-full border border-dashed border-[var(--v2-ink-300)] px-3 text-[12.5px] font-medium text-[var(--v2-ink-400)] transition hover:text-[var(--v2-ink-700)]"
+                >
+                  <V2Icons.plus className="h-3.5 w-3.5" /> категория
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -857,8 +954,9 @@ function DayMode() {
 
 export function PersonalWishesClient() {
   const [mode, setMode] = useState<Mode>("visual");
-  const [cat, setCat] = useState<"all" | WishCategoryId>("all");
+  const [cat, setCat] = useState<"all" | string>("all");
   const [items, setItems] = useState<PersonalWish[]>([]);
+  const [customCats, setCustomCats] = useState<WishCustomCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -866,9 +964,15 @@ export function PersonalWishesClient() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  const catById = useMemo(() => new Map(customCats.map((c) => [c.id, c])), [customCats]);
+  const catOptions = useMemo(() => allWishCatMetas(customCats), [customCats]);
+
   const reload = useCallback(async () => {
-    const data = await fetchJson<{ wishes: PersonalWish[] }>("/api/v2/personal/wishes");
+    const data = await fetchJson<{ wishes: PersonalWish[]; categories: WishCustomCategory[] }>(
+      "/api/v2/personal/wishes"
+    );
     setItems(data.wishes ?? []);
+    setCustomCats(data.categories ?? []);
   }, []);
 
   useEffect(() => {
@@ -890,7 +994,7 @@ export function PersonalWishesClient() {
   }, [reload]);
 
   const counts = useMemo(() => {
-    const c: Partial<Record<WishCategoryId, number>> = {};
+    const c: Record<string, number> = {};
     items.forEach((w) => w.categories.forEach((k) => (c[k] = (c[k] || 0) + 1)));
     return c;
   }, [items]);
@@ -912,10 +1016,37 @@ export function PersonalWishesClient() {
     [shown]
   );
 
+  const createCategory = async (name: string): Promise<WishCatMeta | null> => {
+    try {
+      const { category } = await fetchJson<{ category: WishCustomCategory }>(
+        "/api/v2/personal/wishes/categories",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        }
+      );
+      setCustomCats((prev) => {
+        if (prev.some((c) => c.id === category.id)) return prev;
+        return [...prev, category];
+      });
+      return {
+        id: category.id,
+        label: category.name,
+        tint: category.tint,
+        bg: category.bg,
+        builtin: false,
+      };
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось создать категорию");
+      return null;
+    }
+  };
+
   const saveNew = async (payload: {
     title: string;
     description: string;
-    categories: WishCategoryId[];
+    categories: string[];
     files: File[];
   }) => {
     setSaving(true);
@@ -932,7 +1063,7 @@ export function PersonalWishesClient() {
       });
       if (payload.files.length) {
         const fd = new FormData();
-        payload.files.forEach((f) => fd.append("files", f));
+        payload.files.slice(0, MAX_WISH_IMAGES).forEach((f) => fd.append("files", f));
         const res = await fetch(apiUrl(`/api/v2/personal/wishes/${wish.id}/images`), {
           method: "POST",
           credentials: "include",
@@ -951,13 +1082,21 @@ export function PersonalWishesClient() {
     }
   };
 
-  const uploadToOpen = async (files: FileList | null) => {
-    if (!open || !files?.length) return;
+  const uploadToOpen = async (files: FileList | File[] | null) => {
+    if (!open || !files) return;
+    const list = filesFromDropOrInput(files);
+    if (!list.length) return;
+    const current = items.find((w) => w.id === open);
+    const room = MAX_WISH_IMAGES - (current?.images.length ?? 0);
+    if (room <= 0) {
+      setError(`Можно добавить не больше ${MAX_WISH_IMAGES} фото`);
+      return;
+    }
     setUploading(true);
     setError(null);
     try {
       const fd = new FormData();
-      Array.from(files).forEach((f) => fd.append("files", f));
+      list.slice(0, room).forEach((f) => fd.append("files", f));
       const res = await fetch(apiUrl(`/api/v2/personal/wishes/${open}/images`), {
         method: "POST",
         credentials: "include",
@@ -1036,27 +1175,26 @@ export function PersonalWishesClient() {
             >
               Все <span className="v2-tnum ml-1 text-[11.5px] opacity-60">{items.length}</span>
             </button>
-            {WISH_CAT_ORDER.map((k) => {
-              const c = WISH_CATS[k];
-              const active = cat === k;
+            {catOptions.map((meta) => {
+              const active = cat === meta.id;
               return (
                 <button
-                  key={k}
+                  key={meta.id}
                   type="button"
-                  onClick={() => setCat(k)}
+                  onClick={() => setCat(meta.id)}
                   className="v2-tight inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-medium shadow-[var(--v2-shadow-card)] transition"
                   style={
                     active
-                      ? { background: c.tint, color: "#fff" }
+                      ? { background: meta.tint, color: "#fff" }
                       : { background: "rgba(255,255,255,.8)", color: "#52525B" }
                   }
                 >
                   <span
                     className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: active ? "rgba(255,255,255,.8)" : c.tint }}
+                    style={{ background: active ? "rgba(255,255,255,.8)" : meta.tint }}
                   />
-                  {c.label}
-                  <span className="v2-tnum text-[11.5px] opacity-60">{counts[k] || 0}</span>
+                  {meta.label}
+                  <span className="v2-tnum text-[11.5px] opacity-60">{counts[meta.id] || 0}</span>
                 </button>
               );
             })}
@@ -1081,7 +1219,14 @@ export function PersonalWishesClient() {
           ) : (
             <div className="wish-masonry grid gap-[22px]">
               {shown.map((w, i) => (
-                <WishCard key={w.id} w={w} i={i} onOpen={openWish} onCat={setCat} />
+                <WishCard
+                  key={w.id}
+                  w={w}
+                  i={i}
+                  catById={catById}
+                  onOpen={openWish}
+                  onCat={setCat}
+                />
               ))}
             </div>
           )}
@@ -1094,6 +1239,7 @@ export function PersonalWishesClient() {
       {current ? (
         <Fullscreen
           w={current}
+          catById={catById}
           onClose={() => setOpen(null)}
           onPrev={() => step(-1)}
           onNext={() => step(1)}
@@ -1106,6 +1252,8 @@ export function PersonalWishesClient() {
       {adding ? (
         <AddModal
           onClose={() => !saving && setAdding(false)}
+          catOptions={catOptions}
+          onCreateCategory={createCategory}
           onSave={async (p) => {
             try {
               await saveNew(p);

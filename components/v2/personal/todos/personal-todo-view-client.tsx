@@ -2,6 +2,7 @@
 
 import { InboxSectionQuickAdd } from "@/components/v2/personal/todos/inbox-section-quick-add";
 import { PersonalTodoDetailDrawer } from "@/components/v2/personal/todos/personal-todo-detail-drawer";
+import { PersonalKanbanBoard, PersonalWeekBoard } from "@/components/v2/personal/todos/personal-todo-board";
 import { PersonalTodoRowItem } from "@/components/v2/personal/todos/personal-todo-row";
 import {
   PersonalTodoQuickAdd,
@@ -37,14 +38,6 @@ const EMPTY_MESSAGES: Partial<Record<PersonalTodoView, string>> = {
   completed: "Выполненных задач пока нет.",
 };
 
-const KANBAN_COLUMNS: { key: PersonalKanbanColumn; label: string; dot: string }[] = [
-  { key: "unassigned", label: "Нераспределённые", dot: "#F59E0B" },
-  { key: "today", label: "Сегодня", dot: "#3B6FF7" },
-  { key: "tomorrow", label: "Завтра", dot: "#A1A1AA" },
-  { key: "this_week", label: "На этой неделе", dot: "#A1A1AA" },
-  { key: "later", label: "Позже", dot: "#D4D4D8" },
-];
-
 function scheduledDateForKanbanColumn(column: PersonalKanbanColumn): string | null {
   const today = personalTodoTodayYmd();
   const week = personalTodoWeekDates(today, 7);
@@ -60,10 +53,6 @@ function scheduledDateForKanbanColumn(column: PersonalKanbanColumn): string | nu
     case "later":
       return addDaysFromToday(7);
   }
-}
-
-function formatWeekColumnLabel(ymd: string) {
-  return formatPersonalTodoDateLabel(ymd) ?? ymd;
 }
 
 export function PersonalTodoViewClient({
@@ -87,6 +76,8 @@ export function PersonalTodoViewClient({
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<PersonalKanbanColumn | null>(null);
   const [quickAddSection, setQuickAddSection] = useState<InboxTodoSectionId | null>(null);
 
   const load = useCallback(async () => {
@@ -220,70 +211,25 @@ export function PersonalTodoViewClient({
 
     return (
       <div className="px-6 pb-6">
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {week.dates.map((date) => (
-            <section
-              key={date}
-              className="v2-card flex w-[180px] shrink-0 flex-col p-2"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragId) void scheduleOn(dragId, date);
-                setDragId(null);
-              }}
-            >
-              <h2 className="v2-tight mb-2 px-1 text-[12px] font-semibold text-[var(--v2-ink-800)]">
-                {formatWeekColumnLabel(date)}
-              </h2>
-              <div className="flex flex-1 flex-col gap-1">
-                {(week.columns[date] ?? []).map((todo) => (
-                  <div
-                    key={todo.id}
-                    className="overflow-hidden rounded-lg border border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/40"
-                  >
-                    <PersonalTodoRowItem
-                      todo={todo}
-                      onToggle={(id) => void toggleComplete(id)}
-                      onOpen={setSelectedId}
-                      onAddSubtask={handleAddSubtask}
-                      showProject
-                      compact
-                      draggable
-                      isDragging={dragId === todo.id}
-                      onDragStart={() => setDragId(todo.id)}
-                      onDragEnd={() => setDragId(null)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-
-        {week.unscheduled.length > 0 ? (
-          <section className="v2-card mt-4 p-4">
-            <h2 className="v2-tight mb-3 text-[13px] font-semibold text-[var(--v2-ink-900)]">
-              Без даты ({week.unscheduled.length})
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {week.unscheduled.map((todo) => (
-                <div
-                  key={todo.id}
-                  draggable
-                  onDragStart={() => setDragId(todo.id)}
-                  onDragEnd={() => setDragId(null)}
-                  onClick={() => setSelectedId(todo.id)}
-                  className={`v2-tight cursor-grab rounded-xl border border-dashed border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[13px] font-medium text-[var(--v2-ink-800)] active:cursor-grabbing ${
-                    dragId === todo.id ? "opacity-50" : ""
-                  }`}
-                >
-                  {todo.title}
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
+        <PersonalWeekBoard
+          dates={week.dates}
+          columns={week.columns}
+          unscheduled={week.unscheduled}
+          dragId={dragId}
+          dragOverDate={dragOverDate}
+          onDragStart={setDragId}
+          onDragEnd={() => {
+            setDragId(null);
+            setDragOverDate(null);
+          }}
+          onDragOverDate={setDragOverDate}
+          onDropDate={(ymd) => {
+            if (dragId) void scheduleOn(dragId, ymd);
+            setDragId(null);
+            setDragOverDate(null);
+          }}
+          onOpen={setSelectedId}
+        />
         {!hasAny ? renderEmpty() : null}
       </div>
     );
@@ -292,65 +238,29 @@ export function PersonalTodoViewClient({
   function renderKanbanBoard() {
     const kanban = payload?.kanban;
     if (!kanban) return null;
-    const hasAny = KANBAN_COLUMNS.some((c) => (kanban[c.key] ?? []).length > 0);
+    const hasAny = (Object.keys(kanban) as PersonalKanbanColumn[]).some(
+      (k) => (kanban[k] ?? []).length > 0
+    );
 
     return (
       <div className="px-6 pb-6">
-        <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-2">
-          {KANBAN_COLUMNS.map(({ key, label, dot }) => {
-            const list = kanban[key] ?? [];
-            return (
-              <section
-                key={key}
-                className="v2-card flex w-[220px] shrink-0 flex-col p-2"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (!dragId) return;
-                  void scheduleOn(dragId, scheduledDateForKanbanColumn(key));
-                  setDragId(null);
-                }}
-              >
-                <div className="mb-2 flex items-center gap-2 px-1">
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dot }} aria-hidden />
-                  <h2 className="v2-tight min-w-0 flex-1 truncate text-[12px] font-semibold text-[var(--v2-ink-800)]">
-                    {label}
-                  </h2>
-                  <span className="v2-tnum text-[11px] font-medium text-[var(--v2-ink-400)]">{list.length}</span>
-                </div>
-                <div className="flex min-h-[120px] flex-1 flex-col gap-1">
-                  {list.map((todo) => (
-                    <div
-                      key={todo.id}
-                      className="overflow-hidden rounded-lg border border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/40"
-                    >
-                      <PersonalTodoRowItem
-                        todo={todo}
-                        onToggle={(id) => void toggleComplete(id)}
-                        onOpen={setSelectedId}
-                        onAddSubtask={handleAddSubtask}
-                        showProject
-                        compact
-                        draggable
-                        isDragging={dragId === todo.id}
-                        onDragStart={() => setDragId(todo.id)}
-                        onDragEnd={() => setDragId(null)}
-                      />
-                    </div>
-                  ))}
-                  {list.length === 0 ? (
-                    <p className="v2-tight px-2 py-6 text-center text-[12px] text-[var(--v2-ink-400)]">
-                      Перетащите сюда
-                    </p>
-                  ) : null}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+        <PersonalKanbanBoard
+          kanban={kanban}
+          dragId={dragId}
+          dragOverColumn={dragOverColumn}
+          onDragStart={setDragId}
+          onDragEnd={() => {
+            setDragId(null);
+            setDragOverColumn(null);
+          }}
+          onDragOverColumn={setDragOverColumn}
+          onDropColumn={(key) => {
+            if (dragId) void scheduleOn(dragId, scheduledDateForKanbanColumn(key));
+            setDragId(null);
+            setDragOverColumn(null);
+          }}
+          onOpen={setSelectedId}
+        />
         {!hasAny ? renderEmpty() : null}
       </div>
     );
@@ -377,7 +287,7 @@ export function PersonalTodoViewClient({
                 setDragId(null);
               }}
             >
-              {renderInboxSectionHeader(formatWeekColumnLabel(date), todos.length)}
+              {renderInboxSectionHeader(formatPersonalTodoDateLabel(date) ?? date, todos.length)}
               {todos.length > 0 ? (
                 renderList(todos, { showProject: true, draggable: true })
               ) : (

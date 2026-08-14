@@ -174,6 +174,30 @@ export const V2Icons = {
       />
     </svg>
   ),
+  brand: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <circle cx="12" cy="8.5" r="3.4" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M5 20c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M18.5 4.5 20 6l-1.5 1.5L17 6l1.5-1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  ),
+  compass: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="m14.6 9.4-1.5 4.2-4.2 1.5 1.5-4.2 4.2-1.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  ),
+  code: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path
+        d="m9 8.5-4 3.5 4 3.5M15 8.5l4 3.5-4 3.5M13.4 5.5l-2.8 13"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
   command: (p: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path

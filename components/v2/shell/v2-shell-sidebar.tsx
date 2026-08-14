@@ -329,10 +329,20 @@ export function V2ShellSidebar({
                 active = pathname?.startsWith(appPath("/v2/personal/ideas")) ?? false;
               } else if (item.href.startsWith("/v2/personal/wishes")) {
                 active = pathname?.startsWith(appPath("/v2/personal/wishes")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/time")) {
+                active = pathname?.startsWith(appPath("/v2/personal/time")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/brand")) {
+                active = pathname?.startsWith(appPath("/v2/personal/brand")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/life-strategy")) {
+                active = pathname?.startsWith(appPath("/v2/personal/life-strategy")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/my-code")) {
+                active = pathname?.startsWith(appPath("/v2/personal/my-code")) ?? false;
               } else if (item.href.startsWith("/v2/personal/calendar")) {
                 active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
-              } else if (item.href.startsWith("/v2/personal/strategy")) {
-                active = pathname?.startsWith(appPath("/v2/personal/strategy")) ?? false;
+              } else if (item.href === "/v2/personal/strategy" || item.href.startsWith("/v2/personal/strategy/")) {
+                active =
+                  (pathname?.startsWith(appPath("/v2/personal/strategy")) ?? false) &&
+                  !(pathname?.startsWith(appPath("/v2/personal/life-strategy")) ?? false);
               }
               return <NavLink key={item.href} item={item} active={!!active} />;
             })}

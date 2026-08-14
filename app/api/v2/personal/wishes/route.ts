@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireV2Personal } from "@/lib/v2/auth/require-v2-personal";
 import {
   createPersonalWish,
-  loadPersonalWishes,
+  loadPersonalWishesBoard,
   PersonalWishesValidationError,
 } from "@/lib/v2/personal/personal-wishes-repo";
 
@@ -10,8 +10,8 @@ export async function GET() {
   const auth = await requireV2Personal();
   if (!auth.ok) return auth.response;
   try {
-    const wishes = await loadPersonalWishes(auth.ctx);
-    return NextResponse.json({ wishes });
+    const board = await loadPersonalWishesBoard(auth.ctx);
+    return NextResponse.json(board);
   } catch (e) {
     console.error("personal wishes list:", e);
     return NextResponse.json({ error: "Failed to load wishes" }, { status: 500 });
