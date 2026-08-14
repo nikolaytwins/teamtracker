@@ -23,7 +23,9 @@ const PERSONAL_TABS = [
   {
     href: "/v2/personal/strategy",
     label: "Стратегия",
-    match: (p: string) => p.startsWith(appPath("/v2/personal/strategy")),
+    match: (p: string) =>
+      p.startsWith(appPath("/v2/personal/strategy")) &&
+      !p.startsWith(appPath("/v2/personal/strategy2")),
   },
 ] as const;
 
@@ -58,6 +60,10 @@ const FINANCE_TABS = [
 export default function PersonalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const inFinance = pathname.startsWith(appPath("/v2/personal/finance"));
+  const inS2 = pathname.startsWith(appPath("/v2/personal/strategy2"));
+  if (inS2) {
+    return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
+  }
   const tabs = inFinance ? FINANCE_TABS : PERSONAL_TABS;
 
   return (

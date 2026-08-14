@@ -75,6 +75,7 @@ const PERSONAL_NAV: NavItem[] = [
   { href: "/v2/personal/calendar", label: "Календарь", icon: "cal" },
   { href: "/v2/personal/ideas", label: "Идеи", icon: "spark" },
   { href: "/v2/personal/strategy", label: "Стратегия", icon: "flag" },
+  { href: "/v2/personal/strategy2", label: "Стратегия 2.0", icon: "flag" },
   { href: "/v2/personal/finance", label: "Финансы", icon: "ruble" },
 ];
 

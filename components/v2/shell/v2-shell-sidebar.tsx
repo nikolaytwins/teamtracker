@@ -314,8 +314,12 @@ export function V2ShellSidebar({
                 active = pathname?.startsWith(appPath("/v2/personal/ideas")) ?? false;
               } else if (item.href.startsWith("/v2/personal/calendar")) {
                 active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/strategy2")) {
+                active = pathname?.startsWith(appPath("/v2/personal/strategy2")) ?? false;
               } else if (item.href.startsWith("/v2/personal/strategy")) {
-                active = pathname?.startsWith(appPath("/v2/personal/strategy")) ?? false;
+                active =
+                  (pathname?.startsWith(appPath("/v2/personal/strategy")) ?? false) &&
+                  !(pathname?.startsWith(appPath("/v2/personal/strategy2")) ?? false);
               }
               return <NavLink key={item.href} item={item} active={!!active} />;
             })}
