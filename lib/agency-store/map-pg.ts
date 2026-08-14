@@ -17,6 +17,7 @@ export function mapProjectRow(r: Record<string, unknown>): Record<string, unknow
     source_lead_id: r.source_lead_id,
     workStatus: r.work_status ?? "not_started",
     kanbanSortOrder: Number(r.kanban_sort_order) || 0,
+    hourlyRateRub: Number(r.hourly_rate_rub) || 0,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -71,6 +72,9 @@ export function mapDetailRow(r: Record<string, unknown>): Record<string, unknown
     quantity: r.quantity,
     unitPrice: r.unit_price,
     order: r.sort_order,
+    billingType: r.billing_type === "hourly" ? "hourly" : "fixed",
+    trackedSeconds: Number(r.tracked_seconds) || 0,
+    timerStartedAt: r.timer_started_at ? String(r.timer_started_at) : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

@@ -8,7 +8,7 @@ export async function PUT(
   try {
     const params = await context.params;
     const body = await request.json();
-    const { title, quantity, unitPrice, order } = body;
+    const { title, quantity, unitPrice, order, billingType, trackedSeconds } = body;
 
     const repo = getAgencyRepo();
     await repo.ensureProjectDetailTable();
@@ -28,12 +28,25 @@ export async function PUT(
     const nextOrder =
       typeof order === "number" ? order : typeof existing.order === "number" ? existing.order : 0;
 
+    const nextBilling =
+      billingType === "hourly" || billingType === "fixed" ? billingType : existing.billingType;
+
+    const extras: {
+      billingType?: "fixed" | "hourly";
+      trackedSeconds?: number;
+    } = { billingType: nextBilling };
+    if (trackedSeconds != null) {
+      const n = typeof trackedSeconds === "number" ? trackedSeconds : parseFloat(String(trackedSeconds));
+      if (!Number.isNaN(n)) extras.trackedSeconds = n;
+    }
+
     const detail = await repo.updateProjectDetailById(
       params.id,
       nextTitle,
       Number.isNaN(numericQuantity) ? existing.quantity : numericQuantity,
       Number.isNaN(numericUnitPrice) ? existing.unitPrice : numericUnitPrice,
-      nextOrder
+      nextOrder,
+      extras
     );
 
     return NextResponse.json({ success: true, detail });

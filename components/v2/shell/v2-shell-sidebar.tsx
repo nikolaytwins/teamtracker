@@ -196,6 +196,8 @@ export function V2ShellSidebar({
   }, [teamProjects, pinnedIds, pinnedSet]);
 
   const showOtherProjects = projectsExpanded && otherProjects.length > 0;
+  // Временно скрыто из меню (Доска / Проекты)
+  const showProjectsNav = false;
 
   if (!hydrated) {
     return <aside className="w-[244px] shrink-0 bg-white shadow-[var(--v2-shadow-soft)]" aria-hidden />;
@@ -213,7 +215,7 @@ export function V2ShellSidebar({
         >
           <V2Icons.chevR className="h-4 w-4" />
         </button>
-        {pinnedProjects.length > 0 ? (
+        {showProjectsNav && pinnedProjects.length > 0 ? (
           <aside className="fixed left-3 top-16 z-40 flex w-10 flex-col gap-1 rounded-xl bg-white p-1 shadow-[var(--v2-shadow-card)]">
             {pinnedProjects.map((p) => {
               const active =
@@ -290,7 +292,14 @@ export function V2ShellSidebar({
 
       <nav className="space-y-0.5">
         {nav.map((item) => {
-          const active = pathname === appPath(item.href) || pathname?.startsWith(appPath(item.href + "/"));
+          let active = pathname === appPath(item.href) || (pathname?.startsWith(appPath(item.href + "/")) ?? false);
+          if (item.href.startsWith("/v2/personal/tasks")) {
+            active = pathname?.startsWith(appPath("/v2/personal/tasks")) ?? false;
+          } else if (item.href.startsWith("/v2/personal/calendar")) {
+            active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
+          } else if (item.href.startsWith("/v2/personal/finance")) {
+            active = pathname?.startsWith(appPath("/v2/personal/finance")) ?? false;
+          }
           const count = item.countKey === "open" ? taskCounts.open : undefined;
           return <NavLink key={item.href} item={item} active={!!active} count={count} />;
         })}
@@ -314,12 +323,8 @@ export function V2ShellSidebar({
                 active = pathname?.startsWith(appPath("/v2/personal/ideas")) ?? false;
               } else if (item.href.startsWith("/v2/personal/calendar")) {
                 active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
-              } else if (item.href.startsWith("/v2/personal/strategy2")) {
-                active = pathname?.startsWith(appPath("/v2/personal/strategy2")) ?? false;
               } else if (item.href.startsWith("/v2/personal/strategy")) {
-                active =
-                  (pathname?.startsWith(appPath("/v2/personal/strategy")) ?? false) &&
-                  !(pathname?.startsWith(appPath("/v2/personal/strategy2")) ?? false);
+                active = pathname?.startsWith(appPath("/v2/personal/strategy")) ?? false;
               }
               return <NavLink key={item.href} item={item} active={!!active} />;
             })}
@@ -327,7 +332,7 @@ export function V2ShellSidebar({
         </div>
       ) : null}
 
-      {pinnedProjects.length > 0 ? (
+      {showProjectsNav && pinnedProjects.length > 0 ? (
         <div className="mt-4">
           <div className="mb-1 px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
             Закреплённые
@@ -350,7 +355,7 @@ export function V2ShellSidebar({
         </div>
       ) : null}
 
-      {teamProjects.length > 0 ? (
+      {showProjectsNav && teamProjects.length > 0 ? (
         <div className="mt-3">
           <button
             type="button"

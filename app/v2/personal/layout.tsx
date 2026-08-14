@@ -6,26 +6,14 @@ import { usePathname } from "next/navigation";
 
 const PERSONAL_TABS = [
   {
-    href: "/v2/personal/tasks/inbox",
-    label: "Задачи",
-    match: (p: string) => p.includes(appPath("/v2/personal/tasks")),
-  },
-  {
-    href: "/v2/personal/calendar",
-    label: "Календарь",
-    match: (p: string) => p.startsWith(appPath("/v2/personal/calendar")),
-  },
-  {
     href: "/v2/personal/ideas",
     label: "Идеи",
     match: (p: string) => p.startsWith(appPath("/v2/personal/ideas")),
   },
   {
     href: "/v2/personal/strategy",
-    label: "Стратегия",
-    match: (p: string) =>
-      p.startsWith(appPath("/v2/personal/strategy")) &&
-      !p.startsWith(appPath("/v2/personal/strategy2")),
+    label: "База данных",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/strategy")),
   },
 ] as const;
 
@@ -60,8 +48,9 @@ const FINANCE_TABS = [
 export default function PersonalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const inFinance = pathname.startsWith(appPath("/v2/personal/finance"));
-  const inS2 = pathname.startsWith(appPath("/v2/personal/strategy2"));
-  if (inS2) {
+  const inTasks = pathname.startsWith(appPath("/v2/personal/tasks"));
+  const inCalendar = pathname.startsWith(appPath("/v2/personal/calendar"));
+  if (inTasks || inCalendar) {
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }
   const tabs = inFinance ? FINANCE_TABS : PERSONAL_TABS;

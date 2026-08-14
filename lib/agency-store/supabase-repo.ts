@@ -89,23 +89,24 @@ export class SupabaseAgencyRepo implements AgencyRepo {
   }
 
   async updateProjectById(id: string, body: UpdateProjectBody): Promise<Record<string, unknown> | null> {
-    const { error } = await this.sb
-      .from("agency_project")
-      .update({
-        name: body.name,
-        total_amount: body.totalAmount,
-        paid_amount: body.paidAmount,
-        deadline: body.deadline as string | null,
-        status: body.status,
-        service_type: body.serviceType,
-        business_line: body.businessLine === "impulse" ? "impulse" : "agency",
-        client_type: body.clientType,
-        payment_method: body.paymentMethod,
-        client_contact: body.clientContact,
-        notes: body.notes,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+    const patch: Record<string, unknown> = {
+      name: body.name,
+      total_amount: body.totalAmount,
+      paid_amount: body.paidAmount,
+      deadline: body.deadline as string | null,
+      status: body.status,
+      service_type: body.serviceType,
+      business_line: body.businessLine === "impulse" ? "impulse" : "agency",
+      client_type: body.clientType,
+      payment_method: body.paymentMethod,
+      client_contact: body.clientContact,
+      notes: body.notes,
+      updated_at: new Date().toISOString(),
+    };
+    if (typeof body.hourlyRateRub === "number") {
+      patch.hourly_rate_rub = body.hourlyRateRub;
+    }
+    const { error } = await this.sb.from("agency_project").update(patch).eq("id", id);
     if (error) throw error;
     return this.getProjectById(id);
   }
@@ -141,6 +142,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     });
     (ins as Record<string, unknown>).created_at = newDate;
     (ins as Record<string, unknown>).updated_at = new Date().toISOString();
+    (ins as Record<string, unknown>).hourly_rate_rub = Number(cur.hourlyRateRub) || 0;
     const { error: e1 } = await this.sb.from("agency_project").insert(ins);
     if (e1) throw e1;
     const { data: exps, error: e2 } = await this.sb.from("agency_expense").select("*").eq("project_id", id);
@@ -691,8 +693,11 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     quantity: number;
     unitPrice: number;
     order: number | null;
+    billingType?: "fixed" | "hourly";
+    trackedSeconds?: number;
   }): Promise<Record<string, unknown>> {
     const now = new Date().toISOString();
+    const billingType = input.billingType === "hourly" ? "hourly" : "fixed";
     const { error } = await this.sb.from("agency_project_detail").insert({
       id: input.id,
       project_id: input.projectId,
@@ -700,6 +705,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       quantity: input.quantity,
       unit_price: input.unitPrice,
       sort_order: typeof input.order === "number" ? input.order : 0,
+      billing_type: billingType,
+      tracked_seconds: Math.max(0, Math.floor(Number(input.trackedSeconds) || 0)),
+      timer_started_at: null,
       created_at: now,
       updated_at: now,
     });
@@ -709,9 +717,19 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     return mapDetailRow(data as Record<string, unknown>);
   }
 
-  async getProjectDetailById(
-    id: string
-  ): Promise<{ title: string; quantity: number; unitPrice: number; order: number } | undefined> {
+  async getProjectDetailById(id: string): Promise<
+    | {
+        title: string;
+        quantity: number;
+        unitPrice: number;
+        order: number;
+        billingType: "fixed" | "hourly";
+        trackedSeconds: number;
+        timerStartedAt: string | null;
+        projectId?: string;
+      }
+    | undefined
+  > {
     const { data, error } = await this.sb.from("agency_project_detail").select("*").eq("id", id).maybeSingle();
     if (error) throw error;
     if (!data) return undefined;
@@ -721,6 +739,10 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       quantity: Number(m.quantity),
       unitPrice: Number(m.unitPrice),
       order: Number(m.order),
+      billingType: m.billingType === "hourly" ? "hourly" : "fixed",
+      trackedSeconds: Number(m.trackedSeconds) || 0,
+      timerStartedAt: m.timerStartedAt ? String(m.timerStartedAt) : null,
+      projectId: m.projectId ? String(m.projectId) : undefined,
     };
   }
 
@@ -729,18 +751,30 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     title: string,
     quantity: number,
     unitPrice: number,
-    order: number
+    order: number,
+    extras?: {
+      billingType?: "fixed" | "hourly";
+      trackedSeconds?: number;
+      timerStartedAt?: string | null;
+    }
   ): Promise<Record<string, unknown> | undefined> {
-    const { error } = await this.sb
-      .from("agency_project_detail")
-      .update({
-        title,
-        quantity,
-        unit_price: unitPrice,
-        sort_order: order,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+    const patch: Record<string, unknown> = {
+      title,
+      quantity,
+      unit_price: unitPrice,
+      sort_order: order,
+      updated_at: new Date().toISOString(),
+    };
+    if (extras?.billingType === "hourly" || extras?.billingType === "fixed") {
+      patch.billing_type = extras.billingType;
+    }
+    if (typeof extras?.trackedSeconds === "number") {
+      patch.tracked_seconds = Math.max(0, Math.floor(extras.trackedSeconds));
+    }
+    if (extras && "timerStartedAt" in extras) {
+      patch.timer_started_at = extras.timerStartedAt;
+    }
+    const { error } = await this.sb.from("agency_project_detail").update(patch).eq("id", id);
     if (error) throw error;
     const { data, error: e2 } = await this.sb.from("agency_project_detail").select("*").eq("id", id).maybeSingle();
     if (e2) throw e2;
@@ -750,6 +784,49 @@ export class SupabaseAgencyRepo implements AgencyRepo {
   async deleteProjectDetailById(id: string): Promise<void> {
     const { error } = await this.sb.from("agency_project_detail").delete().eq("id", id);
     if (error) throw error;
+  }
+
+  async setProjectDetailTimer(
+    id: string,
+    action: "start" | "stop"
+  ): Promise<Record<string, unknown> | undefined> {
+    const existing = await this.getProjectDetailById(id);
+    if (!existing) return undefined;
+    if (existing.billingType !== "hourly") {
+      throw new Error("timer_only_for_hourly");
+    }
+    const now = new Date();
+    if (action === "start") {
+      if (existing.timerStartedAt) {
+        const { data } = await this.sb.from("agency_project_detail").select("*").eq("id", id).maybeSingle();
+        return data ? mapDetailRow(data as Record<string, unknown>) : undefined;
+      }
+      return this.updateProjectDetailById(
+        id,
+        existing.title,
+        existing.quantity,
+        existing.unitPrice,
+        existing.order,
+        { timerStartedAt: now.toISOString() }
+      );
+    }
+    if (!existing.timerStartedAt) {
+      const { data } = await this.sb.from("agency_project_detail").select("*").eq("id", id).maybeSingle();
+      return data ? mapDetailRow(data as Record<string, unknown>) : undefined;
+    }
+    const started = Date.parse(existing.timerStartedAt);
+    const elapsed = Number.isNaN(started) ? 0 : Math.max(0, Math.floor((now.getTime() - started) / 1000));
+    return this.updateProjectDetailById(
+      id,
+      existing.title,
+      existing.quantity,
+      existing.unitPrice,
+      existing.order,
+      {
+        trackedSeconds: existing.trackedSeconds + elapsed,
+        timerStartedAt: null,
+      }
+    );
   }
 
   async revenueByClient(): Promise<{ items: unknown[]; total: number }> {

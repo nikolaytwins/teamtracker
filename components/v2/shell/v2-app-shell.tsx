@@ -63,20 +63,17 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/v2/home", label: "Главная", icon: "home" },
-  { href: "/v2/board", label: "Доска", icon: "kanban", countKey: "open" },
-  { href: "/v2/projects", label: "Проекты", icon: "projects" },
-  { href: "/v2/agency", label: "Проекты и финансы", icon: "reports", agency: true },
+  { href: "/v2/personal/tasks/inbox", label: "Задачи", icon: "tasks" },
+  { href: "/v2/personal/calendar", label: "Календарь", icon: "cal" },
+  // Скрыто: Доска, Проекты, Команда
+  { href: "/v2/agency", label: "Финансы месяца", icon: "reports", agency: true },
+  { href: "/v2/personal/finance", label: "Финансы", icon: "ruble" },
   { href: "/v2/admin/leads", label: "Лиды", icon: "spark", admin: true },
-  { href: "/v2/admin/people", label: "Команда", icon: "team", admin: true },
 ];
 
 const PERSONAL_NAV: NavItem[] = [
-  { href: "/v2/personal/tasks/inbox", label: "Задачи", icon: "tasks" },
-  { href: "/v2/personal/calendar", label: "Календарь", icon: "cal" },
   { href: "/v2/personal/ideas", label: "Идеи", icon: "spark" },
-  { href: "/v2/personal/strategy", label: "Стратегия", icon: "flag" },
-  { href: "/v2/personal/strategy2", label: "Стратегия 2.0", icon: "flag" },
-  { href: "/v2/personal/finance", label: "Финансы", icon: "ruble" },
+  { href: "/v2/personal/strategy", label: "База данных", icon: "flag" },
 ];
 
 export function V2AppShell({ children }: { children: React.ReactNode }) {
@@ -169,7 +166,7 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
   const nav = NAV.filter((n) => {
     if (n.admin && !isAdmin) return false;
     if (n.agency && !canAccessAgencyRoutes(normalizeTtUserRole(me?.role))) return false;
-    if (isClient) return n.href === "/v2/projects";
+    if (isClient) return n.href === "/v2/home";
     return true;
   });
   const personalNav = isClient ? [] : PERSONAL_NAV;

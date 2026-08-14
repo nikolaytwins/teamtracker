@@ -1,4 +1,5 @@
 import { getAgencyRepoV2 } from "@/lib/agency-store";
+import { agencyDetailLineTotal } from "@/lib/agency/detail-line-total";
 import { isInFinanceMonth } from "@/lib/v2/finance/meta";
 import {
   FINANCE_SERVICE_META,
@@ -73,11 +74,24 @@ function mapAgencyGeneralExpense(
 async function loadDetailsTotals(projectIds: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (!projectIds.length) return out;
+  const projects = await repo().listProjectsWithTotalExpenses();
+  const rates = new Map<string, number>();
+  for (const p of projects) {
+    rates.set(String(p.id), Number(p.hourlyRateRub) || 0);
+  }
   const details = await repo().listProjectDetails();
   for (const row of details) {
     const pid = String(row.projectId);
     if (!projectIds.includes(pid)) continue;
-    const sum = (Number(row.quantity) || 0) * (Number(row.unitPrice) || 0);
+    const sum = agencyDetailLineTotal(
+      {
+        billingType: row.billingType as string | undefined,
+        quantity: Number(row.quantity) || 0,
+        unitPrice: Number(row.unitPrice) || 0,
+        trackedSeconds: Number(row.trackedSeconds) || 0,
+      },
+      rates.get(pid) ?? 0
+    );
     out.set(pid, (out.get(pid) ?? 0) + sum);
   }
   return out;

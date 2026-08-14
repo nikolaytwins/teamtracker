@@ -26,6 +26,20 @@ export type UpdateProjectBody = {
   paymentMethod: string | null;
   clientContact: string | null;
   notes: string | null;
+  hourlyRateRub?: number;
+};
+
+export type AgencyDetailBillingType = "fixed" | "hourly";
+
+export type ProjectDetailRow = {
+  title: string;
+  quantity: number;
+  unitPrice: number;
+  order: number;
+  billingType: AgencyDetailBillingType;
+  trackedSeconds: number;
+  timerStartedAt: string | null;
+  projectId?: string;
 };
 
 /** Единый доступ к данным агентства (SQLite или Supabase). */
@@ -134,19 +148,28 @@ export interface AgencyRepo {
     quantity: number;
     unitPrice: number;
     order: number | null;
+    billingType?: AgencyDetailBillingType;
+    trackedSeconds?: number;
   }): Promise<Record<string, unknown>>;
-  getProjectDetailById(id: string): Promise<
-    | { title: string; quantity: number; unitPrice: number; order: number }
-    | undefined
-  >;
+  getProjectDetailById(id: string): Promise<ProjectDetailRow | undefined>;
   updateProjectDetailById(
     id: string,
     title: string,
     quantity: number,
     unitPrice: number,
-    order: number
+    order: number,
+    extras?: {
+      billingType?: AgencyDetailBillingType;
+      trackedSeconds?: number;
+      timerStartedAt?: string | null;
+    }
   ): Promise<Record<string, unknown> | undefined>;
   deleteProjectDetailById(id: string): Promise<void>;
+  /** Старт/стоп таймера почасовой строки детализации. */
+  setProjectDetailTimer(
+    id: string,
+    action: "start" | "stop"
+  ): Promise<Record<string, unknown> | undefined>;
 
   revenueByClient(): Promise<{ items: unknown[]; total: number }>;
   revenueByService(): Promise<{ items: unknown[]; total: number }>;

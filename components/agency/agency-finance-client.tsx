@@ -2,6 +2,7 @@
 import { apiUrl, appPath } from '@/lib/api-url'
 import type { AgencyFinanceVariant } from '@/lib/agency/finance-paths'
 import { AGENCY_FINANCE_PATHS, agencyProjectHref } from '@/lib/agency/finance-paths'
+import { agencyDetailLineTotal } from '@/lib/agency/detail-line-total'
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -23,6 +24,7 @@ interface Project {
   totalExpenses: number
   totalDetailsAmount?: number
   effectiveTotalAmount?: number
+  hourlyRateRub?: number
   createdAt: string
 }
 
@@ -99,6 +101,8 @@ interface AgencyExpenseRow {
 interface ProjectDetailRow {
   quantity?: number
   unitPrice?: number
+  billingType?: string
+  trackedSeconds?: number
 }
 
 function adjacentMonth(year: number, month: number, delta: -1 | 1): { year: number; month: number } {
@@ -298,8 +302,19 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
               const detailsRes = await fetch(apiUrl(`${apiBase}/project-details?projectId=${p.id}`))
               const details = await detailsRes.json()
               if (Array.isArray(details)) {
+                const rate = Number(p.hourlyRateRub) || 0
                 totalDetailsAmount = (details as ProjectDetailRow[]).reduce(
-                  (sum, row) => sum + (row.quantity || 0) * (row.unitPrice || 0),
+                  (sum, row) =>
+                    sum +
+                    agencyDetailLineTotal(
+                      {
+                        billingType: row.billingType,
+                        quantity: row.quantity,
+                        unitPrice: row.unitPrice,
+                        trackedSeconds: row.trackedSeconds,
+                      },
+                      rate
+                    ),
                   0
                 )
               }

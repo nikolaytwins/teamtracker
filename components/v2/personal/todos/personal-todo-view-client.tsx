@@ -9,9 +9,21 @@ import {
 } from "@/components/v2/personal/todos/personal-todo-quick-add";
 import { usePersonalTodo } from "@/components/v2/personal/todos/personal-todo-context";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import { formatPersonalTodoDateLabel, isPersonalTodoOverdue } from "@/lib/v2/personal/todo-date";
+import {
+  addDaysFromToday,
+  addDaysYmd,
+  formatPersonalTodoDateLabel,
+  isPersonalTodoOverdue,
+  personalTodoTodayYmd,
+  personalTodoWeekDates,
+} from "@/lib/v2/personal/todo-date";
 import { groupInboxTodosByPriority, INBOX_IMPORTANT_SECTION_IDS, type InboxTodoSectionId } from "@/lib/v2/personal/todo-inbox-groups";
-import type { PersonalTodoListPayload, PersonalTodoRow, PersonalTodoView } from "@/lib/v2/personal/todo-types";
+import type {
+  PersonalKanbanColumn,
+  PersonalTodoListPayload,
+  PersonalTodoRow,
+  PersonalTodoView,
+} from "@/lib/v2/personal/todo-types";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -20,9 +32,35 @@ const EMPTY_MESSAGES: Partial<Record<PersonalTodoView, string>> = {
   today: "На сегодня задач нет. Запланируйте что-нибудь или отдохните.",
   upcoming: "На ближайшие 7 дней задач нет — назначьте дату из входящих.",
   week: "На этой неделе пока ничего не запланировано. Перетащите задачи из блока «Без даты».",
+  kanban: "Задач пока нет — добавьте во входящих или прямо здесь.",
   project: "В этом проекте пока нет открытых задач.",
   completed: "Выполненных задач пока нет.",
 };
+
+const KANBAN_COLUMNS: { key: PersonalKanbanColumn; label: string; dot: string }[] = [
+  { key: "unassigned", label: "Нераспределённые", dot: "#F59E0B" },
+  { key: "today", label: "Сегодня", dot: "#3B6FF7" },
+  { key: "tomorrow", label: "Завтра", dot: "#A1A1AA" },
+  { key: "this_week", label: "На этой неделе", dot: "#A1A1AA" },
+  { key: "later", label: "Позже", dot: "#D4D4D8" },
+];
+
+function scheduledDateForKanbanColumn(column: PersonalKanbanColumn): string | null {
+  const today = personalTodoTodayYmd();
+  const week = personalTodoWeekDates(today, 7);
+  switch (column) {
+    case "unassigned":
+      return null;
+    case "today":
+      return today;
+    case "tomorrow":
+      return week[1] ?? addDaysYmd(today, 1);
+    case "this_week":
+      return week[2] ?? addDaysYmd(today, 2);
+    case "later":
+      return addDaysFromToday(7);
+  }
+}
 
 function formatWeekColumnLabel(ymd: string) {
   return formatPersonalTodoDateLabel(ymd) ?? ymd;
@@ -102,7 +140,7 @@ export function PersonalTodoViewClient({
     }
   }
 
-  async function scheduleOn(todoId: string, date: string) {
+  async function scheduleOn(todoId: string, date: string | null) {
     try {
       await fetchJson("/api/v2/personal/todos/schedule", {
         method: "PATCH",
@@ -246,6 +284,73 @@ export function PersonalTodoViewClient({
           </section>
         ) : null}
 
+        {!hasAny ? renderEmpty() : null}
+      </div>
+    );
+  }
+
+  function renderKanbanBoard() {
+    const kanban = payload?.kanban;
+    if (!kanban) return null;
+    const hasAny = KANBAN_COLUMNS.some((c) => (kanban[c.key] ?? []).length > 0);
+
+    return (
+      <div className="px-6 pb-6">
+        <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-2">
+          {KANBAN_COLUMNS.map(({ key, label, dot }) => {
+            const list = kanban[key] ?? [];
+            return (
+              <section
+                key={key}
+                className="v2-card flex w-[220px] shrink-0 flex-col p-2"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (!dragId) return;
+                  void scheduleOn(dragId, scheduledDateForKanbanColumn(key));
+                  setDragId(null);
+                }}
+              >
+                <div className="mb-2 flex items-center gap-2 px-1">
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dot }} aria-hidden />
+                  <h2 className="v2-tight min-w-0 flex-1 truncate text-[12px] font-semibold text-[var(--v2-ink-800)]">
+                    {label}
+                  </h2>
+                  <span className="v2-tnum text-[11px] font-medium text-[var(--v2-ink-400)]">{list.length}</span>
+                </div>
+                <div className="flex min-h-[120px] flex-1 flex-col gap-1">
+                  {list.map((todo) => (
+                    <div
+                      key={todo.id}
+                      className="overflow-hidden rounded-lg border border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/40"
+                    >
+                      <PersonalTodoRowItem
+                        todo={todo}
+                        onToggle={(id) => void toggleComplete(id)}
+                        onOpen={setSelectedId}
+                        onAddSubtask={handleAddSubtask}
+                        showProject
+                        compact
+                        draggable
+                        isDragging={dragId === todo.id}
+                        onDragStart={() => setDragId(todo.id)}
+                        onDragEnd={() => setDragId(null)}
+                      />
+                    </div>
+                  ))}
+                  {list.length === 0 ? (
+                    <p className="v2-tight px-2 py-6 text-center text-[12px] text-[var(--v2-ink-400)]">
+                      Перетащите сюда
+                    </p>
+                  ) : null}
+                </div>
+              </section>
+            );
+          })}
+        </div>
         {!hasAny ? renderEmpty() : null}
       </div>
     );
@@ -452,6 +557,8 @@ export function PersonalTodoViewClient({
         <div className="flex min-h-[40vh] items-center justify-center text-[var(--v2-ink-500)]">Загрузка…</div>
       ) : view === "week" ? (
         renderWeekBoard()
+      ) : view === "kanban" ? (
+        renderKanbanBoard()
       ) : view === "upcoming" ? (
         renderUpcomingDays()
       ) : view === "today" ? (
@@ -490,6 +597,12 @@ function findTodo(payload: PersonalTodoListPayload | null, id: string): Personal
     }
     const found = payload.week.unscheduled.find((t) => t.id === id);
     if (found) return found;
+  }
+  if (payload.kanban) {
+    for (const list of Object.values(payload.kanban)) {
+      const found = list.find((t) => t.id === id);
+      if (found) return found;
+    }
   }
   return undefined;
 }

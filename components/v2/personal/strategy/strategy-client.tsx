@@ -65,7 +65,7 @@ export function StrategyClient() {
             Личный план
           </p>
           <h1 className="v2-tighter mt-2 text-[40px] font-bold leading-none text-white sm:text-[48px]">
-            Стратегия
+            База данных
           </h1>
           <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-white/80">
             Фокусы месяцев, проекты и принципы рядом. Ниже — журнал из Лилы.

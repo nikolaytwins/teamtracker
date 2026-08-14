@@ -5,6 +5,7 @@ import {
   personalTodoWeekDates,
 } from "@/lib/v2/personal/todo-date";
 import type {
+  PersonalKanbanColumn,
   PersonalTodoBootstrap,
   PersonalTodoListPayload,
   PersonalTodoProjectRow,
@@ -266,6 +267,39 @@ export async function loadPersonalTodoList(
     }
     for (const d of dates) columns[d] = sortTodosForDisplay(columns[d] ?? []);
     return { view, todos, week: { dates, columns, unscheduled: sortTodosForDisplay(unscheduled) } };
+  }
+
+  if (view === "kanban") {
+    const dates = personalTodoWeekDates(today, 7);
+    const tomorrow = dates[1]!;
+    const weekEnd = dates[dates.length - 1]!;
+    const rows = await fetchOpenParentTodos(userId);
+    const todos = await enrichTodos(rows, projects);
+    const kanban: Record<PersonalKanbanColumn, PersonalTodoRow[]> = {
+      unassigned: [],
+      today: [],
+      tomorrow: [],
+      this_week: [],
+      later: [],
+    };
+    for (const t of todos) {
+      const day = t.scheduled_date ?? t.due_date;
+      if (!day) {
+        kanban.unassigned.push(t);
+      } else if (day <= today) {
+        kanban.today.push(t);
+      } else if (day === tomorrow) {
+        kanban.tomorrow.push(t);
+      } else if (day <= weekEnd) {
+        kanban.this_week.push(t);
+      } else {
+        kanban.later.push(t);
+      }
+    }
+    for (const key of Object.keys(kanban) as (keyof typeof kanban)[]) {
+      kanban[key] = sortTodosForDisplay(kanban[key]);
+    }
+    return { view, todos, kanban };
   }
 
   if (view === "completed") {

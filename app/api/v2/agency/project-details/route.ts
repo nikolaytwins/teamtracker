@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   try {
     if (!isSupabaseAgencyConfigured()) return agencyV2NotConfiguredResponse();
     const body = await request.json();
-    const { projectId, title, quantity, unitPrice, order } = body;
+    const { projectId, title, quantity, unitPrice, order, billingType } = body;
 
     if (!projectId || !title) {
       return NextResponse.json({ error: "projectId and title are required" }, { status: 400 });
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     const repo = getAgencyRepoV2();
     await repo.ensureProjectDetailTable();
     const id = `pd_${Date.now()}`;
+    const isHourly = billingType === "hourly";
 
     const numericQuantity = typeof quantity === "number" ? quantity : parseFloat(quantity ?? "1");
     const numericUnitPrice = typeof unitPrice === "number" ? unitPrice : parseFloat(unitPrice ?? "0");
@@ -39,9 +40,11 @@ export async function POST(request: NextRequest) {
       id,
       projectId,
       title: String(title),
-      quantity: Number.isNaN(numericQuantity) ? 1 : numericQuantity,
-      unitPrice: Number.isNaN(numericUnitPrice) ? 0 : numericUnitPrice,
+      quantity: isHourly ? 1 : Number.isNaN(numericQuantity) ? 1 : numericQuantity,
+      unitPrice: isHourly ? 0 : Number.isNaN(numericUnitPrice) ? 0 : numericUnitPrice,
       order: typeof order === "number" ? order : null,
+      billingType: isHourly ? "hourly" : "fixed",
+      trackedSeconds: 0,
     });
 
     return NextResponse.json({ success: true, detail });

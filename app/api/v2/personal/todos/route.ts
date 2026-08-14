@@ -3,7 +3,7 @@ import { requireV2Personal } from "@/lib/v2/auth/require-v2-personal";
 import { createPersonalTodo, getPersonalTodoProject, loadPersonalTodoList } from "@/lib/v2/personal/personal-todo-repo";
 import type { PersonalTodoView } from "@/lib/v2/personal/todo-types";
 
-const VIEWS: PersonalTodoView[] = ["inbox", "today", "upcoming", "week", "project", "completed"];
+const VIEWS: PersonalTodoView[] = ["inbox", "today", "upcoming", "week", "kanban", "project", "completed"];
 
 export async function GET(request: NextRequest) {
   const auth = await requireV2Personal();

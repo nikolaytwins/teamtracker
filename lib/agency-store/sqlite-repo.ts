@@ -42,11 +42,29 @@ function ensureDetailTable(db: Database.Database) {
       "quantity" REAL NOT NULL DEFAULT 1,
       "unitPrice" REAL NOT NULL DEFAULT 0,
       "order" INTEGER NOT NULL DEFAULT 0,
+      "billingType" TEXT NOT NULL DEFAULT 'fixed',
+      "trackedSeconds" INTEGER NOT NULL DEFAULT 0,
+      "timerStartedAt" TEXT,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL,
       CONSTRAINT "AgencyProjectDetail_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "AgencyProject" ("id") ON DELETE CASCADE ON UPDATE CASCADE
     )
   `);
+  try {
+    db.exec(`ALTER TABLE AgencyProjectDetail ADD COLUMN billingType TEXT NOT NULL DEFAULT 'fixed'`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE AgencyProjectDetail ADD COLUMN trackedSeconds INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE AgencyProjectDetail ADD COLUMN timerStartedAt TEXT`);
+  } catch {
+    /* exists */
+  }
 }
 
 export class SqliteAgencyRepo implements AgencyRepo {
@@ -130,26 +148,50 @@ export class SqliteAgencyRepo implements AgencyRepo {
     const db = openSqlite();
     try {
       ensureAgencyProjectsColumns(db);
-      db.prepare(
-        `
+      if (typeof body.hourlyRateRub === "number") {
+        db.prepare(
+          `
+      UPDATE AgencyProject
+      SET name = ?, totalAmount = ?, paidAmount = ?, deadline = ?, status = ?, serviceType = ?, businessLine = ?, clientType = ?, paymentMethod = ?, clientContact = ?, notes = ?, hourlyRateRub = ?, updatedAt = datetime('now')
+      WHERE id = ?
+    `
+        ).run(
+          body.name,
+          body.totalAmount,
+          body.paidAmount,
+          body.deadline,
+          body.status,
+          body.serviceType,
+          body.businessLine === "impulse" ? "impulse" : "agency",
+          body.clientType,
+          body.paymentMethod,
+          body.clientContact,
+          body.notes,
+          body.hourlyRateRub,
+          id
+        );
+      } else {
+        db.prepare(
+          `
       UPDATE AgencyProject
       SET name = ?, totalAmount = ?, paidAmount = ?, deadline = ?, status = ?, serviceType = ?, businessLine = ?, clientType = ?, paymentMethod = ?, clientContact = ?, notes = ?, updatedAt = datetime('now')
       WHERE id = ?
     `
-      ).run(
-        body.name,
-        body.totalAmount,
-        body.paidAmount,
-        body.deadline,
-        body.status,
-        body.serviceType,
-        body.businessLine === "impulse" ? "impulse" : "agency",
-        body.clientType,
-        body.paymentMethod,
-        body.clientContact,
-        body.notes,
-        id
-      );
+        ).run(
+          body.name,
+          body.totalAmount,
+          body.paidAmount,
+          body.deadline,
+          body.status,
+          body.serviceType,
+          body.businessLine === "impulse" ? "impulse" : "agency",
+          body.clientType,
+          body.paymentMethod,
+          body.clientContact,
+          body.notes,
+          id
+        );
+      }
       const project = db.prepare("SELECT * FROM AgencyProject WHERE id = ?").get(id) as
         | Record<string, unknown>
         | undefined;
@@ -829,14 +871,17 @@ export class SqliteAgencyRepo implements AgencyRepo {
     quantity: number;
     unitPrice: number;
     order: number | null;
+    billingType?: "fixed" | "hourly";
+    trackedSeconds?: number;
   }): Promise<Record<string, unknown>> {
     const db = openSqlite();
     try {
       ensureDetailTable(db);
+      const billingType = input.billingType === "hourly" ? "hourly" : "fixed";
       db.prepare(
         `
-      INSERT INTO AgencyProjectDetail (id, projectId, title, quantity, unitPrice, "order", createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, COALESCE(?, 0), datetime('now'), datetime('now'))
+      INSERT INTO AgencyProjectDetail (id, projectId, title, quantity, unitPrice, "order", billingType, trackedSeconds, timerStartedAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, COALESCE(?, 0), ?, ?, NULL, datetime('now'), datetime('now'))
     `
       ).run(
         input.id,
@@ -844,7 +889,9 @@ export class SqliteAgencyRepo implements AgencyRepo {
         input.title,
         input.quantity,
         input.unitPrice,
-        typeof input.order === "number" ? input.order : null
+        typeof input.order === "number" ? input.order : null,
+        billingType,
+        Math.max(0, Math.floor(Number(input.trackedSeconds) || 0))
       );
       return db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(input.id) as Record<
         string,
@@ -855,15 +902,36 @@ export class SqliteAgencyRepo implements AgencyRepo {
     }
   }
 
-  async getProjectDetailById(
-    id: string
-  ): Promise<{ title: string; quantity: number; unitPrice: number; order: number } | undefined> {
+  async getProjectDetailById(id: string): Promise<
+    | {
+        title: string;
+        quantity: number;
+        unitPrice: number;
+        order: number;
+        billingType: "fixed" | "hourly";
+        trackedSeconds: number;
+        timerStartedAt: string | null;
+        projectId?: string;
+      }
+    | undefined
+  > {
     const db = openSqlite();
     try {
       ensureDetailTable(db);
-      return db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(id) as
-        | { title: string; quantity: number; unitPrice: number; order: number }
+      const row = db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(id) as
+        | Record<string, unknown>
         | undefined;
+      if (!row) return undefined;
+      return {
+        title: String(row.title),
+        quantity: Number(row.quantity),
+        unitPrice: Number(row.unitPrice),
+        order: Number(row.order) || 0,
+        billingType: row.billingType === "hourly" ? "hourly" : "fixed",
+        trackedSeconds: Number(row.trackedSeconds) || 0,
+        timerStartedAt: row.timerStartedAt ? String(row.timerStartedAt) : null,
+        projectId: row.projectId ? String(row.projectId) : undefined,
+      };
     } finally {
       db.close();
     }
@@ -874,18 +942,39 @@ export class SqliteAgencyRepo implements AgencyRepo {
     title: string,
     quantity: number,
     unitPrice: number,
-    order: number
+    order: number,
+    extras?: {
+      billingType?: "fixed" | "hourly";
+      trackedSeconds?: number;
+      timerStartedAt?: string | null;
+    }
   ): Promise<Record<string, unknown> | undefined> {
     const db = openSqlite();
     try {
       ensureDetailTable(db);
+      const existing = db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(id) as
+        | Record<string, unknown>
+        | undefined;
+      if (!existing) return undefined;
+      const billingType =
+        extras?.billingType === "hourly" || extras?.billingType === "fixed"
+          ? extras.billingType
+          : existing.billingType === "hourly"
+            ? "hourly"
+            : "fixed";
+      const trackedSeconds =
+        typeof extras?.trackedSeconds === "number"
+          ? Math.max(0, Math.floor(extras.trackedSeconds))
+          : Number(existing.trackedSeconds) || 0;
+      const timerStartedAt =
+        extras && "timerStartedAt" in extras ? extras.timerStartedAt : (existing.timerStartedAt as string | null);
       db.prepare(
         `
       UPDATE AgencyProjectDetail
-      SET title = ?, quantity = ?, unitPrice = ?, "order" = ?, updatedAt = datetime('now')
+      SET title = ?, quantity = ?, unitPrice = ?, "order" = ?, billingType = ?, trackedSeconds = ?, timerStartedAt = ?, updatedAt = datetime('now')
       WHERE id = ?
     `
-      ).run(title, quantity, unitPrice, order, id);
+      ).run(title, quantity, unitPrice, order, billingType, trackedSeconds, timerStartedAt, id);
       return db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(id) as
         | Record<string, unknown>
         | undefined;
@@ -899,6 +988,59 @@ export class SqliteAgencyRepo implements AgencyRepo {
     try {
       ensureDetailTable(db);
       db.prepare("DELETE FROM AgencyProjectDetail WHERE id = ?").run(id);
+    } finally {
+      db.close();
+    }
+  }
+
+  async setProjectDetailTimer(
+    id: string,
+    action: "start" | "stop"
+  ): Promise<Record<string, unknown> | undefined> {
+    const existing = await this.getProjectDetailById(id);
+    if (!existing) return undefined;
+    if (existing.billingType !== "hourly") {
+      throw new Error("timer_only_for_hourly");
+    }
+    const now = new Date();
+    if (action === "start") {
+      if (existing.timerStartedAt) {
+        return this.getProjectDetailRaw(id);
+      }
+      return this.updateProjectDetailById(
+        id,
+        existing.title,
+        existing.quantity,
+        existing.unitPrice,
+        existing.order,
+        { timerStartedAt: now.toISOString() }
+      );
+    }
+    if (!existing.timerStartedAt) {
+      return this.getProjectDetailRaw(id);
+    }
+    const started = Date.parse(existing.timerStartedAt);
+    const elapsed = Number.isNaN(started) ? 0 : Math.max(0, Math.floor((now.getTime() - started) / 1000));
+    return this.updateProjectDetailById(
+      id,
+      existing.title,
+      existing.quantity,
+      existing.unitPrice,
+      existing.order,
+      {
+        trackedSeconds: existing.trackedSeconds + elapsed,
+        timerStartedAt: null,
+      }
+    );
+  }
+
+  private async getProjectDetailRaw(id: string): Promise<Record<string, unknown> | undefined> {
+    const db = openSqlite();
+    try {
+      ensureDetailTable(db);
+      return db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(id) as
+        | Record<string, unknown>
+        | undefined;
     } finally {
       db.close();
     }

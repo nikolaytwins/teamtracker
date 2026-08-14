@@ -1,6 +1,8 @@
 import type { V2TaskPriority } from "@/lib/v2/types";
 
-export type PersonalTodoView = "inbox" | "today" | "upcoming" | "week" | "project" | "completed";
+export type PersonalTodoView = "inbox" | "today" | "upcoming" | "week" | "kanban" | "project" | "completed";
+
+export type PersonalKanbanColumn = "unassigned" | "today" | "tomorrow" | "this_week" | "later";
 
 export type PersonalTodoProjectRow = {
   id: string;
@@ -48,4 +50,5 @@ export type PersonalTodoListPayload = {
   todos: PersonalTodoRow[];
   groups?: { date: string; label: string; todos: PersonalTodoRow[] }[];
   week?: { dates: string[]; columns: Record<string, PersonalTodoRow[]>; unscheduled: PersonalTodoRow[] };
+  kanban?: Record<PersonalKanbanColumn, PersonalTodoRow[]>;
 };

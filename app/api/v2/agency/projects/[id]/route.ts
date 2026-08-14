@@ -45,6 +45,8 @@ export async function PUT(
       body.paymentMethod != null && body.paymentMethod !== "" ? String(body.paymentMethod) : null;
     const clientContact = body.clientContact != null ? String(body.clientContact) : null;
     const notes = body.notes != null ? String(body.notes) : null;
+    const hourlyRateRub =
+      body.hourlyRateRub != null ? Number(body.hourlyRateRub) || 0 : undefined;
 
     const project = await getAgencyRepoV2().updateProjectById(params.id, {
       name,
@@ -58,6 +60,7 @@ export async function PUT(
       paymentMethod,
       clientContact,
       notes,
+      ...(hourlyRateRub !== undefined ? { hourlyRateRub } : {}),
     });
 
     if (!project) {

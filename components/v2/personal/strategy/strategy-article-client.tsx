@@ -73,7 +73,7 @@ export function StrategyArticleClient({ slug }: { slug: string }) {
           className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--v2-ink-500)] transition hover:text-[var(--v2-ink-800)]"
         >
           <V2Icons.chevL className="h-3.5 w-3.5" />
-          Стратегия
+          База данных
         </Link>
 
         <article className="mt-6 overflow-hidden rounded-[28px] bg-white shadow-[var(--v2-shadow-soft)]">
