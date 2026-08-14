@@ -21,14 +21,16 @@ export type UploadedAttachment = {
   contentType: string;
 };
 
-function storagePath(prefix: "projects" | "tasks" | "ideas", entityId: string, filename: string): string {
+type AttachmentPrefix = "projects" | "tasks" | "ideas" | "wishes";
+
+function storagePath(prefix: AttachmentPrefix, entityId: string, filename: string): string {
   const safeEntity = entityId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
   const safeName = sanitizeUploadFilename(filename);
   return `${prefix}/${safeEntity}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
 }
 
 export async function uploadAttachmentFiles(
-  prefix: "projects" | "tasks" | "ideas",
+  prefix: AttachmentPrefix,
   entityId: string,
   files: File[],
   opts?: { imagesOnly?: boolean }
@@ -47,7 +49,7 @@ export async function uploadAttachmentFiles(
 
   const bucket = getAttachmentStorageBucket();
   const uploaded: UploadedAttachment[] = [];
-  const imagesOnly = opts?.imagesOnly ?? prefix === "ideas";
+  const imagesOnly = opts?.imagesOnly ?? (prefix === "ideas" || prefix === "wishes");
 
   for (const file of files) {
     if (file.size <= 0) continue;

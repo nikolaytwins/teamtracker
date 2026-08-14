@@ -158,6 +158,22 @@ export const V2Icons = {
       <path d="M12 3.5 13.7 9 19 10.8 13.7 12.6 12 18l-1.7-5.4L5 10.8 10.3 9 12 3.5Z" fill="currentColor" />
     </svg>
   ),
+  wish: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path
+        d="M12 3.5c.7 3.9 2.6 5.8 6.5 6.5-3.9.7-5.8 2.6-6.5 6.5-.7-3.9-2.6-5.8-6.5-6.5 3.9-.7 5.8-2.6 6.5-6.5Z"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M17.8 16.2c.28 1.4 1 2.1 2.4 2.4-1.4.28-2.12 1-2.4 2.4-.28-1.4-1-2.12-2.4-2.4 1.4-.28 2.12-1 2.4-2.4Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
   command: (p: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path
