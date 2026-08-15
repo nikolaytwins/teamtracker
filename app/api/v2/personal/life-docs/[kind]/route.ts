@@ -10,7 +10,7 @@ import { seedBrandDoc } from "@/lib/v2/personal/seeds/brand-seed";
 import { seedLifeStrategyDoc } from "@/lib/v2/personal/seeds/life-strategy-seed";
 import { seedMyCodeDoc } from "@/lib/v2/personal/seeds/mycode-seed";
 import { normalizeTimeDoc, seedTimeDoc } from "@/lib/v2/personal/seeds/time-seed";
-import { enrichTimeDocWithFinance } from "@/lib/v2/personal/time-finance";
+import { enrichTimeDocWithFinance } from "@/lib/v2/personal/time-finance-server";
 
 const KINDS = new Set<LifeDocKind>(["time", "brand", "life_strategy", "mycode"]);
 

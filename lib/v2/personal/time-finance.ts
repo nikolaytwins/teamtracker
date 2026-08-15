@@ -1,7 +1,5 @@
-import { listFinanceProjectsForMonth } from "@/lib/v2/finance/finance-repo";
 import type { V2FinanceBusinessLine, V2FinanceProjectView } from "@/lib/v2/finance/types";
 import type { TimeDoc, TimeProject } from "@/lib/v2/personal/seeds/time-seed";
-import type { V2SessionContext } from "@/lib/v2/types";
 
 /** time project id → finance business_line */
 export const TIME_PROJECT_FINANCE_LINE: Partial<Record<string, V2FinanceBusinessLine>> = {
@@ -48,15 +46,6 @@ export function computeTimeFinanceSnapshot(projects: V2FinanceProjectView[]): Ti
   return out;
 }
 
-export async function loadTimeFinanceSnapshot(
-  ctx: V2SessionContext,
-  year: number,
-  month: number
-): Promise<TimeFinanceSnapshot> {
-  const projects = await listFinanceProjectsForMonth(ctx, year, month);
-  return computeTimeFinanceSnapshot(projects);
-}
-
 /** Overlay live finance ₽ onto mapped time projects (does not mutate other fields). */
 export function applyTimeFinanceSnapshot(doc: TimeDoc, snap: TimeFinanceSnapshot): TimeDoc {
   return {
@@ -77,20 +66,6 @@ function applyFinanceToProject(p: TimeProject, snap: TimeFinanceSnapshot): TimeP
     name: p.id === "saas" ? "Qmagic" : p.name,
     role: p.id === "saas" ? (p.role || "Асимметрия") : p.role,
   };
-}
-
-export async function enrichTimeDocWithFinance(
-  ctx: V2SessionContext,
-  doc: TimeDoc,
-  now = new Date()
-): Promise<TimeDoc> {
-  try {
-    const snap = await loadTimeFinanceSnapshot(ctx, now.getFullYear(), now.getMonth() + 1);
-    return applyTimeFinanceSnapshot(doc, snap);
-  } catch (e) {
-    console.warn("time finance enrich failed:", e);
-    return doc;
-  }
 }
 
 export function isFinanceLinkedTimeProject(projectId: string): boolean {
