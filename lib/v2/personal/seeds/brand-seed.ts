@@ -35,6 +35,17 @@ export type BrandVideo = {
   quotes: { t: string; src: string }[];
 };
 
+export type BrandLabItem = {
+  id: string;
+  kind: "insight" | "hypothesis";
+  text: string;
+  /** Источник инсайта или «почему» гипотезы */
+  note: string;
+  power?: number;
+  createdAt: string;
+  status: "open" | "done";
+};
+
 export type BrandDoc = {
   hyp: {
     status: string;
@@ -64,6 +75,8 @@ export type BrandDoc = {
   videos: BrandVideo[];
   dirStats: { dir: string; videos: number; ctr: string; viewed: string; subs: number; sig: BrandSignal }[];
   insights: { t: string; src: string; power: number }[];
+  /** Бэклог инсайтов и гипотез с шапки страницы. */
+  labBacklog: BrandLabItem[];
   evolution: { period: string; text: string; why: string; data: string; now?: boolean }[];
   keep: string[];
   money: {
@@ -74,14 +87,63 @@ export type BrandDoc = {
   };
   productHyp: { name: string; status: string; text: string; why: string }[];
   channels: { n: string; d: string }[];
-  phrases: string[];
-  nextHyp: { n: string; text: string; has: string; need: string }[];
-  backlog: { t: string; d: string }[];
   ui: {
     filter: "all" | "pub" | "plan";
     columns: BrandColumn[];
   };
 };
+
+export function normalizeBrandDoc(raw: unknown): BrandDoc {
+  const seed = seedBrandDoc();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return seed;
+  const d = raw as Partial<BrandDoc>;
+  const labBacklog: BrandLabItem[] = Array.isArray(d.labBacklog)
+    ? d.labBacklog
+        .filter((x) => x && typeof x === "object")
+        .map((x, i) => {
+          const row = x as Partial<BrandLabItem>;
+          const item: BrandLabItem = {
+            id: String(row.id || `lab_${i}`),
+            kind: row.kind === "hypothesis" ? "hypothesis" : "insight",
+            text: String(row.text || ""),
+            note: String(row.note || ""),
+            power: typeof row.power === "number" ? row.power : undefined,
+            createdAt: String(row.createdAt || new Date().toISOString()),
+            status: row.status === "done" ? "done" : "open",
+          };
+          return item;
+        })
+        .filter((x) => x.text.trim())
+    : [];
+  const normalized: BrandDoc = {
+    ...seed,
+    ...d,
+    hyp: { ...seed.hyp, ...(d.hyp || {}) },
+    core: { ...seed.core, ...(d.core || {}) },
+    money: { ...seed.money, ...(d.money || {}) },
+    ui: { ...seed.ui, ...(d.ui || {}), columns: d.ui?.columns?.length ? d.ui.columns : seed.ui.columns },
+    insights: Array.isArray(d.insights) ? d.insights : seed.insights,
+    labBacklog,
+    evolution: Array.isArray(d.evolution) ? d.evolution : seed.evolution,
+    dirs: Array.isArray(d.dirs) ? d.dirs : seed.dirs,
+    videos: Array.isArray(d.videos) ? d.videos : seed.videos,
+    dirStats: Array.isArray(d.dirStats) ? d.dirStats : seed.dirStats,
+    unknown: Array.isArray(d.unknown) ? d.unknown : seed.unknown,
+    keep: Array.isArray(d.keep) ? d.keep : seed.keep,
+    productHyp: Array.isArray(d.productHyp) ? d.productHyp : seed.productHyp,
+    channels: Array.isArray(d.channels) ? d.channels : seed.channels,
+  };
+  // Drop removed fields if they still exist in stored docs.
+  const legacy = normalized as BrandDoc & {
+    phrases?: unknown;
+    nextHyp?: unknown;
+    backlog?: unknown;
+  };
+  delete legacy.phrases;
+  delete legacy.nextHyp;
+  delete legacy.backlog;
+  return normalized;
+}
 
 export function seedBrandDoc(): BrandDoc {
   return {
@@ -368,6 +430,7 @@ export function seedBrandDoc(): BrandDoc {
         power: 4,
       },
     ],
+    labBacklog: [],
     evolution: [
       {
         period: "Август 2026",
@@ -434,26 +497,6 @@ export function seedBrandDoc(): BrandDoc {
       { n: "YouTube", d: "Главная лаборатория гипотез." },
       { n: "Telegram", d: "Глубокие мысли / наблюдения / контакт с ядром." },
       { n: "Instagram", d: "Производные форматы: Reels, карусели, визуальная упаковка уже существующих мыслей." },
-    ],
-    phrases: [
-      "Я сейчас понял вот такую неприятную вещь…",
-      "Я способен на большее, но не понимаю, куда идти.",
-      "Что если проблема не в том, что ты ленивый, а в том, что старая траектория больше не кажется тебе живой?",
-      "Я не собираюсь учить вас жизни. Я пытаюсь построить свою — и показываю, что получается.",
-      "Создавать то, чего тебе самому не хватает в мире.",
-      "Каждый может жить так, как мечтает — но дорога редко выглядит так, как мы представляли.",
-    ],
-    nextHyp: [
-      { n: "Гипотеза 1", text: "Тема усталости действительно является сильным входом.", has: "2 ролика", need: "ещё 1 тест другим углом." },
-      { n: "Гипотеза 2", text: "Людям интересно реалити твоей пересборки.", has: "1 ролик", need: "первый эпизод с конкретным шагом." },
-      { n: "Гипотеза 3", text: "Практический AI может расширить полезность канала.", has: "1 ролик", need: "тест одного инструмента от нуля до результата." },
-      { n: "Гипотеза 4", text: "Измеримый личный эксперимент усиливает реалити.", has: "0 роликов", need: "первый тест." },
-    ],
-    backlog: [
-      { t: "«Мне 27, у меня нет квартиры и машины»", d: "тест реалити" },
-      { t: "«Как я создаю проекты с AI»", d: "AI практика" },
-      { t: "«Эпоха великой усталости»", d: "кризис" },
-      { t: "«60 дней без сахара и кофе»", d: "здоровье / измеримость" },
     ],
     ui: {
       filter: "all",

@@ -34,13 +34,6 @@ export type LifeStrategyLila = {
   main: string;
 };
 
-export type LifeStrategyWeekItem = {
-  n: string;
-  area: string;
-  text: string;
-  state: string;
-};
-
 export type LifeStrategyWeekRule = {
   id: string;
   n: string;
@@ -65,11 +58,7 @@ export type LifeStrategyPrana = {
 
 export type LifeStrategyOpenQ = { q: string; st: string; back: string };
 
-export type LifeStrategySignal = { date: string; area: string; text: string };
-
 export type LifeStrategySeasonQ = { area: string; q: string };
-
-export type LifeStrategyLink = { name: string; note: string; href: string };
 
 export type LifeStrategySeasonPayload = {
   season: LifeStrategySeason;
@@ -77,11 +66,9 @@ export type LifeStrategySeasonPayload = {
   maintain: LifeStrategyMaintain[];
   notThis: LifeStrategyNotThis[];
   lila: LifeStrategyLila;
-  week: LifeStrategyWeekItem[];
   weekRules: LifeStrategyWeekRule[];
   prana: LifeStrategyPrana[];
   openQ: LifeStrategyOpenQ[];
-  signals: LifeStrategySignal[];
   game: string[];
   seasonQ: LifeStrategySeasonQ[];
 };
@@ -98,7 +85,6 @@ export type LifeStrategyDoc = LifeStrategySeasonPayload & {
   rulePool: LifeStrategyRulePoolItem[];
   history: LifeStrategyHistoryEntry[];
   activeHistoryId: string;
-  links: LifeStrategyLink[];
 };
 
 const ACTIVE_PAYLOAD: LifeStrategySeasonPayload = {
@@ -218,26 +204,6 @@ const ACTIVE_PAYLOAD: LifeStrategySeasonPayload = {
     ],
     main: "Я уже достаточно понял, чтобы временно перестать понимать и начать жить.",
   },
-  week: [
-    {
-      n: "01",
-      area: "Найм",
-      text: "Выйти на рынок с первой версией позиционирования.",
-      state: "В работе",
-    },
-    {
-      n: "02",
-      area: "Обязательства",
-      text: "Закрыть 4 оставшиеся старые задачи.",
-      state: "2 из 4",
-    },
-    {
-      n: "03",
-      area: "YouTube / медийность",
-      text: "Продвинуть следующий контент-тест до конкретного следующего этапа.",
-      state: "Сценарий",
-    },
-  ],
   weekRules: [
     { id: "wr1", n: "01", text: "Если могу больше — не значит, что должен.", why: "Maximizer" },
     {
@@ -288,15 +254,6 @@ const ACTIVE_PAYLOAD: LifeStrategySeasonPayload = {
     },
     { q: "Будет ли Qmagic большим проектом?", st: "сначала validation", back: "После пользовательского сигнала" },
   ],
-  signals: [
-    { date: "14 сентября", area: "Найм", text: "Получил первый ответ на позиционирование AI Product Designer." },
-    { date: "10 сентября", area: "Qmagic", text: "4 из 8 людей попросили доступ к продукту." },
-    {
-      date: "8 сентября",
-      area: "Энергия",
-      text: "После тренировки + прогулки появилось сильное желание что-то создавать.",
-    },
-  ],
   game: [
     "Я могу хотеть большую жизнь ещё до того, как знаю дорогу.",
     "Моя настоящая природа — создавать; формы могут меняться.",
@@ -338,9 +295,7 @@ const PAST_AUG: LifeStrategySeasonPayload = {
       cta: "Итог",
     },
   ],
-  week: [],
   weekRules: [],
-  signals: [{ date: "28 августа", area: "Обязательства", text: "Закрыл последние 4 старые задачи." }],
 };
 
 const PAST_SPRING: LifeStrategySeasonPayload = {
@@ -365,9 +320,7 @@ const PAST_SPRING: LifeStrategySeasonPayload = {
       cta: "Итог",
     },
   ],
-  week: [],
   weekRules: [],
-  signals: [],
 };
 
 export function seedLifeStrategyDoc(): LifeStrategyDoc {
@@ -419,11 +372,5 @@ export function seedLifeStrategyDoc(): LifeStrategyDoc {
       },
     ],
     activeHistoryId: "h1",
-    links: [
-      { name: "Желания", note: "зачем я это строю", href: "/v2/personal/wishes" },
-      { name: "Мой код", note: "как я не хочу снова действовать", href: "/v2/personal/my-code" },
-      { name: "Идеи", note: "что потенциально можно попробовать", href: "/v2/personal/ideas" },
-      { name: "Проекты", note: "что уже в работе", href: "/v2/projects" },
-    ],
   };
 }

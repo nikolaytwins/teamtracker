@@ -25,6 +25,7 @@ import type {
   CreateProjectBody,
   UpdateProjectBody,
 } from "./repo-interface";
+import { isFinanceBusinessLine } from "@/lib/v2/finance/meta";
 
 function openSqlite(): Database.Database {
   const db = new Database(getAgencySqlitePath());
@@ -111,7 +112,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         body.deadline || null,
         body.status || "not_paid",
         body.serviceType,
-        body.businessLine === "impulse" ? "impulse" : "agency",
+        isFinanceBusinessLine(body.businessLine) ? body.businessLine : "agency",
         body.clientType || null,
         body.paymentMethod || null,
         body.clientContact || null,
@@ -162,7 +163,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
           body.deadline,
           body.status,
           body.serviceType,
-          body.businessLine === "impulse" ? "impulse" : "agency",
+          isFinanceBusinessLine(body.businessLine) ? body.businessLine : "agency",
           body.clientType,
           body.paymentMethod,
           body.clientContact,
@@ -184,7 +185,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
           body.deadline,
           body.status,
           body.serviceType,
-          body.businessLine === "impulse" ? "impulse" : "agency",
+          isFinanceBusinessLine(body.businessLine) ? body.businessLine : "agency",
           body.clientType,
           body.paymentMethod,
           body.clientContact,
@@ -235,7 +236,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         project.deadline,
         "not_paid",
         project.serviceType,
-        project.businessLine === "impulse" ? "impulse" : "agency",
+        isFinanceBusinessLine(project.businessLine) ? project.businessLine : "agency",
         project.clientType,
         project.paymentMethod,
         project.clientContact,

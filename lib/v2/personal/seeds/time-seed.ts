@@ -1,5 +1,10 @@
 export type TimeMode = "planned" | "reactive";
 
+export type TimeTaskType = {
+  id: string;
+  name: string;
+};
+
 export type TimeProject = {
   id: string;
   name: string;
@@ -7,6 +12,9 @@ export type TimeProject = {
   money: boolean;
   revenue?: number;
   profit?: number;
+  /** Типы задач только этого проекта (не пересекаются с другими). */
+  taskTypes: TimeTaskType[];
+  /** Legacy fallback for empty month split charts. */
   split: [string, number][];
   note: string;
 };
@@ -15,6 +23,8 @@ export type TimeEntry = {
   id: string;
   projectId: string;
   task: string;
+  activityId: string;
+  /** Snapshot имени типа на момент записи. */
   activity: string;
   mode: TimeMode;
   durationMin: number;
@@ -23,6 +33,7 @@ export type TimeEntry = {
 
 export type TimeRunning = {
   projectId: string;
+  activityId: string;
   activity: string;
   mode: TimeMode;
   startedAt: string;
@@ -30,197 +41,205 @@ export type TimeRunning = {
 } | null;
 
 export type TimeDoc = {
-  activityTypes: string[];
   projects: TimeProject[];
   entries: TimeEntry[];
   review: string[];
   running: TimeRunning;
 };
 
-function parseDur(dur: string): number {
-  const [h, m] = dur.split(":").map((x) => Number(x) || 0);
-  return h * 60 + m;
+function typesFrom(projectId: string, names: string[]): TimeTaskType[] {
+  return names.map((name, i) => ({
+    id: `tt_${projectId}_${i}_${name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, "_").slice(0, 24)}`,
+    name,
+  }));
 }
 
-/** Seed entries use Aug 2026 so they land in the current month relative to app date. */
-export function seedTimeDoc(): TimeDoc {
+/** Migrate older docs that had global activityTypes / string-only activities. */
+export function normalizeTimeDoc(raw: unknown): TimeDoc {
+  const seed = seedTimeDoc();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return seed;
+  const d = raw as Partial<TimeDoc> & { activityTypes?: string[] };
+  const projectsIn = Array.isArray(d.projects) ? d.projects : seed.projects;
+
+  const projects: TimeProject[] = projectsIn.map((p, idx) => {
+    const base = p as TimeProject & { taskTypes?: TimeTaskType[] };
+    const id = String(base.id || `p_${idx}`);
+    let taskTypes = Array.isArray(base.taskTypes) ? base.taskTypes.filter((t) => t?.id && t?.name) : [];
+    if (!taskTypes.length) {
+      const fromSplit = Array.isArray(base.split)
+        ? base.split.map((s) => String(Array.isArray(s) ? s[0] : "")).filter(Boolean)
+        : [];
+      const seedMatch = seed.projects.find((x) => x.id === id);
+      const fallback = fromSplit.length
+        ? fromSplit
+        : seedMatch?.taskTypes.map((t) => t.name) ?? ["Strategy", "Production", "Communication", "Other"];
+      taskTypes = typesFrom(id, [...new Set(fallback)]);
+    }
+    const financeLinked = id === "agency" || id === "course" || id === "saas";
+    const name =
+      id === "saas"
+        ? "Qmagic"
+        : String(base.name || seed.projects.find((x) => x.id === id)?.name || "Проект");
+    return {
+      id,
+      name,
+      role: String(base.role || seed.projects.find((x) => x.id === id)?.role || ""),
+      money: financeLinked ? true : Boolean(base.money),
+      revenue: base.revenue,
+      profit: base.profit,
+      taskTypes,
+      split: [],
+      note: String(base.note || ""),
+    };
+  });
+
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const seedEntryIds = new Set(["e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8"]);
+  const entriesIn = Array.isArray(d.entries) ? d.entries : [];
+  const entries: TimeEntry[] = entriesIn
+    .filter((e) => {
+      const row = e as TimeEntry;
+      return !seedEntryIds.has(String(row.id || ""));
+    })
+    .map((e, i) => {
+    const row = e as TimeEntry & { activity?: string; activityId?: string };
+    const project = byId.get(String(row.projectId)) ?? projects[0];
+    const types = project?.taskTypes ?? [];
+    let activityId = String(row.activityId || "");
+    let activity = String(row.activity || "");
+    let tt = types.find((t) => t.id === activityId);
+    if (!tt && activity) tt = types.find((t) => t.name === activity);
+    if (!tt) tt = types[0];
+    if (tt) {
+      activityId = tt.id;
+      activity = activity || tt.name;
+    }
+    return {
+      id: String(row.id || `e_${i}`),
+      projectId: String(row.projectId || project?.id || ""),
+      task: String(row.task || ""),
+      activityId,
+      activity,
+      mode: row.mode === "reactive" ? "reactive" : "planned",
+      durationMin: Number(row.durationMin) || 0,
+      at: String(row.at || new Date().toISOString()),
+    };
+  });
+
+  let running: TimeRunning = null;
+  if (d.running && typeof d.running === "object") {
+    const r = d.running as TimeRunning & { activity?: string; activityId?: string };
+    const project = byId.get(String(r.projectId)) ?? projects[0];
+    const types = project?.taskTypes ?? [];
+    let activityId = String(r.activityId || "");
+    let activity = String(r.activity || "");
+    let tt = types.find((t) => t.id === activityId);
+    if (!tt && activity) tt = types.find((t) => t.name === activity);
+    if (!tt) tt = types[0];
+    if (project && tt) {
+      running = {
+        projectId: project.id,
+        activityId: tt.id,
+        activity: tt.name,
+        mode: r.mode === "reactive" ? "reactive" : "planned",
+        startedAt: String(r.startedAt || new Date().toISOString()),
+        task: String(r.task || ""),
+      };
+    }
+  }
+
   return {
-    activityTypes: [
-      "Production",
-      "Strategy",
-      "Communication",
-      "Sales",
-      "Management",
-      "Learning",
-      "Creative",
-      "Other",
-    ],
-    projects: [
-      {
-        id: "agency",
-        name: "Агентство",
-        role: "Опора / cashflow",
-        money: true,
-        revenue: 186000,
-        profit: 72400,
-        split: [
-          ["Production", 1.4],
-          ["Communication", 2.6],
-          ["Sales", 1.1],
-          ["Management", 2.1],
-        ],
-        note: "Проект должен давать деньги при низком founder-load. Смотрим не только на часы, но и на количество вторжений.",
-      },
-      {
-        id: "course",
-        name: "Курс",
-        role: "Существующий актив",
-        money: true,
-        revenue: 243000,
-        profit: 118000,
-        split: [
-          ["Создание системы", 6.2],
-          ["Презентации", 4.1],
-          ["Запись", 7.4],
-          ["Правки", 4.3],
-          ["Коммуникация", 3.6],
-          ["Продажи", 2.8],
-        ],
-        note: "Видно, что творческая и системная работа занимает меньше половины — остальное ручное обслуживание продукта.",
-      },
-      {
-        id: "hire",
-        name: "Найм / поиск работы",
-        role: "Опора · главная ставка",
-        money: false,
-        split: [
-          ["Позиционирование", 4.2],
-          ["Отклики и контакты", 3.4],
-          ["Собеседования", 2.6],
-          ["Подготовка кейсов", 1.4],
-        ],
-        note: "Первое направление сезона. Здесь рост часов — хороший знак, а не перегрузка.",
-      },
-      {
-        id: "brand",
-        name: "Личный бренд",
-        role: "Капитализация / магнит",
-        money: false,
-        split: [
-          ["Ideas", 2.1],
-          ["Scripts", 4.6],
-          ["Shooting", 5.8],
-          ["Editing", 3.4],
-          ["Packaging", 2.3],
-        ],
-        note: "Съёмка забирает больше всего времени и нравится меньше всего. Это реальная стоимость контент-машины.",
-      },
-      {
-        id: "saas",
-        name: "SaaS / Qmagic",
-        role: "Асимметрия",
-        money: false,
-        split: [
-          ["Discovery", 2.4],
-          ["Validation", 3.8],
-          ["Building", 4.9],
-          ["Bug fixing", 1.8],
-          ["Marketing", 0.8],
-          ["Support", 0.4],
-        ],
-        note: "Пока лаборатория, а не поддержка: багфиксинг и support занимают меньше 16%.",
-      },
-      {
-        id: "arkalium",
-        name: "Аркалиум",
-        role: "Смысл · без KPI",
-        money: false,
-        split: [
-          ["Creative", 5.1],
-          ["Strategy", 1.3],
-        ],
-        note: "Единственный проект без reactive-времени. Это и есть признак защищённого пространства.",
-      },
-    ],
-    entries: [
-      {
-        id: "e1",
-        projectId: "agency",
-        task: "Звонок с клиентом по правкам лендинга",
-        activity: "Communication",
-        mode: "reactive",
-        durationMin: parseDur("0:48"),
-        at: "2026-08-14T11:20:00.000Z",
-      },
-      {
-        id: "e2",
-        projectId: "hire",
-        task: "Переписал позиционирование под AI Product",
-        activity: "Strategy",
-        mode: "planned",
-        durationMin: parseDur("1:35"),
-        at: "2026-08-14T09:30:00.000Z",
-      },
-      {
-        id: "e3",
-        projectId: "brand",
-        task: "Съёмка ролика про усталость",
-        activity: "Production",
-        mode: "planned",
-        durationMin: parseDur("2:20"),
-        at: "2026-08-13T15:00:00.000Z",
-      },
-      {
-        id: "e4",
-        projectId: "saas",
-        task: "Разбор фидбека первых 8 пользователей",
-        activity: "Strategy",
-        mode: "planned",
-        durationMin: parseDur("1:10"),
-        at: "2026-08-13T12:05:00.000Z",
-      },
-      {
-        id: "e5",
-        projectId: "agency",
-        task: "Срочная правка макета к утру",
-        activity: "Production",
-        mode: "reactive",
-        durationMin: parseDur("0:35"),
-        at: "2026-08-13T21:40:00.000Z",
-      },
-      {
-        id: "e6",
-        projectId: "arkalium",
-        task: "Черновик мира",
-        activity: "Creative",
-        mode: "planned",
-        durationMin: parseDur("1:50"),
-        at: "2026-08-12T14:00:00.000Z",
-      },
-      {
-        id: "e7",
-        projectId: "course",
-        task: "Запись урока 04",
-        activity: "Production",
-        mode: "planned",
-        durationMin: parseDur("2:05"),
-        at: "2026-08-12T10:00:00.000Z",
-      },
-      {
-        id: "e8",
-        projectId: "course",
-        task: "Ответы студентам",
-        activity: "Communication",
-        mode: "reactive",
-        durationMin: parseDur("0:55"),
-        at: "2026-08-11T16:30:00.000Z",
-      },
-    ],
-    review: [
-      "Агентство дало 72 400 ₽ прибыли и потребовало 7.2 часа.",
-      "Курс занял 28.4 часа — больше, чем найм и SaaS вместе.",
-      "Аркалиум — единственный проект без незапланированных вторжений.",
-    ],
+    projects: projects.length ? projects : seed.projects,
+    entries,
+    review: [],
+    running,
+  };
+}
+
+/** Empty starter doc — hours and money come from real entries / finance. */
+export function seedTimeDoc(): TimeDoc {
+  const agencyTypes = typesFrom("agency", ["Production", "Communication", "Sales", "Management", "Strategy"]);
+  const courseTypes = typesFrom("course", [
+    "Создание системы",
+    "Презентации",
+    "Запись",
+    "Правки",
+    "Коммуникация",
+    "Продажи",
+    "Production",
+  ]);
+  const hireTypes = typesFrom("hire", ["Позиционирование", "Отклики и контакты", "Собеседования", "Подготовка кейсов", "Strategy"]);
+  const brandTypes = typesFrom("brand", ["Ideas", "Scripts", "Shooting", "Editing", "Packaging", "Production"]);
+  const saasTypes = typesFrom("saas", ["Discovery", "Validation", "Building", "Bug fixing", "Marketing", "Support", "Strategy"]);
+  const arkaliumTypes = typesFrom("arkalium", ["Creative", "Strategy"]);
+
+  const projects: TimeProject[] = [
+    {
+      id: "agency",
+      name: "Агентство",
+      role: "Опора / cashflow",
+      money: true,
+      revenue: 0,
+      profit: 0,
+      taskTypes: agencyTypes,
+      split: [],
+      note: "",
+    },
+    {
+      id: "course",
+      name: "Курс",
+      role: "Существующий актив · Импульс",
+      money: true,
+      revenue: 0,
+      profit: 0,
+      taskTypes: courseTypes,
+      split: [],
+      note: "",
+    },
+    {
+      id: "hire",
+      name: "Найм / поиск работы",
+      role: "Опора · главная ставка",
+      money: false,
+      taskTypes: hireTypes,
+      split: [],
+      note: "",
+    },
+    {
+      id: "brand",
+      name: "Личный бренд",
+      role: "Капитализация / магнит",
+      money: false,
+      taskTypes: brandTypes,
+      split: [],
+      note: "",
+    },
+    {
+      id: "saas",
+      name: "Qmagic",
+      role: "Асимметрия",
+      money: true,
+      revenue: 0,
+      profit: 0,
+      taskTypes: saasTypes,
+      split: [],
+      note: "",
+    },
+    {
+      id: "arkalium",
+      name: "Аркалиум",
+      role: "Смысл · без KPI",
+      money: false,
+      taskTypes: arkaliumTypes,
+      split: [],
+      note: "",
+    },
+  ];
+
+  return {
+    projects,
+    entries: [],
+    review: [],
     running: null,
   };
 }

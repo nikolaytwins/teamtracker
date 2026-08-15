@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
       note: typeof body.note === "string" ? body.note : null,
       include_in_finance: body.includeInFinance !== false,
       total_amount: typeof body.totalAmount === "number" ? body.totalAmount : 0,
-      business_line: body.businessLine === "impulse" ? "impulse" : "agency",
+      business_line:
+        body.businessLine === "impulse" || body.businessLine === "qmagic" ? body.businessLine : "agency",
     });
     return NextResponse.json({ card });
   } catch (e) {

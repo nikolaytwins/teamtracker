@@ -96,7 +96,8 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       deadline: body.deadline as string | null,
       status: body.status,
       service_type: body.serviceType,
-      business_line: body.businessLine === "impulse" ? "impulse" : "agency",
+      business_line:
+        body.businessLine === "impulse" || body.businessLine === "qmagic" ? body.businessLine : "agency",
       client_type: body.clientType,
       payment_method: body.paymentMethod,
       client_contact: body.clientContact,

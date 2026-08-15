@@ -149,7 +149,7 @@ export function AgencyWorkKanbanClient() {
   const [note, setNote] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
   const [includeInFinance, setIncludeInFinance] = useState(true);
-  const [businessLine, setBusinessLine] = useState<"agency" | "impulse">("agency");
+  const [businessLine, setBusinessLine] = useState<"agency" | "impulse" | "qmagic">("agency");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -427,11 +427,12 @@ export function AgencyWorkKanbanClient() {
                     <span className="mb-1 block text-[12px] font-medium text-[var(--v2-ink-600)]">
                       Направление
                     </span>
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                       {(
                         [
                           { value: "agency" as const, label: "Агентство" },
                           { value: "impulse" as const, label: "Импульс" },
+                          { value: "qmagic" as const, label: "Qmagic" },
                         ]
                       ).map((opt) => (
                         <label

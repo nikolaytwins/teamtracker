@@ -15,20 +15,18 @@ const PERSONAL_TABS = [
     label: "Желания",
     match: (p: string) => p.startsWith(appPath("/v2/personal/wishes")),
   },
+] as const;
+
+const STRATEGY_TABS = [
   {
-    href: "/v2/personal/time",
-    label: "Время",
-    match: (p: string) => p.startsWith(appPath("/v2/personal/time")),
+    href: "/v2/personal/life-strategy",
+    label: "Общая стратегия",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/life-strategy")),
   },
   {
     href: "/v2/personal/brand",
-    label: "Бренд",
+    label: "Личный бренд",
     match: (p: string) => p.startsWith(appPath("/v2/personal/brand")),
-  },
-  {
-    href: "/v2/personal/life-strategy",
-    label: "Стратегия",
-    match: (p: string) => p.startsWith(appPath("/v2/personal/life-strategy")),
   },
   {
     href: "/v2/personal/my-code",
@@ -39,7 +37,15 @@ const PERSONAL_TABS = [
     href: "/v2/personal/strategy",
     label: "База данных",
     match: (p: string) =>
-      p.startsWith(appPath("/v2/personal/strategy")) && !p.startsWith(appPath("/v2/personal/life-strategy")),
+      p === appPath("/v2/personal/strategy") || p.startsWith(appPath("/v2/personal/strategy/")),
+  },
+] as const;
+
+const DASHBOARD_TABS = [
+  {
+    href: "/v2/personal/dashboard/youtube",
+    label: "YouTube",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/dashboard")),
   },
 ] as const;
 
@@ -71,15 +77,38 @@ const FINANCE_TABS = [
   },
 ] as const;
 
+function isStrategyBlockPath(pathname: string) {
+  const strategyDb =
+    pathname === appPath("/v2/personal/strategy") ||
+    pathname.startsWith(appPath("/v2/personal/strategy/"));
+  return (
+    pathname.startsWith(appPath("/v2/personal/life-strategy")) ||
+    pathname.startsWith(appPath("/v2/personal/brand")) ||
+    pathname.startsWith(appPath("/v2/personal/my-code")) ||
+    strategyDb
+  );
+}
+
 export default function PersonalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const inFinance = pathname.startsWith(appPath("/v2/personal/finance"));
   const inTasks = pathname.startsWith(appPath("/v2/personal/tasks"));
   const inCalendar = pathname.startsWith(appPath("/v2/personal/calendar"));
-  if (inTasks || inCalendar) {
+  const inTime = pathname.startsWith(appPath("/v2/personal/time"));
+  const inDashboard = pathname.startsWith(appPath("/v2/personal/dashboard"));
+  const inObservations = pathname.startsWith(appPath("/v2/personal/observations"));
+  if (inTasks || inCalendar || inTime || inObservations) {
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }
-  const tabs = inFinance ? FINANCE_TABS : PERSONAL_TABS;
+
+  const inStrategy = isStrategyBlockPath(pathname);
+  const tabs = inFinance
+    ? FINANCE_TABS
+    : inDashboard
+      ? DASHBOARD_TABS
+      : inStrategy
+        ? STRATEGY_TABS
+        : PERSONAL_TABS;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">

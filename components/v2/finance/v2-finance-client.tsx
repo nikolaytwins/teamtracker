@@ -248,6 +248,7 @@ export function V2FinanceClient() {
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectAmount, setNewProjectAmount] = useState("");
   const [newProjectLine, setNewProjectLine] = useState<V2FinanceBusinessLine>("agency");
+  const [lineTab, setLineTab] = useState<V2FinanceBusinessLine>("agency");
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [expenseWho, setExpenseWho] = useState("");
   const [expenseRole, setExpenseRole] = useState<string>(FINANCE_EMPLOYEE_ROLES[0]!.label);
@@ -345,7 +346,7 @@ export function V2FinanceClient() {
       });
       setNewProjectName("");
       setNewProjectAmount("");
-      setNewProjectLine("agency");
+      setNewProjectLine(lineTab);
       setNewProjectOpen(false);
       await load(year, month);
     } catch (e) {
@@ -401,7 +402,16 @@ export function V2FinanceClient() {
 
   const reload = useCallback(() => load(year, month), [load, year, month]);
   const summary = data?.summary;
-  const projects = data?.projects ?? [];
+  const allProjects = data?.projects ?? [];
+  const projects = useMemo(
+    () => allProjects.filter((p) => p.business_line === lineTab),
+    [allProjects, lineTab]
+  );
+  const lineTotals = useMemo(() => {
+    const expected = projects.reduce((s, p) => s + p.effective_total_amount, 0);
+    const actual = projects.reduce((s, p) => s + p.paid_amount, 0);
+    return { expected, actual };
+  }, [projects]);
   const generalExpenses = data?.generalExpenses ?? [];
 
   if (loading && !data) {
@@ -432,7 +442,10 @@ export function V2FinanceClient() {
         <div className="ml-auto">
           <button
             type="button"
-            onClick={() => setNewProjectOpen(true)}
+            onClick={() => {
+              setNewProjectLine(lineTab);
+              setNewProjectOpen(true);
+            }}
             className="v2-tight inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
           >
             <V2Icons.plus className="h-4 w-4 shrink-0" />
@@ -542,13 +555,39 @@ export function V2FinanceClient() {
 
           {tab === "projects" ? (
             <>
-              {projects.length > 0 ? (
-                <div className="mb-4 flex flex-wrap items-center gap-2">
-                  <FinanceStatusChip count={projects.filter((p) => p.status === "paid").length} status="paid" />
-                  <FinanceStatusChip count={projects.filter((p) => p.status === "prepaid").length} status="prepaid" />
-                  <FinanceStatusChip count={projects.filter((p) => p.status === "not_paid").length} status="not_paid" />
+              <div className="mb-4">
+                <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+                  <h2 className="v2-tighter text-[22px] font-semibold leading-none text-[var(--v2-ink-900)]">
+                    {FINANCE_BUSINESS_LINE_META[lineTab].label}
+                  </h2>
+                  <div className="inline-flex items-center rounded-full bg-white p-1 shadow-[var(--v2-shadow-card)]">
+                    {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => {
+                      const active = lineTab === k;
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setLineTab(k)}
+                          className={`v2-tight h-8 rounded-full px-3.5 text-[12.5px] font-medium transition ${
+                            active
+                              ? "bg-[var(--v2-ink-900)] text-white"
+                              : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
+                          }`}
+                        >
+                          {FINANCE_BUSINESS_LINE_META[k].label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : null}
+                {projects.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FinanceStatusChip count={projects.filter((p) => p.status === "paid").length} status="paid" />
+                    <FinanceStatusChip count={projects.filter((p) => p.status === "prepaid").length} status="prepaid" />
+                    <FinanceStatusChip count={projects.filter((p) => p.status === "not_paid").length} status="not_paid" />
+                  </div>
+                ) : null}
+              </div>
               <FinanceCard className="mb-7 overflow-hidden">
                 <div
                   className={`${PROJECT_COLS} border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
@@ -565,7 +604,7 @@ export function V2FinanceClient() {
                 <div className="divide-y divide-[var(--v2-ink-100)]/70">
                   {projects.length === 0 ? (
                     <div className="px-5 py-10 text-center text-sm text-[var(--v2-ink-500)]">
-                      Нет проектов за выбранный месяц
+                      Нет проектов «{FINANCE_BUSINESS_LINE_META[lineTab].label}» за выбранный месяц
                     </div>
                   ) : (
                     projects.map((p, i) => {
@@ -788,10 +827,10 @@ export function V2FinanceClient() {
                       </span>
                     </div>
                     <div className="v2-tnum v2-tight text-right font-semibold text-[var(--v2-ink-900)]">
-                      {formatRub(summary.expectedRevenue)}
+                      {formatRub(lineTotals.expected)}
                     </div>
                     <div className="v2-tnum v2-tight text-right font-semibold text-emerald-600">
-                      {formatRub(summary.actualRevenue)}
+                      {formatRub(lineTotals.actual)}
                     </div>
                   </div>
                 ) : null}
@@ -1062,7 +1101,7 @@ export function V2FinanceClient() {
               <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
                 Направление
               </span>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => {
                   const meta = FINANCE_BUSINESS_LINE_META[k];
                   const active = newProjectLine === k;
@@ -1090,7 +1129,7 @@ export function V2FinanceClient() {
                   setNewProjectOpen(false);
                   setNewProjectName("");
                   setNewProjectAmount("");
-                  setNewProjectLine("agency");
+                  setNewProjectLine(lineTab);
                 }}
                 className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
               >

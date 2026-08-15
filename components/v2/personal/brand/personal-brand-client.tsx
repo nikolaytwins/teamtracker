@@ -3,11 +3,12 @@
 import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type {
-  BrandColumn,
   BrandDoc,
+  BrandLabItem,
   BrandSignal,
   BrandVideo,
 } from "@/lib/v2/personal/seeds/brand-seed";
+import { normalizeBrandDoc } from "@/lib/v2/personal/seeds/brand-seed";
 import { V2Icons } from "@/components/v2/ui/icons";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -21,11 +22,6 @@ const SIG: Record<BrandSignal, { label: string; dots: number; tint: string }> = 
 };
 
 const POWER = ["слабый", "повторяется", "сильный", "почти доказано"];
-const FILTERS = [
-  { id: "all" as const, label: "Все" },
-  { id: "pub" as const, label: "Опубликованные" },
-  { id: "plan" as const, label: "В работе" },
-];
 
 const VIDEO_STATUSES = ["Idea", "Script", "Ready", "Опубликован"];
 
@@ -33,29 +29,6 @@ function IcClose(p: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={p.className}>
       <path d="m6.5 6.5 11 11m0-11-11 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IcCopy(p: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={p.className}>
-      <rect x="4" y="7" width="11" height="13" rx="2.4" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M8.5 7V6a2 2 0 0 1 2-2h7.5a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H17"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function IcCols(p: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={p.className}>
-      <rect x="4" y="5" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M10 5v14M15 5v14" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   );
 }
@@ -71,20 +44,6 @@ function IcQ(p: { className?: string }) {
         strokeLinecap="round"
       />
       <circle cx="12" cy="16.2" r=".9" fill="currentColor" />
-    </svg>
-  );
-}
-
-function IcArrowD(p: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={p.className}>
-      <path
-        d="M12 5v13m0 0-4.5-4.5M12 18l4.5-4.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }
@@ -168,28 +127,26 @@ export function PersonalBrandClient() {
   const [doc, setDoc] = useState<BrandDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [colsOpen, setColsOpen] = useState(false);
   const [videoId, setVideoId] = useState<string | null>(null);
-  const [nextOpen, setNextOpen] = useState(false);
   const [insightOpen, setInsightOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
   const [videoModal, setVideoModal] = useState(false);
   const [hypModal, setHypModal] = useState(false);
-  const [phraseDraft, setPhraseDraft] = useState("");
   const [dirOpen, setDirOpen] = useState<string | null>("crisis");
-  const [copied, setCopied] = useState<number | null>(null);
+  const [labFilter, setLabFilter] = useState<"all" | "insight" | "hypothesis">("all");
 
   const saveDoc = useCallback(async (next: BrandDoc) => {
-    setDoc(next);
+    const normalized = normalizeBrandDoc(next);
+    setDoc(normalized);
     setSaving(true);
     setError(null);
     try {
       const res = await fetchJson<{ doc: BrandDoc }>("/api/v2/personal/life-docs/brand", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doc: next }),
+        body: JSON.stringify({ doc: normalized }),
       });
-      setDoc(res.doc);
+      setDoc(normalizeBrandDoc(res.doc));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось сохранить");
     } finally {
@@ -202,7 +159,7 @@ export function PersonalBrandClient() {
     (async () => {
       try {
         const res = await fetchJson<{ doc: BrandDoc }>("/api/v2/personal/life-docs/brand");
-        if (!cancelled) setDoc(res.doc);
+        if (!cancelled) setDoc(normalizeBrandDoc(res.doc));
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Не удалось загрузить");
       }
@@ -221,22 +178,22 @@ export function PersonalBrandClient() {
   }
 
   const dirName = (id: string) => doc.dirs.find((d) => d.id === id)?.name ?? "—";
-  const filter = doc.ui.filter;
-  const cols = doc.ui.columns;
   const current = videoId ? doc.videos.find((v) => v.id === videoId) : null;
 
-  const setFilter = (f: BrandDoc["ui"]["filter"]) => {
-    void saveDoc({ ...doc, ui: { ...doc.ui, filter: f } });
-  };
-
-  const setCols = (updater: (cs: BrandColumn[]) => BrandColumn[]) => {
-    void saveDoc({ ...doc, ui: { ...doc.ui, columns: updater(doc.ui.columns) } });
-  };
-
   const addInsight = async (t: string, src: string, power: number) => {
+    const item: BrandLabItem = {
+      id: uid("lab"),
+      kind: "insight",
+      text: t.trim(),
+      note: src.trim(),
+      power,
+      createdAt: new Date().toISOString(),
+      status: "open",
+    };
     await saveDoc({
       ...doc,
-      insights: [{ t, src, power }, ...doc.insights],
+      insights: [{ t: item.text, src: item.note, power }, ...doc.insights],
+      labBacklog: [item, ...(doc.labBacklog ?? [])],
     });
     setInsightOpen(false);
   };
@@ -263,10 +220,27 @@ export function PersonalBrandClient() {
   };
 
   const createHyp = async (main: string, why: string) => {
+    const item: BrandLabItem = {
+      id: uid("lab"),
+      kind: "hypothesis",
+      text: main.trim(),
+      note: why.trim(),
+      createdAt: new Date().toISOString(),
+      status: "open",
+    };
+    await saveDoc({
+      ...doc,
+      labBacklog: [item, ...(doc.labBacklog ?? [])],
+    });
+    setHypModal(false);
+  };
+
+  const promoteHypFromBacklog = async (item: BrandLabItem) => {
+    if (item.kind !== "hypothesis") return;
     const archived = {
       period: doc.hyp.start || "Архив",
       text: doc.hyp.main,
-      why: why || "Смена гипотезы.",
+      why: item.note || "Смена гипотезы из бэклога.",
       data: `Статус был: ${doc.hyp.status}`,
     };
     const evolution = doc.evolution.map((e) => ({ ...e, now: false }));
@@ -274,17 +248,39 @@ export function PersonalBrandClient() {
       ...doc,
       hyp: {
         ...doc.hyp,
-        main,
+        main: item.text,
         status: "Проверяем",
         start: new Date().toLocaleDateString("ru-RU"),
       },
       evolution: [
         ...evolution.filter((e) => !e.now),
         archived,
-        { period: "Текущая гипотеза", text: main, why: why || "Новая гипотеза.", data: "Только создана.", now: true },
+        {
+          period: "Текущая гипотеза",
+          text: item.text,
+          why: item.note || "Поднята из бэклога.",
+          data: "Из бэклога.",
+          now: true,
+        },
       ],
+      labBacklog: (doc.labBacklog ?? []).map((x) =>
+        x.id === item.id ? { ...x, status: "done" as const } : x
+      ),
     });
-    setHypModal(false);
+  };
+
+  const setLabItemStatus = async (id: string, status: BrandLabItem["status"]) => {
+    await saveDoc({
+      ...doc,
+      labBacklog: (doc.labBacklog ?? []).map((x) => (x.id === id ? { ...x, status } : x)),
+    });
+  };
+
+  const removeLabItem = async (id: string) => {
+    await saveDoc({
+      ...doc,
+      labBacklog: (doc.labBacklog ?? []).filter((x) => x.id !== id),
+    });
   };
 
   const saveVideo = async (id: string, patch: Partial<BrandVideo>) => {
@@ -294,21 +290,8 @@ export function PersonalBrandClient() {
     });
   };
 
-  const addPhrase = async () => {
-    const t = phraseDraft.trim();
-    if (!t) return;
-    await saveDoc({ ...doc, phrases: [t, ...doc.phrases] });
-    setPhraseDraft("");
-  };
-
-  const copyPhrase = (t: string, i: number) => {
-    void navigator.clipboard?.writeText(t);
-    setCopied(i);
-    setTimeout(() => setCopied(null), 1200);
-  };
-
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6" onClick={() => colsOpen && setColsOpen(false)}>
+    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6">
       <div className="mx-auto max-w-[1320px]">
         <div className="mb-10 flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
           <div className="min-w-[280px] max-w-[640px] flex-1">
@@ -338,23 +321,6 @@ export function PersonalBrandClient() {
               <V2Icons.plus className="h-4 w-4" /> Ролик
             </button>
           </div>
-        </div>
-
-        <div className="mb-14 flex flex-wrap items-center gap-6 rounded-[20px] bg-white px-7 py-5 shadow-[var(--v2-shadow-card)]">
-          <div>
-            <p className="v2-tight text-[16px] font-medium text-[var(--v2-ink-900)]">Есть достаточно данных для Brand Review</p>
-            <p className="v2-tight mt-1 text-[13.5px] text-[var(--v2-ink-500)]">
-              {doc.videos.filter((v) => v.status === "Опубликован").length} опубликованных роликов, {doc.dirs.length}{" "}
-              направлений, {doc.insights.length} инсайтов.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setNextOpen(true)}
-            className="ml-auto h-10 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
-          >
-            Открыть review
-          </button>
         </div>
 
         {/* Hyp */}
@@ -414,6 +380,151 @@ export function PersonalBrandClient() {
             </div>
           </div>
         </div>
+
+        <BSect
+          title="Бэклог"
+          sub="Инсайты и гипотезы с шапки страницы. Гипотезу можно поднять в текущую, когда она созреет."
+          right={
+            <div className="inline-flex items-center rounded-full bg-white p-1 shadow-[var(--v2-shadow-card)]">
+              {(
+                [
+                  ["all", "Все"],
+                  ["insight", "Инсайты"],
+                  ["hypothesis", "Гипотезы"],
+                ] as const
+              ).map(([k, l]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setLabFilter(k)}
+                  className={`v2-tight h-7 rounded-full px-3.5 text-[12px] font-medium transition ${
+                    labFilter === k
+                      ? "bg-[var(--v2-ink-900)] text-white"
+                      : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {(() => {
+            const items = (doc.labBacklog ?? []).filter(
+              (x) => labFilter === "all" || x.kind === labFilter
+            );
+            const openCount = items.filter((x) => x.status === "open").length;
+            if (!items.length) {
+              return (
+                <div className="rounded-[24px] border border-dashed border-[var(--v2-ink-200)] bg-white/70 px-8 py-12 text-center">
+                  <p className="v2-tighter text-[22px] font-light text-[var(--v2-ink-800)]">Пока пусто</p>
+                  <p className="v2-tight mx-auto mt-2 max-w-[42ch] text-[14px] text-[var(--v2-ink-500)]">
+                    Добавьте инсайт аудитории или гипотезу кнопками сверху — они появятся здесь.
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-soft)]">
+                <div className="flex items-center justify-between gap-4 border-b border-[var(--v2-ink-100)] px-7 py-4">
+                  <BK cls="text-[var(--v2-ink-500)]">Записи лаборатории</BK>
+                  <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-400)]">
+                    {openCount} открытых · {items.length} всего
+                  </span>
+                </div>
+                <div className="divide-y divide-[var(--v2-ink-100)]">
+                  {items.map((item) => {
+                    const isHyp = item.kind === "hypothesis";
+                    const done = item.status === "done";
+                    return (
+                      <div
+                        key={item.id}
+                        className={`group grid items-start gap-5 px-7 py-5 transition ${
+                          done ? "bg-[var(--v2-ink-50)]/50 opacity-70" : "hover:bg-[var(--v2-ink-50)]/40"
+                        }`}
+                        style={{ gridTemplateColumns: "112px minmax(0,1fr) auto" }}
+                      >
+                        <div className="pt-0.5">
+                          <span
+                            className={`inline-flex h-7 items-center rounded-full px-2.5 text-[11px] font-semibold ${
+                              isHyp
+                                ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
+                                : "bg-emerald-50 text-emerald-700"
+                            }`}
+                          >
+                            {isHyp ? "Гипотеза" : "Инсайт"}
+                          </span>
+                          {typeof item.power === "number" ? (
+                            <p className="v2-tight mt-2 text-[11px] text-[var(--v2-ink-400)]">
+                              {POWER[Math.max(0, Math.min(3, item.power - 1))] ?? "сигнал"}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="min-w-0">
+                          <p
+                            className={`v2-tight text-[16px] font-light leading-snug text-[var(--v2-ink-900)] ${
+                              done ? "line-through decoration-[var(--v2-ink-300)]" : ""
+                            }`}
+                            style={{ textWrap: "pretty" }}
+                          >
+                            «{item.text}»
+                          </p>
+                          {item.note ? (
+                            <p className="v2-tight mt-2 text-[13px] text-[var(--v2-ink-500)]">{item.note}</p>
+                          ) : null}
+                          <p className="v2-tnum mt-2 text-[11.5px] text-[var(--v2-ink-400)]">
+                            {new Date(item.createdAt).toLocaleDateString("ru-RU", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                            {done ? " · взято в работу" : ""}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1.5 opacity-0 transition group-hover:opacity-100">
+                          {isHyp && !done ? (
+                            <button
+                              type="button"
+                              onClick={() => void promoteHypFromBacklog(item)}
+                              className="v2-tight h-8 rounded-lg bg-[var(--v2-ink-900)] px-3 text-[12px] font-medium text-white"
+                            >
+                              Сделать текущей
+                            </button>
+                          ) : null}
+                          {!done ? (
+                            <button
+                              type="button"
+                              onClick={() => void setLabItemStatus(item.id, "done")}
+                              className="v2-tight h-8 rounded-lg px-3 text-[12px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                            >
+                              Готово
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void setLabItemStatus(item.id, "open")}
+                              className="v2-tight h-8 rounded-lg px-3 text-[12px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                            >
+                              Вернуть
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => void removeLabItem(item.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-300)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                            title="Удалить"
+                          >
+                            <V2Icons.trash className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </BSect>
 
         <BSect title="Кого мы сейчас считаем ядром">
           <p
@@ -532,83 +643,6 @@ export function PersonalBrandClient() {
         </BSect>
 
         <BSect
-          title="YouTube Lab"
-          sub="Каждый ролик — не просто контент, а маленький тест аудитории и позиционирования."
-          right={
-            <>
-              <div className="inline-flex items-center rounded-full bg-white p-1 shadow-[var(--v2-shadow-card)]">
-                {FILTERS.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setFilter(f.id)}
-                    className={`v2-tight h-7 rounded-full px-3.5 text-[12px] font-medium transition ${
-                      filter === f.id
-                        ? "bg-[var(--v2-ink-900)] text-white"
-                        : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              <div className="relative">
-                <BGhost
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setColsOpen((o) => !o);
-                  }}
-                >
-                  <IcCols className="h-4 w-4 text-[var(--v2-ink-400)]" /> Настроить колонки
-                </BGhost>
-                {colsOpen ? (
-                  <ColumnsMenu cols={cols} setCols={setCols} onClose={() => setColsOpen(false)} />
-                ) : null}
-              </div>
-            </>
-          }
-        >
-          <VideoTable cols={cols} filter={filter} videos={doc.videos} dirName={dirName} onOpen={setVideoId} />
-          <p className="v2-tight mt-3 text-[12.5px] text-[var(--v2-ink-400)]">
-            Успех ролика — это упаковка (CTR), удержание (avg %), масштаб (views/impressions), конверсия (subs на 1000) и
-            глубина отклика. Качественный сигнал ставится вручную.
-          </p>
-        </BSect>
-
-        <BSect title="Сравнение направлений" sub="Минимум 2 ролика в направлении — иначе это ещё не данные.">
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px,1fr))" }}>
-            {doc.dirStats.map((s) => (
-              <div key={s.dir} className="rounded-[20px] bg-white px-6 py-5 shadow-[var(--v2-shadow-card)]">
-                <h3 className="v2-tight text-[16px] font-medium text-[var(--v2-ink-900)]">{dirName(s.dir)}</h3>
-                <p className="v2-tnum mt-1 text-[12px] text-[var(--v2-ink-400)]">
-                  {s.videos} {s.videos === 1 ? "ролик" : "ролика"}
-                </p>
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  {(
-                    [
-                      ["Avg CTR", s.ctr],
-                      ["Avg viewed", s.viewed],
-                      ["Subs / 1000", s.subs],
-                    ] as const
-                  ).map(([l, v]) => (
-                    <div key={l}>
-                      <BK>{l}</BK>
-                      <p className="v2-tnum mt-1 text-[17px] font-light text-[var(--v2-ink-900)]">{v}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 border-t border-[var(--v2-ink-100)] pt-4">
-                  <SigCell k={s.sig} />
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="v2-tight mt-4 text-[13.5px] text-[var(--v2-ink-500)]">
-            Похоже, тема кризиса лучше привлекает правильную аудиторию. Данных пока мало.
-          </p>
-        </BSect>
-
-        <BSect
           title="Что я узнаю о своей аудитории"
           right={
             <BGhost onClick={() => setInsightOpen(true)}>
@@ -630,46 +664,6 @@ export function PersonalBrandClient() {
                   <Dots n={x.power} tint="#2A56EB" />
                   <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">{POWER[x.power - 1]}</span>
                 </span>
-              </div>
-            ))}
-          </div>
-        </BSect>
-
-        <BSect title="Как менялось позиционирование">
-          <div className="flex flex-col">
-            {doc.evolution.map((e, i) => (
-              <div key={i}>
-                <div className={`rounded-[20px] px-7 py-6 ${e.now ? "bg-white shadow-[var(--v2-shadow-card)]" : "bg-[var(--v2-ink-100)]/60"}`}>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <BK cls={e.now ? "text-[var(--v2-brand-600)]" : "text-[var(--v2-ink-400)]"}>{e.period}</BK>
-                    {e.now ? (
-                      <span className="inline-flex h-6 items-center rounded-full bg-[var(--v2-brand-50)] px-2.5 text-[11px] font-semibold text-[var(--v2-brand-700)]">
-                        Актуально
-                      </span>
-                    ) : null}
-                  </div>
-                  <p
-                    className={`v2-tighter mt-2.5 font-light leading-[1.35] text-[var(--v2-ink-900)] ${e.now ? "text-[22px]" : "text-[18px]"}`}
-                    style={{ textWrap: "pretty" }}
-                  >
-                    «{e.text}»
-                  </p>
-                  <div className="mt-4 grid max-w-[820px] grid-cols-2 gap-6">
-                    <div>
-                      <BK>Почему изменили</BK>
-                      <p className="v2-tight mt-1.5 text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">{e.why}</p>
-                    </div>
-                    <div>
-                      <BK>Какие данные привели</BK>
-                      <p className="v2-tight mt-1.5 text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">{e.data}</p>
-                    </div>
-                  </div>
-                </div>
-                {i < doc.evolution.length - 1 ? (
-                  <div className="flex justify-center py-2">
-                    <IcArrowD className="h-5 w-5 text-[var(--v2-ink-300)]" />
-                  </div>
-                ) : null}
               </div>
             ))}
           </div>
@@ -794,61 +788,6 @@ export function PersonalBrandClient() {
             </div>
           </div>
         </BSect>
-
-        <BSect title="Что звучит как мой бренд" sub="Библиотека формулировок — можно копировать и отправлять в Идеи.">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <input
-              value={phraseDraft}
-              onChange={(e) => setPhraseDraft(e.target.value)}
-              placeholder="Новая формулировка"
-              className="v2-tight h-10 min-w-[280px] flex-1 rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 text-[14px] outline-none focus:border-[var(--v2-brand-400)]"
-            />
-            <button
-              type="button"
-              onClick={() => void addPhrase()}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white"
-            >
-              <V2Icons.plus className="h-4 w-4" /> Добавить
-            </button>
-          </div>
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(330px,1fr))" }}>
-            {doc.phrases.map((p, i) => (
-              <div key={i} className="group relative rounded-[20px] bg-white px-6 py-5 shadow-[var(--v2-shadow-card)]">
-                <p
-                  className="v2-tight pr-8 text-[17px] font-light leading-[1.45] text-[var(--v2-ink-900)]"
-                  style={{ textWrap: "pretty" }}
-                >
-                  «{p}»
-                </p>
-                <button
-                  type="button"
-                  title="Скопировать"
-                  onClick={() => copyPhrase(p, i)}
-                  className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-300)] opacity-0 transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)] group-hover:opacity-100"
-                >
-                  <IcCopy className="h-4 w-4" />
-                </button>
-                {copied === i ? (
-                  <span className="v2-tight absolute right-14 top-5 text-[11.5px] text-[var(--v2-brand-600)]">скопировано</span>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </BSect>
-
-        <div className="flex flex-wrap items-center gap-8 rounded-[24px] bg-[var(--v2-ink-900)] px-9 py-8 text-white">
-          <div>
-            <p className="v2-tighter text-[24px] font-light leading-tight">Что снимать дальше?</p>
-            <p className="v2-tight mt-2 text-[14px] text-white/60">Незакрытые гипотезы и идеи из backlog — без выбора за вас.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setNextOpen(true)}
-            className="ml-auto h-11 rounded-xl bg-white px-5 text-[13.5px] font-medium text-[var(--v2-ink-900)] transition hover:bg-[var(--v2-ink-100)]"
-          >
-            Открыть
-          </button>
-        </div>
       </div>
 
       {current ? (
@@ -859,7 +798,6 @@ export function PersonalBrandClient() {
           onSave={(patch) => void saveVideo(current.id, patch)}
         />
       ) : null}
-      {nextOpen ? <NextOverlay doc={doc} dirName={dirName} onClose={() => setNextOpen(false)} /> : null}
       {insightOpen ? (
         <InsightModal videos={doc.videos} onClose={() => setInsightOpen(false)} onSave={addInsight} />
       ) : null}
@@ -868,216 +806,6 @@ export function PersonalBrandClient() {
         <VideoModal dirs={doc.dirs} onClose={() => setVideoModal(false)} onSave={addVideo} />
       ) : null}
       {hypModal ? <HypModal onClose={() => setHypModal(false)} onSave={createHyp} /> : null}
-    </div>
-  );
-}
-
-function ColumnsMenu({
-  cols,
-  setCols,
-  onClose,
-}: {
-  cols: BrandColumn[];
-  setCols: (u: (cs: BrandColumn[]) => BrandColumn[]) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="absolute right-0 top-11 z-30 w-[260px] rounded-2xl bg-white p-3 shadow-[var(--v2-shadow-pop)]"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="flex items-center justify-between px-2 pb-2">
-        <BK>Колонки</BK>
-        <button type="button" onClick={onClose} className="text-[var(--v2-ink-400)] transition hover:text-[var(--v2-ink-800)]">
-          <IcClose className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      <div className="max-h-[300px] overflow-y-auto">
-        {cols.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            disabled={c.fixed}
-            onClick={() => setCols((cs) => cs.map((x) => (x.id === c.id ? { ...x, on: !x.on } : x)))}
-            className={`v2-tight flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] transition ${
-              c.fixed ? "opacity-40" : "hover:bg-[var(--v2-ink-50)]"
-            }`}
-          >
-            <span
-              className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] ${
-                c.on ? "bg-[var(--v2-brand-500)]" : "border border-[var(--v2-ink-300)]"
-              }`}
-            >
-              {c.on ? (
-                <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none">
-                  <path d="m6 12.5 4 4 8-9" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ) : null}
-            </span>
-            <span className="text-[var(--v2-ink-700)]">{c.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function VideoTable({
-  cols,
-  filter,
-  videos,
-  dirName,
-  onOpen,
-}: {
-  cols: BrandColumn[];
-  filter: "all" | "pub" | "plan";
-  videos: BrandVideo[];
-  dirName: (id: string) => string;
-  onOpen: (id: string) => void;
-}) {
-  const on = (id: string) => cols.find((c) => c.id === id)?.on;
-  const rows =
-    filter === "all"
-      ? videos
-      : videos.filter((v) => (filter === "pub" ? v.status === "Опубликован" : v.status !== "Опубликован"));
-  type Cell = { id: string; label: string; width: number; render: (v: BrandVideo) => React.ReactNode };
-  const allCells: Cell[] = [
-    {
-      id: "dir",
-      label: "Направление",
-      width: 160,
-      render: (v) => <span className="v2-tight text-[12.5px] text-[var(--v2-ink-600)]">{dirName(v.dir)}</span>,
-    },
-    {
-      id: "hyp",
-      label: "Гипотеза",
-      width: 240,
-      render: (v) => <span className="v2-tight line-clamp-2 text-[12.5px] text-[var(--v2-ink-500)]">{v.hyp}</span>,
-    },
-    {
-      id: "date",
-      label: "Дата",
-      width: 88,
-      render: (v) => <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-500)]">{v.date}</span>,
-    },
-    {
-      id: "v24",
-      label: "Views 24h",
-      width: 88,
-      render: (v) => (
-        <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-700)]">{v.m ? v.m.v24.toLocaleString("ru") : "—"}</span>
-      ),
-    },
-    {
-      id: "v7",
-      label: "Views 7d",
-      width: 88,
-      render: (v) => (
-        <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-700)]">{v.m ? v.m.v7.toLocaleString("ru") : "—"}</span>
-      ),
-    },
-    {
-      id: "v30",
-      label: "Views",
-      width: 88,
-      render: (v) => (
-        <span className="v2-tnum text-[13px] font-medium text-[var(--v2-ink-900)]">
-          {v.m ? v.m.v30.toLocaleString("ru") : "—"}
-        </span>
-      ),
-    },
-    {
-      id: "impressions",
-      label: "Impressions",
-      width: 100,
-      render: (v) => (
-        <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-700)]">
-          {v.m ? v.m.impressions.toLocaleString("ru") : "—"}
-        </span>
-      ),
-    },
-    {
-      id: "ctr",
-      label: "CTR",
-      width: 68,
-      render: (v) => <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-700)]">{v.m ? `${v.m.ctr}%` : "—"}</span>,
-    },
-    {
-      id: "avd",
-      label: "AVD",
-      width: 68,
-      render: (v) => <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-700)]">{v.m ? v.m.avd : "—"}</span>,
-    },
-    {
-      id: "avp",
-      label: "Avg %",
-      width: 68,
-      render: (v) => <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-700)]">{v.m ? `${v.m.avp}%` : "—"}</span>,
-    },
-    {
-      id: "subs",
-      label: "Subs",
-      width: 68,
-      render: (v) => <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-700)]">{v.m ? `+${v.m.subs}` : "—"}</span>,
-    },
-    {
-      id: "comments",
-      label: "Комментарии",
-      width: 100,
-      render: (v) => <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-700)]">{v.m ? v.m.comments : "—"}</span>,
-    },
-    { id: "sig", label: "Сигнал", width: 150, render: (v) => <SigCell k={v.sig} /> },
-    {
-      id: "learn",
-      label: "Вывод",
-      width: 260,
-      render: (v) => (
-        <span className="v2-tight line-clamp-2 text-[12.5px] text-[var(--v2-ink-600)]">{v.learn || "—"}</span>
-      ),
-    },
-  ];
-  const cells = allCells.filter((c) => on(c.id));
-  const grid = `minmax(240px,1fr) ${cells.map((c) => `${c.width}px`).join(" ")} 32px`;
-  return (
-    <div className="overflow-x-auto rounded-[20px] bg-white shadow-[var(--v2-shadow-card)]">
-      <div className="min-w-[900px]">
-        <div
-          className="grid gap-5 border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/60 px-7 py-3.5"
-          style={{ gridTemplateColumns: grid }}
-        >
-          <BK>Название</BK>
-          {cells.map((c) => (
-            <BK key={c.id}>{c.label}</BK>
-          ))}
-          <span />
-        </div>
-        {rows.map((v) => (
-          <div
-            key={v.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => onOpen(v.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onOpen(v.id);
-            }}
-            className="group grid cursor-pointer items-center gap-5 border-b border-[var(--v2-ink-100)] px-7 py-4 transition last:border-0 hover:bg-[var(--v2-ink-50)]/60"
-            style={{ gridTemplateColumns: grid }}
-          >
-            <div className="min-w-0">
-              <p className="v2-tight truncate text-[14.5px] font-medium text-[var(--v2-ink-900)] transition group-hover:text-[var(--v2-brand-700)]">
-                {v.title}
-              </p>
-              <p className="v2-tight mt-0.5 truncate text-[12px] text-[var(--v2-ink-400)]">{v.sub || v.status}</p>
-            </div>
-            {cells.map((c) => (
-              <div key={c.id} className="min-w-0">
-                {c.render(v)}
-              </div>
-            ))}
-            <V2Icons.arrowR className="h-4 w-4 text-[var(--v2-ink-300)] transition group-hover:text-[var(--v2-brand-600)]" />
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1159,22 +887,7 @@ function VideoDrawer({
         </div>
 
         <div className="px-10 pb-28 pt-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-2xl bg-[var(--v2-ink-50)] p-5">
-              <BK>Гипотеза ролика</BK>
-              <p className="v2-tight mt-2.5 text-[14.5px] leading-relaxed text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
-                «{v.hyp || "—"}»
-              </p>
-            </div>
-            <div className="rounded-2xl bg-[var(--v2-ink-50)] p-5">
-              <BK>Что мы хотим узнать</BK>
-              <p className="v2-tight mt-2.5 text-[14.5px] leading-relaxed text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
-                «{v.want || "—"}»
-              </p>
-            </div>
-          </div>
-
-          <section className="mt-8">
+          <section>
             <BK>Показатели</BK>
             {M ? (
               <div className="mt-3 grid grid-cols-3 gap-x-6 gap-y-4">
@@ -1485,7 +1198,7 @@ function HypModal({ onClose, onSave }: { onClose: () => void; onSave: (main: str
         <div className="px-8 pb-6 pt-7">
           <h2 className="v2-tighter text-[24px] font-light text-[var(--v2-ink-900)]">Новая гипотеза</h2>
           <p className="v2-tight mt-1.5 text-[13px] text-[var(--v2-ink-500)]">
-            Текущая гипотеза уйдёт в эволюцию позиционирования.
+            Попадёт в бэклог. Текущую гипотезу не заменит — поднять можно оттуда.
           </p>
           <label className="mt-5 block">
             <span className={labCls}>Формулировка</span>
@@ -1497,8 +1210,8 @@ function HypModal({ onClose, onSave }: { onClose: () => void; onSave: (main: str
             />
           </label>
           <label className="mt-4 block">
-            <span className={labCls}>Почему меняем</span>
-            <input value={why} onChange={(e) => setWhy(e.target.value)} className={fieldCls} placeholder="Какие данные привели" />
+            <span className={labCls}>Заметка / почему</span>
+            <input value={why} onChange={(e) => setWhy(e.target.value)} className={fieldCls} placeholder="Откуда идея, какие данные" />
           </label>
         </div>
         <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-8 py-4">
@@ -1513,7 +1226,7 @@ function HypModal({ onClose, onSave }: { onClose: () => void; onSave: (main: str
             }}
             className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-5 text-[13px] font-medium text-white"
           >
-            Создать
+            В бэклог
           </button>
         </div>
       </div>
@@ -1558,94 +1271,6 @@ function HypHistory({
               <p className="v2-tight mt-3 text-[13px] leading-relaxed text-[var(--v2-ink-500)]">{e.why}</p>
             </div>
           ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NextOverlay({
-  doc,
-  onClose,
-}: {
-  doc: BrandDoc;
-  dirName: (id: string) => string;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-[var(--v2-app-bg,#F4F5F7)]">
-      <div className="flex min-h-full flex-col items-center px-8 py-14">
-        <div className="w-full max-w-[900px]">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <h2 className="v2-tighter text-[38px] font-light leading-[1.05] text-[var(--v2-ink-900)]">Что снимать дальше?</h2>
-              <p className="v2-tight mt-3 max-w-[60ch] text-[15px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
-                Сервис не выбирает ролик. Он показывает, какую гипотезу тестирует каждый вариант.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[var(--v2-ink-500)] shadow-[var(--v2-shadow-card)] transition hover:text-[var(--v2-ink-900)]"
-            >
-              <IcClose className="h-[18px] w-[18px]" />
-            </button>
-          </div>
-          <div className="mt-10 flex flex-col">
-            {doc.nextHyp.map((h, i) => (
-              <div
-                key={i}
-                className="grid items-baseline gap-8 border-t border-[var(--v2-ink-200)]/80 py-6"
-                style={{ gridTemplateColumns: "minmax(0,1fr) 130px 260px" }}
-              >
-                <div>
-                  <BK>{h.n}</BK>
-                  <p className="v2-tighter mt-2 text-[20px] font-light leading-snug text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
-                    {h.text}
-                  </p>
-                </div>
-                <div>
-                  <BK>Уже</BK>
-                  <p className="v2-tnum mt-1.5 text-[14px] text-[var(--v2-ink-700)]">{h.has}</p>
-                </div>
-                <div>
-                  <BK cls="text-[var(--v2-brand-600)]">Нужно</BK>
-                  <p className="v2-tight mt-1.5 text-[14px] leading-relaxed text-[var(--v2-ink-800)]">{h.need}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-12">
-            <BK>Идеи из backlog</BK>
-            <div className="mt-3 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px,1fr))" }}>
-              {doc.backlog.map((b, i) => (
-                <div key={i} className="rounded-2xl bg-white px-5 py-4 shadow-[var(--v2-shadow-card)]">
-                  <p className="v2-tight text-[14.5px] leading-snug text-[var(--v2-ink-900)]">{b.t}</p>
-                  <p className="v2-tight mt-1.5 text-[12.5px] text-[var(--v2-ink-400)]">→ {b.d}</p>
-                </div>
-              ))}
-            </div>
-            <Link
-              href={appPath("/v2/personal/ideas")}
-              className="v2-tight mt-4 inline-flex items-center gap-1.5 text-[12.5px] font-medium"
-            >
-              Открыть все идеи <V2Icons.arrowR className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-12 h-11 rounded-xl bg-[var(--v2-ink-900)] px-6 text-[13.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
-          >
-            Вернуться
-          </button>
         </div>
       </div>
     </div>

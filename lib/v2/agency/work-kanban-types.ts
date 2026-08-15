@@ -23,7 +23,7 @@ export type AgencyKanbanCard = {
   total_amount: number | null;
   paid_amount: number | null;
   payment_status: "not_paid" | "prepaid" | "paid" | null;
-  business_line: "agency" | "impulse" | null;
+  business_line: "agency" | "impulse" | "qmagic" | null;
   deadline: string | null;
   updated_at: string;
 };

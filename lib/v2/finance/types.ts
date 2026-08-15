@@ -1,8 +1,8 @@
 export type V2FinanceServiceType = "site" | "presentation" | "small_task" | "subscription" | "ai_development";
 export type V2FinancePaymentStatus = "not_paid" | "prepaid" | "paid";
 export type V2FinancePaymentMethod = "card" | "account" | null;
-/** Направление выручки: агентство или импульс (разбивка — на будущее). */
-export type V2FinanceBusinessLine = "agency" | "impulse";
+/** Направление выручки: агентство, импульс или Qmagic. */
+export type V2FinanceBusinessLine = "agency" | "impulse" | "qmagic";
 
 export type V2FinanceProjectRow = {
   id: string;

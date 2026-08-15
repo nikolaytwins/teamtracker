@@ -40,10 +40,11 @@ export const FINANCE_BUSINESS_LINE_META: Record<
 > = {
   agency: { label: "Агентство", tint: "#1F3AAF", bg: "#E6EDFF" },
   impulse: { label: "Импульс", tint: "#0F766E", bg: "#CCFBF1" },
+  qmagic: { label: "Qmagic", tint: "#7C3AED", bg: "#EFE8FF" },
 };
 
 export function isFinanceBusinessLine(v: unknown): v is V2FinanceBusinessLine {
-  return v === "agency" || v === "impulse";
+  return v === "agency" || v === "impulse" || v === "qmagic";
 }
 
 export const FINANCE_STATUS_META: Record<

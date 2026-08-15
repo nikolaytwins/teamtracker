@@ -2,11 +2,6 @@
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
-  STRATEGY_MONTH_FOCI,
-  STRATEGY_NEAR_PROJECTS,
-  STRATEGY_PRINCIPLES,
-} from "@/lib/v2/strategy/board-content";
-import {
   STRATEGY_TAG_META,
   type StrategyArticleMeta,
   type StrategyArticleTag,
@@ -22,13 +17,6 @@ const TAGS: { key: StrategyArticleTag | "all"; label: string }[] = [
   { key: "personal", label: "Личная жизнь" },
   { key: "sport", label: "Спорт" },
 ];
-
-function splitParagraphs(text: string) {
-  return text
-    .split(/\n\n+/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
 
 export function StrategyClient() {
   const [articles, setArticles] = useState<StrategyArticleMeta[]>([]);
@@ -68,7 +56,7 @@ export function StrategyClient() {
             База данных
           </h1>
           <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-white/80">
-            Фокусы месяцев, проекты и принципы рядом. Ниже — журнал из Лилы.
+            Журнал из Лилы — статьи с разметкой.
           </p>
         </div>
       </div>
@@ -79,155 +67,6 @@ export function StrategyClient() {
             {error}
           </div>
         ) : null}
-
-        <section className="mb-12">
-          <div className="mb-4">
-            <h2 className="v2-tight text-[20px] font-bold text-[var(--v2-ink-900)]">
-              Закреплённые фокусы
-            </h2>
-            <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
-              Три месяца — одна линия: закрыть главу → найти опору → усилить ответ
-            </p>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            {STRATEGY_MONTH_FOCI.map((focus) => (
-              <article
-                key={focus.month}
-                className="flex flex-col overflow-hidden rounded-3xl border border-[var(--v2-ink-100)] bg-white shadow-[var(--v2-shadow-card)]"
-              >
-                <div className="border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/80 px-4 py-3.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--v2-ink-400)]">
-                    {focus.month}
-                  </p>
-                  <h3 className="v2-tight mt-1 text-[18px] font-bold leading-snug text-[var(--v2-ink-900)]">
-                    {focus.headline}
-                  </h3>
-                </div>
-                <ul className="space-y-2.5 p-4">
-                  {focus.items.map((item) => (
-                    <li key={item} className="flex items-start gap-2.5">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--v2-brand-500)]" />
-                      <p className="v2-tight text-[13.5px] leading-snug text-[var(--v2-ink-800)]">
-                        {item}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-                {focus.dont?.length ? (
-                  <div className="mt-auto border-t border-red-100 bg-red-50/70 px-4 py-3.5">
-                    <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-red-600">
-                      Не делать
-                    </p>
-                    <ul className="mt-2 space-y-1.5">
-                      {focus.dont.map((item) => (
-                        <li key={item} className="flex items-start gap-2">
-                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
-                          <p className="v2-tight text-[13px] leading-snug text-red-800/90">
-                            {item}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="mb-12">
-          <div className="mb-4">
-            <h2 className="v2-tight text-[20px] font-bold text-[var(--v2-ink-900)]">
-              Проекты на ближайшие 3 месяца
-            </h2>
-            <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
-              Роли проектов — без требования строить империю
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {STRATEGY_NEAR_PROJECTS.map((card) => (
-              <article
-                key={card.title}
-                className="rounded-3xl border border-[var(--v2-ink-100)] bg-white p-5 shadow-[var(--v2-shadow-card)]"
-              >
-                <h3 className="v2-tight text-[16px] font-bold text-[var(--v2-ink-900)]">
-                  {card.title}
-                </h3>
-                <div className="mt-3 space-y-3">
-                  {splitParagraphs(card.body).map((p) => (
-                    <p
-                      key={p}
-                      className="v2-tight text-[13.5px] leading-relaxed text-[var(--v2-ink-700)]"
-                    >
-                      {p}
-                    </p>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="mb-14">
-          <div className="mb-4">
-            <h2 className="v2-tight text-[20px] font-bold text-[var(--v2-ink-900)]">
-              Принципы и запреты
-            </h2>
-            <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
-              Как двигаться ближайшие месяцы — и чего не делать
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {STRATEGY_PRINCIPLES.map((card) => {
-              const ban = card.emphasis === "ban";
-              return (
-                <article
-                  key={card.title}
-                  className={`rounded-3xl border p-5 shadow-[var(--v2-shadow-card)] ${
-                    ban
-                      ? "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/80"
-                      : "border-[var(--v2-ink-100)] bg-white"
-                  }`}
-                >
-                  <h3
-                    className={`v2-tight text-[16px] font-bold ${
-                      ban ? "text-amber-950" : "text-[var(--v2-ink-900)]"
-                    }`}
-                  >
-                    {card.title}
-                  </h3>
-                  {card.body ? (
-                    <div className="mt-3 space-y-3">
-                      {splitParagraphs(card.body).map((p) => (
-                        <p
-                          key={p}
-                          className={`v2-tight text-[13.5px] leading-relaxed ${
-                            ban ? "text-amber-950/85" : "text-[var(--v2-ink-700)]"
-                          }`}
-                        >
-                          {p}
-                        </p>
-                      ))}
-                    </div>
-                  ) : null}
-                  {card.items?.length ? (
-                    <ul className="mt-3 space-y-2">
-                      {card.items.map((item) => (
-                        <li key={item} className="flex items-start gap-2.5">
-                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--v2-brand-500)]" />
-                          <p className="v2-tight text-[13.5px] leading-snug text-[var(--v2-ink-800)]">
-                            {item}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-        </section>
 
         <section>
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">

@@ -21,13 +21,6 @@ function IcClose(p: IconProps) {
     </svg>
   );
 }
-function IcMinus(p: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path d="M6 12h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
 function IcInfo(p: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
@@ -59,11 +52,9 @@ function payloadFromDoc(doc: LifeStrategyDoc): LifeStrategySeasonPayload {
     maintain: doc.maintain,
     notThis: doc.notThis,
     lila: doc.lila,
-    week: doc.week,
     weekRules: doc.weekRules,
     prana: doc.prana,
     openQ: doc.openQ,
-    signals: doc.signals,
     game: doc.game,
     seasonQ: doc.seasonQ,
   };
@@ -194,108 +185,6 @@ function DirectionRow({ d }: { d: LifeStrategyDirection }) {
   );
 }
 
-function RulesModal({
-  selected,
-  pool,
-  onClose,
-  onSave,
-}: {
-  selected: string[];
-  pool: LifeStrategyDoc["rulePool"];
-  onClose: () => void;
-  onSave: (texts: string[]) => void;
-}) {
-  const [sel, setSel] = useState(selected);
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
-  const toggle = (t: string) =>
-    setSel((s) => (s.includes(t) ? s.filter((x) => x !== t) : s.length >= 5 ? s : [...s, t]));
-  return (
-    <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[86vh] w-full max-w-[620px] flex-col rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-4 px-8 pb-4 pt-7">
-          <div>
-            <h2 className="v2-tighter text-[23px] font-light leading-tight text-[var(--v2-ink-900)]">Правила недели</h2>
-            <p className="v2-tight mt-1.5 text-[13px] text-[var(--v2-ink-500)]">
-              Из «Моего кода». Максимум 5 — выбрано {sel.length}.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
-          >
-            <IcClose className="h-[17px] w-[17px]" />
-          </button>
-        </div>
-        <div className="flex flex-col gap-1.5 overflow-y-auto px-8 pb-4">
-          {pool.map((r) => {
-            const on = sel.includes(r.text);
-            const full = !on && sel.length >= 5;
-            return (
-              <button
-                key={r.id}
-                type="button"
-                disabled={full}
-                onClick={() => toggle(r.text)}
-                className={`flex items-start gap-3 rounded-xl px-4 py-3 text-left transition ${
-                  on ? "bg-[var(--v2-brand-50)]" : "hover:bg-[var(--v2-ink-50)]"
-                } ${full ? "opacity-40" : ""}`}
-              >
-                <span
-                  className={`mt-[3px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] ${
-                    on ? "bg-[var(--v2-brand-500)] text-white" : "border border-[var(--v2-ink-300)]"
-                  }`}
-                >
-                  {on ? <V2Icons.check className="h-3 w-3" /> : null}
-                </span>
-                <span>
-                  <span
-                    className={`v2-tight block text-[14.5px] leading-snug ${
-                      on ? "text-[var(--v2-brand-800)]" : "text-[var(--v2-ink-800)]"
-                    }`}
-                    style={{ textWrap: "pretty" }}
-                  >
-                    «{r.text}»
-                  </span>
-                  <span className="v2-tight mt-1 block text-[11.5px] text-[var(--v2-ink-400)]">{r.why}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-8 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
-          >
-            Отмена
-          </button>
-          <button
-            type="button"
-            onClick={() => onSave(sel)}
-            className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-5 text-[13px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
-          >
-            Сохранить
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function HistoryDrawer({
   doc,
   onClose,
@@ -388,7 +277,6 @@ function EditDrawer({
     directionsText: string;
     notThisText: string;
     openQText: string;
-    weekRulesText: string;
     pranaText: string;
     seasonQText: string;
   }) => void;
@@ -400,7 +288,6 @@ function EditDrawer({
   const dirsRef = useRef<HTMLTextAreaElement>(null);
   const notRef = useRef<HTMLTextAreaElement>(null);
   const openRef = useRef<HTMLTextAreaElement>(null);
-  const rulesRef = useRef<HTMLTextAreaElement>(null);
   const pranaRef = useRef<HTMLTextAreaElement>(null);
   const sqRef = useRef<HTMLTextAreaElement>(null);
 
@@ -422,7 +309,6 @@ function EditDrawer({
     ["Активные направления", doc.directions.map((d) => d.name).join("\n"), dirsRef],
     ["Что не делаю", doc.notThis.map((n) => n.t).join("\n"), notRef],
     ["Что не решаю", doc.openQ.map((o) => o.q).join("\n"), openRef],
-    ["Правила недели", doc.weekRules.map((r) => r.text).join("\n"), rulesRef],
     ["Режим жизни", doc.prana.map((p) => p.label).join("\n"), pranaRef],
     ["Главные вопросы сезона", doc.seasonQ.map((s) => `${s.area} — ${s.q}`).join("\n"), sqRef],
   ];
@@ -492,80 +378,11 @@ function EditDrawer({
                 directionsText: dirsRef.current?.value ?? "",
                 notThisText: notRef.current?.value ?? "",
                 openQText: openRef.current?.value ?? "",
-                weekRulesText: rulesRef.current?.value ?? "",
                 pranaText: pranaRef.current?.value ?? "",
                 seasonQText: sqRef.current?.value ?? "",
               })
             }
             className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-5 text-[13px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
-          >
-            Сохранить
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AddSignalModal({ onClose, onSave }: { onClose: () => void; onSave: (s: { date: string; area: string; text: string }) => void }) {
-  const [date, setDate] = useState("");
-  const [area, setArea] = useState("");
-  const [text, setText] = useState("");
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
-  const field =
-    "v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white";
-  const lab = "text-[11.5px] uppercase tracking-[0.1em] font-semibold text-[var(--v2-ink-400)]";
-  return (
-    <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div className="w-full max-w-[480px] rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
-        <div className="px-8 pb-6 pt-7">
-          <div className="flex items-start justify-between gap-4">
-            <h2 className="v2-tighter text-[24px] font-light text-[var(--v2-ink-900)]">Новый сигнал</h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
-            >
-              <IcClose className="h-[17px] w-[17px]" />
-            </button>
-          </div>
-          <label className="mt-5 block">
-            <span className={lab}>Дата</span>
-            <input value={date} onChange={(e) => setDate(e.target.value)} placeholder="14 сентября" className={field} />
-          </label>
-          <label className="mt-4 block">
-            <span className={lab}>Область</span>
-            <input value={area} onChange={(e) => setArea(e.target.value)} placeholder="Найм" className={field} />
-          </label>
-          <label className="mt-4 block">
-            <span className={lab}>Сигнал</span>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={3}
-              placeholder="Что произошло…"
-              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white"
-            />
-          </label>
-        </div>
-        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-8 py-4">
-          <button type="button" onClick={onClose} className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--v2-ink-600)]">
-            Отмена
-          </button>
-          <button
-            type="button"
-            disabled={!text.trim()}
-            onClick={() => onSave({ date: date.trim() || "сегодня", area: area.trim() || "—", text: text.trim() })}
-            className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-5 text-[13px] font-medium text-white disabled:opacity-40"
           >
             Сохранить
           </button>
@@ -647,10 +464,8 @@ function PranaItem({ p, onChange }: { p: LifeStrategyPrana; onChange: (next: Lif
 export function PersonalLifeStrategyClient() {
   const [doc, setDoc] = useState<LifeStrategyDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editRules, setEditRules] = useState(false);
   const [edit, setEdit] = useState(false);
   const [hist, setHist] = useState(false);
-  const [addSignal, setAddSignal] = useState(false);
   const [seasonQOpen, setSeasonQOpen] = useState(false);
   const [notOpen, setNotOpen] = useState<number | null>(null);
   const saving = useRef(false);
@@ -696,15 +511,6 @@ export function PersonalLifeStrategyClient() {
     );
   }
 
-  const saveRules = (texts: string[]) => {
-    const weekRules = texts.map((t, i) => {
-      const src = doc.rulePool.find((p) => p.text === t);
-      return { id: `wr${i}`, n: String(i + 1).padStart(2, "0"), text: t, why: src ? src.why : "Мой код" };
-    });
-    void persist({ ...doc, weekRules });
-    setEditRules(false);
-  };
-
   const switchHistory = (id: string) => {
     const target = doc.history.find((h) => h.id === id);
     if (!target) return;
@@ -731,7 +537,6 @@ export function PersonalLifeStrategyClient() {
     directionsText: string;
     notThisText: string;
     openQText: string;
-    weekRulesText: string;
     pranaText: string;
     seasonQText: string;
   }) => {
@@ -773,21 +578,6 @@ export function PersonalLifeStrategyClient() {
       return prev ?? { q, st: "", back: "" };
     });
 
-    const ruleLines = patch.weekRulesText
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 5);
-    const weekRules = ruleLines.map((text, i) => {
-      const src = doc.rulePool.find((p) => p.text === text) ?? doc.weekRules.find((r) => r.text === text);
-      return {
-        id: `wr${i}`,
-        n: String(i + 1).padStart(2, "0"),
-        text,
-        why: src?.why ?? "Мой код",
-      };
-    });
-
     const pranaLabels = patch.pranaText
       .split("\n")
       .map((s) => s.trim())
@@ -822,7 +612,7 @@ export function PersonalLifeStrategyClient() {
       dates: doc.season.dates,
     };
 
-    void persist({ ...doc, season, directions, notThis, openQ, weekRules, prana, seasonQ });
+    void persist({ ...doc, season, directions, notThis, openQ, prana, seasonQ });
     setEdit(false);
   };
 
@@ -978,42 +768,13 @@ export function PersonalLifeStrategyClient() {
           </div>
         </section>
 
-        <Sect title="Эта неделя" sub="Если эти вещи произойдут — неделя стратегически состоялась.">
-          <div className="grid grid-cols-3 gap-5">
-            {doc.week.map((w) => (
-              <article
-                key={w.n}
-                className="flex flex-col rounded-[20px] bg-white px-7 py-6 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="v2-tnum font-mono text-[12px] text-[var(--v2-ink-300)]">{w.n}</span>
-                  <Kicker>{w.area}</Kicker>
-                </div>
-                <p className="v2-tight mt-3 text-[17px] leading-snug text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
-                  {w.text}
-                </p>
-                <div className="mt-auto flex items-center gap-3 pt-5">
-                  <span className="v2-tnum inline-flex h-6 items-center rounded-full bg-[var(--v2-ink-100)] px-2.5 text-[11.5px] font-medium text-[var(--v2-ink-600)]">
-                    {w.state}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </Sect>
-
-        <Sect
-          title="Помнить на этой неделе"
-          right={
-            <GhostBtn onClick={() => setEditRules(true)}>
-              <V2Icons.edit className="h-4 w-4 text-[var(--v2-ink-400)]" /> Изменить правила недели
-            </GhostBtn>
-          }
-        >
+        <Sect title="Помнить на этой неделе">
           <div className="divide-y divide-[var(--v2-ink-100)] rounded-[20px] bg-white shadow-[var(--v2-shadow-card)]">
-            {doc.weekRules.map((r) => (
-              <div key={r.id} className="group flex items-center gap-6 px-7 py-5">
-                <span className="v2-tnum w-6 font-mono text-[12px] text-[var(--v2-ink-300)]">{r.n}</span>
+            {doc.rulePool.map((r, i) => (
+              <div key={r.id} className="flex items-center gap-6 px-7 py-5">
+                <span className="v2-tnum w-6 font-mono text-[12px] text-[var(--v2-ink-300)]">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
                 <p
                   className="v2-tight min-w-0 flex-1 text-[19px] font-light leading-snug text-[var(--v2-ink-900)]"
                   style={{ textWrap: "pretty" }}
@@ -1023,23 +784,10 @@ export function PersonalLifeStrategyClient() {
                 <Link href="/v2/personal/my-code" className="v2-tight shrink-0 text-[12px] text-[var(--v2-ink-500)] hover:text-[var(--v2-brand-700)]">
                   почему · {r.why}
                 </Link>
-                <button
-                  type="button"
-                  title="Убрать из фокуса"
-                  onClick={() => {
-                    const weekRules = doc.weekRules
-                      .filter((x) => x.id !== r.id)
-                      .map((x, i) => ({ ...x, n: String(i + 1).padStart(2, "0") }));
-                    void persist({ ...doc, weekRules });
-                  }}
-                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--v2-ink-300)] opacity-0 transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)] group-hover:opacity-100"
-                >
-                  <IcMinus className="h-4 w-4" />
-                </button>
               </div>
             ))}
-            {!doc.weekRules.length ? (
-              <p className="v2-tight px-7 py-6 text-[14px] text-[var(--v2-ink-500)]">Правил на эту неделю пока нет.</p>
+            {!doc.rulePool.length ? (
+              <p className="v2-tight px-7 py-6 text-[14px] text-[var(--v2-ink-500)]">Правил пока нет.</p>
             ) : null}
           </div>
         </Sect>
@@ -1078,29 +826,6 @@ export function PersonalLifeStrategyClient() {
                 <span className="v2-tight text-[13.5px] text-[var(--v2-ink-500)]">{o.st}</span>
                 <span className="v2-tight justify-self-end text-right text-[13px] text-[var(--v2-ink-400)]">{o.back}</span>
               </div>
-            ))}
-          </div>
-        </Sect>
-
-        <Sect
-          title="Последние сигналы реальности"
-          right={
-            <GhostBtn onClick={() => setAddSignal(true)}>
-              <V2Icons.plus className="h-3.5 w-3.5" /> Добавить сигнал
-            </GhostBtn>
-          }
-        >
-          <div className="grid grid-cols-3 gap-5">
-            {doc.signals.map((s, i) => (
-              <article key={i} className="flex flex-col rounded-[20px] bg-white px-7 py-6 shadow-[var(--v2-shadow-card)]">
-                <div className="flex items-center gap-3">
-                  <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{s.date}</span>
-                  <Kicker>{s.area}</Kicker>
-                </div>
-                <p className="v2-tight mt-3 text-[15.5px] leading-relaxed text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
-                  «{s.text}»
-                </p>
-              </article>
             ))}
           </div>
         </Sect>
@@ -1158,45 +883,10 @@ export function PersonalLifeStrategyClient() {
             </div>
           ) : null}
         </section>
-
-        <Sect title="Рядом">
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))" }}>
-            {doc.links.map((l) => (
-              <Link
-                key={l.name}
-                href={l.href}
-                className="group flex flex-col rounded-[20px] bg-white px-6 py-5 no-underline shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
-              >
-                <span className="v2-tight text-[15.5px] font-medium text-[var(--v2-ink-900)] transition group-hover:text-[var(--v2-brand-700)]">
-                  {l.name}
-                </span>
-                <span className="v2-tight mt-1.5 text-[13px] text-[var(--v2-ink-500)]">{l.note}</span>
-                <IcChevR className="mt-4 h-4 w-4 text-[var(--v2-ink-300)] transition group-hover:text-[var(--v2-brand-600)]" />
-              </Link>
-            ))}
-          </div>
-        </Sect>
       </div>
 
-      {editRules ? (
-        <RulesModal
-          selected={doc.weekRules.map((r) => r.text)}
-          pool={doc.rulePool}
-          onClose={() => setEditRules(false)}
-          onSave={saveRules}
-        />
-      ) : null}
       {edit ? <EditDrawer doc={doc} onClose={() => setEdit(false)} onSave={applyEdit} /> : null}
       {hist ? <HistoryDrawer doc={doc} onClose={() => setHist(false)} onSwitch={switchHistory} /> : null}
-      {addSignal ? (
-        <AddSignalModal
-          onClose={() => setAddSignal(false)}
-          onSave={(s) => {
-            void persist({ ...doc, signals: [s, ...doc.signals] });
-            setAddSignal(false);
-          }}
-        />
-      ) : null}
     </div>
   );
 }

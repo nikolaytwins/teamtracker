@@ -34,7 +34,7 @@ export async function PUT(
     const status = body.status != null ? String(body.status) : "not_paid";
     const serviceType = body.serviceType != null ? String(body.serviceType) : "site";
     const businessLine =
-      body.businessLine === "impulse" || body.businessLine === "agency"
+      body.businessLine === "impulse" || body.businessLine === "agency" || body.businessLine === "qmagic"
         ? String(body.businessLine)
         : "agency";
     const clientType = body.clientType != null && body.clientType !== "" ? String(body.clientType) : null;

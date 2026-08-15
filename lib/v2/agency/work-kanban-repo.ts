@@ -1,5 +1,7 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import { createFinanceProject } from "@/lib/v2/finance/finance-repo";
+import { isFinanceBusinessLine } from "@/lib/v2/finance/meta";
+import type { V2FinanceBusinessLine } from "@/lib/v2/finance/types";
 import {
   AGENCY_WORK_STATUSES,
   isAgencyWorkStatus,
@@ -15,7 +17,7 @@ function mapFinanceCard(r: Record<string, unknown>): AgencyKanbanCard {
       ? statusRaw
       : "not_paid";
   const work = isAgencyWorkStatus(r.work_status) ? r.work_status : "not_started";
-  const bl = r.business_line === "impulse" ? "impulse" : "agency";
+  const bl: V2FinanceBusinessLine = isFinanceBusinessLine(r.business_line) ? r.business_line : "agency";
   return {
     id: `fin:${String(r.id)}`,
     kind: "finance",
@@ -139,7 +141,7 @@ export async function createAgencyKanbanCard(
     /** true — создать проект в «Проекты и финансы»; false — только канбан */
     include_in_finance?: boolean;
     total_amount?: number;
-    business_line?: "agency" | "impulse";
+    business_line?: V2FinanceBusinessLine;
   }
 ): Promise<AgencyKanbanCard> {
   const title = input.title.trim();
@@ -154,7 +156,7 @@ export async function createAgencyKanbanCard(
       paidAmount: 0,
       status: "not_paid",
       serviceType: "site",
-      businessLine: input.business_line === "impulse" ? "impulse" : "agency",
+      businessLine: isFinanceBusinessLine(input.business_line) ? input.business_line : "agency",
       notes: input.note ?? null,
     });
     const sb = getV2Supabase();

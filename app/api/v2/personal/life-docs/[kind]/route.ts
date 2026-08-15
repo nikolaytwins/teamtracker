@@ -9,7 +9,8 @@ import {
 import { seedBrandDoc } from "@/lib/v2/personal/seeds/brand-seed";
 import { seedLifeStrategyDoc } from "@/lib/v2/personal/seeds/life-strategy-seed";
 import { seedMyCodeDoc } from "@/lib/v2/personal/seeds/mycode-seed";
-import { seedTimeDoc } from "@/lib/v2/personal/seeds/time-seed";
+import { normalizeTimeDoc, seedTimeDoc } from "@/lib/v2/personal/seeds/time-seed";
+import { enrichTimeDocWithFinance } from "@/lib/v2/personal/time-finance";
 
 const KINDS = new Set<LifeDocKind>(["time", "brand", "life_strategy", "mycode"]);
 
@@ -38,6 +39,11 @@ export async function GET(_request: NextRequest, { params }: Ctx) {
     }
     const kind = raw as LifeDocKind;
     const doc = await loadPersonalLifeDoc(auth.ctx, kind, seedFor(kind));
+    if (kind === "time") {
+      const normalized = normalizeTimeDoc(doc);
+      const enriched = await enrichTimeDocWithFinance(auth.ctx, normalized);
+      return NextResponse.json({ doc: enriched });
+    }
     return NextResponse.json({ doc });
   } catch (e) {
     console.error("life doc get:", e);
@@ -55,9 +61,15 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
     }
     const kind = raw as LifeDocKind;
     const body = await request.json();
-    const doc = body.doc ?? body;
+    let doc = body.doc ?? body;
     if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
       return NextResponse.json({ error: "doc required" }, { status: 400 });
+    }
+    if (kind === "time") {
+      const normalized = normalizeTimeDoc(doc);
+      const saved = await savePersonalLifeDoc(auth.ctx, kind, normalized);
+      const enriched = await enrichTimeDocWithFinance(auth.ctx, normalizeTimeDoc(saved));
+      return NextResponse.json({ doc: enriched });
     }
     const saved = await savePersonalLifeDoc(auth.ctx, kind, doc);
     return NextResponse.json({ doc: saved });

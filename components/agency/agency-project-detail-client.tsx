@@ -885,7 +885,11 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
           <div>
             <div className="text-sm text-[var(--muted-foreground)]">Направление</div>
             <div className="font-medium">
-              {project.businessLine === "impulse" ? "Импульс" : "Агентство"}
+              {project.businessLine === "impulse"
+                ? "Импульс"
+                : project.businessLine === "qmagic"
+                  ? "Qmagic"
+                  : "Агентство"}
             </div>
           </div>
           <div>

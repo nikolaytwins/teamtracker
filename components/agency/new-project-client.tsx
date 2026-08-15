@@ -136,7 +136,7 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
 
             <div>
               <span className="block text-sm font-medium text-[var(--text)] mb-1">Направление *</span>
-              <div className="flex gap-4">
+              <div className="flex flex-wrap gap-4">
                 <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
                   <input type="radio" name="businessLine" value="agency" defaultChecked />
                   Агентство
@@ -144,6 +144,10 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
                 <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
                   <input type="radio" name="businessLine" value="impulse" />
                   Импульс
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                  <input type="radio" name="businessLine" value="qmagic" />
+                  Qmagic
                 </label>
               </div>
             </div>
