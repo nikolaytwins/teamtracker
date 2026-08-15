@@ -1,4 +1,7 @@
-/** Данные главной страницы (Home). Статичный seed — БД не задействована. */
+/**
+ * Данные главной страницы (Home).
+ * Статичный seed — 1:1 перенос макета. БД и API не задействованы.
+ */
 
 export type HomeSeason = {
   kicker: string;
@@ -117,6 +120,28 @@ export type HomeVideo = {
   short: HomeVideoItem[];
   question: string;
 };
+
+/* -------------------------------- ССЫЛКИ --------------------------------- */
+
+/** Страницы макета (`*.html`) в маршруты приложения. */
+export const HOME_LINKS = {
+  /** Стратегия.html */
+  strategy: "/v2/personal/life-strategy",
+  /** Проекты.html */
+  projects: "/v2/agency/overview",
+  /** Личный бренд.html */
+  brand: "/v2/personal/brand",
+  /** Финансы.html */
+  finance: "/v2/personal/finance",
+  /** Проекты и финансы.html */
+  agencyFinance: "/v2/agency",
+  /** Время и экономика.html */
+  time: "/v2/personal/time",
+  /** Мои задачи v2.html */
+  tasks: "/v2/personal/tasks/inbox",
+  /** Наблюдения.html */
+  observations: "/v2/personal/observations",
+} as const;
 
 /* ------------------------------- СЕЗОН ----------------------------------- */
 
@@ -239,7 +264,7 @@ export const HOME_BETS: HomeBet[] = [
     bg: "#EFF4FF",
     hyp: "Найти AI / Product / Creative роль на 250–300к, которая закроет фундамент и оставит мне жизнь.",
     horizon: "Сентябрь — выход на рынок",
-    href: "/v2/personal/life-strategy",
+    href: HOME_LINKS.strategy,
   },
   {
     id: "qmagic",
@@ -250,7 +275,7 @@ export const HOME_BETS: HomeBet[] = [
     bg: "#F3EDFF",
     hyp: "Дать доступ 10 людям, проверить, пользуются ли они и готовы ли платить.",
     horizon: "Сентябрь — direct validation",
-    href: "/v2/personal/dashboard",
+    href: HOME_LINKS.projects,
   },
   {
     id: "brand",
@@ -261,7 +286,7 @@ export const HOME_BETS: HomeBet[] = [
     bg: "#FFF1E8",
     hyp: "Выпустить 6 роликов на YouTube и проверить отклик.",
     horizon: "Октябрь — когда есть где снимать",
-    href: "/v2/personal/brand",
+    href: HOME_LINKS.brand,
   },
 ];
 

@@ -1,16 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode, type SVGProps } from "react";
+import { useState, type SVGProps } from "react";
 import { appPath } from "@/lib/api-url";
-import { fetchJson } from "@/lib/v2/client/fetch-json";
-import { V2Icons } from "@/components/v2/ui/icons";
-import type { BrandDoc } from "@/lib/v2/personal/seeds/brand-seed";
-import type { LifeStrategyDoc } from "@/lib/v2/personal/seeds/life-strategy-seed";
 import {
   HOME_BETS,
   HOME_CHECKS,
   HOME_LILA_BAN,
+  HOME_LINKS,
   HOME_MONEY,
   HOME_MONTHS,
   HOME_NOT_NOW,
@@ -28,42 +25,54 @@ import {
   HOME_WEEK_DONE_SEED,
   homeFmt,
   homeFmtK,
-  type HomeSeason,
-  type HomeVideoItem,
   type HomeVideoStatus,
 } from "@/lib/v2/personal/seeds/home-seed";
 
+/* -------------------------------- ИКОНКИ --------------------------------- */
 type IconProps = SVGProps<SVGSVGElement>;
 
-function IcMinus(p: IconProps) {
-  return (
+const HI = {
+  plus: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ),
+  bell: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path
+        d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M10 20a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  ),
+  arrowR: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M9.5 6.5 15 12l-5.5 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  check: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="m6 12.5 4 4 8-9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  video: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <rect x="3.5" y="6.5" width="12" height="11" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="m15.5 12 5-3v9l-5-3v-3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  ),
+  minus: (p: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path d="M6 12h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
-  );
-}
-
-function IcVideo(p: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <rect x="3" y="6" width="12.5" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m15.5 11 4.2-2.6c.5-.3 1.3 0 1.3.7v5.8c0 .7-.8 1-1.3.7l-4.2-2.6" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** Статусы роликов из документа «Личный бренд» приводим к словарю главной. */
-const BRAND_STATUS: Record<string, HomeVideoStatus> = {
-  Опубликован: "опубликовано",
-  Ready: "монтаж",
-  Script: "сценарий",
-  Idea: "идея",
+  ),
 };
 
-function toVideoStatus(status: string): HomeVideoStatus {
-  if (status in HOME_VIDEO_ST) return status as HomeVideoStatus;
-  return BRAND_STATUS[status] ?? "идея";
-}
+/** Синий макета отличается от --v2-brand-600, поэтому задаётся явно. */
+const HERO_BLUE = "#2d5eef";
 
 function videoOpacity(status: HomeVideoStatus) {
   if (status === "опубликовано") return 1;
@@ -71,41 +80,69 @@ function videoOpacity(status: HomeVideoStatus) {
   return 0.28;
 }
 
-function capitalize(s: string) {
-  return s ? s[0].toUpperCase() + s.slice(1) : s;
+/* ------------------------------- TOPBAR ---------------------------------- */
+function Topbar() {
+  return (
+    <div className="flex h-14 items-center gap-3 px-8">
+      <div className="flex items-center gap-2 text-[13px] text-[var(--v2-ink-500)]">
+        <span className="v2-tight font-medium text-[var(--v2-ink-900)]">Главная</span>
+        <span className="text-[var(--v2-ink-300)]">/</span>
+        <span className="v2-tight text-[var(--v2-ink-400)]">{HOME_SEASON.day}</span>
+      </div>
+      <div className="ml-auto flex items-center gap-1.5">
+        <Link
+          href={appPath(HOME_LINKS.observations)}
+          className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+        >
+          <HI.plus className="h-4 w-4 text-[var(--v2-ink-400)]" /> Наблюдение
+        </Link>
+        <button
+          type="button"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+        >
+          <span className="relative">
+            <HI.bell className="h-[18px] w-[18px]" />
+            <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--v2-brand-500)] ring-2 ring-white" />
+          </span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /* -------------------------------- СЕЗОН ---------------------------------- */
-function SeasonHero({ season }: { season: HomeSeason }) {
+function SeasonHero() {
   return (
     <section
       className="rounded-2xl px-8 py-8 text-white shadow-[var(--v2-shadow-soft)]"
-      style={{ background: "var(--v2-brand-600)" }}
+      style={{ background: HERO_BLUE }}
     >
       <div className="flex items-center gap-2.5">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">{season.kicker}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">
+          {HOME_SEASON.kicker}
+        </span>
         <span className="h-1 w-1 rounded-full bg-white/25" />
-        <span className="v2-tight text-[12px] text-white/55">{season.dates}</span>
+        <span className="v2-tight text-[12px] text-white/55">{HOME_SEASON.dates}</span>
       </div>
       <p
         className="v2-tight mt-3.5 max-w-[52ch] text-[30px] font-medium leading-[1.28] text-white"
         style={{ textWrap: "pretty" }}
       >
-        {season.idea}
+        {HOME_SEASON.idea}
       </p>
       <div className="mt-7 flex items-center gap-4">
         <div className="h-1 max-w-[420px] flex-1 overflow-hidden rounded-full bg-white/15">
           <span
             className="block h-full rounded-full bg-white/80"
-            style={{ width: `${Math.round(season.progress * 100)}%` }}
+            style={{ width: `${HOME_SEASON.progress * 100}%` }}
           />
         </div>
-        <span className="v2-tight shrink-0 text-[12px] text-white/45">Review · {season.review}</span>
+        <span className="v2-tight shrink-0 text-[12px] text-white/45">Review · {HOME_SEASON.review}</span>
         <Link
-          href={appPath("/v2/personal/life-strategy")}
+          href={appPath(HOME_LINKS.strategy)}
           className="v2-tight ml-auto inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-white/85 transition hover:text-white"
         >
-          Стратегия <V2Icons.arrowR className="h-3.5 w-3.5" />
+          Стратегия <HI.arrowR className="h-3.5 w-3.5" />
         </Link>
       </div>
     </section>
@@ -172,7 +209,7 @@ function MonthBand({ month, setMonth }: { month: string; setMonth: (id: string) 
                   ? "text-white shadow-[var(--v2-shadow-soft)]"
                   : "bg-white shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-cardHv)]"
               }`}
-              style={active ? { background: "var(--v2-brand-600)" } : undefined}
+              style={active ? { background: HERO_BLUE } : undefined}
             >
               <div className="flex items-center gap-2">
                 <span
@@ -185,9 +222,7 @@ function MonthBand({ month, setMonth }: { month: string; setMonth: (id: string) 
                 {x.state === "сейчас" ? (
                   <span
                     className={`rounded px-1.5 py-[2px] text-[10px] font-semibold uppercase tracking-[0.1em] ${
-                      active
-                        ? "bg-white/15 text-white/80"
-                        : "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
+                      active ? "bg-white/15 text-white/80" : "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
                     }`}
                   >
                     сейчас
@@ -219,7 +254,7 @@ function MonthBand({ month, setMonth }: { month: string; setMonth: (id: string) 
               </p>
               <div
                 className={`mt-4 flex flex-col gap-1.5 border-t pt-3.5 ${
-                  active ? "border-white/10" : "border-[var(--v2-ink-100)]"
+                  active ? "border-white/12" : "border-[var(--v2-ink-100)]"
                 }`}
               >
                 {x.focus.map((f, i) => (
@@ -279,7 +314,7 @@ function SprintGoals() {
             <div className="mt-3.5 flex flex-col gap-2">
               {g.items.map((it) => (
                 <div key={it} className="v2-tight flex gap-2.5 text-[13px] leading-relaxed text-[var(--v2-ink-600)]">
-                  <IcMinus className="mt-[4px] h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-300)]" />
+                  <HI.minus className="mt-[4px] h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-300)]" />
                   <span>{it}</span>
                 </div>
               ))}
@@ -321,10 +356,7 @@ function BetCards() {
                 <div className="v2-tight truncate text-[15px] font-semibold text-[var(--v2-ink-900)]">{b.name}</div>
               </div>
             </div>
-            <p
-              className="v2-tight mt-3.5 text-[14px] leading-[1.55] text-[var(--v2-ink-800)]"
-              style={{ textWrap: "pretty" }}
-            >
+            <p className="v2-tight mt-3.5 text-[14px] leading-[1.55] text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
               {b.hyp}
             </p>
             <div className="mt-auto flex items-center gap-3 pt-4">
@@ -333,7 +365,7 @@ function BetCards() {
                 href={appPath(b.href)}
                 className="v2-tight ml-auto inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-[var(--v2-brand-700)] transition hover:text-[var(--v2-brand-800)]"
               >
-                Открыть <V2Icons.arrowR className="h-3 w-3" />
+                Открыть <HI.arrowR className="h-3 w-3" />
               </Link>
             </div>
           </div>
@@ -355,7 +387,7 @@ function NotNow() {
       <div className="mt-3.5 grid grid-cols-3 gap-x-6 gap-y-2">
         {HOME_NOT_NOW.map((n) => (
           <div key={n} className="v2-tight flex items-center gap-2.5 text-[13.5px] text-[var(--v2-ink-600)]">
-            <IcMinus className="h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-300)]" />
+            <HI.minus className="h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-300)]" />
             {n}
           </div>
         ))}
@@ -403,25 +435,25 @@ function MoneyStrip() {
         label="Капитал всего"
         value={`${homeFmt(HOME_MONEY.capital)} ₽`}
         note="+86 тыс ₽ за 2026 год"
-        href="/v2/personal/finance"
+        href={HOME_LINKS.finance}
       />
       <MoneyCard
         label="В распоряжении"
         value={`${homeFmt(HOME_MONEY.available)} ₽`}
         note="карта, ИП и наличные"
-        href="/v2/personal/finance"
+        href={HOME_LINKS.finance}
       />
       <MoneyCard
         label={`Ожидается за ${HOME_MONEY.month}`}
         value={`${homeFmt(HOME_MONEY.expected)} ₽`}
         note={`оплачено ${homeFmt(HOME_MONEY.paid)} ₽ · 9 проектов`}
-        href="/v2/agency"
+        href={HOME_LINKS.agencyFinance}
       />
       <MoneyCard
         label="Прогноз конца месяца"
         value={`+${homeFmt(HOME_MONEY.forecast)} ₽`}
         note={`расходы ${homeFmtK(HOME_MONEY.expenses)} ₽`}
-        href="/v2/personal/finance"
+        href={HOME_LINKS.finance}
         good
       />
     </section>
@@ -446,7 +478,7 @@ function WeekBoard({
         <h2 className="v2-tight text-[19px] font-semibold text-[var(--v2-ink-900)]">{HOME_WEEK.label}</h2>
         <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">Планирую неделями, не днями.</span>
         <Link
-          href={appPath("/v2/personal/tasks/inbox")}
+          href={appPath(HOME_LINKS.tasks)}
           className="v2-tight ml-auto shrink-0 text-[12.5px] font-medium text-[var(--v2-brand-700)] transition hover:text-[var(--v2-brand-800)]"
         >
           Задачи недели →
@@ -479,16 +511,14 @@ function WeekBoard({
                       on ? "bg-emerald-500 text-white" : "bg-[var(--v2-ink-100)] text-transparent"
                     }`}
                   >
-                    <V2Icons.check className="h-[11px] w-[11px]" />
+                    <HI.check className="h-[11px] w-[11px]" />
                   </span>
                   <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
                     {f.area}
                   </span>
                 </div>
                 <p
-                  className={`v2-tight mt-2 text-[13px] leading-snug text-[var(--v2-ink-800)] ${
-                    on ? "line-through" : ""
-                  }`}
+                  className={`v2-tight mt-2 text-[13px] leading-snug text-[var(--v2-ink-800)] ${on ? "line-through" : ""}`}
                   style={{ textWrap: "pretty" }}
                 >
                   {f.text}
@@ -504,7 +534,10 @@ function WeekBoard({
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {Object.entries(HOME_WEEK.kinds).map(([id, k]) => (
-          <span key={id} className="v2-tight inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--v2-ink-500)]">
+          <span
+            key={id}
+            className="v2-tight inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--v2-ink-500)]"
+          >
             <span className="h-2 w-2 rounded-full" style={{ background: k.tint }} />
             {k.label}
           </span>
@@ -539,7 +572,7 @@ function WeekBoard({
               </span>
             </div>
             {d.items.map((it, i) => {
-              const k = HOME_WEEK.kinds[it.k] ?? { label: it.k, tint: "#71717A", bg: "#F4F4F5" };
+              const k = HOME_WEEK.kinds[it.k];
               const itemId = `${d.id}${i}`;
               const isDone = done.includes(itemId);
               return (
@@ -553,7 +586,7 @@ function WeekBoard({
                 >
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: k.tint }} />
-                    {isDone ? <V2Icons.check className="ml-auto h-3 w-3 shrink-0" style={{ color: k.tint }} /> : null}
+                    {isDone ? <HI.check className="ml-auto h-3 w-3 shrink-0" style={{ color: k.tint }} /> : null}
                   </span>
                   <span
                     className={`v2-tight mt-1 block text-[11.5px] leading-snug text-[var(--v2-ink-800)] ${
@@ -589,17 +622,14 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-const TIME_COLS = "grid gap-x-5 items-center";
+const TIME_COLS = "grid items-center gap-x-5";
 const TIME_GRID = { gridTemplateColumns: "136px minmax(0,1fr) 116px 104px" } as const;
 
 function TimeProfit() {
-  const rows = useMemo(
-    () => HOME_TRACKS.map((t) => ({ ...t, rate: t.money ? Math.round(t.money / t.hours) : 0 })),
-    [],
-  );
+  const rows = HOME_TRACKS.map((t) => ({ ...t, rate: t.money ? Math.round(t.money / t.hours) : 0 }));
   const totalH = rows.reduce((s, r) => s + r.hours, 0);
   const totalM = rows.reduce((s, r) => s + r.money, 0);
-  const maxH = Math.max(...rows.map((r) => r.hours), 1);
+  const maxH = Math.max(...rows.map((r) => r.hours));
   const maxRate = Math.max(...rows.map((r) => r.rate), 1);
   const betHours = rows.filter((r) => r.kind === "bet").reduce((s, r) => s + r.hours, 0);
 
@@ -611,7 +641,7 @@ function TimeProfit() {
           {HOME_MONEY.month} · {totalH} ч · {homeFmt(totalM)} ₽
         </span>
         <Link
-          href={appPath("/v2/personal/time")}
+          href={appPath(HOME_LINKS.time)}
           className="v2-tight ml-auto shrink-0 text-[12.5px] font-medium text-[var(--v2-brand-700)] transition hover:text-[var(--v2-brand-800)]"
         >
           Время и экономика →
@@ -675,11 +705,7 @@ function TimeProfit() {
       <div className="mt-4 grid grid-cols-4 gap-4 border-t border-[var(--v2-ink-100)] pt-4">
         <Stat label="Всего часов" value={`${totalH} ч`} />
         <Stat label="Деньги месяца" value={`${homeFmt(totalM)} ₽`} />
-        <Stat
-          label="Средний ₽/час"
-          value={`${homeFmt(totalH ? Math.round(totalM / totalH) : 0)} ₽`}
-          accent
-        />
+        <Stat label="Средний ₽/час" value={`${homeFmt(Math.round(totalM / totalH))} ₽`} accent />
         <Stat label="Часы в ставки" value={`${betHours} ч`} />
       </div>
     </section>
@@ -687,13 +713,7 @@ function TimeProfit() {
 }
 
 /* ------------------------- ПРАВИЛА И МИНИМУМ ------------------------------ */
-function RulesCard({
-  state,
-  toggle,
-}: {
-  state: Record<string, boolean>;
-  toggle: (id: string) => void;
-}) {
+function RulesCard({ state, toggle }: { state: Record<string, boolean>; toggle: (id: string) => void }) {
   return (
     <section className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">
       <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">Минимум недели</h3>
@@ -714,7 +734,7 @@ function RulesCard({
                   on ? "bg-emerald-500 text-white" : "bg-[var(--v2-ink-100)] text-transparent"
                 }`}
               >
-                <V2Icons.check className="h-3 w-3" />
+                <HI.check className="h-3 w-3" />
               </span>
               <span className="min-w-0">
                 <span
@@ -751,7 +771,7 @@ function RulesCard({
   );
 }
 
-function RulesBand({ rules }: { rules: string[] }) {
+function RulesBand() {
   return (
     <section className="rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-soft)]">
       <div className="flex items-baseline gap-3">
@@ -759,15 +779,12 @@ function RulesBand({ rules }: { rules: string[] }) {
         <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">Рамки, а не производственный план.</span>
       </div>
       <div className="mt-4 grid grid-cols-5 gap-3">
-        {rules.map((r, i) => (
-          <div key={`${i}-${r}`} className="rounded-xl bg-[var(--v2-ink-50)] px-4 py-3.5">
+        {HOME_RULES.map((r, i) => (
+          <div key={r} className="rounded-xl bg-[var(--v2-ink-50)] px-4 py-3.5">
             <div className="v2-tnum text-[10.5px] font-semibold text-[var(--v2-ink-300)]">
               {String(i + 1).padStart(2, "0")}
             </div>
-            <p
-              className="v2-tight mt-1 text-[14px] leading-snug text-[var(--v2-ink-800)]"
-              style={{ textWrap: "pretty" }}
-            >
+            <p className="v2-tight mt-1 text-[14px] leading-snug text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
               {r}
             </p>
           </div>
@@ -792,19 +809,19 @@ function RulesBand({ rules }: { rules: string[] }) {
 }
 
 /* -------------------------------- РОЛИКИ --------------------------------- */
-function VideoCard({ videos }: { videos: HomeVideoItem[] }) {
-  const pub = videos.filter((v) => v.st === "опубликовано").length;
+function VideoCard() {
+  const pub = HOME_VIDEO.yt.filter((v) => v.st === "опубликовано").length;
   return (
     <section className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">
       <div className="flex items-center gap-2">
-        <IcVideo className="h-[16px] w-[16px] text-[var(--v2-ink-400)]" />
+        <HI.video className="h-[16px] w-[16px] text-[var(--v2-ink-400)]" />
         <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">Ролики</h3>
         <span className="v2-tnum v2-tight ml-auto text-[12px] text-[var(--v2-ink-500)]">
           {pub} из {HOME_VIDEO.goal} на YouTube
         </span>
       </div>
       <div className="mt-2.5 flex gap-1">
-        {videos.map((v) => (
+        {HOME_VIDEO.yt.map((v) => (
           <span
             key={`bar-${v.n}`}
             className="h-1.5 flex-1 rounded-full"
@@ -813,7 +830,7 @@ function VideoCard({ videos }: { videos: HomeVideoItem[] }) {
         ))}
       </div>
       <div className="mt-3 flex flex-col divide-y divide-[var(--v2-ink-100)]">
-        {videos.map((v) => {
+        {HOME_VIDEO.yt.map((v) => {
           const s = HOME_VIDEO_ST[v.st];
           return (
             <div key={v.n} className="py-2.5">
@@ -843,9 +860,7 @@ function VideoCard({ videos }: { videos: HomeVideoItem[] }) {
                   </>
                 ) : null}
               </div>
-              {v.react ? (
-                <div className="v2-tight mt-0.5 pl-[22px] text-[11.5px] text-[var(--v2-ink-500)]">{v.react}</div>
-              ) : null}
+              <div className="v2-tight mt-0.5 pl-[22px] text-[11.5px] text-[var(--v2-ink-500)]">{v.react}</div>
             </div>
           );
         })}
@@ -853,10 +868,10 @@ function VideoCard({ videos }: { videos: HomeVideoItem[] }) {
       <div className="mt-3 border-t border-[var(--v2-ink-100)] pt-3">
         <p className="v2-tight text-[12px] leading-relaxed text-[var(--v2-ink-500)]">{HOME_VIDEO.question}</p>
         <Link
-          href={appPath("/v2/personal/brand")}
+          href={appPath(HOME_LINKS.brand)}
           className="v2-tight mt-2.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--v2-brand-700)] transition hover:text-[var(--v2-brand-800)]"
         >
-          Личный бренд <V2Icons.arrowR className="h-3 w-3" />
+          Личный бренд <HI.arrowR className="h-3 w-3" />
         </Link>
       </div>
     </section>
@@ -865,11 +880,6 @@ function VideoCard({ videos }: { videos: HomeVideoItem[] }) {
 
 /* --------------------------------- HOME ---------------------------------- */
 export function V2PersonalHomeClient() {
-  const [today, setToday] = useState(HOME_SEASON.day);
-  const [season, setSeason] = useState<HomeSeason>(HOME_SEASON);
-  const [rules, setRules] = useState<string[]>(HOME_RULES);
-  const [videos, setVideos] = useState<HomeVideoItem[]>(HOME_VIDEO.yt);
-
   const [month, setMonth] = useState("aug");
   const [doneItems, setDoneItems] = useState<string[]>(HOME_WEEK_DONE_SEED);
   const [focusDone, setFocusDone] = useState<string[]>([]);
@@ -883,91 +893,11 @@ export function V2PersonalHomeClient() {
     setFocusDone((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const toggleCheck = (id: string) => setChecks((p) => ({ ...p, [id]: !p[id] }));
 
-  useEffect(() => {
-    setToday(
-      capitalize(
-        new Date().toLocaleDateString("ru-RU", {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        }),
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-
-    const loadStrategy = async () => {
-      try {
-        const { doc } = await fetchJson<{ doc: LifeStrategyDoc }>(
-          "/api/v2/personal/life-docs/life_strategy",
-        );
-        if (!alive || !doc) return;
-        if (doc.season) {
-          setSeason((prev) => ({
-            ...prev,
-            kicker: doc.season.kicker || prev.kicker,
-            dates: doc.season.dates || prev.dates,
-            idea: doc.season.lead ? doc.season.lead.replace(/\s*\n+\s*/g, " ") : prev.idea,
-            review: doc.season.review || prev.review,
-          }));
-        }
-        const source = doc.weekRules?.length ? doc.weekRules : doc.rulePool ?? [];
-        const texts = source.map((r) => r.text).filter(Boolean).slice(0, 5);
-        if (texts.length) setRules(texts);
-      } catch {
-        // оставляем seed-контент
-      }
-    };
-
-    const loadBrand = async () => {
-      try {
-        const { doc } = await fetchJson<{ doc: BrandDoc }>("/api/v2/personal/life-docs/brand");
-        if (!alive || !doc?.videos?.length) return;
-        setVideos(
-          doc.videos.slice(0, 6).map((v, i) => ({
-            n: String(i + 1).padStart(2, "0"),
-            t: v.title,
-            st: toVideoStatus(v.status),
-            date: v.date,
-            views: v.m?.v30 ? homeFmtK(v.m.v30) : "—",
-            react: v.m
-              ? `${v.m.comments} комментов · +${v.m.subs} подписчиков`
-              : v.next || v.sub || "",
-          })),
-        );
-      } catch {
-        // оставляем seed-контент
-      }
-    };
-
-    void loadStrategy();
-    void loadBrand();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-20 pt-4">
-      <div className="mx-auto flex max-w-[1240px] flex-col gap-6">
-        <div className="flex items-center gap-3">
-          <div className="v2-tight flex items-center gap-2 text-[13px] text-[var(--v2-ink-500)]">
-            <span className="font-medium text-[var(--v2-ink-900)]">Главная</span>
-            <span className="text-[var(--v2-ink-300)]">/</span>
-            <span className="text-[var(--v2-ink-400)]">{today}</span>
-          </div>
-          <Link
-            href={appPath("/v2/personal/observations")}
-            className="v2-tight ml-auto inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
-          >
-            <V2Icons.plus className="h-4 w-4 text-[var(--v2-ink-400)]" /> Наблюдение
-          </Link>
-        </div>
-
-        <SeasonHero season={season} />
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <Topbar />
+      <div className="flex flex-col gap-6 px-8 pb-20 pt-3">
+        <SeasonHero />
         <LilaBanner />
         <MonthBand month={month} setMonth={setMonth} />
         <SprintGoals />
@@ -976,20 +906,15 @@ export function V2PersonalHomeClient() {
         <MoneyStrip />
         <div className="grid grid-cols-[minmax(0,1fr)_336px] items-start gap-6">
           <div className="flex min-w-0 flex-col gap-6">
-            <WeekBoard
-              done={doneItems}
-              toggle={toggleItem}
-              focusDone={focusDone}
-              toggleFocus={toggleFocus}
-            />
+            <WeekBoard done={doneItems} toggle={toggleItem} focusDone={focusDone} toggleFocus={toggleFocus} />
             <TimeProfit />
           </div>
           <div className="flex min-w-0 flex-col gap-4">
             <RulesCard state={checks} toggle={toggleCheck} />
-            <VideoCard videos={videos} />
+            <VideoCard />
           </div>
         </div>
-        <RulesBand rules={rules} />
+        <RulesBand />
       </div>
     </div>
   );
