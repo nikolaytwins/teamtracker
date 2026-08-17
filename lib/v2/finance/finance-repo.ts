@@ -2,6 +2,8 @@ import { getAgencyRepoV2 } from "@/lib/agency-store";
 import { agencyDetailLineTotal } from "@/lib/agency/detail-line-total";
 import { isInFinanceMonth } from "@/lib/v2/finance/meta";
 import {
+  FINANCE_BUSINESS_LINE_META,
+  FINANCE_MONTH_NAMES,
   FINANCE_SERVICE_META,
   isFinanceBusinessLine,
   isFinanceServiceType,
@@ -66,6 +68,7 @@ function mapAgencyGeneralExpense(
     employee_role: role || "custom",
     amount: Number(raw.amount) || 0,
     notes: raw.notes ? String(raw.notes) : null,
+    business_line: isFinanceBusinessLine(raw.businessLine) ? raw.businessLine : "agency",
     created_at: String(raw.createdAt),
     updated_at: String(raw.updatedAt),
   };
@@ -185,6 +188,97 @@ export async function listFinanceMonthSummaries(
     out.set(key, computeFinanceMonthSummary(projects, generalExpenses, year, month));
   }
   return out;
+}
+
+export type V2FinanceLineMonthPoint = {
+  key: string;
+  year: number;
+  month: number;
+  label: string;
+  expectedRevenue: number;
+  actualRevenue: number;
+  totalExpenses: number;
+  profit: number;
+  projectCount: number;
+};
+
+export type V2FinanceLineAnalytics = {
+  businessLine: V2FinanceBusinessLine;
+  months: V2FinanceLineMonthPoint[];
+  byService: V2FinanceServiceStat[];
+  totals: {
+    expectedRevenue: number;
+    actualRevenue: number;
+    totalExpenses: number;
+    profit: number;
+    projectCount: number;
+  };
+};
+
+/**
+ * Вся история по направлению: помесячная выручка/прибыль и разрез по услугам.
+ * Общие расходы и налог не делятся между направлениями — считаются как накладные целиком.
+ */
+export async function loadFinanceLineAnalytics(
+  ctx: V2SessionContext,
+  businessLine: V2FinanceBusinessLine
+): Promise<V2FinanceLineAnalytics> {
+  const [allProjects, allExpensesRaw] = await Promise.all([
+    loadEnrichedFinanceProjects(ctx),
+    repo().listGeneralExpenses(),
+  ]);
+  const allExpenses = allExpensesRaw.map((r) => mapAgencyGeneralExpense(r, ctx.workspaceId));
+  const lineProjects = allProjects.filter((p) => p.business_line === businessLine);
+
+  const monthKeys = new Map<string, { year: number; month: number }>();
+  for (const p of lineProjects) {
+    const d = new Date(p.created_at);
+    if (Number.isNaN(d.getTime())) continue;
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    monthKeys.set(`${year}-${String(month).padStart(2, "0")}`, { year, month });
+  }
+
+  const months: V2FinanceLineMonthPoint[] = [...monthKeys.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, { year, month }]) => {
+      const projects = lineProjects.filter((p) => isInFinanceMonth(p.created_at, year, month));
+      const generalExpenses = allExpenses.filter(
+        (e) => e.business_line === businessLine && isInFinanceMonth(e.created_at, year, month)
+      );
+      const summary = computeFinanceMonthSummary(projects, generalExpenses, year, month, {
+        fixedTax: financeFixedTaxForLine(businessLine),
+      });
+      return {
+        key,
+        year,
+        month,
+        label: `${FINANCE_MONTH_NAMES[month - 1]?.slice(0, 3) ?? month} ${String(year).slice(2)}`,
+        expectedRevenue: summary.expectedRevenue,
+        actualRevenue: summary.actualRevenue,
+        totalExpenses: summary.totalExpenses,
+        profit: summary.profit,
+        projectCount: summary.projectCount,
+      };
+    });
+
+  const totals = months.reduce(
+    (acc, m) => ({
+      expectedRevenue: acc.expectedRevenue + m.expectedRevenue,
+      actualRevenue: acc.actualRevenue + m.actualRevenue,
+      totalExpenses: acc.totalExpenses + m.totalExpenses,
+      profit: acc.profit + m.profit,
+      projectCount: acc.projectCount + m.projectCount,
+    }),
+    { expectedRevenue: 0, actualRevenue: 0, totalExpenses: 0, profit: 0, projectCount: 0 }
+  );
+
+  return {
+    businessLine,
+    months,
+    byService: computeFinanceServiceStats(lineProjects),
+    totals,
+  };
 }
 
 export async function createFinanceProject(
@@ -330,6 +424,7 @@ export async function createFinanceGeneralExpense(
     employeeRole: string;
     amount: number;
     notes?: string | null;
+    businessLine?: V2FinanceBusinessLine;
     year?: number;
     month?: number;
   }
@@ -341,6 +436,7 @@ export async function createFinanceGeneralExpense(
     employeeRole: input.employeeRole.trim(),
     amount: input.amount,
     notes: input.notes ?? null,
+    businessLine: input.businessLine ?? "agency",
     year: input.year,
     month: input.month,
   });
@@ -355,6 +451,7 @@ export async function updateFinanceGeneralExpense(
     employeeRole: string;
     amount: number;
     notes?: string | null;
+    businessLine?: V2FinanceBusinessLine;
   }
 ): Promise<V2FinanceGeneralExpenseRow> {
   const existing = await repo().getGeneralExpenseById(id);
@@ -365,7 +462,8 @@ export async function updateFinanceGeneralExpense(
     input.employeeName.trim(),
     input.employeeRole.trim(),
     input.amount,
-    input.notes?.trim() || null
+    input.notes?.trim() || null,
+    input.businessLine
   );
   if (!updated) throw new Error("Expense not found after update");
   return mapAgencyGeneralExpense(updated, ctx.workspaceId);
@@ -380,21 +478,31 @@ export async function copyFinanceGeneralExpensesFromMonth(
   fromYear: number,
   fromMonth: number,
   toYear: number,
-  toMonth: number
+  toMonth: number,
+  businessLine?: V2FinanceBusinessLine
 ): Promise<number> {
   return repo().copyGeneralExpensesBetweenMonths({
     fromYear,
     fromMonth,
     toYear,
     toMonth,
+    businessLine,
   });
+}
+
+/** Фиксированные страховые взносы ИП — относятся к агентству как основному направлению. */
+const FIXED_MONTHLY_TAX_RUB = 6916;
+
+export function financeFixedTaxForLine(businessLine: V2FinanceBusinessLine): number {
+  return businessLine === "agency" ? FIXED_MONTHLY_TAX_RUB : 0;
 }
 
 export function computeFinanceMonthSummary(
   projects: V2FinanceProjectView[],
   generalExpenses: V2FinanceGeneralExpenseRow[],
   year: number,
-  month: number
+  month: number,
+  options?: { fixedTax?: number }
 ): V2FinanceMonthSummary {
   const expectedRevenue = projects.reduce((s, p) => s + p.effective_total_amount, 0);
   const actualRevenue = projects.reduce((s, p) => s + p.paid_amount, 0);
@@ -403,7 +511,7 @@ export function computeFinanceMonthSummary(
   const accountRevenue = projects
     .filter((p) => p.payment_method === "account" && p.status === "paid")
     .reduce((s, p) => s + p.paid_amount, 0);
-  const taxAmount = 6916 + accountRevenue * 0.01;
+  const taxAmount = (options?.fixedTax ?? FIXED_MONTHLY_TAX_RUB) + accountRevenue * 0.01;
   const totalExpenses = projectExpenses + manualGeneralExpenses + taxAmount;
   const profit = expectedRevenue - totalExpenses;
   const margin = expectedRevenue ? (profit / expectedRevenue) * 100 : 0;
@@ -420,6 +528,30 @@ export function computeFinanceMonthSummary(
     margin,
     projectCount: projects.length,
   };
+}
+
+/**
+ * Сводка по каждому направлению за месяц: свои проекты и свои общие расходы.
+ * Фиксированные взносы ИП добавляются только агентству, чтобы не дублироваться между направлениями.
+ */
+export function computeFinanceSummaryByLine(
+  projects: V2FinanceProjectView[],
+  generalExpenses: V2FinanceGeneralExpenseRow[],
+  year: number,
+  month: number
+): Record<V2FinanceBusinessLine, V2FinanceMonthSummary> {
+  const lines = Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[];
+  const out = {} as Record<V2FinanceBusinessLine, V2FinanceMonthSummary>;
+  for (const line of lines) {
+    out[line] = computeFinanceMonthSummary(
+      projects.filter((p) => p.business_line === line),
+      generalExpenses.filter((e) => e.business_line === line),
+      year,
+      month,
+      { fixedTax: financeFixedTaxForLine(line) }
+    );
+  }
+  return out;
 }
 
 export function computeFinanceServiceStats(projects: V2FinanceProjectView[]): V2FinanceServiceStat[] {

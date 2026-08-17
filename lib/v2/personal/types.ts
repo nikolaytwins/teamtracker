@@ -240,4 +240,23 @@ export type PersonalFinanceDashboard = {
     /** @deprecated — то же, что forecastDelta */
     forecastEnd: number;
   };
+  system: PersonalFinanceSystemRow;
+  goals: PersonalFinanceGoalRow[];
+};
+
+export type PersonalFinanceSystemRow = {
+  user_id: string;
+  life_expenses_rub: number;
+  funds_rub: number;
+  moscow_job_stable: boolean;
+};
+
+export type PersonalFinanceGoalRow = {
+  id: string;
+  user_id: string;
+  goal_key: string | null;
+  title: string;
+  hint: string;
+  target_rub: number;
+  sort_order: number;
 };

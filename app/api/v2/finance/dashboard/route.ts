@@ -3,6 +3,7 @@ import { requireV2Admin } from "@/lib/v2/auth/require-v2-session";
 import {
   computeFinanceMonthSummary,
   computeFinanceServiceStats,
+  computeFinanceSummaryByLine,
   listFinanceGeneralExpenses,
   listFinanceProjectsForMonth,
 } from "@/lib/v2/finance/finance-repo";
@@ -30,7 +31,16 @@ export async function GET(request: NextRequest) {
   ]);
 
   const summary = computeFinanceMonthSummary(projects, generalExpenses, year, month);
+  const summaryByLine = computeFinanceSummaryByLine(projects, generalExpenses, year, month);
   const byService = computeFinanceServiceStats(projects);
 
-  return NextResponse.json({ year, month, projects, generalExpenses, summary, byService });
+  return NextResponse.json({
+    year,
+    month,
+    projects,
+    generalExpenses,
+    summary,
+    summaryByLine,
+    byService,
+  });
 }

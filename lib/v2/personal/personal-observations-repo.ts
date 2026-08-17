@@ -249,7 +249,7 @@ export async function createPersonalObservation(
   if (!body) throw new PersonalObservationsValidationError("Напишите, что произошло");
   const typeRaw = String(input.type || "other");
   if (!isObservationType(typeRaw)) {
-    throw new PersonalObservationsValidationError("Неизвестный тип наблюдения");
+    throw new PersonalObservationsValidationError("Неизвестный тип записи");
   }
   let linkKey: string | null = input.linkKey ? String(input.linkKey) : null;
   if (linkKey && !OBSERVATION_LINKS[linkKey]) {
@@ -258,7 +258,7 @@ export async function createPersonalObservation(
   const title =
     String(input.title ?? "").trim() ||
     body.split("\n").map((l) => l.trim()).find(Boolean)?.slice(0, 90) ||
-    "Наблюдение";
+    "Запись";
   const why = String(input.why ?? "").trim();
   const observedAt = input.observedAt ? new Date(input.observedAt) : new Date();
   if (Number.isNaN(observedAt.getTime())) {
@@ -310,13 +310,13 @@ export async function updatePersonalObservation(
     .eq("id", id)
     .maybeSingle();
   if (loadErr) throw loadErr;
-  if (!existing) throw new PersonalObservationsValidationError("Наблюдение не найдено");
+  if (!existing) throw new PersonalObservationsValidationError("Запись не найдена");
 
   const patch: Record<string, unknown> = { updated_at: nowIso() };
   if (input.type != null) {
     const typeRaw = String(input.type);
     if (!isObservationType(typeRaw)) {
-      throw new PersonalObservationsValidationError("Неизвестный тип наблюдения");
+      throw new PersonalObservationsValidationError("Неизвестный тип записи");
     }
     patch.obs_type = typeRaw;
   }
@@ -407,7 +407,7 @@ export function formatObservationsExportMarkdown(
   payload: Awaited<ReturnType<typeof exportPersonalObservations>>
 ): string {
   const lines: string[] = [
-    `# Наблюдения — экспорт`,
+    `# Дневник — экспорт`,
     ``,
     `Экспортировано: ${payload.exported_at}`,
     `Записей: ${payload.count}`,

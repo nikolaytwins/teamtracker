@@ -29,6 +29,9 @@ export type TimeEntry = {
   mode: TimeMode;
   durationMin: number;
   at: string;
+  /** Проект из «Проекты и финансы» (agency), если привязан. */
+  agencyProjectId?: string | null;
+  agencyProjectName?: string | null;
 };
 
 export type TimeRunning = {
@@ -38,6 +41,8 @@ export type TimeRunning = {
   mode: TimeMode;
   startedAt: string;
   task: string;
+  agencyProjectId?: string | null;
+  agencyProjectName?: string | null;
 } | null;
 
 export type TimeDoc = {
@@ -123,6 +128,8 @@ export function normalizeTimeDoc(raw: unknown): TimeDoc {
       mode: row.mode === "reactive" ? "reactive" : "planned",
       durationMin: Number(row.durationMin) || 0,
       at: String(row.at || new Date().toISOString()),
+      agencyProjectId: row.agencyProjectId ? String(row.agencyProjectId) : null,
+      agencyProjectName: row.agencyProjectName ? String(row.agencyProjectName) : null,
     };
   });
 
@@ -144,6 +151,8 @@ export function normalizeTimeDoc(raw: unknown): TimeDoc {
         mode: r.mode === "reactive" ? "reactive" : "planned",
         startedAt: String(r.startedAt || new Date().toISOString()),
         task: String(r.task || ""),
+        agencyProjectId: r.agencyProjectId ? String(r.agencyProjectId) : null,
+        agencyProjectName: r.agencyProjectName ? String(r.agencyProjectName) : null,
       };
     }
   }

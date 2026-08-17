@@ -1,5 +1,7 @@
 /** Приводим строки из Supabase (snake_case) к форме, ожидаемой текущим UI/API (camelCase). */
 
+import type { AgencyProjectTrackedTimeRow } from "@/lib/agency/tracked-time-types";
+
 export function mapProjectRow(r: Record<string, unknown>): Record<string, unknown> {
   return {
     id: r.id,
@@ -59,6 +61,7 @@ export function mapGeneralExpenseRow(r: Record<string, unknown>): Record<string,
     employeeRole: r.employee_role,
     amount: r.amount,
     notes: r.notes,
+    businessLine: r.business_line ?? "agency",
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -77,6 +80,24 @@ export function mapDetailRow(r: Record<string, unknown>): Record<string, unknown
     timerStartedAt: r.timer_started_at ? String(r.timer_started_at) : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+  };
+}
+
+export function mapTrackedTimeRow(r: Record<string, unknown>): AgencyProjectTrackedTimeRow {
+  return {
+    id: String(r.id),
+    projectId: String(r.project_id),
+    userId: String(r.user_id),
+    source: String(r.source ?? "personal_timer"),
+    sourceEntryId: r.source_entry_id ? String(r.source_entry_id) : null,
+    task: String(r.task ?? ""),
+    activity: String(r.activity ?? ""),
+    durationSeconds: Math.max(0, Math.floor(Number(r.duration_seconds) || 0)),
+    trackedAt: String(r.tracked_at),
+    inEstimate: r.in_estimate === true,
+    detailId: r.detail_id ? String(r.detail_id) : null,
+    createdAt: String(r.created_at),
+    updatedAt: String(r.updated_at),
   };
 }
 

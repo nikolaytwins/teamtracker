@@ -52,6 +52,16 @@ interface ProjectDetail {
   timerStartedAt?: string | null
 }
 
+interface TrackedTimeRow {
+  id: string
+  task: string
+  activity: string
+  durationSeconds: number
+  trackedAt: string
+  inEstimate: boolean
+  detailId: string | null
+}
+
 function ExpenseRow({
   expense,
   roleLabels,
@@ -217,13 +227,21 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [hourlyRateDraft, setHourlyRateDraft] = useState('')
   const [savingRate, setSavingRate] = useState(false)
+  const [trackedTime, setTrackedTime] = useState<TrackedTimeRow[]>([])
+  const [togglingEstimateId, setTogglingEstimateId] = useState<string | null>(null)
+  const [estimateToggleError, setEstimateToggleError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
-      const [projectRes, expensesRes, detailsRes] = await Promise.all([
+      const trackedPromise =
+        variant === 'v2'
+          ? fetch(apiUrl(`${apiBase}/projects/${id}/tracked-time`)).then((r) => (r.ok ? r.json() : []))
+          : Promise.resolve([])
+      const [projectRes, expensesRes, detailsRes, trackedRes] = await Promise.all([
         fetch(apiUrl(`${apiBase}/projects`)).then(r => r.json()),
         fetch(apiUrl(`${apiBase}/expenses?projectId=${id}`)).then(r => r.json()),
         fetch(apiUrl(`${apiBase}/project-details?projectId=${id}`)).then(r => r.json()),
+        trackedPromise,
       ])
       
       const proj = projectRes.find((p: Project) => p.id === id)
@@ -231,12 +249,13 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
       if (proj) setHourlyRateDraft(String(Number(proj.hourlyRateRub) || 0))
       setExpenses(expensesRes)
       setDetails(Array.isArray(detailsRes) ? detailsRes : [])
+      setTrackedTime(Array.isArray(trackedRes) ? trackedRes : [])
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
-  }, [id, apiBase])
+  }, [id, apiBase, variant])
 
   useEffect(() => {
     if (id) {
@@ -250,6 +269,30 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
     const t = window.setInterval(() => setNowMs(Date.now()), 1000)
     return () => window.clearInterval(t)
   }, [details])
+
+  const handleToggleTrackedInEstimate = async (row: TrackedTimeRow, next: boolean) => {
+    if (variant !== 'v2') return
+    setEstimateToggleError(null)
+    setTogglingEstimateId(row.id)
+    try {
+      const res = await fetch(apiUrl(`/api/v2/agency/tracked-time/${row.id}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inEstimate: next }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setEstimateToggleError(String(json.error || 'Не удалось обновить смету'))
+        return
+      }
+      await fetchData()
+    } catch (e) {
+      console.error(e)
+      setEstimateToggleError('Не удалось обновить смету')
+    } finally {
+      setTogglingEstimateId(null)
+    }
+  }
 
   const handleAddDetail = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -838,6 +881,90 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
           </div>
         </div>
       </div>
+
+      {variant === 'v2' ? (
+        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6 mb-6">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text)]">Учёт времени</h2>
+              <p className="mt-1 max-w-[72ch] text-xs text-[var(--muted-foreground)]">
+                Сюда попадает время с личного таймера (Агентство → Production). В смету не добавляется автоматически —
+                отметьте галочку, если эта задача оплачивается по часам.
+              </p>
+            </div>
+            {(Number(project.hourlyRateRub) || 0) <= 0 ? (
+              <span className="text-xs text-amber-700">Сначала укажите стоимость часа выше</span>
+            ) : null}
+          </div>
+          {estimateToggleError ? (
+            <p className="mb-3 text-sm text-red-600">{estimateToggleError}</p>
+          ) : null}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-[var(--border)]">
+              <thead className="bg-[var(--surface-2)]">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Когда
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Задача
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Тип
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Время
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+                    В смету
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)] bg-[var(--surface)]">
+                {trackedTime.map((row) => (
+                  <tr key={row.id}>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-[var(--muted-foreground)]">
+                      {new Date(row.trackedAt).toLocaleString('ru-RU', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-[var(--text)]">{row.task || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[var(--muted-foreground)]">{row.activity || '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm tabular-nums text-[var(--text)]">
+                      {formatAgencyDetailHours(row.durationSeconds)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                        <input
+                          type="checkbox"
+                          checked={row.inEstimate}
+                          disabled={
+                            togglingEstimateId === row.id ||
+                            ((Number(project.hourlyRateRub) || 0) <= 0 && !row.inEstimate)
+                          }
+                          onChange={(e) => void handleToggleTrackedInEstimate(row, e.target.checked)}
+                          className="h-4 w-4 rounded border-[var(--border)]"
+                        />
+                        <span>{row.inEstimate ? 'в смете' : 'почасово'}</span>
+                      </label>
+                    </td>
+                  </tr>
+                ))}
+                {!trackedTime.length ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-sm text-[var(--muted-foreground)]">
+                      Записей пока нет. Запустите таймер на странице «Время / Экономика» с привязкой к этому проекту.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[var(--text)]">{project.name}</h1>

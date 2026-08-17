@@ -14,6 +14,7 @@ import {
   mapLeadRow,
   mapOutreachRow,
   mapProjectRow,
+  mapTrackedTimeRow,
   projectInsertFromBody,
 } from "./map-pg";
 
@@ -523,6 +524,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     employeeRole: string | null;
     amount: number;
     notes: string | null;
+    businessLine?: string;
     year?: number;
     month?: number;
   }): Promise<Record<string, unknown>> {
@@ -537,6 +539,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       employee_role: input.employeeRole,
       amount: input.amount,
       notes: input.notes,
+      business_line: input.businessLine ?? "agency",
       created_at: createdAt,
       updated_at: now,
     });
@@ -561,7 +564,8 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     employeeName: string | null,
     employeeRole: string | null,
     amount: number,
-    notes: string | null
+    notes: string | null,
+    businessLine?: string
   ): Promise<Record<string, unknown> | undefined> {
     const { error } = await this.sb
       .from("agency_general_expense")
@@ -570,6 +574,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         employee_role: employeeRole,
         amount,
         notes,
+        ...(businessLine ? { business_line: businessLine } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -587,8 +592,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     fromMonth: number;
     toYear: number;
     toMonth: number;
+    businessLine?: string;
   }): Promise<number> {
-    const { fromYear, fromMonth, toYear, toMonth } = input;
+    const { fromYear, fromMonth, toYear, toMonth, businessLine } = input;
     const fromStart = new Date(fromYear, fromMonth - 1, 1);
     const fromEnd = new Date(fromYear, fromMonth, 0, 23, 59, 59);
     const toDate = `${toYear}-${String(toMonth).padStart(2, "0")}-01T00:00:00.000Z`;
@@ -598,6 +604,8 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     for (const exp of data ?? []) {
       const ca = new Date(exp.created_at as string);
       if (ca < fromStart || ca > fromEnd) continue;
+      const line = (exp.business_line as string) ?? "agency";
+      if (businessLine && line !== businessLine) continue;
       const newId = `agexp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
       const { error: e2 } = await this.sb.from("agency_general_expense").insert({
         id: newId,
@@ -605,6 +613,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         employee_role: exp.employee_role,
         amount: exp.amount,
         notes: exp.notes,
+        business_line: line,
         created_at: toDate,
         updated_at: new Date().toISOString(),
       });
@@ -828,6 +837,130 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         timerStartedAt: null,
       }
     );
+  }
+
+  async listProjectTrackedTime(projectId: string) {
+    const { data, error } = await this.sb
+      .from("agency_project_tracked_time")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("tracked_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r) => mapTrackedTimeRow(r as Record<string, unknown>));
+  }
+
+  async getProjectTrackedTimeById(id: string) {
+    const { data, error } = await this.sb
+      .from("agency_project_tracked_time")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapTrackedTimeRow(data as Record<string, unknown>) : undefined;
+  }
+
+  async getProjectTrackedTimeBySourceEntryId(sourceEntryId: string) {
+    const { data, error } = await this.sb
+      .from("agency_project_tracked_time")
+      .select("*")
+      .eq("source_entry_id", sourceEntryId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapTrackedTimeRow(data as Record<string, unknown>) : undefined;
+  }
+
+  async createProjectTrackedTime(input: import("@/lib/agency/tracked-time-types").CreateAgencyProjectTrackedTimeInput) {
+    const now = new Date().toISOString();
+    const row = {
+      id: input.id,
+      project_id: input.projectId,
+      user_id: input.userId,
+      source: "personal_timer",
+      source_entry_id: input.sourceEntryId,
+      task: input.task,
+      activity: input.activity,
+      duration_seconds: Math.max(0, Math.floor(input.durationSeconds)),
+      tracked_at: input.trackedAt,
+      in_estimate: false,
+      detail_id: null,
+      created_at: now,
+      updated_at: now,
+    };
+    const { error } = await this.sb.from("agency_project_tracked_time").insert(row);
+    if (error) throw error;
+    const { data, error: e2 } = await this.sb
+      .from("agency_project_tracked_time")
+      .select("*")
+      .eq("id", input.id)
+      .single();
+    if (e2) throw e2;
+    return mapTrackedTimeRow(data as Record<string, unknown>);
+  }
+
+  async setProjectTrackedTimeEstimate(trackedTimeId: string, inEstimate: boolean, hourlyRateRub: number) {
+    const { data: raw, error } = await this.sb
+      .from("agency_project_tracked_time")
+      .select("*")
+      .eq("id", trackedTimeId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!raw) return undefined;
+    const row = mapTrackedTimeRow(raw as Record<string, unknown>);
+
+    if (inEstimate) {
+      if (row.inEstimate && row.detailId) return row;
+      if ((Number(hourlyRateRub) || 0) <= 0) {
+        throw new Error("hourly_rate_required");
+      }
+      const detailId = `pd_tt_${Date.now()}`;
+      const title = row.task.trim() || row.activity.trim() || "Время";
+      const maxOrder = await this.sb
+        .from("agency_project_detail")
+        .select("sort_order")
+        .eq("project_id", row.projectId)
+        .order("sort_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const order = Number(maxOrder.data?.sort_order) || 0;
+      await this.createProjectDetail({
+        id: detailId,
+        projectId: row.projectId,
+        title,
+        quantity: 1,
+        unitPrice: 0,
+        order: order + 1,
+        billingType: "hourly",
+        trackedSeconds: row.durationSeconds,
+      });
+      const { data: updated, error: uErr } = await this.sb
+        .from("agency_project_tracked_time")
+        .update({
+          in_estimate: true,
+          detail_id: detailId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", trackedTimeId)
+        .select("*")
+        .single();
+      if (uErr) throw uErr;
+      return mapTrackedTimeRow(updated as Record<string, unknown>);
+    }
+
+    if (row.detailId) {
+      await this.deleteProjectDetailById(row.detailId);
+    }
+    const { data: updated, error: uErr } = await this.sb
+      .from("agency_project_tracked_time")
+      .update({
+        in_estimate: false,
+        detail_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", trackedTimeId)
+      .select("*")
+      .single();
+    if (uErr) throw uErr;
+    return mapTrackedTimeRow(updated as Record<string, unknown>);
   }
 
   async revenueByClient(): Promise<{ items: unknown[]; total: number }> {

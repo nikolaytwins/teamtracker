@@ -1,4 +1,8 @@
 import type { OutreachPlatform } from "@/lib/outreach";
+import type {
+  AgencyProjectTrackedTimeRow,
+  CreateAgencyProjectTrackedTimeInput,
+} from "@/lib/agency/tracked-time-types";
 
 export type CreateProjectBody = {
   name: string;
@@ -111,6 +115,8 @@ export interface AgencyRepo {
     employeeRole: string | null;
     amount: number;
     notes: string | null;
+    /** Направление расхода: agency | impulse | qmagic (по умолчанию agency) */
+    businessLine?: string;
     /** Если задано — расход попадает в этот месяц (по created_at), а не в текущую дату */
     year?: number;
     month?: number;
@@ -121,7 +127,8 @@ export interface AgencyRepo {
     employeeName: string | null,
     employeeRole: string | null,
     amount: number,
-    notes: string | null
+    notes: string | null,
+    businessLine?: string
   ): Promise<Record<string, unknown> | undefined>;
   deleteGeneralExpenseById(id: string): Promise<void>;
   copyGeneralExpensesBetweenMonths(input: {
@@ -129,6 +136,8 @@ export interface AgencyRepo {
     fromMonth: number;
     toYear: number;
     toMonth: number;
+    /** Если задано — копируются только расходы этого направления */
+    businessLine?: string;
   }): Promise<number>;
 
   getAgencyProfitForMonth(year: number, month: number): Promise<{
@@ -170,6 +179,16 @@ export interface AgencyRepo {
     id: string,
     action: "start" | "stop"
   ): Promise<Record<string, unknown> | undefined>;
+
+  listProjectTrackedTime(projectId: string): Promise<AgencyProjectTrackedTimeRow[]>;
+  getProjectTrackedTimeById(id: string): Promise<AgencyProjectTrackedTimeRow | undefined>;
+  getProjectTrackedTimeBySourceEntryId(sourceEntryId: string): Promise<AgencyProjectTrackedTimeRow | undefined>;
+  createProjectTrackedTime(input: CreateAgencyProjectTrackedTimeInput): Promise<AgencyProjectTrackedTimeRow>;
+  setProjectTrackedTimeEstimate(
+    trackedTimeId: string,
+    inEstimate: boolean,
+    hourlyRateRub: number
+  ): Promise<AgencyProjectTrackedTimeRow | undefined>;
 
   revenueByClient(): Promise<{ items: unknown[]; total: number }>;
   revenueByService(): Promise<{ items: unknown[]; total: number }>;

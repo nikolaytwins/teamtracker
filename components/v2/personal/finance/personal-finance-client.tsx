@@ -11,6 +11,14 @@ import {
   PersonalCapitalAmountInline,
 } from "./personal-money-inline";
 import { PersonalOperationModal } from "./personal-operation-modal";
+import {
+  allocateGoals,
+  PfAccountsAsFunds,
+  PfGoalQueue,
+  PfMonthSplit,
+  PfMoscowReady,
+  PfNearestGoal,
+} from "./personal-finance-system";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
   formatPersonalPct,
@@ -294,13 +302,11 @@ function PfTopbar({
 function PfPageHead({
   year,
   month,
-  forecastEnd,
   onMonthChange,
   today,
 }: {
   year: number;
   month: number;
-  forecastEnd: number;
   onMonthChange: (y: number, m: number) => void;
   today: Date;
 }) {
@@ -309,8 +315,6 @@ function PfPageHead({
   const nowY = today.getFullYear();
   const nowM = today.getMonth() + 1;
   const nextDisabled = next.year > nowY || (next.year === nowY && next.month > nowM);
-  const positive = forecastEnd >= 0;
-  const monthName = PERSONAL_MONTH_NAMES[month - 1]?.toLowerCase() ?? "";
 
   return (
     <div className="mb-7 flex items-end justify-between gap-6">
@@ -319,17 +323,8 @@ function PfPageHead({
           Личные финансы · {monthLabel(year, month)}
         </div>
         <h1 className="v2-tighter mt-1 text-[40px] font-semibold leading-[1.05] text-[var(--v2-ink-900)]">
-          Деньги под контролем
+          Финансовая система
         </h1>
-        <p className="v2-tight mt-2 max-w-[60ch] text-[14.5px] text-[var(--v2-ink-500)]">
-          {PERSONAL_MONTH_NAMES[month - 1]} идёт{" "}
-          <span className={`font-medium ${positive ? "text-emerald-600" : "text-red-500"}`}>
-            {positive ? "в плюс" : "в минус"}
-          </span>
-          : к концу {monthName} ожидается остаток{" "}
-          <PersonalAmt v={forecastEnd} short className="font-medium text-[var(--v2-ink-800)]" /> с учётом поступлений и
-          плановых трат.
-        </p>
       </div>
       <div className="flex items-center gap-2">
         <div className="hidden items-center gap-1 rounded-xl bg-white/80 p-1 shadow-[var(--v2-shadow-card)] backdrop-blur lg:flex">
@@ -1729,8 +1724,23 @@ export function PersonalFinanceClient() {
 
   if (!data) return null;
 
-  const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, history, incomeHistory } =
+  const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, history, incomeHistory, system, goals } =
     data;
+  const accountsTotal = summary.disposable + summary.reserves;
+  const allocated = allocateGoals(goals ?? [], accountsTotal);
+  const nearest = allocated.find((g) => g.active);
+  const monthIncome = summary.projectExpectedRevenue || summary.incomeExpected;
+  const toGoal = monthIncome - (system?.life_expenses_rub ?? 0) - (system?.funds_rub ?? 0);
+  const monthlySurplus = Math.max(toGoal, 0);
+
+  const patchSystem = async (patch: Record<string, unknown>) => {
+    await fetchJson("/api/v2/personal/finance/system", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    await reload();
+  };
 
   return (
     <PersonalMaskProvider masked={masked}>
@@ -1753,7 +1763,6 @@ export function PersonalFinanceClient() {
             <PfPageHead
               year={year}
               month={month}
-              forecastEnd={summary.forecastEnd}
               onMonthChange={(y, m) => {
                 setYear(y);
                 setMonth(m);
@@ -1763,19 +1772,35 @@ export function PersonalFinanceClient() {
 
             <div className="space-y-7">
               <PfHeroCards summary={summary} accounts={accounts} history={history} year={year} month={month} />
-              <PfForecastCard
-                summary={summary}
-                budget={budget}
-                year={year}
-                month={month}
-                onReload={() => void reload()}
+              <PfNearestGoal nearest={nearest} accountsTotal={accountsTotal} />
+              {system ? (
+                <PfMonthSplit
+                  income={monthIncome}
+                  system={system}
+                  nearestTitle={nearest?.title ?? "цель"}
+                  onPatch={async (patch) => {
+                    await patchSystem(patch);
+                  }}
+                />
+              ) : null}
+              <PfGoalQueue allocated={allocated} monthly={monthlySurplus} onReload={() => void reload()} />
+              <PfMoscowReady
+                allocated={allocated}
+                monthly={monthlySurplus}
+                jobStable={system?.moscow_job_stable !== false}
+                onJobChange={async (v) => {
+                  await patchSystem({ moscow_job_stable: v });
+                }}
               />
-              <PfAccountsAndCapital
+              <PfAccountsAsFunds
                 accounts={accounts}
                 capital={capital}
-                summary={summary}
-                onReload={() => void reload()}
+                accountsTotal={accountsTotal}
+                capitalSum={summary.capitalSum}
+                onSaved={() => void reload()}
                 onError={setError}
+                AccountBalance={PersonalAccountBalanceInline}
+                CapitalAmount={PersonalCapitalAmountInline}
               />
               <PfChartsSection history={history} masked={masked} year={year} month={month} />
               <PfHistoryTable incomeHistory={incomeHistory} year={year} month={month} />

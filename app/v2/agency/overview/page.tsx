@@ -1,5 +1,5 @@
-import { AgencyOverviewClient } from "@/components/v2/agency/agency-overview-client";
+import { BusinessLineClient } from "@/components/v2/agency/business-line-client";
 
 export default function V2AgencyOverviewPage() {
-  return <AgencyOverviewClient />;
+  return <BusinessLineClient line="agency" />;
 }

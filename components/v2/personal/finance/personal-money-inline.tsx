@@ -132,6 +132,7 @@ export function PersonalAccountBalanceInline({
   rubValue,
   onSaved,
   onError,
+  className = "",
 }: {
   accountId: string;
   /** Для RUB — рубли; для валюты — остаток в исходной валюте */
@@ -141,10 +142,11 @@ export function PersonalAccountBalanceInline({
   rubValue?: number;
   onSaved?: (account: PersonalAccountRow) => void;
   onError?: (msg: string) => void;
+  className?: string;
 }) {
   const isFx = currencyCode !== "RUB";
   return (
-    <div className="flex flex-col items-end gap-0.5">
+    <div className={`flex flex-col items-end gap-0.5 ${className}`}>
       <PersonalMoneyInline
         value={value}
         allowCents={isFx}
@@ -185,15 +187,18 @@ export function PersonalCapitalAmountInline({
   value,
   onSaved,
   onError,
+  className = "",
 }: {
   capitalId: string;
   value: number;
   onSaved?: (amount: number) => void;
   onError?: (msg: string) => void;
+  className?: string;
 }) {
   return (
     <PersonalMoneyInline
       value={value}
+      className={className}
       title="Нажмите, чтобы изменить сумму"
       onSave={async (next) => {
         const { item } = await fetchJson<{ item: PersonalCapitalRow }>(

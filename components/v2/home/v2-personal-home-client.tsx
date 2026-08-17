@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type SVGProps } from "react";
+import { useCallback, useEffect, useState, type SVGProps } from "react";
 import { appPath } from "@/lib/api-url";
+import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { V2Icons } from "@/components/v2/ui/icons";
+import { FINANCE_MONTH_NAMES, formatRub } from "@/lib/v2/finance/meta";
 import {
   HOME_BETS,
   HOME_CHECKS,
@@ -16,17 +19,15 @@ import {
   HOME_SEASON,
   HOME_SPRINT,
   HOME_SPRINT_GOALS,
-  HOME_TIME_NOTE,
-  HOME_TRACKS,
   HOME_TRAININGS,
   HOME_VIDEO,
   HOME_VIDEO_ST,
-  HOME_WEEK,
-  HOME_WEEK_DONE_SEED,
   homeFmt,
   homeFmtK,
   type HomeVideoStatus,
 } from "@/lib/v2/personal/seeds/home-seed";
+
+const CALENDAR_HREF = "/v2/personal/calendar";
 
 /* -------------------------------- ИКОНКИ --------------------------------- */
 type IconProps = SVGProps<SVGSVGElement>;
@@ -80,6 +81,27 @@ function videoOpacity(status: HomeVideoStatus) {
   return 0.28;
 }
 
+/* -------------------------------- ДАТЫ ----------------------------------- */
+function toYmd(d: Date) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function mondayOf(d: Date) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+const WEEKDAYS_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+function formatWeekLabel(monday: Date) {
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  const fmt = (d: Date) => new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(d);
+  return `${fmt(monday)} — ${fmt(sunday)}`;
+}
+
 /* ------------------------------- TOPBAR ---------------------------------- */
 function Topbar() {
   return (
@@ -94,7 +116,7 @@ function Topbar() {
           href={appPath(HOME_LINKS.observations)}
           className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
         >
-          <HI.plus className="h-4 w-4 text-[var(--v2-ink-400)]" /> Наблюдение
+          <HI.plus className="h-4 w-4 text-[var(--v2-ink-400)]" /> Запись в дневник
         </Link>
         <button
           type="button"
@@ -181,6 +203,207 @@ function LilaBanner() {
         >
           {HOME_LILA_BAN.note}
         </p>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------------------- ФОКУС НЕДЕЛИ -------------------------------- */
+type WeekFocusPriority = "high" | "medium" | "low";
+
+type WeekFocusGoal = {
+  id: string;
+  title: string;
+  priority: WeekFocusPriority;
+  completed_at: string | null;
+};
+
+type WeekFocusPayload = {
+  week_start: string;
+  week_end: string;
+  label: string;
+  result_title: string;
+  goals: WeekFocusGoal[];
+};
+
+const FOCUS_PRIORITY: Record<WeekFocusPriority, { label: string; tint: string; bg: string }> = {
+  high: { label: "обязательно", tint: "#B42318", bg: "#FEE4E2" },
+  medium: { label: "желательно", tint: "#B54708", bg: "#FEF0C7" },
+  low: { label: "можно не делать", tint: "#475467", bg: "#EAECF0" },
+};
+
+function WeekFocusBoard() {
+  const [focus, setFocus] = useState<WeekFocusPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [priority, setPriority] = useState<WeekFocusPriority>("medium");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetchJson<{ weekFocus: WeekFocusPayload }>(
+        `/api/v2/personal/calendar/week-focus?date=${toYmd(new Date())}`
+      );
+      setFocus(res.weekFocus);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось загрузить фокус недели");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const addGoal = async () => {
+    const text = title.trim();
+    if (!text || !focus || busy) return;
+    setBusy(true);
+    try {
+      await fetchJson("/api/v2/personal/calendar/week-focus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ week_start: focus.week_start, title: text, priority }),
+      });
+      setTitle("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось добавить фокус");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleGoal = async (goal: WeekFocusGoal) => {
+    const completed = !goal.completed_at;
+    setFocus((prev) =>
+      prev
+        ? {
+            ...prev,
+            goals: prev.goals.map((g) =>
+              g.id === goal.id ? { ...g, completed_at: completed ? new Date().toISOString() : null } : g
+            ),
+          }
+        : prev
+    );
+    try {
+      await fetchJson(`/api/v2/personal/calendar/week-focus/goals/${goal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed }),
+      });
+    } catch {
+      await load();
+    }
+  };
+
+  return (
+    <section
+      className="rounded-2xl px-7 py-6 text-white shadow-[var(--v2-shadow-soft)]"
+      style={{ background: HERO_BLUE }}
+    >
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h2 className="v2-tight text-[19px] font-semibold text-white">Фокус недели</h2>
+        <span className="v2-tight text-[13px] text-white/55">{focus?.label ?? "…"}</span>
+        <Link
+          href={appPath(CALENDAR_HREF)}
+          className="v2-tight ml-auto inline-flex shrink-0 items-center gap-1 text-[12.5px] font-medium text-white/85 transition hover:text-white"
+        >
+          Календарь <HI.arrowR className="h-3 w-3" />
+        </Link>
+      </div>
+
+      <p
+        className="v2-tight mt-2 max-w-[56ch] text-[26px] font-semibold leading-[1.3] text-white"
+        style={{ textWrap: "pretty" }}
+      >
+        {focus?.result_title ?? "Главный результат недели"}
+      </p>
+
+      {error ? <p className="v2-tight mt-3 text-[12.5px] text-white/70">{error}</p> : null}
+
+      <div className="mt-5 grid grid-cols-4 gap-2.5">
+        {(focus?.goals ?? []).map((g) => {
+          const p = FOCUS_PRIORITY[g.priority];
+          const done = Boolean(g.completed_at);
+          return (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => void toggleGoal(g)}
+              className={`rounded-xl bg-white px-3.5 py-3 text-left shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] ${
+                done ? "opacity-55" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-md transition ${
+                    done ? "bg-emerald-500 text-white" : "bg-[var(--v2-ink-100)] text-transparent"
+                  }`}
+                >
+                  <HI.check className="h-[11px] w-[11px]" />
+                </span>
+                <span
+                  className="v2-tight rounded px-1.5 py-[2px] text-[10px] font-semibold uppercase tracking-[0.08em]"
+                  style={{ background: p.bg, color: p.tint }}
+                >
+                  {p.label}
+                </span>
+              </div>
+              <p
+                className={`v2-tight mt-2 text-[13.5px] leading-snug text-[var(--v2-ink-800)] ${
+                  done ? "line-through" : ""
+                }`}
+                style={{ textWrap: "pretty" }}
+              >
+                {g.title}
+              </p>
+            </button>
+          );
+        })}
+        {focus && !focus.goals.length ? (
+          <p className="v2-tight col-span-4 text-[13.5px] text-white/70">
+            Фокусов на эту неделю пока нет — добавьте ниже.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void addGoal();
+            }
+          }}
+          placeholder="Добавить фокус недели…"
+          className="v2-tight h-10 min-w-[260px] flex-1 rounded-xl bg-white/12 px-3.5 text-[13.5px] text-white outline-none transition placeholder:text-white/50 focus:bg-white/18"
+        />
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as WeekFocusPriority)}
+          className="v2-tight h-10 cursor-pointer appearance-none rounded-xl bg-white/12 px-3 text-[13px] text-white outline-none"
+        >
+          <option value="high" className="text-[var(--v2-ink-900)]">
+            обязательно
+          </option>
+          <option value="medium" className="text-[var(--v2-ink-900)]">
+            желательно
+          </option>
+          <option value="low" className="text-[var(--v2-ink-900)]">
+            можно не делать
+          </option>
+        </select>
+        <button
+          type="button"
+          disabled={!title.trim() || busy || !focus}
+          onClick={() => void addGoal()}
+          className="v2-tight inline-flex h-10 items-center gap-1.5 rounded-xl bg-white px-4 text-[13px] font-medium text-[var(--v2-ink-900)] transition hover:bg-white/90 disabled:opacity-45"
+        >
+          <HI.plus className="h-4 w-4" /> Добавить
+        </button>
       </div>
     </section>
   );
@@ -396,6 +619,116 @@ function NotNow() {
   );
 }
 
+/* --------------------- ДЕНЬГИ: ИТОГИ ПО ВСЕМ ПРОЕКТАМ --------------------- */
+type HomeFinanceSummary = {
+  expectedRevenue: number;
+  actualRevenue: number;
+  projectExpenses: number;
+  manualGeneralExpenses: number;
+  taxAmount: number;
+  totalExpenses: number;
+  profit: number;
+  margin: number;
+  projectCount: number;
+};
+
+function ProjectsKpiCard({
+  label,
+  value,
+  sub,
+  accent,
+  icon: Icon,
+  tone = "ink",
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  accent: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone?: "ink" | "green" | "red";
+}) {
+  const toneClass =
+    tone === "red" ? "text-red-500" : tone === "green" ? "text-emerald-600" : "text-[var(--v2-ink-900)]";
+  return (
+    <Link
+      href={appPath("/v2/agency")}
+      className="block rounded-2xl bg-white p-4 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+    >
+      <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
+        <span
+          className="inline-flex h-6 w-6 items-center justify-center rounded-lg"
+          style={{ background: `${accent}14`, color: accent }}
+        >
+          <Icon className="h-[15px] w-[15px]" />
+        </span>
+        {label}
+      </div>
+      <div className={`v2-tnum v2-tighter mt-1.5 text-[24px] font-semibold ${toneClass}`}>{value}</div>
+      <div className="v2-tight mt-1 text-[11.5px] text-[var(--v2-ink-500)]">{sub}</div>
+    </Link>
+  );
+}
+
+function ProjectsMoneyStrip() {
+  const [summary, setSummary] = useState<HomeFinanceSummary | null>(null);
+  const [monthLabel, setMonthLabel] = useState("");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await fetchJson<{ year: number; month: number; summary: HomeFinanceSummary }>(
+          "/api/v2/finance/dashboard"
+        );
+        setSummary(data.summary);
+        setMonthLabel(`${FINANCE_MONTH_NAMES[data.month - 1]?.toLowerCase() ?? ""} ${data.year}`);
+      } catch {
+        setSummary(null);
+      }
+    })();
+  }, []);
+
+  if (!summary) return null;
+
+  const paidShare = summary.expectedRevenue
+    ? Math.round((summary.actualRevenue / summary.expectedRevenue) * 100)
+    : 0;
+
+  return (
+    <section className="grid grid-cols-4 gap-3">
+      <ProjectsKpiCard
+        label="Предполагаемая выручка"
+        value={formatRub(summary.expectedRevenue)}
+        sub={`${summary.projectCount} проектов · ${monthLabel}`}
+        accent="#3B6FF7"
+        icon={V2Icons.projects}
+      />
+      <ProjectsKpiCard
+        label="Фактическая выручка"
+        value={formatRub(summary.actualRevenue)}
+        sub={summary.expectedRevenue ? `${paidShare}% оплачено` : "нет проектов"}
+        accent="#0EA5A4"
+        icon={V2Icons.ruble}
+      />
+      <ProjectsKpiCard
+        label="Расходы"
+        value={formatRub(summary.totalExpenses)}
+        sub={`${formatRub(summary.manualGeneralExpenses + summary.projectExpenses)} команда · ${formatRub(summary.taxAmount)} налог`}
+        accent="#EF4444"
+        icon={V2Icons.folder}
+        tone="red"
+      />
+      <ProjectsKpiCard
+        label="Прибыль"
+        value={formatRub(summary.profit)}
+        sub={`маржа ${Math.round(summary.margin)}% · все направления`}
+        accent={summary.profit >= 0 ? "#10B981" : "#EF4444"}
+        icon={V2Icons.reports}
+        tone={summary.profit >= 0 ? "green" : "red"}
+      />
+    </section>
+  );
+}
+
 /* -------------------------------- ДЕНЬГИ --------------------------------- */
 function MoneyCard({
   label,
@@ -460,317 +793,137 @@ function MoneyStrip() {
   );
 }
 
-/* -------------------------------- НЕДЕЛЯ --------------------------------- */
-function WeekBoard({
-  done,
-  toggle,
-  focusDone,
-  toggleFocus,
-}: {
-  done: string[];
-  toggle: (id: string) => void;
-  focusDone: string[];
-  toggleFocus: (id: string) => void;
-}) {
-  return (
-    <section className="rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-soft)]">
-      <div className="flex items-baseline gap-3">
-        <h2 className="v2-tight text-[19px] font-semibold text-[var(--v2-ink-900)]">{HOME_WEEK.label}</h2>
-        <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">Планирую неделями, не днями.</span>
-        <Link
-          href={appPath(HOME_LINKS.tasks)}
-          className="v2-tight ml-auto shrink-0 text-[12.5px] font-medium text-[var(--v2-brand-700)] transition hover:text-[var(--v2-brand-800)]"
-        >
-          Задачи недели →
-        </Link>
-      </div>
+/* ------------------------------- КАЛЕНДАРЬ -------------------------------- */
+type CalendarItem = {
+  id: string;
+  title: string;
+  date: string;
+  time: string | null;
+  completed_at: string | null;
+  category: string;
+  color: string;
+};
 
-      <div className="mt-4 rounded-xl bg-[var(--v2-ink-50)] p-4">
-        <div className="mb-3 flex items-baseline gap-2.5">
-          <h3 className="v2-tight text-[13px] font-semibold text-[var(--v2-ink-900)]">{HOME_WEEK.focusTitle}</h3>
-          <span className="v2-tight text-[11.5px] text-[var(--v2-ink-500)]">цели, которые я ставлю заранее</span>
-          <span className="v2-tnum v2-tight ml-auto text-[11.5px] text-[var(--v2-ink-500)]">
-            {focusDone.length} из {HOME_WEEK.focus.length}
-          </span>
-        </div>
-        <div className="grid grid-cols-4 gap-2.5">
-          {HOME_WEEK.focus.map((f) => {
-            const on = focusDone.includes(f.id);
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => toggleFocus(f.id)}
-                className={`rounded-xl bg-white px-3.5 py-3 text-left shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] ${
-                  on ? "opacity-60" : ""
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-md transition ${
-                      on ? "bg-emerald-500 text-white" : "bg-[var(--v2-ink-100)] text-transparent"
-                    }`}
-                  >
-                    <HI.check className="h-[11px] w-[11px]" />
-                  </span>
-                  <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
-                    {f.area}
-                  </span>
-                </div>
-                <p
-                  className={`v2-tight mt-2 text-[13px] leading-snug text-[var(--v2-ink-800)] ${on ? "line-through" : ""}`}
-                  style={{ textWrap: "pretty" }}
-                >
-                  {f.text}
-                </p>
-                <span className="v2-tnum v2-tight mt-2 inline-block rounded bg-[var(--v2-ink-100)] px-1.5 py-[2px] text-[10.5px] text-[var(--v2-ink-500)]">
-                  {f.state}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+function CalendarWeek() {
+  const [items, setItems] = useState<CalendarItem[]>([]);
+  const [days, setDays] = useState<{ ymd: string; label: string; n: string; today: boolean; past: boolean }[]>([]);
+  const [weekLabel, setWeekLabel] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        {Object.entries(HOME_WEEK.kinds).map(([id, k]) => (
-          <span
-            key={id}
-            className="v2-tight inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--v2-ink-500)]"
-          >
-            <span className="h-2 w-2 rounded-full" style={{ background: k.tint }} />
-            {k.label}
-          </span>
-        ))}
-      </div>
-      <div className="mt-2 grid grid-cols-7 gap-2">
-        {HOME_WEEK.days.map((d) => (
-          <div
-            key={d.id}
-            className={`flex min-h-[132px] min-w-0 flex-col gap-1.5 rounded-xl p-2 ${
-              d.today
-                ? "bg-[var(--v2-brand-50)] ring-1 ring-[var(--v2-brand-200)]"
-                : d.past
-                  ? "bg-[var(--v2-ink-50)]/60"
-                  : "bg-[var(--v2-ink-50)]"
-            }`}
-          >
-            <div className="flex items-baseline gap-1.5 px-0.5">
-              <span
-                className={`text-[10.5px] font-semibold uppercase tracking-[0.08em] ${
-                  d.today ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-400)]"
-                }`}
-              >
-                {d.d}
-              </span>
-              <span
-                className={`v2-tnum text-[13px] font-semibold ${
-                  d.today ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-700)]"
-                }`}
-              >
-                {d.n}
-              </span>
-            </div>
-            {d.items.map((it, i) => {
-              const k = HOME_WEEK.kinds[it.k];
-              const itemId = `${d.id}${i}`;
-              const isDone = done.includes(itemId);
-              return (
-                <button
-                  key={itemId}
-                  type="button"
-                  title={`${k.label} — ${it.t}`}
-                  onClick={() => toggle(itemId)}
-                  className={`min-w-0 rounded-lg px-1.5 py-1.5 text-left transition ${isDone ? "opacity-45" : ""}`}
-                  style={{ background: k.bg }}
-                >
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: k.tint }} />
-                    {isDone ? <HI.check className="ml-auto h-3 w-3 shrink-0" style={{ color: k.tint }} /> : null}
-                  </span>
-                  <span
-                    className={`v2-tight mt-1 block text-[11.5px] leading-snug text-[var(--v2-ink-800)] ${
-                      isDone ? "line-through" : ""
-                    }`}
-                    style={{ textWrap: "pretty", overflowWrap: "anywhere" }}
-                  >
-                    {it.t}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
+  useEffect(() => {
+    const now = new Date();
+    const todayYmd = toYmd(now);
+    const monday = mondayOf(now);
+    const cells = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + i);
+      const ymd = toYmd(d);
+      return {
+        ymd,
+        label: WEEKDAYS_SHORT[i]!,
+        n: String(d.getDate()),
+        today: ymd === todayYmd,
+        past: ymd < todayYmd,
+      };
+    });
+    setDays(cells);
+    setWeekLabel(formatWeekLabel(monday));
 
-/* --------------------------- ВРЕМЯ → ПРИБЫЛЬ ------------------------------ */
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div>
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">{label}</div>
-      <div
-        className={`v2-tnum v2-tight mt-1 text-[19px] font-semibold ${
-          accent ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-900)]"
-        }`}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-const TIME_COLS = "grid items-center gap-x-5";
-const TIME_GRID = { gridTemplateColumns: "136px minmax(0,1fr) 116px 104px" } as const;
-
-function TimeProfit() {
-  const rows = HOME_TRACKS.map((t) => ({ ...t, rate: t.money ? Math.round(t.money / t.hours) : 0 }));
-  const totalH = rows.reduce((s, r) => s + r.hours, 0);
-  const totalM = rows.reduce((s, r) => s + r.money, 0);
-  const maxH = Math.max(...rows.map((r) => r.hours));
-  const maxRate = Math.max(...rows.map((r) => r.rate), 1);
-  const betHours = rows.filter((r) => r.kind === "bet").reduce((s, r) => s + r.hours, 0);
+    (async () => {
+      try {
+        const res = await fetchJson<{ items: CalendarItem[] }>(
+          `/api/v2/personal/calendar?from=${cells[0]!.ymd}&to=${cells[6]!.ymd}`
+        );
+        setItems(res.items ?? []);
+        setError(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Не удалось загрузить календарь");
+      }
+    })();
+  }, []);
 
   return (
     <section className="rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-soft)]">
-      <div className="flex items-baseline gap-3">
-        <h2 className="v2-tight text-[19px] font-semibold text-[var(--v2-ink-900)]">Время → прибыль</h2>
-        <span className="v2-tnum v2-tight text-[13px] text-[var(--v2-ink-500)]">
-          {HOME_MONEY.month} · {totalH} ч · {homeFmt(totalM)} ₽
-        </span>
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h2 className="v2-tight text-[19px] font-semibold text-[var(--v2-ink-900)]">Календарь недели</h2>
+        <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">{weekLabel}</span>
         <Link
-          href={appPath(HOME_LINKS.time)}
+          href={appPath(CALENDAR_HREF)}
           className="v2-tight ml-auto shrink-0 text-[12.5px] font-medium text-[var(--v2-brand-700)] transition hover:text-[var(--v2-brand-800)]"
         >
-          Время и экономика →
+          Открыть календарь →
         </Link>
       </div>
-      <p className="v2-tight mt-1.5 text-[12.5px] text-[var(--v2-ink-500)]">{HOME_TIME_NOTE}</p>
-      <div
-        className={`${TIME_COLS} mt-5 border-b border-[var(--v2-ink-100)] pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]`}
-        style={TIME_GRID}
-      >
-        <span>Направление</span>
-        <span>Часы</span>
-        <span className="text-right">Деньги месяца</span>
-        <span className="text-right">₽ / час</span>
-      </div>
-      <div className="divide-y divide-[var(--v2-ink-100)]">
-        {rows.map((r) => (
-          <div key={r.id} className={`${TIME_COLS} py-3.5`} style={TIME_GRID}>
-            <div className="min-w-0">
-              <div className="v2-tight truncate text-[14px] font-semibold text-[var(--v2-ink-900)]">{r.label}</div>
-              <div className="v2-tight truncate text-[11.5px] text-[var(--v2-ink-500)]">{r.note}</div>
-            </div>
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
+
+      {error ? <p className="v2-tight mt-3 text-[12.5px] text-[var(--v2-ink-500)]">{error}</p> : null}
+
+      <div className="mt-4 grid grid-cols-7 gap-2">
+        {days.map((d) => {
+          const dayItems = items.filter((it) => it.date === d.ymd);
+          return (
+            <div
+              key={d.ymd}
+              className={`flex min-h-[136px] min-w-0 flex-col gap-1.5 rounded-xl p-2 ${
+                d.today
+                  ? "bg-[var(--v2-brand-50)] ring-1 ring-[var(--v2-brand-200)]"
+                  : d.past
+                    ? "bg-[var(--v2-ink-50)]/60"
+                    : "bg-[var(--v2-ink-50)]"
+              }`}
+            >
+              <div className="flex items-baseline gap-1.5 px-0.5">
                 <span
-                  className="block h-full rounded-full"
-                  style={{ width: `${(r.hours / maxH) * 100}%`, background: r.tint }}
-                />
-              </div>
-              <span className="v2-tnum w-11 shrink-0 text-[13px] text-[var(--v2-ink-700)]">{r.hours} ч</span>
-            </div>
-            <div className="text-right">
-              {r.money > 0 ? (
-                <span className="v2-tnum text-[14px] font-semibold text-[var(--v2-ink-900)]">
-                  {homeFmt(r.money)} ₽
+                  className={`text-[10.5px] font-semibold uppercase tracking-[0.08em] ${
+                    d.today ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-400)]"
+                  }`}
+                >
+                  {d.label}
                 </span>
-              ) : (
-                <span className="v2-tight text-[12px] text-[var(--v2-ink-400)]">ставка</span>
-              )}
-            </div>
-            <div className="text-right">
-              {r.rate > 0 ? (
-                <div className="inline-flex flex-col items-end">
-                  <span className="v2-tnum text-[14px] font-semibold" style={{ color: r.tint }}>
-                    {homeFmt(r.rate)} ₽
-                  </span>
-                  <span className="mt-1 h-1 w-[68px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
+                <span
+                  className={`v2-tnum text-[13px] font-semibold ${
+                    d.today ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-700)]"
+                  }`}
+                >
+                  {d.n}
+                </span>
+              </div>
+              {dayItems.map((it) => {
+                const done = Boolean(it.completed_at);
+                return (
+                  <Link
+                    key={it.id}
+                    href={appPath(CALENDAR_HREF)}
+                    title={`${it.category} — ${it.title}`}
+                    className={`min-w-0 rounded-lg px-1.5 py-1.5 transition hover:brightness-95 ${done ? "opacity-45" : ""}`}
+                    style={{ background: `${it.color}1A` }}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: it.color }} />
+                      {it.time ? (
+                        <span className="v2-tnum text-[10px] text-[var(--v2-ink-500)]">{it.time}</span>
+                      ) : null}
+                      {done ? <HI.check className="ml-auto h-3 w-3 shrink-0" style={{ color: it.color }} /> : null}
+                    </span>
                     <span
-                      className="block h-full rounded-full"
-                      style={{ width: `${(r.rate / maxRate) * 100}%`, background: r.tint }}
-                    />
-                  </span>
-                </div>
-              ) : (
-                <span className="v2-tight text-[12px] text-[var(--v2-ink-400)]">—</span>
-              )}
+                      className={`v2-tight mt-1 block text-[11.5px] leading-snug text-[var(--v2-ink-800)] ${
+                        done ? "line-through" : ""
+                      }`}
+                      style={{ textWrap: "pretty", overflowWrap: "anywhere" }}
+                    >
+                      {it.title}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 grid grid-cols-4 gap-4 border-t border-[var(--v2-ink-100)] pt-4">
-        <Stat label="Всего часов" value={`${totalH} ч`} />
-        <Stat label="Деньги месяца" value={`${homeFmt(totalM)} ₽`} />
-        <Stat label="Средний ₽/час" value={`${homeFmt(Math.round(totalM / totalH))} ₽`} accent />
-        <Stat label="Часы в ставки" value={`${betHours} ч`} />
+          );
+        })}
       </div>
     </section>
   );
 }
 
 /* ------------------------- ПРАВИЛА И МИНИМУМ ------------------------------ */
-function RulesCard({ state, toggle }: { state: Record<string, boolean>; toggle: (id: string) => void }) {
-  return (
-    <section className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">
-      <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">Минимум недели</h3>
-      <p className="v2-tight mt-1 text-[12px] text-[var(--v2-ink-500)]">Сделал — можно отдыхать.</p>
-
-      <div className="mt-3.5 flex flex-col gap-0.5">
-        {HOME_CHECKS.map((r) => {
-          const on = state[r.id];
-          return (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => toggle(r.id)}
-              className="-mx-1 flex items-start gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-[var(--v2-ink-50)]"
-            >
-              <span
-                className={`mt-[1px] inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md transition ${
-                  on ? "bg-emerald-500 text-white" : "bg-[var(--v2-ink-100)] text-transparent"
-                }`}
-              >
-                <HI.check className="h-3 w-3" />
-              </span>
-              <span className="min-w-0">
-                <span
-                  className={`v2-tight block text-[13.5px] font-medium ${
-                    on ? "text-[var(--v2-ink-500)] line-through" : "text-[var(--v2-ink-900)]"
-                  }`}
-                >
-                  {r.label}
-                </span>
-                <span className="v2-tight block text-[11.5px] text-[var(--v2-ink-500)]">{r.note}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-3 flex items-center gap-3 rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5">
-        <span className="v2-tight text-[13px] font-medium text-[var(--v2-ink-900)]">{HOME_TRAININGS.label}</span>
-        <span className="ml-auto flex items-center gap-1">
-          {Array.from({ length: HOME_TRAININGS.total }).map((_, i) => (
-            <span
-              key={i}
-              className={`h-1.5 w-5 rounded-full ${
-                i < HOME_TRAININGS.done ? "bg-emerald-500" : "bg-[var(--v2-ink-200)]"
-              }`}
-            />
-          ))}
-        </span>
-        <span className="v2-tnum v2-tight text-[12px] text-[var(--v2-ink-500)]">
-          {HOME_TRAININGS.done} из {HOME_TRAININGS.total}
-        </span>
-      </div>
-    </section>
-  );
-}
-
 function RulesBand() {
   return (
     <section className="rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-soft)]">
@@ -790,7 +943,39 @@ function RulesBand() {
           </div>
         ))}
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3">
+
+      <div className="mt-5 border-t border-[var(--v2-ink-100)] pt-5">
+        <div className="flex items-baseline gap-3">
+          <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">Минимум недели</h3>
+          <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">
+            Сделал — можно отдыхать. Просто помню, не отмечаю.
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-x-6 gap-y-2.5">
+          {HOME_CHECKS.map((r) => (
+            <div key={r.id} className="flex gap-2.5">
+              <HI.minus className="mt-[5px] h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-300)]" />
+              <span className="min-w-0">
+                <span className="v2-tight block text-[13.5px] font-medium text-[var(--v2-ink-900)]">{r.label}</span>
+                <span className="v2-tight block text-[11.5px] text-[var(--v2-ink-500)]">{r.note}</span>
+              </span>
+            </div>
+          ))}
+          <div className="flex gap-2.5">
+            <HI.minus className="mt-[5px] h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-300)]" />
+            <span className="min-w-0">
+              <span className="v2-tight block text-[13.5px] font-medium text-[var(--v2-ink-900)]">
+                {HOME_TRAININGS.label}
+              </span>
+              <span className="v2-tight block text-[11.5px] text-[var(--v2-ink-500)]">
+                {HOME_TRAININGS.total} раза в неделю
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
         <div
           className="v2-tight rounded-xl bg-emerald-50 px-4 py-3.5 text-[14px] leading-relaxed text-emerald-900"
           style={{ textWrap: "pretty" }}
@@ -881,38 +1066,23 @@ function VideoCard() {
 /* --------------------------------- HOME ---------------------------------- */
 export function V2PersonalHomeClient() {
   const [month, setMonth] = useState("aug");
-  const [doneItems, setDoneItems] = useState<string[]>(HOME_WEEK_DONE_SEED);
-  const [focusDone, setFocusDone] = useState<string[]>([]);
-  const [checks, setChecks] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(HOME_CHECKS.map((r) => [r.id, r.done])),
-  );
-
-  const toggleItem = (id: string) =>
-    setDoneItems((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  const toggleFocus = (id: string) =>
-    setFocusDone((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  const toggleCheck = (id: string) => setChecks((p) => ({ ...p, [id]: !p[id] }));
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <Topbar />
       <div className="flex flex-col gap-6 px-8 pb-20 pt-3">
+        <ProjectsMoneyStrip />
+        <MoneyStrip />
         <SeasonHero />
         <LilaBanner />
+        <WeekFocusBoard />
         <MonthBand month={month} setMonth={setMonth} />
         <SprintGoals />
         <BetCards />
         <NotNow />
-        <MoneyStrip />
         <div className="grid grid-cols-[minmax(0,1fr)_336px] items-start gap-6">
-          <div className="flex min-w-0 flex-col gap-6">
-            <WeekBoard done={doneItems} toggle={toggleItem} focusDone={focusDone} toggleFocus={toggleFocus} />
-            <TimeProfit />
-          </div>
-          <div className="flex min-w-0 flex-col gap-4">
-            <RulesCard state={checks} toggle={toggleCheck} />
-            <VideoCard />
-          </div>
+          <CalendarWeek />
+          <VideoCard />
         </div>
         <RulesBand />
       </div>

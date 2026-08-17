@@ -7,12 +7,12 @@ import { usePathname } from "next/navigation";
 const TABS = [
   {
     href: "/v2/agency/overview",
-    label: "Обзор",
+    label: "Агентство",
     match: (p: string) => p.startsWith(appPath("/v2/agency/overview")),
   },
   {
     href: "/v2/agency",
-    label: "Финансы",
+    label: "Все направления",
     match: (p: string) =>
       p === appPath("/v2/agency") || p.startsWith(appPath("/v2/agency/projects")),
   },

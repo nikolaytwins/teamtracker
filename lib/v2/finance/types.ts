@@ -36,6 +36,7 @@ export type V2FinanceGeneralExpenseRow = {
   employee_role: string;
   amount: number;
   notes: string | null;
+  business_line: V2FinanceBusinessLine;
   created_at: string;
   updated_at: string;
 };

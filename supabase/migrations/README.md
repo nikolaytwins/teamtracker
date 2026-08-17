@@ -68,8 +68,11 @@
 | 047 | `047_v2_personal_life_docs.sql` | Личные разделы: время, бренд, стратегия сезона, мой код |
 | 048 | `048_finance_business_line_qmagic.sql` | Проекты и финансы: направление qmagic |
 | 049 | `049_v2_personal_observations.sql` | Личные наблюдения: записи и теги |
+| 050 | `050_agency_project_tracked_time.sql` | Учёт времени с личного таймера на проекте (отдельно от сметы) |
+| 051 | `051_agency_general_expense_business_line.sql` | Направление (agency/impulse/qmagic) у общих расходов |
+| 052 | `052_v2_personal_finance_system.sql` | Финансовая система: очередь целей и стабильные расходы |
 
-**Следующий свободный номер:** `049`
+**Следующий свободный номер:** `053`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

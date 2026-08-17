@@ -146,11 +146,9 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/agency") ||
       pathname.startsWith("/sales") ||
       pathname.startsWith("/admin") ||
-      pathname.startsWith("/v2/agency")
+      pathname.startsWith("/v2/agency") ||
+      pathname.startsWith("/v2/impulse")
     ) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
-    }
-    if (pathname.startsWith("/v2/agency")) {
       return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
     }
     if (pathname.startsWith("/board/team-load")) {

@@ -61,12 +61,14 @@ export function PersonalTodoViewClient({
   title,
   subtitle,
   focusQuickAddOnMount = false,
+  headerRight,
 }: {
   view: PersonalTodoView;
   projectId?: string;
   title: string;
   subtitle?: string;
   focusQuickAddOnMount?: boolean;
+  headerRight?: ReactNode;
 }) {
   const { refreshBootstrap, listNonce, projects, focusQuickAdd, setParentCandidates, setSubtaskParentId } =
     usePersonalTodo();
@@ -447,9 +449,12 @@ export function PersonalTodoViewClient({
 
   return (
     <>
-      <header className="px-6 pb-2 pt-6">
-        <h1 className="v2-tight text-2xl font-semibold text-[var(--v2-ink-900)]">{displayTitle}</h1>
-        {subtitle ? <p className="v2-tight mt-1 text-[14px] text-[var(--v2-ink-500)]">{subtitle}</p> : null}
+      <header className="flex items-start gap-4 px-6 pb-2 pt-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="v2-tight text-2xl font-semibold text-[var(--v2-ink-900)]">{displayTitle}</h1>
+          {subtitle ? <p className="v2-tight mt-1 text-[14px] text-[var(--v2-ink-500)]">{subtitle}</p> : null}
+        </div>
+        {headerRight ? <div className="shrink-0 pt-1">{headerRight}</div> : null}
       </header>
 
       <PersonalTodoQuickAdd

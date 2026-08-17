@@ -33,14 +33,40 @@ type DashboardPayload = {
   projects: V2FinanceProjectView[];
   generalExpenses: V2FinanceGeneralExpenseRow[];
   summary: V2FinanceMonthSummary;
+  summaryByLine: Record<V2FinanceBusinessLine, V2FinanceMonthSummary>;
   byService: V2FinanceServiceStat[];
+};
+
+type AnalyticsMonthPoint = {
+  key: string;
+  year: number;
+  month: number;
+  label: string;
+  expectedRevenue: number;
+  actualRevenue: number;
+  totalExpenses: number;
+  profit: number;
+  projectCount: number;
+};
+
+type AnalyticsPayload = {
+  businessLine: V2FinanceBusinessLine;
+  months: AnalyticsMonthPoint[];
+  byService: V2FinanceServiceStat[];
+  totals: {
+    expectedRevenue: number;
+    actualRevenue: number;
+    totalExpenses: number;
+    profit: number;
+    projectCount: number;
+  };
 };
 
 const PROJECT_COLS =
   "grid grid-cols-[1.7fr_0.95fr_0.95fr_0.95fr_0.8fr_0.95fr_0.95fr_0.95fr]";
 const EXPENSE_COLS = "grid grid-cols-[1.3fr_2fr_1fr_1.7fr_0.9fr]";
 
-function FinanceCard({ className = "", children }: { className?: string; children: React.ReactNode }) {
+function Card({ className = "", children }: { className?: string; children: React.ReactNode }) {
   return (
     <div className={`rounded-2xl bg-white shadow-[var(--v2-shadow-soft)] ${className}`}>{children}</div>
   );
@@ -165,13 +191,7 @@ function FinanceStatusSelect({
   );
 }
 
-function FinanceStatusChip({
-  count,
-  status,
-}: {
-  count: number;
-  status: V2FinancePaymentStatus;
-}) {
+function StatusChip({ count, status }: { count: number; status: V2FinancePaymentStatus }) {
   if (count <= 0) return null;
   const meta = FINANCE_STATUS_META[status];
   return (
@@ -192,6 +212,7 @@ function KpiCard({
   accent,
   icon: Icon,
   sub,
+  note,
 }: {
   label: string;
   value: string;
@@ -199,11 +220,12 @@ function KpiCard({
   accent: string;
   icon: React.ComponentType<{ className?: string }>;
   sub?: string;
+  note?: React.ReactNode;
 }) {
   const toneClass =
     tone === "red" ? "text-red-500" : tone === "green" ? "text-emerald-600" : "text-[var(--v2-ink-900)]";
   return (
-    <FinanceCard className="p-5">
+    <Card className="p-5">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
         <span
           className="inline-flex h-6 w-6 items-center justify-center rounded-lg"
@@ -215,7 +237,8 @@ function KpiCard({
       </div>
       <div className={`v2-tnum v2-tighter mt-3 text-[28px] font-semibold leading-none ${toneClass}`}>{value}</div>
       {sub ? <div className="v2-tight mt-2 text-[12px] text-[var(--v2-ink-500)]">{sub}</div> : null}
-    </FinanceCard>
+      {note ? <div className="mt-2">{note}</div> : null}
+    </Card>
   );
 }
 
@@ -236,19 +259,21 @@ function StatBar({ label, value, max, tint }: { label: string; value: number; ma
   );
 }
 
-export function V2FinanceClient() {
+export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
+  const lineMeta = FINANCE_BUSINESS_LINE_META[line];
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
-  const [tab, setTab] = useState<"projects" | "stats">("projects");
+  const [tab, setTab] = useState<"projects" | "analytics">("projects");
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectAmount, setNewProjectAmount] = useState("");
-  const [newProjectLine, setNewProjectLine] = useState<V2FinanceBusinessLine>("agency");
-  const [lineTab, setLineTab] = useState<V2FinanceBusinessLine>("agency");
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [expenseWho, setExpenseWho] = useState("");
   const [expenseRole, setExpenseRole] = useState<string>(FINANCE_EMPLOYEE_ROLES[0]!.label);
@@ -260,46 +285,28 @@ export function V2FinanceClient() {
   const [actionError, setActionError] = useState<string | null>(null);
   const skipMonthReload = useRef(true);
 
-  const load = useCallback(
-    async (y: number, m: number) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const payload = await fetchJson<DashboardPayload>(
-          `/api/v2/finance/dashboard?year=${y}&month=${m}`
-        );
-        setData(payload);
-        setYear(payload.year);
-        setMonth(payload.month);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
+  const load = useCallback(async (y: number, m: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = await fetchJson<DashboardPayload>(`/api/v2/finance/dashboard?year=${y}&month=${m}`);
+      setData(payload);
+      setYear(payload.year);
+      setMonth(payload.month);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void (async () => {
       const now = new Date();
-      const y = now.getFullYear();
-      const m = now.getMonth() + 1;
-      setLoading(true);
-      setError(null);
-      try {
-        const payload = await fetchJson<DashboardPayload>(`/api/v2/finance/dashboard?year=${y}&month=${m}`);
-        setData(payload);
-        setYear(payload.year);
-        setMonth(payload.month);
-        setMonthReady(true);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-      } finally {
-        setLoading(false);
-      }
+      await load(now.getFullYear(), now.getMonth() + 1);
+      setMonthReady(true);
     })();
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (!monthReady) return;
@@ -309,6 +316,21 @@ export function V2FinanceClient() {
     }
     void load(year, month);
   }, [year, month, monthReady, load]);
+
+  useEffect(() => {
+    if (tab !== "analytics" || analytics || analyticsLoading) return;
+    void (async () => {
+      setAnalyticsLoading(true);
+      setAnalyticsError(null);
+      try {
+        setAnalytics(await fetchJson<AnalyticsPayload>(`/api/v2/agency/analytics?line=${line}`));
+      } catch (e) {
+        setAnalyticsError(e instanceof Error ? e.message : "Ошибка загрузки аналитики");
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    })();
+  }, [tab, analytics, analyticsLoading, line]);
 
   const yearOptions = useMemo(() => {
     const ys = new Set<number>([year, today.getFullYear(), today.getFullYear() - 1]);
@@ -327,6 +349,7 @@ export function V2FinanceClient() {
         body: JSON.stringify(patch),
       });
       await load(year, month);
+      setAnalytics(null);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Не удалось сохранить");
     }
@@ -342,13 +365,13 @@ export function V2FinanceClient() {
       await fetchJson("/api/v2/finance/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, totalAmount, businessLine: newProjectLine, year, month }),
+        body: JSON.stringify({ name, totalAmount, businessLine: line, year, month }),
       });
       setNewProjectName("");
       setNewProjectAmount("");
-      setNewProjectLine(lineTab);
       setNewProjectOpen(false);
       await load(year, month);
+      setAnalytics(null);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Не удалось создать проект");
     }
@@ -368,6 +391,7 @@ export function V2FinanceClient() {
           employeeRole: expenseRole,
           amount,
           notes: expenseNotes.trim() || null,
+          businessLine: line,
           year,
           month,
         }),
@@ -378,6 +402,7 @@ export function V2FinanceClient() {
       setEditingExpenseId(null);
       setExpenseFormOpen(false);
       await load(year, month);
+      setAnalytics(null);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Не удалось добавить расход");
     }
@@ -400,19 +425,26 @@ export function V2FinanceClient() {
     setExpenseNotes("");
   };
 
-  const reload = useCallback(() => load(year, month), [load, year, month]);
-  const summary = data?.summary;
-  const allProjects = data?.projects ?? [];
+  const reload = useCallback(async () => {
+    await load(year, month);
+    setAnalytics(null);
+  }, [load, year, month]);
+
+  const totalSummary = data?.summary;
+  const summary = data?.summaryByLine?.[line];
   const projects = useMemo(
-    () => allProjects.filter((p) => p.business_line === lineTab),
-    [allProjects, lineTab]
+    () => (data?.projects ?? []).filter((p) => p.business_line === line),
+    [data?.projects, line]
   );
   const lineTotals = useMemo(() => {
     const expected = projects.reduce((s, p) => s + p.effective_total_amount, 0);
     const actual = projects.reduce((s, p) => s + p.paid_amount, 0);
     return { expected, actual };
   }, [projects]);
-  const generalExpenses = data?.generalExpenses ?? [];
+  const generalExpenses = useMemo(
+    () => (data?.generalExpenses ?? []).filter((e) => e.business_line === line),
+    [data?.generalExpenses, line]
+  );
 
   if (loading && !data) {
     return (
@@ -437,15 +469,12 @@ export function V2FinanceClient() {
         <div className="v2-tight flex items-center gap-2 text-[13px] text-[var(--v2-ink-500)]">
           <span className="text-[var(--v2-ink-400)]">Студия</span>
           <span className="text-[var(--v2-ink-300)]">/</span>
-          <span className="font-medium text-[var(--v2-ink-900)]">Проекты и финансы</span>
+          <span className="font-medium text-[var(--v2-ink-900)]">{lineMeta.label}</span>
         </div>
         <div className="ml-auto">
           <button
             type="button"
-            onClick={() => {
-              setNewProjectLine(lineTab);
-              setNewProjectOpen(true);
-            }}
+            onClick={() => setNewProjectOpen(true)}
             className="v2-tight inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
           >
             <V2Icons.plus className="h-4 w-4 shrink-0" />
@@ -460,7 +489,7 @@ export function V2FinanceClient() {
             {(
               [
                 ["projects", "Проекты"],
-                ["stats", "Статистика"],
+                ["analytics", "Аналитика"],
               ] as const
             ).map(([k, label]) => (
               <button
@@ -479,116 +508,130 @@ export function V2FinanceClient() {
             ))}
           </div>
 
-          <div className="mb-6 flex flex-wrap items-center gap-4">
-            <h1 className="v2-tighter text-[34px] font-semibold leading-none text-[var(--v2-ink-900)]">Проекты</h1>
-            <div className="flex items-center gap-2 pl-2">
-              <FinanceSelect
-                value={year}
-                options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
-                onChange={(v) => setYear(Number(v))}
-              />
-              <FinanceSelect
-                value={month}
-                options={FINANCE_MONTH_NAMES.map((name, i) => ({ value: i + 1, label: name }))}
-                onChange={(v) => setMonth(Number(v))}
-              />
-              <span className="v2-tight max-w-[150px] text-[12px] leading-tight text-[var(--v2-ink-500)]">
-                Фильтр по месяцу создания проекта
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setYear(today.getFullYear());
-                  setMonth(today.getMonth() + 1);
-                }}
-                className="v2-tight text-[13px] font-medium text-[var(--v2-brand-600)] transition hover:text-[var(--v2-brand-700)]"
-              >
-                Сегодня
-              </button>
-            </div>
-          </div>
-
-          {actionError ? (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-              {actionError}
-            </div>
-          ) : null}
-
-          {summary ? (
-            <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <KpiCard
-                label="Предполагаемая выручка"
-                value={formatRub(summary.expectedRevenue)}
-                accent="#3B6FF7"
-                icon={V2Icons.projects}
-                sub={`${summary.projectCount} проектов в ${FINANCE_MONTH_NAMES[month - 1]?.toLowerCase()}`}
-              />
-              <KpiCard
-                label="Фактическая выручка"
-                value={formatRub(summary.actualRevenue)}
-                accent="#0EA5A4"
-                icon={V2Icons.ruble}
-                sub={
-                  summary.expectedRevenue
-                    ? `${Math.round((summary.actualRevenue / summary.expectedRevenue) * 100)}% оплачено`
-                    : "—"
-                }
-              />
-              <KpiCard
-                label="Расходы"
-                value={formatRub(summary.totalExpenses)}
-                tone="red"
-                accent="#EF4444"
-                icon={V2Icons.folder}
-                sub={`${formatRub(summary.manualGeneralExpenses + summary.projectExpenses)} команда · ${formatRub(summary.taxAmount)} налог`}
-              />
-              <KpiCard
-                label="Прибыль"
-                value={formatRub(summary.profit)}
-                tone={summary.profit >= 0 ? "green" : "red"}
-                accent={summary.profit >= 0 ? "#10B981" : "#EF4444"}
-                icon={V2Icons.reports}
-                sub={`маржа ${Math.round(summary.margin)}% · предполагаемая выручка − расходы`}
-              />
-            </div>
-          ) : null}
-
           {tab === "projects" ? (
             <>
+              <div className="mb-6 flex flex-wrap items-center gap-4">
+                <h1 className="v2-tighter text-[34px] font-semibold leading-none text-[var(--v2-ink-900)]">
+                  {lineMeta.label}
+                </h1>
+                <div className="flex items-center gap-2 pl-2">
+                  <FinanceSelect
+                    value={year}
+                    options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
+                    onChange={(v) => setYear(Number(v))}
+                  />
+                  <FinanceSelect
+                    value={month}
+                    options={FINANCE_MONTH_NAMES.map((name, i) => ({ value: i + 1, label: name }))}
+                    onChange={(v) => setMonth(Number(v))}
+                  />
+                  <span className="v2-tight max-w-[150px] text-[12px] leading-tight text-[var(--v2-ink-500)]">
+                    Фильтр по месяцу создания проекта
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setYear(today.getFullYear());
+                      setMonth(today.getMonth() + 1);
+                    }}
+                    className="v2-tight text-[13px] font-medium text-[var(--v2-brand-600)] transition hover:text-[var(--v2-brand-700)]"
+                  >
+                    Сегодня
+                  </button>
+                </div>
+              </div>
+
+              {actionError ? (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+                  {actionError}
+                </div>
+              ) : null}
+
+              {summary ? (
+                <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                  <KpiCard
+                    label="Предполагаемая выручка"
+                    value={formatRub(summary.expectedRevenue)}
+                    accent="#3B6FF7"
+                    icon={V2Icons.projects}
+                    sub={`${summary.projectCount} проектов в ${FINANCE_MONTH_NAMES[month - 1]?.toLowerCase()}`}
+                    note={
+                      totalSummary ? (
+                        <TotalNote label="общая" value={formatRub(totalSummary.expectedRevenue)} />
+                      ) : null
+                    }
+                  />
+                  <KpiCard
+                    label="Фактическая выручка"
+                    value={formatRub(summary.actualRevenue)}
+                    accent="#0EA5A4"
+                    icon={V2Icons.ruble}
+                    sub={
+                      summary.expectedRevenue
+                        ? `${Math.round((summary.actualRevenue / summary.expectedRevenue) * 100)}% оплачено`
+                        : "—"
+                    }
+                    note={
+                      totalSummary ? (
+                        <TotalNote label="общая" value={formatRub(totalSummary.actualRevenue)} />
+                      ) : null
+                    }
+                  />
+                  <KpiCard
+                    label="Расходы"
+                    value={formatRub(summary.totalExpenses)}
+                    tone="red"
+                    accent="#EF4444"
+                    icon={V2Icons.folder}
+                    sub={`${formatRub(summary.manualGeneralExpenses + summary.projectExpenses)} команда · ${formatRub(summary.taxAmount)} налог`}
+                    note={
+                      totalSummary ? (
+                        <TotalNote label="общие" value={formatRub(totalSummary.totalExpenses)} />
+                      ) : null
+                    }
+                  />
+                  <KpiCard
+                    label="Прибыль"
+                    value={formatRub(summary.profit)}
+                    tone={summary.profit >= 0 ? "green" : "red"}
+                    accent={summary.profit >= 0 ? "#10B981" : "#EF4444"}
+                    icon={V2Icons.reports}
+                    sub={`маржа ${Math.round(summary.margin)}% · выручка ${lineMeta.label.toLowerCase()} − расходы`}
+                    note={
+                      totalSummary ? (
+                        <TotalNote
+                          label="общая"
+                          value={formatRub(totalSummary.profit)}
+                          hint="все направления"
+                        />
+                      ) : null
+                    }
+                  />
+                </div>
+              ) : null}
+
               <div className="mb-4">
                 <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
                   <h2 className="v2-tighter text-[22px] font-semibold leading-none text-[var(--v2-ink-900)]">
-                    {FINANCE_BUSINESS_LINE_META[lineTab].label}
+                    Проекты · {lineMeta.label}
                   </h2>
-                  <div className="inline-flex items-center rounded-full bg-white p-1 shadow-[var(--v2-shadow-card)]">
-                    {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => {
-                      const active = lineTab === k;
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => setLineTab(k)}
-                          className={`v2-tight h-8 rounded-full px-3.5 text-[12.5px] font-medium transition ${
-                            active
-                              ? "bg-[var(--v2-ink-900)] text-white"
-                              : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
-                          }`}
-                        >
-                          {FINANCE_BUSINESS_LINE_META[k].label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <Link
+                    href={appPath("/v2/agency")}
+                    className="v2-tight text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:text-[var(--v2-ink-900)]"
+                  >
+                    Все направления →
+                  </Link>
                 </div>
                 {projects.length > 0 ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <FinanceStatusChip count={projects.filter((p) => p.status === "paid").length} status="paid" />
-                    <FinanceStatusChip count={projects.filter((p) => p.status === "prepaid").length} status="prepaid" />
-                    <FinanceStatusChip count={projects.filter((p) => p.status === "not_paid").length} status="not_paid" />
+                    <StatusChip count={projects.filter((p) => p.status === "paid").length} status="paid" />
+                    <StatusChip count={projects.filter((p) => p.status === "prepaid").length} status="prepaid" />
+                    <StatusChip count={projects.filter((p) => p.status === "not_paid").length} status="not_paid" />
                   </div>
                 ) : null}
               </div>
-              <FinanceCard className="mb-7 overflow-hidden">
+
+              <Card className="mb-7 overflow-hidden">
                 <div
                   className={`${PROJECT_COLS} border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
                 >
@@ -604,7 +647,7 @@ export function V2FinanceClient() {
                 <div className="divide-y divide-[var(--v2-ink-100)]/70">
                   {projects.length === 0 ? (
                     <div className="px-5 py-10 text-center text-sm text-[var(--v2-ink-500)]">
-                      Нет проектов «{FINANCE_BUSINESS_LINE_META[lineTab].label}» за выбранный месяц
+                      Нет проектов «{lineMeta.label}» за выбранный месяц
                     </div>
                   ) : (
                     projects.map((p, i) => {
@@ -620,10 +663,7 @@ export function V2FinanceClient() {
                         <div
                           key={p.id}
                           className={`group ${PROJECT_COLS} items-center border-l-[3px] px-5 py-3.5 transition hover:brightness-[0.99]`}
-                          style={{
-                            borderLeftColor: statusMeta.dot,
-                            backgroundColor: statusMeta.bg,
-                          }}
+                          style={{ borderLeftColor: statusMeta.dot, backgroundColor: statusMeta.bg }}
                         >
                           <div className="flex min-w-0 items-center gap-2.5 pr-2">
                             <span
@@ -650,13 +690,11 @@ export function V2FinanceClient() {
                                 className="v2-tight mt-0.5 max-w-full rounded border-0 bg-transparent py-0 pl-0 text-[11px] font-medium text-[var(--v2-ink-500)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
                                 title="Направление"
                               >
-                                {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map(
-                                  (k) => (
-                                    <option key={k} value={k}>
-                                      {FINANCE_BUSINESS_LINE_META[k].label}
-                                    </option>
-                                  )
-                                )}
+                                {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => (
+                                  <option key={k} value={k}>
+                                    {FINANCE_BUSINESS_LINE_META[k].label}
+                                  </option>
+                                ))}
                               </select>
                             </div>
                             <span className="ml-0.5 hidden items-center gap-0.5 group-hover:flex">
@@ -694,7 +732,9 @@ export function V2FinanceClient() {
                                 title="Удалить"
                                 onClick={() => {
                                   if (!confirm(`Удалить «${p.name}»?`)) return;
-                                  void fetchJson(`/api/v2/finance/projects/${p.id}`, { method: "DELETE" }).then(reload);
+                                  void fetchJson(`/api/v2/finance/projects/${p.id}`, { method: "DELETE" }).then(
+                                    reload
+                                  );
                                 }}
                                 className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-red-50 hover:text-red-500"
                               >
@@ -705,9 +745,7 @@ export function V2FinanceClient() {
                           <div>
                             <select
                               value={p.service_type}
-                              onChange={(e) =>
-                                void patchProject(p.id, { serviceType: e.target.value })
-                              }
+                              onChange={(e) => void patchProject(p.id, { serviceType: e.target.value })}
                               className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] font-medium text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
                             >
                               {(Object.keys(FINANCE_SERVICE_META) as V2FinanceServiceType[]).map((k) => (
@@ -720,11 +758,7 @@ export function V2FinanceClient() {
                           <div>
                             <select
                               value={p.client_type ?? ""}
-                              onChange={(e) =>
-                                void patchProject(p.id, {
-                                  clientType: e.target.value || null,
-                                })
-                              }
+                              onChange={(e) => void patchProject(p.id, { clientType: e.target.value || null })}
                               className="v2-tight max-w-full rounded-lg border-0 bg-transparent text-[12.5px] text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
                             >
                               <option value="">—</option>
@@ -752,11 +786,7 @@ export function V2FinanceClient() {
                           <div>
                             <select
                               value={p.payment_method ?? ""}
-                              onChange={(e) =>
-                                void patchProject(p.id, {
-                                  paymentMethod: e.target.value || null,
-                                })
-                              }
+                              onChange={(e) => void patchProject(p.id, { paymentMethod: e.target.value || null })}
                               className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
                             >
                               <option value="">—</option>
@@ -834,13 +864,13 @@ export function V2FinanceClient() {
                     </div>
                   </div>
                 ) : null}
-              </FinanceCard>
+              </Card>
 
-              <FinanceCard className="overflow-hidden">
+              <Card className="overflow-hidden">
                 <div className="flex items-center justify-between gap-4 px-5 py-4">
                   <div>
                     <h3 className="v2-tighter text-[16px] font-semibold text-[var(--v2-ink-900)]">
-                      Общие расходы
+                      Расходы · {lineMeta.label}
                     </h3>
                     <p className="v2-tight mt-0.5 text-[12.5px] text-[var(--v2-ink-500)]">
                       Команда и налоги за {FINANCE_MONTH_NAMES[month - 1]?.toLowerCase()} · всего{" "}
@@ -862,6 +892,7 @@ export function V2FinanceClient() {
                             fromMonth: prev.month,
                             toYear: year,
                             toMonth: month,
+                            businessLine: line,
                           }),
                         }).then(reload);
                       }}
@@ -968,13 +999,15 @@ export function V2FinanceClient() {
                       <span className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Налоги</span>
                     </div>
                     <div className="v2-tight pr-3 text-[12.5px] text-[var(--v2-ink-500)]">
-                      6 916 ₽/мес + 1% от расчётного счёта
+                      {line === "agency" ? "6 916 ₽/мес + 1% от расчётного счёта" : "1% от расчётного счёта"}
                     </div>
                     <div className="v2-tnum v2-tight text-right text-[14px] font-semibold text-red-500">
                       {formatRub(summary.taxAmount)}
                     </div>
                     <div className="v2-tight pl-3 text-[12.5px] italic text-[var(--v2-ink-500)]">
-                      6916 ₽ + 1% с оплат на р/с
+                      {line === "agency"
+                        ? "6916 ₽ + 1% с оплат на р/с"
+                        : "1% с оплат на р/с · взносы ИП учтены в агентстве"}
                     </div>
                     <div className="text-right">
                       <span className="v2-tight inline-flex items-center gap-1 text-[12px] font-medium text-[var(--v2-ink-400)]">
@@ -986,6 +1019,11 @@ export function V2FinanceClient() {
                 ) : null}
 
                 <div className="divide-y divide-[var(--v2-ink-100)]/70">
+                  {generalExpenses.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm text-[var(--v2-ink-500)]">
+                      Нет расходов «{lineMeta.label}» за {FINANCE_MONTH_NAMES[month - 1]?.toLowerCase()}
+                    </div>
+                  ) : null}
                   {generalExpenses.map((e, i) => {
                     const tint = financeAvatarTint(e.employee_name, i + 2);
                     return (
@@ -1013,18 +1051,7 @@ export function V2FinanceClient() {
                             {e.employee_name}
                           </span>
                         </div>
-                        <div className="v2-tight flex items-center gap-2 text-[13px] text-[var(--v2-ink-600)]">
-                          {e.employee_role}
-                          <span
-                            className="rounded-full px-2 py-0.5 text-[11px] font-medium"
-                            style={{
-                              background: FINANCE_BUSINESS_LINE_META[e.business_line].bg,
-                              color: FINANCE_BUSINESS_LINE_META[e.business_line].tint,
-                            }}
-                          >
-                            {FINANCE_BUSINESS_LINE_META[e.business_line].label}
-                          </span>
-                        </div>
+                        <div className="v2-tight text-[13px] text-[var(--v2-ink-600)]">{e.employee_role}</div>
                         <div className="v2-tnum v2-tight text-right text-[14px] font-semibold text-red-500">
                           {formatRub(e.amount)}
                         </div>
@@ -1055,7 +1082,7 @@ export function V2FinanceClient() {
                     className={`${EXPENSE_COLS} items-center border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-5 py-3.5`}
                   >
                     <div className="v2-tight col-span-2 text-[13px] font-semibold text-[var(--v2-ink-900)]">
-                      Итого общих расходов
+                      Итого расходов · {lineMeta.label}
                     </div>
                     <div className="v2-tnum text-right text-[15px] font-semibold text-red-500">
                       {formatRub(summary.manualGeneralExpenses)}
@@ -1065,13 +1092,14 @@ export function V2FinanceClient() {
                     </div>
                   </div>
                 ) : null}
-              </FinanceCard>
+              </Card>
             </>
           ) : (
-            <StatsTab
-              byService={data?.byService ?? []}
-              summary={summary}
-              projectCount={projects.length}
+            <AnalyticsTab
+              data={analytics}
+              loading={analyticsLoading}
+              error={analyticsError}
+              lineLabel={lineMeta.label}
             />
           )}
         </div>
@@ -1080,7 +1108,9 @@ export function V2FinanceClient() {
       {newProjectOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
-            <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Новый проект</h2>
+            <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">
+              Новый проект · {lineMeta.label}
+            </h2>
             <label className="mt-4 block">
               <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
                 Название
@@ -1108,31 +1138,6 @@ export function V2FinanceClient() {
                 className="v2-tnum h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
               />
             </label>
-            <div className="mt-3">
-              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
-                Направление
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => {
-                  const meta = FINANCE_BUSINESS_LINE_META[k];
-                  const active = newProjectLine === k;
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setNewProjectLine(k)}
-                      className={`v2-tight rounded-xl border px-3 py-2.5 text-[13px] font-medium transition ${
-                        active
-                          ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
-                          : "border-[var(--v2-ink-200)] text-[var(--v2-ink-700)] hover:border-[var(--v2-ink-300)]"
-                      }`}
-                    >
-                      {meta.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
@@ -1140,7 +1145,6 @@ export function V2FinanceClient() {
                   setNewProjectOpen(false);
                   setNewProjectName("");
                   setNewProjectAmount("");
-                  setNewProjectLine(lineTab);
                 }}
                 className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
               >
@@ -1161,61 +1165,238 @@ export function V2FinanceClient() {
   );
 }
 
-function StatsTab({
-  byService,
-  summary,
-  projectCount,
+function TotalNote({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="v2-tight flex items-baseline gap-1.5 border-t border-[var(--v2-ink-100)] pt-2 text-[12px] text-[var(--v2-ink-500)]">
+      <span>{label}:</span>
+      <span className="v2-tnum font-semibold text-[var(--v2-ink-700)]">{value}</span>
+      {hint ? <span className="text-[11px] text-[var(--v2-ink-400)]">· {hint}</span> : null}
+    </div>
+  );
+}
+
+function AnalyticsTab({
+  data,
+  loading,
+  error,
+  lineLabel,
 }: {
-  byService: V2FinanceServiceStat[];
-  summary: V2FinanceMonthSummary | undefined;
-  projectCount: number;
+  data: AnalyticsPayload | null;
+  loading: boolean;
+  error: string | null;
+  lineLabel: string;
 }) {
-  if (!summary) return null;
+  if (loading && !data) {
+    return <div className="py-16 text-center text-[var(--v2-ink-500)]">Загрузка аналитики…</div>;
+  }
+  if (error && !data) {
+    return <div className="py-16 text-center text-[var(--v2-ink-700)]">{error}</div>;
+  }
+  if (!data) return null;
+
+  const { months, byService, totals } = data;
   const maxSvc = Math.max(...byService.map((s) => s.total), 1);
-  const comp = [
-    { label: "Команда (дизайнеры)", value: summary.manualGeneralExpenses + summary.projectExpenses, tint: "#EF4444" },
-    { label: "Налоги", value: summary.taxAmount, tint: "#F59E0B" },
-    { label: "Прибыль", value: summary.profit, tint: "#10B981" },
-  ];
-  const maxComp = summary.expectedRevenue || 1;
+  const serviceTotal = byService.reduce((s, x) => s + x.total, 0);
+  const best = byService[0];
+  const monthsWithData = months.filter((m) => m.projectCount > 0);
+  const avgProfit = monthsWithData.length
+    ? Math.round(monthsWithData.reduce((s, m) => s + m.profit, 0) / monthsWithData.length)
+    : 0;
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <FinanceCard className="p-6">
-        <h3 className="v2-tight mb-4 text-[15px] font-semibold text-[var(--v2-ink-900)]">Выручка по услугам</h3>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-4">
+        <h1 className="v2-tighter text-[34px] font-semibold leading-none text-[var(--v2-ink-900)]">Аналитика</h1>
+        <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">
+          {lineLabel} · вся история{months.length ? ` · ${months.length} мес.` : ""}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <KpiCard
+          label="Выручка за всё время"
+          value={formatRub(totals.actualRevenue)}
+          accent="#0EA5A4"
+          icon={V2Icons.ruble}
+          sub={`ожидалось ${formatRub(totals.expectedRevenue)}`}
+        />
+        <KpiCard
+          label="Прибыль за всё время"
+          value={formatRub(totals.profit)}
+          tone={totals.profit >= 0 ? "green" : "red"}
+          accent={totals.profit >= 0 ? "#10B981" : "#EF4444"}
+          icon={V2Icons.reports}
+          sub={`в среднем ${formatRub(avgProfit)} в месяц`}
+        />
+        <KpiCard
+          label="Проектов"
+          value={String(totals.projectCount)}
+          accent="#3B6FF7"
+          icon={V2Icons.projects}
+          sub={
+            totals.projectCount
+              ? `средний чек ${formatRub(Math.round(totals.actualRevenue / totals.projectCount))}`
+              : "—"
+          }
+        />
+        <KpiCard
+          label="Топ-услуга"
+          value={best ? best.label : "—"}
+          accent={best?.tint ?? "#7C5CFF"}
+          icon={V2Icons.spark}
+          sub={
+            best && serviceTotal
+              ? `${formatRub(best.total)} · ${Math.round((best.total / serviceTotal) * 100)}% выручки`
+              : "Нет данных"
+          }
+        />
+      </div>
+
+      <Card className="p-6">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">Выручка по услугам</h3>
+          <span className="v2-tight text-[12px] text-[var(--v2-ink-500)]">
+            фактические оплаты за всю историю · {formatRub(serviceTotal)}
+          </span>
+        </div>
         <div className="space-y-4">
           {byService.map((s) => (
             <StatBar
               key={s.serviceType}
-              label={`${s.label} · ${s.count}`}
+              label={`${s.label} · ${s.count} проектов · ${
+                serviceTotal ? Math.round((s.total / serviceTotal) * 100) : 0
+              }%`}
               value={s.total}
               max={maxSvc}
               tint={s.tint}
             />
           ))}
-          {byService.length === 0 ? (
-            <p className="text-sm text-[var(--v2-ink-500)]">Нет данных за месяц</p>
+          {byService.length === 0 ? <p className="text-sm text-[var(--v2-ink-500)]">Нет данных</p> : null}
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+          <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">
+            Выручка и прибыль по месяцам
+          </h3>
+          <div className="flex items-center gap-4 text-[12px] text-[var(--v2-ink-500)]">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-[#3B6FF7]" />
+              Выручка
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-[#10B981]" />
+              Прибыль
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-[#EF4444]" />
+              Убыток
+            </span>
+          </div>
+        </div>
+        <MonthlyChart months={months} />
+      </Card>
+
+      <Card className="overflow-hidden">
+        <div className="grid grid-cols-[1fr_1fr_1fr_1fr_0.7fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]">
+          <div>Месяц</div>
+          <div className="text-right">Выручка</div>
+          <div className="text-right">Расходы</div>
+          <div className="text-right">Прибыль</div>
+          <div className="text-right">Проектов</div>
+        </div>
+        <div className="divide-y divide-[var(--v2-ink-100)]/70">
+          {[...months].reverse().map((m) => (
+            <div key={m.key} className="grid grid-cols-[1fr_1fr_1fr_1fr_0.7fr] items-center px-5 py-3 text-[13px]">
+              <div className="v2-tight font-medium text-[var(--v2-ink-900)]">
+                {FINANCE_MONTH_NAMES[m.month - 1]} {m.year}
+              </div>
+              <div className="v2-tnum text-right text-[var(--v2-ink-800)]">{formatRub(m.actualRevenue)}</div>
+              <div className="v2-tnum text-right text-red-500">{formatRub(m.totalExpenses)}</div>
+              <div
+                className={`v2-tnum text-right font-semibold ${
+                  m.profit >= 0 ? "text-emerald-600" : "text-red-500"
+                }`}
+              >
+                {formatRub(m.profit)}
+              </div>
+              <div className="v2-tnum text-right text-[var(--v2-ink-500)]">{m.projectCount}</div>
+            </div>
+          ))}
+          {months.length === 0 ? (
+            <div className="px-5 py-10 text-center text-sm text-[var(--v2-ink-500)]">Пока нет истории</div>
           ) : null}
         </div>
-        <div className="mt-5 flex items-center justify-between border-t border-[var(--v2-ink-100)]/80 pt-4 text-[13px]">
-          <span className="v2-tight text-[var(--v2-ink-500)]">Средний чек</span>
-          <span className="v2-tnum font-semibold text-[var(--v2-ink-900)]">
-            {formatRub(projectCount ? Math.round(summary.actualRevenue / projectCount) : 0)}
-          </span>
-        </div>
-      </FinanceCard>
-      <FinanceCard className="p-6">
-        <h3 className="v2-tight mb-4 text-[15px] font-semibold text-[var(--v2-ink-900)]">Куда уходит выручка</h3>
-        <div className="space-y-4">
-          {comp.map((c) => (
-            <StatBar key={c.label} label={c.label} value={c.value} max={maxComp} tint={c.tint} />
-          ))}
-        </div>
-        <div className="mt-5 flex items-center justify-between border-t border-[var(--v2-ink-100)]/80 pt-4 text-[13px]">
-          <span className="v2-tight text-[var(--v2-ink-500)]">Маржа прибыли</span>
-          <span className="v2-tnum font-semibold text-emerald-600">{Math.round(summary.margin)}%</span>
-        </div>
-      </FinanceCard>
+      </Card>
+    </div>
+  );
+}
+
+const CHART_HEIGHT = 200;
+
+function MonthlyChart({ months }: { months: AnalyticsMonthPoint[] }) {
+  if (months.length === 0) {
+    return <p className="py-10 text-center text-sm text-[var(--v2-ink-500)]">Пока нет истории</p>;
+  }
+
+  const maxPositive = Math.max(...months.map((m) => Math.max(m.actualRevenue, m.profit, 0)), 1);
+  const maxNegative = Math.max(...months.map((m) => Math.max(-m.profit, 0)), 0);
+  const scale = maxPositive + maxNegative;
+  const positiveHeight = (CHART_HEIGHT * maxPositive) / scale;
+  const negativeHeight = CHART_HEIGHT - positiveHeight;
+
+  return (
+    <div className="overflow-x-auto pb-1">
+      <div className="flex min-w-full items-end gap-2" style={{ minWidth: months.length * 46 }}>
+        {months.map((m) => {
+          const revenueH = (m.actualRevenue / scale) * CHART_HEIGHT;
+          const profitH = (Math.abs(m.profit) / scale) * CHART_HEIGHT;
+          return (
+            <div key={m.key} className="flex min-w-[38px] flex-1 flex-col items-center gap-1.5">
+              <div className="relative w-full" style={{ height: CHART_HEIGHT }}>
+                <div
+                  className="absolute left-0 right-0 border-t border-dashed border-[var(--v2-ink-200)]"
+                  style={{ top: positiveHeight }}
+                />
+                <div
+                  className="absolute inset-x-0 flex items-end justify-center gap-1"
+                  style={{ height: positiveHeight, top: 0 }}
+                >
+                  <div
+                    className="w-[42%] rounded-t-[3px] bg-[#3B6FF7]/85 transition hover:bg-[#3B6FF7]"
+                    style={{ height: Math.max(m.actualRevenue > 0 ? 2 : 0, revenueH) }}
+                    title={`${FINANCE_MONTH_NAMES[m.month - 1]} ${m.year} · выручка ${formatRub(m.actualRevenue)}`}
+                  />
+                  {m.profit >= 0 ? (
+                    <div
+                      className="w-[42%] rounded-t-[3px] bg-[#10B981]/85 transition hover:bg-[#10B981]"
+                      style={{ height: Math.max(m.profit > 0 ? 2 : 0, profitH) }}
+                      title={`${FINANCE_MONTH_NAMES[m.month - 1]} ${m.year} · прибыль ${formatRub(m.profit)}`}
+                    />
+                  ) : (
+                    <div className="w-[42%]" />
+                  )}
+                </div>
+                {m.profit < 0 && negativeHeight > 0 ? (
+                  <div
+                    className="absolute inset-x-0 flex items-start justify-center gap-1"
+                    style={{ top: positiveHeight, height: negativeHeight }}
+                  >
+                    <div className="w-[42%]" />
+                    <div
+                      className="w-[42%] rounded-b-[3px] bg-[#EF4444]/85 transition hover:bg-[#EF4444]"
+                      style={{ height: Math.max(2, profitH) }}
+                      title={`${FINANCE_MONTH_NAMES[m.month - 1]} ${m.year} · убыток ${formatRub(m.profit)}`}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <span className="v2-tight whitespace-nowrap text-[10.5px] text-[var(--v2-ink-500)]">{m.label}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -34,6 +34,8 @@ import type {
   PersonalTaxProfileRow,
   PersonalTransactionRow,
   PersonalTxnType,
+  PersonalFinanceSystemRow,
+  PersonalFinanceGoalRow,
 } from "@/lib/v2/personal/types";
 
 export const DEFAULT_EXPECTED_EXPENSES_RUB = 180_000;
@@ -347,6 +349,18 @@ export async function loadPersonalFinanceDashboard(
 
   const tax = await ensureTaxProfile(userId);
   const budget = await ensureBudgetMonth(userId, year, month);
+  let system: PersonalFinanceSystemRow = {
+    user_id: userId,
+    life_expenses_rub: DEFAULT_LIFE_EXPENSES_RUB,
+    funds_rub: DEFAULT_FUNDS_RUB,
+    moscow_job_stable: true,
+  };
+  let goals: PersonalFinanceGoalRow[] = [];
+  try {
+    [system, goals] = await Promise.all([ensureFinanceSystem(userId), ensureFinanceGoals(userId)]);
+  } catch (e) {
+    console.warn("personal finance system tables unavailable — apply migration 052", e);
+  }
 
   const [
     accountsRes,
@@ -574,6 +588,8 @@ export async function loadPersonalFinanceDashboard(
     fxRates,
     history: historyWithCurrent,
     incomeHistory: incomeHistoryForUi,
+    system,
+    goals,
     summary: {
       ...summary,
       projectExpectedRevenue,
@@ -1648,6 +1664,237 @@ export async function deleteForecastExtraExpense(ctx: V2SessionContext, id: stri
   const sb = getV2Supabase();
   const { error } = await sb
     .from("v2_personal_forecast_extra_expenses")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", uid(ctx));
+  if (error) throw error;
+}
+
+export const DEFAULT_LIFE_EXPENSES_RUB = 200_000;
+export const DEFAULT_FUNDS_RUB = 22_000;
+
+const DEFAULT_FINANCE_GOALS: Array<{
+  goal_key: string;
+  title: string;
+  hint: string;
+  target_rub: number;
+  sort_order: number;
+}> = [
+  {
+    goal_key: "cushion_min",
+    title: "Подушка №1 (минимальная)",
+    hint: "3 месяца защитной жизни",
+    target_rub: 510_000,
+    sort_order: 0,
+  },
+  {
+    goal_key: "cushion_goal",
+    title: "Подушка №2 (цель)",
+    hint: "запас сверх минимума",
+    target_rub: 1_000_000,
+    sort_order: 1,
+  },
+  {
+    goal_key: "moscow",
+    title: "Москва",
+    hint: "переезд: первый, последний, комиссия, логистика",
+    target_rub: 250_000,
+    sort_order: 2,
+  },
+  {
+    goal_key: "china",
+    title: "Китай",
+    hint: "ждёт очереди, потом закрывается быстро",
+    target_rub: 300_000,
+    sort_order: 3,
+  },
+];
+
+function mapFinanceSystem(r: Record<string, unknown>): PersonalFinanceSystemRow {
+  return {
+    user_id: String(r.user_id),
+    life_expenses_rub: Number(r.life_expenses_rub) || 0,
+    funds_rub: Number(r.funds_rub) || 0,
+    moscow_job_stable: r.moscow_job_stable !== false,
+  };
+}
+
+function mapFinanceGoal(r: Record<string, unknown>): PersonalFinanceGoalRow {
+  return {
+    id: String(r.id),
+    user_id: String(r.user_id),
+    goal_key: r.goal_key ? String(r.goal_key) : null,
+    title: String(r.title),
+    hint: r.hint ? String(r.hint) : "",
+    target_rub: Number(r.target_rub) || 0,
+    sort_order: Number(r.sort_order) || 0,
+  };
+}
+
+export async function ensureFinanceSystem(userId: string): Promise<PersonalFinanceSystemRow> {
+  const sb = getV2Supabase();
+  const { data } = await sb
+    .from("v2_personal_finance_system")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (data) return mapFinanceSystem(data as Record<string, unknown>);
+  const row = {
+    user_id: userId,
+    life_expenses_rub: DEFAULT_LIFE_EXPENSES_RUB,
+    funds_rub: DEFAULT_FUNDS_RUB,
+    moscow_job_stable: true,
+    updated_at: nowIso(),
+  };
+  const { error } = await sb.from("v2_personal_finance_system").insert(row);
+  if (error && !String(error.message).includes("duplicate")) throw error;
+  const { data: again } = await sb
+    .from("v2_personal_finance_system")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (again) return mapFinanceSystem(again as Record<string, unknown>);
+  return {
+    user_id: userId,
+    life_expenses_rub: DEFAULT_LIFE_EXPENSES_RUB,
+    funds_rub: DEFAULT_FUNDS_RUB,
+    moscow_job_stable: true,
+  };
+}
+
+export async function ensureFinanceGoals(userId: string): Promise<PersonalFinanceGoalRow[]> {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_finance_goals")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order");
+  if (error) throw error;
+  if (data && data.length > 0) {
+    return data.map((r) => mapFinanceGoal(r as Record<string, unknown>));
+  }
+  const inserts = DEFAULT_FINANCE_GOALS.map((g) => ({
+    id: newV2Id(),
+    user_id: userId,
+    goal_key: g.goal_key,
+    title: g.title,
+    hint: g.hint,
+    target_rub: g.target_rub,
+    sort_order: g.sort_order,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  }));
+  const { error: insErr } = await sb.from("v2_personal_finance_goals").insert(inserts);
+  if (insErr && !String(insErr.message).includes("duplicate")) throw insErr;
+  const { data: again } = await sb
+    .from("v2_personal_finance_goals")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order");
+  return (again ?? inserts).map((r) => mapFinanceGoal(r as Record<string, unknown>));
+}
+
+export async function updateFinanceSystem(
+  ctx: V2SessionContext,
+  patch: Partial<{
+    life_expenses_rub: number;
+    funds_rub: number;
+    moscow_job_stable: boolean;
+  }>
+): Promise<PersonalFinanceSystemRow> {
+  const userId = uid(ctx);
+  await ensureFinanceSystem(userId);
+  const safe: Record<string, unknown> = { updated_at: nowIso() };
+  if (patch.life_expenses_rub != null) {
+    const n = Number(patch.life_expenses_rub);
+    if (!Number.isFinite(n) || n < 0) throw new PersonalFinanceValidationError("Проверьте сумму жизни");
+    safe.life_expenses_rub = Math.round(n);
+  }
+  if (patch.funds_rub != null) {
+    const n = Number(patch.funds_rub);
+    if (!Number.isFinite(n) || n < 0) throw new PersonalFinanceValidationError("Проверьте сумму фондов");
+    safe.funds_rub = Math.round(n);
+  }
+  if (patch.moscow_job_stable != null) {
+    safe.moscow_job_stable = Boolean(patch.moscow_job_stable);
+  }
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_finance_system")
+    .update(safe)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new PersonalFinanceValidationError("Настройки не найдены");
+  return mapFinanceSystem(data as Record<string, unknown>);
+}
+
+export async function createFinanceGoal(
+  ctx: V2SessionContext,
+  input: { title: string; hint?: string; target_rub: number }
+): Promise<PersonalFinanceGoalRow> {
+  const title = String(input.title ?? "").trim();
+  if (!title) throw new PersonalFinanceValidationError("Название цели обязательно");
+  const target = Number(input.target_rub);
+  if (!Number.isFinite(target) || target < 0) {
+    throw new PersonalFinanceValidationError("Проверьте сумму цели");
+  }
+  const userId = uid(ctx);
+  const existing = await ensureFinanceGoals(userId);
+  const sort_order = existing.reduce((m, g) => Math.max(m, g.sort_order), -1) + 1;
+  const row = {
+    id: newV2Id(),
+    user_id: userId,
+    goal_key: null as string | null,
+    title,
+    hint: String(input.hint ?? "").trim(),
+    target_rub: Math.round(target),
+    sort_order,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  const sb = getV2Supabase();
+  const { error } = await sb.from("v2_personal_finance_goals").insert(row);
+  if (error) throw error;
+  return mapFinanceGoal(row);
+}
+
+export async function updateFinanceGoal(
+  ctx: V2SessionContext,
+  id: string,
+  patch: Partial<{ title: string; hint: string; target_rub: number }>
+): Promise<PersonalFinanceGoalRow> {
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+  const safe: Record<string, unknown> = { updated_at: nowIso() };
+  if (patch.title != null) {
+    const title = String(patch.title).trim();
+    if (!title) throw new PersonalFinanceValidationError("Название цели обязательно");
+    safe.title = title;
+  }
+  if (patch.hint != null) safe.hint = String(patch.hint).trim();
+  if (patch.target_rub != null) {
+    const n = Number(patch.target_rub);
+    if (!Number.isFinite(n) || n < 0) throw new PersonalFinanceValidationError("Проверьте сумму цели");
+    safe.target_rub = Math.round(n);
+  }
+  const { data, error } = await sb
+    .from("v2_personal_finance_goals")
+    .update(safe)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new PersonalFinanceValidationError("Цель не найдена");
+  return mapFinanceGoal(data as Record<string, unknown>);
+}
+
+export async function deleteFinanceGoal(ctx: V2SessionContext, id: string): Promise<void> {
+  const sb = getV2Supabase();
+  const { error } = await sb
+    .from("v2_personal_finance_goals")
     .delete()
     .eq("id", id)
     .eq("user_id", uid(ctx));

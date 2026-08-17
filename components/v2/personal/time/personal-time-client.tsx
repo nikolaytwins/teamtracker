@@ -44,10 +44,62 @@ function fmtRub(n: number) {
   return n.toLocaleString("ru") + " ₽";
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+/** Длительность записи: «2 мин», «2 мин 5 сек», «1 ч 12 мин» — не «0:06», которое читается как 6 секунд. */
 function fmtDur(min: number) {
-  const h = Math.floor(min / 60);
-  const m = Math.round(min % 60);
-  return `${h}:${String(m).padStart(2, "0")}`;
+  const sec = Math.max(0, Math.round(min * 60));
+  if (sec < 60) return `${sec} сек`;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return s ? `${h} ч ${m} мин` : m ? `${h} ч ${m} мин` : `${h} ч`;
+  return s ? `${m} мин ${s} сек` : `${m} мин`;
+}
+
+function fmtHours(hours: number) {
+  if (hours <= 0) return "0 мин";
+  return fmtDur(hours * 60);
+}
+
+function elapsedSeconds(startedAt: string, now = Date.now()) {
+  const t = new Date(startedAt).getTime();
+  if (!Number.isFinite(t)) return 0;
+  return Math.max(0, Math.floor((now - t) / 1000));
+}
+
+/** Ставка ₽/час по нескольким минутам врёт на порядки — считаем только с 1 часа. */
+const MIN_HOURS_FOR_RATE = 1;
+
+type AgencyProjectOption = { id: string; name: string };
+
+function isAgencyProductionLink(lifeProjectId: string, activityId: string, doc: TimeDoc | null) {
+  if (lifeProjectId !== "agency" || !doc) return false;
+  const activity = doc.projects.find((p) => p.id === lifeProjectId)?.taskTypes.find((t) => t.id === activityId);
+  return activity?.name.toLowerCase() === "production";
+}
+
+function agencyProjectLabel(projects: AgencyProjectOption[], id: string | null | undefined) {
+  if (!id) return null;
+  return projects.find((p) => p.id === id)?.name ?? null;
+}
+
+async function syncAgencyTrackedTime(entry: TimeEntry) {
+  if (!entry.agencyProjectId) return;
+  await fetchJson("/api/v2/personal/time/sync-tracked", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sourceEntryId: entry.id,
+      agencyProjectId: entry.agencyProjectId,
+      task: entry.task,
+      activity: entry.activity,
+      durationSeconds: Math.max(1, Math.round(entry.durationMin * 60)),
+      trackedAt: entry.at,
+    }),
+  });
 }
 
 function parseDurInput(s: string): number | null {
@@ -96,12 +148,10 @@ function computeMonthStats(projectId: string, entries: TimeEntry[]): MonthStats 
   for (const e of pe) {
     byAct.set(e.activity, (byAct.get(e.activity) ?? 0) + e.durationMin / 60);
   }
-  const split: [string, number][] = [...byAct.entries()]
-    .map(([k, v]) => [k, Math.round(v * 10) / 10] as [string, number])
-    .sort((a, b) => b[1] - a[1]);
+  const split: [string, number][] = [...byAct.entries()].sort((a, b) => b[1] - a[1]);
   return {
-    founder: Math.round(founder * 10) / 10,
-    reactive: Math.round(reactive * 10) / 10,
+    founder,
+    reactive,
     interruptions: reactiveEntries.length,
     days,
     split,
@@ -156,6 +206,9 @@ export function PersonalTimeClient() {
   const [timerActivityId, setTimerActivityId] = useState("");
   const [timerMode, setTimerMode] = useState<TimeMode>("planned");
   const [timerTask, setTimerTask] = useState("");
+  const [timerAgencyProjectId, setTimerAgencyProjectId] = useState("");
+  const [agencyProjects, setAgencyProjects] = useState<AgencyProjectOption[]>([]);
+  const [agencyProjectsConfigured, setAgencyProjectsConfigured] = useState(true);
 
   const saveDoc = useCallback(async (next: TimeDoc) => {
     const normalized = normalizeTimeDoc(next);
@@ -197,11 +250,7 @@ export function PersonalTimeClient() {
           setTimerActivityId(normalized.running.activityId);
           setTimerMode(normalized.running.mode);
           setTimerTask(normalized.running.task);
-          const elapsed = Math.max(
-            0,
-            Math.floor((Date.now() - new Date(normalized.running.startedAt).getTime()) / 1000)
-          );
-          setTimerSec(elapsed);
+          setTimerAgencyProjectId(normalized.running.agencyProjectId ?? "");
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Не удалось загрузить");
@@ -213,12 +262,54 @@ export function PersonalTimeClient() {
   }, []);
 
   const running = !!doc?.running;
+  const runningStartedAt = doc?.running?.startedAt ?? null;
 
   useEffect(() => {
-    if (!running) return;
-    const i = setInterval(() => setTimerSec((s) => s + 1), 1000);
-    return () => clearInterval(i);
-  }, [running]);
+    if (!running || !runningStartedAt) {
+      setTimerSec(0);
+      return;
+    }
+    const sync = () => setTimerSec(elapsedSeconds(runningStartedAt));
+    sync();
+    const i = window.setInterval(sync, 250);
+    const onResume = () => sync();
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onResume);
+    window.addEventListener("pageshow", onResume);
+    return () => {
+      window.clearInterval(i);
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onResume);
+      window.removeEventListener("pageshow", onResume);
+    };
+  }, [running, runningStartedAt]);
+
+  const timerLifeProjectId = running && doc?.running ? doc.running.projectId : timerProj;
+  const timerLifeActivityId = running && doc?.running ? doc.running.activityId : timerActivityId;
+  const showAgencyProjectPicker = isAgencyProductionLink(timerLifeProjectId, timerLifeActivityId, doc);
+
+  useEffect(() => {
+    if (!showAgencyProjectPicker) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchJson<{ projects: AgencyProjectOption[]; configured?: boolean }>(
+          "/api/v2/personal/time/agency-projects"
+        );
+        if (cancelled) return;
+        setAgencyProjects(res.projects ?? []);
+        setAgencyProjectsConfigured(res.configured !== false);
+      } catch {
+        if (!cancelled) {
+          setAgencyProjects([]);
+          setAgencyProjectsConfigured(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showAgencyProjectPicker]);
 
   const monthEntries = useMemo(() => (doc ? doc.entries.filter((e) => inCurrentMonth(e.at)) : []), [doc]);
 
@@ -227,7 +318,7 @@ export function PersonalTimeClient() {
     return doc.projects
       .map((p) => {
         const h = monthEntries.filter((e) => e.projectId === p.id).reduce((s, e) => s + e.durationMin, 0) / 60;
-        return { id: p.id, h: Math.round(h * 10) / 10 };
+        return { id: p.id, h };
       })
       .filter((a) => a.h > 0)
       .sort((a, b) => b.h - a.h);
@@ -241,7 +332,7 @@ export function PersonalTimeClient() {
         const st = computeMonthStats(p.id, doc.entries);
         const profit = p.profit ?? 0;
         const revenue = p.revenue ?? 0;
-        const per = st.founder > 0 ? Math.round(profit / st.founder) : null;
+        const per = st.founder >= MIN_HOURS_FOR_RATE ? Math.round(profit / st.founder) : null;
         const reactiveShare = st.founder ? Math.round((st.reactive / st.founder) * 100) : 0;
         return {
           id: p.id,
@@ -275,8 +366,7 @@ export function PersonalTimeClient() {
   const toggleTimer = async () => {
     if (!doc) return;
     if (doc.running) {
-      const started = new Date(doc.running.startedAt).getTime();
-      const durationMin = Math.max(1, Math.round((Date.now() - started) / 60000));
+      const durationMin = Math.max(1, elapsedSeconds(doc.running.startedAt)) / 60;
       const task = timerTask.trim() || doc.running.task.trim() || "Сессия таймера";
       const entry: TimeEntry = {
         id: uid("e"),
@@ -287,14 +377,24 @@ export function PersonalTimeClient() {
         mode: doc.running.mode,
         durationMin,
         at: new Date().toISOString(),
+        agencyProjectId: doc.running.agencyProjectId ?? null,
+        agencyProjectName: doc.running.agencyProjectName ?? null,
       };
       await saveDoc({
         ...doc,
         entries: [entry, ...doc.entries],
         running: null,
       });
+      if (entry.agencyProjectId) {
+        try {
+          await syncAgencyTrackedTime(entry);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Время сохранено, но не записалось на проект");
+        }
+      }
       setTimerSec(0);
       setTimerTask("");
+      setTimerAgencyProjectId("");
       return;
     }
     const task = timerTask.trim();
@@ -307,6 +407,8 @@ export function PersonalTimeClient() {
       setError("У проекта нет типов задач — добавьте их в настройках.");
       return;
     }
+    const agencyId = showAgencyProjectPicker && timerAgencyProjectId ? timerAgencyProjectId : null;
+    const agencyName = agencyId ? agencyProjectLabel(agencyProjects, agencyId) : null;
     setError(null);
     await saveDoc({
       ...doc,
@@ -317,6 +419,8 @@ export function PersonalTimeClient() {
         mode: timerMode,
         startedAt: new Date().toISOString(),
         task,
+        agencyProjectId: agencyId,
+        agencyProjectName: agencyName,
       },
     });
   };
@@ -336,6 +440,8 @@ export function PersonalTimeClient() {
     activityId: string;
     mode: TimeMode;
     task: string;
+    agencyProjectId?: string | null;
+    agencyProjectName?: string | null;
   }) => {
     if (!doc) return;
     const act = resolveActivity(payload.projectId, payload.activityId);
@@ -348,8 +454,17 @@ export function PersonalTimeClient() {
       mode: payload.mode,
       durationMin: payload.durationMin,
       at: new Date().toISOString(),
+      agencyProjectId: payload.agencyProjectId ?? null,
+      agencyProjectName: payload.agencyProjectName ?? null,
     };
     await saveDoc({ ...doc, entries: [entry, ...doc.entries] });
+    if (entry.agencyProjectId) {
+      try {
+        await syncAgencyTrackedTime(entry);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Время сохранено, но не записалось на проект");
+      }
+    }
     setManual(false);
   };
 
@@ -407,9 +522,9 @@ export function PersonalTimeClient() {
     );
   }
 
-  const hh = String(Math.floor(timerSec / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((timerSec % 3600) / 60)).padStart(2, "0");
-  const ss = String(timerSec % 60).padStart(2, "0");
+  const hh = pad2(Math.floor(timerSec / 3600));
+  const mm = pad2(Math.floor((timerSec % 3600) / 60));
+  const ss = pad2(timerSec % 60);
   const projName = (id: string) => doc.projects.find((x) => x.id === id)?.name ?? "—";
   const maxAtt = Math.max(0.1, ...attention.map((a) => a.h));
   const monthStats = p ? computeMonthStats(p.id, doc.entries) : null;
@@ -545,6 +660,35 @@ export function PersonalTimeClient() {
               placeholder="Например: звонок с клиентом, сценарий ролика, правки лендинга…"
             />
           </label>
+          {showAgencyProjectPicker ? (
+            <label className="mt-4 block">
+              <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                Проект агентства <span className="font-normal normal-case tracking-normal text-[var(--v2-ink-400)]">(необязательно)</span>
+              </span>
+              {!agencyProjectsConfigured ? (
+                <p className="v2-tight mt-2 text-[13px] text-[var(--v2-ink-500)]">
+                  Список проектов недоступен — время сохранится только в личном учёте.
+                </p>
+              ) : (
+                <select
+                  value={running ? doc.running!.agencyProjectId ?? "" : timerAgencyProjectId}
+                  disabled={running}
+                  onChange={(e) => setTimerAgencyProjectId(e.target.value)}
+                  className={`${fieldCls} mt-1.5 cursor-pointer appearance-none`}
+                >
+                  <option value="">— без привязки к проекту —</option>
+                  {agencyProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="v2-tight mt-2 text-[12.5px] text-[var(--v2-ink-400)]">
+                Время попадёт на карточку проекта. В смету — только если отметите там галочкой «почасовая оплата».
+              </p>
+            </label>
+          ) : null}
           <p className="v2-tight mt-4 text-[12.5px] text-[var(--v2-ink-400)]">
             Reactive — незапланированное вторжение. Отмечайте честно: важны не часы, а количество раз, когда проект
             вошёл в день без приглашения.
@@ -606,7 +750,7 @@ export function PersonalTimeClient() {
                       }}
                     />
                   </span>
-                  <span className="v2-tnum justify-self-end text-[13px] text-[var(--v2-ink-600)]">{a.h} h</span>
+                  <span className="v2-tnum justify-self-end text-[13px] text-[var(--v2-ink-600)]">{fmtHours(a.h)}</span>
                 </button>
               ))}
               {!attention.length ? (
@@ -623,7 +767,7 @@ export function PersonalTimeClient() {
           <div className="overflow-hidden rounded-[20px] bg-white shadow-[var(--v2-shadow-card)]">
             <div
               className="grid gap-4 border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/60 px-7 py-3.5"
-              style={{ gridTemplateColumns: "minmax(0,1.2fr) 120px 120px 80px 120px 160px" }}
+              style={{ gridTemplateColumns: "minmax(0,1.2fr) 120px 120px 110px 120px 160px" }}
             >
               {["Проект", "Выручка", "Прибыль", "Часы", "₽ / час", "Reactive"].map((h) => (
                 <TK key={h}>{h}</TK>
@@ -633,7 +777,7 @@ export function PersonalTimeClient() {
               <div
                 key={e.id}
                 className="grid items-center gap-4 border-b border-[var(--v2-ink-100)] px-7 py-4 last:border-0"
-                style={{ gridTemplateColumns: "minmax(0,1.2fr) 120px 120px 80px 120px 160px" }}
+                style={{ gridTemplateColumns: "minmax(0,1.2fr) 120px 120px 110px 120px 160px" }}
               >
                 <div className="min-w-0">
                   <span className="v2-tight block truncate text-[14.5px] font-medium text-[var(--v2-ink-900)]">
@@ -645,7 +789,7 @@ export function PersonalTimeClient() {
                 </div>
                 <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtRub(e.revenue)}</span>
                 <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtRub(e.profit)}</span>
-                <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{e.hours} h</span>
+                <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtHours(e.hours)}</span>
                 <span className="v2-tnum text-[14px] font-medium text-[var(--v2-brand-700)]">
                   {e.per == null ? "—" : fmtRub(e.per)}
                 </span>
@@ -667,8 +811,9 @@ export function PersonalTimeClient() {
             className="v2-tight mt-4 max-w-[80ch] text-[14px] leading-relaxed text-[var(--v2-ink-600)]"
             style={{ textWrap: "pretty" }}
           >
-            ₽ / час = прибыль линии ÷ founder-часы. Без часов за месяц ставка не считается. Высокий reactive делает
-            ту же прибыль дороже психологически.
+            ₽ / час = прибыль линии ÷ часы таймера за месяц. Ставка считается только если есть хотя бы 1 час — иначе
+            несколько минут дают миллионы и ничего не значат. Высокий reactive делает ту же прибыль дороже
+            психологически.
           </p>
         </TSect>
 
@@ -710,9 +855,14 @@ export function PersonalTimeClient() {
                 className={`group grid items-center gap-5 px-7 py-4 transition hover:bg-[var(--v2-ink-50)]/60 ${
                   i ? "border-t border-[var(--v2-ink-100)]" : ""
                 }`}
-                style={{ gridTemplateColumns: "minmax(0,1fr) 150px 130px 120px 70px 36px" }}
+                style={{ gridTemplateColumns: "minmax(0,1fr) 150px 130px 120px 110px 36px" }}
               >
-                <span className="v2-tight truncate text-[14.5px] text-[var(--v2-ink-900)]">{e.task}</span>
+                <span className="v2-tight truncate text-[14.5px] text-[var(--v2-ink-900)]">
+                  {e.task}
+                  {e.agencyProjectName ? (
+                    <span className="ml-2 text-[12px] font-normal text-[var(--v2-brand-600)]">→ {e.agencyProjectName}</span>
+                  ) : null}
+                </span>
                 <span className="v2-tight text-[12.5px] text-[var(--v2-ink-600)]">{projName(e.projectId)}</span>
                 <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">{e.activity}</span>
                 <span>
@@ -745,6 +895,8 @@ export function PersonalTimeClient() {
       {manual ? (
         <ManualModal
           projects={doc.projects}
+          agencyProjects={agencyProjects}
+          agencyProjectsConfigured={agencyProjectsConfigured}
           onClose={() => setManual(false)}
           onSave={(payload) => void addManualEntry(payload)}
         />
@@ -783,8 +935,10 @@ function ProjectPanel({
   p: TimeProject;
   m: MonthStats;
 }) {
-  const perHour = p.money && m.founder ? Math.round((p.profit ?? 0) / m.founder) : null;
-  const revPer = p.money && m.founder ? Math.round((p.revenue ?? 0) / m.founder) : null;
+  const perHour =
+    p.money && m.founder >= MIN_HOURS_FOR_RATE ? Math.round((p.profit ?? 0) / m.founder) : null;
+  const revPer =
+    p.money && m.founder >= MIN_HOURS_FOR_RATE ? Math.round((p.revenue ?? 0) / m.founder) : null;
   const reactiveShare = m.founder ? Math.round((m.reactive / m.founder) * 100) : 0;
   const totalSplit = m.split.reduce((s, x) => s + x[1], 0) || 1;
   return (
@@ -814,7 +968,11 @@ function ProjectPanel({
             sub={isFinanceLinkedTimeProject(p.id) ? "выручка − расходы проектов линии" : undefined}
           />
         ) : null}
-        <Metric label="Founder load" value={`${m.founder} h`} sub={`reactive ${m.reactive} h · ${reactiveShare}%`} />
+        <Metric
+          label="Founder load"
+          value={fmtHours(m.founder)}
+          sub={`reactive ${fmtHours(m.reactive)} · ${reactiveShare}%`}
+        />
         <Metric label="Вторжения" value={String(m.interruptions)} sub={`${m.days} дн. с вторжениями`} />
         {p.money && perHour != null ? <Metric label="Profit / founder hour" value={fmtRub(perHour)} accent /> : null}
         {p.money && revPer != null ? <Metric label="Revenue / founder hour" value={fmtRub(revPer)} /> : null}
@@ -832,7 +990,7 @@ function ProjectPanel({
                   style={{ width: `${(h / totalSplit) * 100}%` }}
                 />
               </span>
-              <span className="v2-tnum justify-self-end text-[13px] text-[var(--v2-ink-600)]">{h} h</span>
+              <span className="v2-tnum justify-self-end text-[13px] text-[var(--v2-ink-600)]">{fmtHours(h)}</span>
             </div>
           ))}
           {!m.split.length ? (
@@ -846,10 +1004,14 @@ function ProjectPanel({
 
 function ManualModal({
   projects,
+  agencyProjects,
+  agencyProjectsConfigured,
   onClose,
   onSave,
 }: {
   projects: TimeProject[];
+  agencyProjects: AgencyProjectOption[];
+  agencyProjectsConfigured: boolean;
   onClose: () => void;
   onSave: (p: {
     projectId: string;
@@ -857,6 +1019,8 @@ function ManualModal({
     activityId: string;
     mode: TimeMode;
     task: string;
+    agencyProjectId?: string | null;
+    agencyProjectName?: string | null;
   }) => void;
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
@@ -865,6 +1029,8 @@ function ManualModal({
   const [activityId, setActivityId] = useState(types[0]?.id ?? "");
   const [mode, setMode] = useState<TimeMode>("planned");
   const [task, setTask] = useState("");
+  const [agencyProjectId, setAgencyProjectId] = useState("");
+  const showAgencyPicker = isAgencyProductionLink(projectId, activityId, { projects, entries: [], review: [], running: null });
 
   useEffect(() => {
     const next = projects.find((p) => p.id === projectId)?.taskTypes ?? [];
@@ -973,6 +1139,23 @@ function ManualModal({
               className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
             />
           </label>
+          {showAgencyPicker && agencyProjectsConfigured ? (
+            <label className="mt-4 block">
+              <span className={labCls}>Проект агентства (необязательно)</span>
+              <select
+                value={agencyProjectId}
+                onChange={(e) => setAgencyProjectId(e.target.value)}
+                className={`${fieldCls} cursor-pointer appearance-none`}
+              >
+                <option value="">— без привязки —</option>
+                {agencyProjects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
         <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-8 py-4">
           <button
@@ -988,7 +1171,16 @@ function ManualModal({
             onClick={() => {
               const durationMin = parseDurInput(dur);
               if (durationMin == null || durationMin <= 0 || !projectId || !task.trim() || !activityId) return;
-              onSave({ projectId, durationMin, activityId, mode, task: task.trim() });
+              const apId = showAgencyPicker && agencyProjectId ? agencyProjectId : null;
+              onSave({
+                projectId,
+                durationMin,
+                activityId,
+                mode,
+                task: task.trim(),
+                agencyProjectId: apId,
+                agencyProjectName: apId ? agencyProjectLabel(agencyProjects, apId) : null,
+              });
             }}
             className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-5 text-[13px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)] disabled:opacity-40 disabled:hover:bg-[var(--v2-ink-900)]"
           >

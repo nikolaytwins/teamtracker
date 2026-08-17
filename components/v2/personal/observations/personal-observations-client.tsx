@@ -227,7 +227,7 @@ export function PersonalObservationsClient() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Удалить наблюдение?")) return;
+    if (!confirm("Удалить запись?")) return;
     try {
       await fetchJson(`/api/v2/personal/observations/${id}`, { method: "DELETE" });
       await load();
@@ -261,7 +261,7 @@ export function PersonalObservationsClient() {
         <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
           <div className="min-w-0 max-w-[62ch]">
             <h1 className="v2-tighter text-[42px] font-semibold leading-[1.02] text-[var(--v2-ink-900)]">
-              Наблюдения
+              Дневник
             </h1>
             <p className="v2-tight mt-2.5 text-[14.5px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
               Не выводы о всей жизни. Просто то, что реально произошло и может оказаться значимым.
@@ -289,7 +289,7 @@ export function PersonalObservationsClient() {
               onClick={() => setAdding(true)}
               className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
             >
-              <V2Icons.plus className="h-4 w-4" /> Наблюдение
+              <V2Icons.plus className="h-4 w-4" /> Запись
             </button>
           </div>
         </div>
@@ -531,7 +531,7 @@ export function PersonalObservationsClient() {
                   Обзор за период · {monthStats.month}
                 </div>
                 <p className="v2-tight mt-2 text-[16px] leading-snug">
-                  За этот месяц накопилось <span className="v2-tnum">{monthStats.total}</span> наблюдений.
+                  За этот месяц накопилось <span className="v2-tnum">{monthStats.total}</span> записей.
                 </p>
                 <p className="v2-tight v2-tnum mt-1.5 text-[13px] text-white/55">
                   В {monthStats.prevMonth.toLowerCase()} было {monthStats.prevTotal}.

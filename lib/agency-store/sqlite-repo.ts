@@ -1531,4 +1531,56 @@ export class SqliteAgencyRepo implements AgencyRepo {
       db.close();
     }
   }
+
+  async listProjectTrackedTime(_projectId: string) {
+    return [];
+  }
+
+  async getProjectTrackedTimeById(_id: string) {
+    return undefined;
+  }
+
+  async getProjectTrackedTimeBySourceEntryId(_sourceEntryId: string) {
+    return undefined;
+  }
+
+  async createProjectTrackedTime(input: import("@/lib/agency/tracked-time-types").CreateAgencyProjectTrackedTimeInput) {
+    return {
+      id: input.id,
+      projectId: input.projectId,
+      userId: input.userId,
+      source: "personal_timer",
+      sourceEntryId: input.sourceEntryId,
+      task: input.task,
+      activity: input.activity,
+      durationSeconds: input.durationSeconds,
+      trackedAt: input.trackedAt,
+      inEstimate: false,
+      detailId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async setProjectTrackedTimeEstimate(
+    trackedTimeId: string,
+    inEstimate: boolean,
+    _hourlyRateRub: number
+  ) {
+    return {
+      id: trackedTimeId,
+      projectId: "",
+      userId: "",
+      source: "personal_timer",
+      sourceEntryId: null,
+      task: "",
+      activity: "",
+      durationSeconds: 0,
+      trackedAt: new Date().toISOString(),
+      inEstimate,
+      detailId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
 }

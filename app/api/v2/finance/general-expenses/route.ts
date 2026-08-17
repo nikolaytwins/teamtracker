@@ -6,6 +6,7 @@ import {
   deleteFinanceGeneralExpense,
   updateFinanceGeneralExpense,
 } from "@/lib/v2/finance/finance-repo";
+import { isFinanceBusinessLine } from "@/lib/v2/finance/meta";
 
 export async function POST(request: NextRequest) {
   const auth = await requireV2Admin();
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
       employeeRole,
       amount,
       notes: typeof body.notes === "string" ? body.notes : null,
+      businessLine: isFinanceBusinessLine(body.businessLine) ? body.businessLine : undefined,
       year: typeof body.year === "number" ? body.year : undefined,
       month: typeof body.month === "number" ? body.month : undefined,
     });
@@ -71,6 +73,7 @@ export async function PATCH(request: NextRequest) {
       employeeRole,
       amount,
       notes: typeof body.notes === "string" ? body.notes : null,
+      businessLine: isFinanceBusinessLine(body.businessLine) ? body.businessLine : undefined,
     });
     return NextResponse.json({ expense });
   } catch (e) {
@@ -98,7 +101,8 @@ export async function PUT(request: NextRequest) {
       fromYear,
       fromMonth,
       toYear,
-      toMonth
+      toMonth,
+      isFinanceBusinessLine(body.businessLine) ? body.businessLine : undefined
     );
     return NextResponse.json({ copied });
   } catch (e) {

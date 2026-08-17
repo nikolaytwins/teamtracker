@@ -63,21 +63,21 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/v2/home", label: "Главная", icon: "home" },
-  { href: "/v2/personal/tasks/inbox", label: "Задачи", icon: "tasks" },
+  { href: "/v2/personal/ideas-tasks", label: "Идеи и задачи", icon: "tasks" },
   { href: "/v2/personal/calendar", label: "Календарь", icon: "cal" },
   // Скрыто: Доска, Проекты, Команда
   { href: "/v2/agency/overview", label: "Агентство", icon: "reports", agency: true },
-  { href: "/v2/agency", label: "Финансы месяца", icon: "reports", agency: true },
+  { href: "/v2/impulse", label: "Импульс", icon: "spark", agency: true },
   { href: "/v2/personal/finance", label: "Финансы", icon: "ruble" },
-  { href: "/v2/admin/leads", label: "Лиды", icon: "spark", admin: true },
+  // Скрыто: Финансы месяца (/v2/agency — итоги вынесены на главную)
+  // Скрыто: Лиды
 ];
 
 const PERSONAL_NAV: NavItem[] = [
-  { href: "/v2/personal/ideas", label: "Идеи", icon: "spark" },
-  { href: "/v2/personal/wishes", label: "Желания", icon: "wish" },
-  { href: "/v2/personal/observations", label: "Наблюдения", icon: "eye" },
-  { href: "/v2/personal/time", label: "Время и экономика", icon: "clock" },
+  // Скрыто: Идеи (/v2/personal/ideas — вкладка в «Идеи и задачи»)
   { href: "/v2/personal/dashboard", label: "Дашборд", icon: "reports" },
+  { href: "/v2/personal/wishes", label: "Желания", icon: "wish" },
+  { href: "/v2/personal/observations", label: "Дневник", icon: "eye" },
   { href: "/v2/personal/life-strategy", label: "Стратегия", icon: "compass" },
 ];
 
