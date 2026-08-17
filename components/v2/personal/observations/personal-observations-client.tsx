@@ -13,7 +13,7 @@ import type {
   PersonalObservationTag,
 } from "@/lib/v2/personal/personal-observations-repo";
 import { V2Icons } from "@/components/v2/ui/icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 function IcClose(p: { className?: string }) {
   return (
@@ -102,10 +102,10 @@ export function PersonalObservationsClient() {
   const [period, setPeriod] = useState("all");
   const [tag, setTag] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [adding, setAdding] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [openIds, setOpenIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,10 +126,7 @@ export function PersonalObservationsClient() {
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setAdding(false);
-        setExportOpen(false);
-      }
+      if (e.key === "Escape") setExportOpen(false);
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -187,7 +184,7 @@ export function PersonalObservationsClient() {
     tags: string[];
     link?: string;
     why?: string;
-  }) => {
+  }): Promise<boolean> => {
     setSaving(true);
     setError(null);
     try {
@@ -218,9 +215,10 @@ export function PersonalObservationsClient() {
       );
       setOpenIds((ids) => [...ids, res.observation.id]);
       await load();
-      setAdding(false);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось сохранить");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -286,7 +284,10 @@ export function PersonalObservationsClient() {
             </button>
             <button
               type="button"
-              onClick={() => setAdding(true)}
+              onClick={() => {
+                composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                composerRef.current?.focus();
+              }}
               className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
             >
               <V2Icons.plus className="h-4 w-4" /> Запись
@@ -368,11 +369,19 @@ export function PersonalObservationsClient() {
           </div>
         </div>
 
-        {loading && !board ? (
-          <p className="v2-tight text-[14px] text-[var(--v2-ink-500)]">Загрузка…</p>
-        ) : (
-          <div className="grid items-start gap-6" style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}>
-            <section className="rounded-2xl bg-white px-7 py-3 shadow-[var(--v2-shadow-soft)]">
+        <div className="grid items-start gap-6" style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}>
+            <div className="flex min-w-0 flex-col gap-4">
+              <Composer
+                knownTags={knownTags}
+                defaultType={type === "all" ? "other" : type}
+                saving={saving}
+                textareaRef={composerRef}
+                onCreate={(p) => create(p)}
+              />
+              {loading && !board ? (
+                <p className="v2-tight px-1 text-[14px] text-[var(--v2-ink-500)]">Загрузка…</p>
+              ) : (
+              <section className="rounded-2xl bg-white px-7 py-3 shadow-[var(--v2-shadow-soft)]">
               <div className="relative">
                 <span className="absolute bottom-8 left-[4.5px] top-8 w-px bg-[var(--v2-ink-200)]" />
                 <div className="relative divide-y divide-[var(--v2-ink-100)]">
@@ -478,6 +487,8 @@ export function PersonalObservationsClient() {
                 </div>
               ) : null}
             </section>
+              )}
+            </div>
 
             <div className="sticky top-4 flex flex-col gap-5">
               <section className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">
@@ -546,17 +557,7 @@ export function PersonalObservationsClient() {
               </p>
             </div>
           </div>
-        )}
       </div>
-
-      {adding ? (
-        <AddModal
-          knownTags={knownTags}
-          saving={saving}
-          onClose={() => setAdding(false)}
-          onCreate={(p) => void create(p)}
-        />
-      ) : null}
 
       {exportOpen ? (
         <ExportModal
@@ -571,15 +572,17 @@ export function PersonalObservationsClient() {
   );
 }
 
-function AddModal({
+function Composer({
   knownTags,
+  defaultType,
   saving,
-  onClose,
+  textareaRef,
   onCreate,
 }: {
   knownTags: string[];
+  defaultType: ObservationType;
   saving: boolean;
-  onClose: () => void;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
   onCreate: (p: {
     type: ObservationType;
     title: string;
@@ -587,15 +590,20 @@ function AddModal({
     tags: string[];
     link?: string;
     why?: string;
-  }) => void;
+  }) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<ObservationType>("loop");
-  const [link, setLink] = useState("");
-  const [why, setWhy] = useState("");
+  const [type, setType] = useState<ObservationType>(defaultType);
   const [tags, setTags] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
+  const [more, setMore] = useState(false);
+  const [title, setTitle] = useState("");
+  const [link, setLink] = useState("");
+  const [why, setWhy] = useState("");
+
+  useEffect(() => {
+    if (!text.trim()) setType(defaultType);
+  }, [defaultType, text]);
 
   const addTag = (t: string) => {
     const v = t.trim().replace(/^#/, "").toLowerCase();
@@ -604,177 +612,174 @@ function AddModal({
   };
   const suggestions = knownTags
     .filter((t) => !tags.includes(t) && (!draft || t.includes(draft.toLowerCase().replace(/^#/, ""))))
-    .slice(0, 8);
+    .slice(0, 6);
 
-  const today = new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  const grow = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 52), 280)}px`;
+  };
+
+  const submit = async () => {
+    const body = text.trim();
+    if (!body || saving) return;
+    const ok = await onCreate({
+      type,
+      title: title.trim() || body.split("\n")[0]!.slice(0, 70),
+      text: body,
+      tags,
+      link: link || undefined,
+      why: why.trim() || undefined,
+    });
+    if (!ok) return;
+    setText("");
+    setTags([]);
+    setDraft("");
+    setTitle("");
+    setLink("");
+    setWhy("");
+    setMore(false);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "52px";
+      textareaRef.current.focus();
+    }
+  };
 
   return (
-    <div className="fade-in fixed inset-0 z-50 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="absolute inset-0 bg-[var(--v2-ink-900)]/30 backdrop-blur-sm" />
-      <div
-        className="relative max-h-[92vh] w-[620px] max-w-full overflow-y-auto rounded-2xl bg-white shadow-[var(--v2-shadow-pop)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start gap-3 px-6 pb-4 pt-5">
-          <div>
-            <h3 className="v2-tight text-[19px] font-semibold text-[var(--v2-ink-900)]">Что произошло?</h3>
-            <p className="v2-tight mt-0.5 text-[12.5px] text-[var(--v2-ink-500)]">
-              Дата поставится сама — {today}. Пиши столько, сколько нужно.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
-          >
-            <IcClose className="h-4 w-4" />
-          </button>
+    <section className="rounded-2xl bg-white px-5 py-4 shadow-[var(--v2-shadow-soft)]">
+      <textarea
+        ref={textareaRef}
+        value={text}
+        rows={2}
+        placeholder="Что произошло?"
+        onChange={(e) => {
+          setText(e.target.value);
+          grow(e.target);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void submit();
+          }
+        }}
+        className="v2-tight w-full resize-none bg-transparent text-[15.5px] leading-[1.55] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+        style={{ minHeight: 52 }}
+      />
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[var(--v2-ink-100)] pt-3">
+        {(Object.keys(OBSERVATION_TYPE_META) as ObservationType[]).map((id) => {
+          const t = OBSERVATION_TYPE_META[id];
+          const on = type === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              title={t.label}
+              onClick={() => setType(id)}
+              className={`v2-tight inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-medium transition ${
+                on ? "" : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
+              }`}
+              style={on ? { background: t.bg, color: t.tint } : undefined}
+            >
+              <span className="text-[12px] leading-none">{t.emoji}</span>
+              <span className="hidden sm:inline">{t.short}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <div className="flex min-h-[36px] min-w-[180px] flex-1 flex-wrap items-center gap-1.5 rounded-xl bg-[var(--v2-ink-50)] px-2.5 py-1.5">
+          {tags.map((t) => (
+            <span
+              key={t}
+              className="v2-tight inline-flex h-6 items-center gap-1 rounded-md bg-[var(--v2-ink-900)] pl-1.5 pr-0.5 text-[11.5px] font-medium text-white"
+            >
+              <span className="text-white/50">#</span>
+              {t}
+              <button
+                type="button"
+                onClick={() => setTags(tags.filter((x) => x !== t))}
+                className="inline-flex h-5 w-5 items-center justify-center rounded text-white/60 hover:text-white"
+              >
+                <IcClose className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                addTag(draft);
+              }
+              if (e.key === "Backspace" && !draft && tags.length) setTags(tags.slice(0, -1));
+            }}
+            placeholder={tags.length ? "" : "Тег…"}
+            className="v2-tight h-6 min-w-[80px] flex-1 bg-transparent text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+          />
         </div>
-        <div className="flex flex-col gap-2.5 px-6">
+        <button
+          type="button"
+          onClick={() => setMore((v) => !v)}
+          className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-800)]"
+        >
+          {more ? "Свернуть" : "Ещё"}
+        </button>
+        <button
+          type="button"
+          disabled={!text.trim() || saving}
+          onClick={() => void submit()}
+          className="v2-tight ml-auto h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-35 disabled:hover:bg-[var(--v2-ink-900)]"
+        >
+          {saving ? "…" : "Опубликовать"}
+        </button>
+      </div>
+      {suggestions.length && draft ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {suggestions.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => addTag(t)}
+              className="v2-tight inline-flex h-[26px] items-center gap-1 rounded-md bg-[var(--v2-ink-100)] px-2 text-[11.5px] font-medium text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
+            >
+              <span className="text-[var(--v2-ink-400)]">#</span>
+              {t}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {more ? (
+        <div className="mt-3 grid gap-2 border-t border-[var(--v2-ink-100)] pt-3 sm:grid-cols-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Заголовок одной строкой — необязательно"
-            className="v2-tight h-11 w-full rounded-xl bg-[var(--v2-ink-50)] px-3.5 text-[15px] font-medium text-[var(--v2-ink-900)] outline-none transition placeholder:font-normal placeholder:text-[var(--v2-ink-400)] focus:bg-white focus:shadow-[var(--v2-shadow-card)]"
+            placeholder="Заголовок — необязательно"
+            className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-50)] px-3 text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)] sm:col-span-2"
           />
-          <textarea
-            autoFocus
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={9}
-            placeholder="Что случилось, что заметил, какие детали. Абзацами, как в дневнике."
-            className="v2-tight w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3.5 py-3 text-[14.5px] leading-[1.7] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:bg-white focus:shadow-[var(--v2-shadow-card)]"
-          />
-        </div>
-        <div className="px-6 pt-5">
-          <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">Тип</div>
-          <div className="flex flex-wrap gap-1.5">
-            {(Object.keys(OBSERVATION_TYPE_META) as ObservationType[]).map((id) => {
-              const t = OBSERVATION_TYPE_META[id];
-              const on = type === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setType(id)}
-                  className={`v2-tight inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium transition ${
-                    on ? "" : "border-transparent bg-[var(--v2-ink-50)] text-[var(--v2-ink-700)] hover:bg-[var(--v2-ink-100)]"
-                  }`}
-                  style={on ? { background: t.bg, borderColor: t.border, color: t.tint } : undefined}
-                >
-                  <span className="text-[12px] leading-none">{t.emoji}</span>
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="px-6 pt-5">
-          <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">Теги</div>
-          <div className="flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-xl bg-[var(--v2-ink-50)] px-2.5 py-2">
-            {tags.map((t) => (
-              <span
-                key={t}
-                className="v2-tight inline-flex h-7 items-center gap-1 rounded-md bg-[var(--v2-ink-900)] pl-2 pr-1 text-[12px] font-medium text-white"
-              >
-                <span className="text-white/50">#</span>
-                {t}
-                <button
-                  type="button"
-                  onClick={() => setTags(tags.filter((x) => x !== t))}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded text-white/60 hover:text-white"
-                >
-                  <IcClose className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === ",") {
-                  e.preventDefault();
-                  addTag(draft);
-                }
-                if (e.key === "Backspace" && !draft && tags.length) setTags(tags.slice(0, -1));
-              }}
-              placeholder={tags.length ? "" : "vibecoding, аркалиум…"}
-              className="v2-tight h-7 min-w-[120px] flex-1 bg-transparent text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
-            />
-          </div>
-          {suggestions.length ? (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="v2-tight mr-0.5 text-[11.5px] text-[var(--v2-ink-400)]">Уже использовались:</span>
-              {suggestions.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => addTag(t)}
-                  className="v2-tight inline-flex h-[26px] items-center gap-1 rounded-md bg-[var(--v2-ink-100)] px-2 text-[11.5px] font-medium text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)]/70 hover:text-[var(--v2-ink-900)]"
-                >
-                  <span className="text-[var(--v2-ink-400)]">#</span>
-                  {t}
-                </button>
+          <div className="relative">
+            <select
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              className="v2-tight h-9 w-full cursor-pointer appearance-none rounded-xl bg-[var(--v2-ink-50)] pl-3 pr-8 text-[13px] text-[var(--v2-ink-800)] outline-none"
+            >
+              <option value="">Без связи</option>
+              {Object.entries(OBSERVATION_LINKS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
               ))}
-            </div>
-          ) : null}
+            </select>
+            <IcChev className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--v2-ink-400)]" />
+          </div>
+          <input
+            value={why}
+            onChange={(e) => setWhy(e.target.value)}
+            placeholder="Почему интересно"
+            className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-50)] px-3 text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+          />
         </div>
-        <div className="grid grid-cols-2 gap-3 px-6 pt-5">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-              Связать с <span className="font-normal normal-case tracking-normal text-[var(--v2-ink-300)]">— необязательно</span>
-            </span>
-            <div className="relative">
-              <select
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                className="v2-tight h-9 w-full cursor-pointer appearance-none rounded-xl bg-[var(--v2-ink-50)] pl-3 pr-8 text-[13px] text-[var(--v2-ink-800)] outline-none"
-              >
-                <option value="">Ничего</option>
-                {Object.entries(OBSERVATION_LINKS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-              <IcChev className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--v2-ink-400)]" />
-            </div>
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-              Почему интересно{" "}
-              <span className="font-normal normal-case tracking-normal text-[var(--v2-ink-300)]">— необязательно</span>
-            </span>
-            <input
-              value={why}
-              onChange={(e) => setWhy(e.target.value)}
-              placeholder="Одна строка"
-              className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-50)] px-3 text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
-            />
-          </label>
-        </div>
-        <div className="mt-5 flex items-center gap-3 bg-[var(--v2-ink-50)]/70 px-6 py-5">
-          <span className="v2-tight text-[12px] text-[var(--v2-ink-400)]">Оценивать ничего не нужно.</span>
-          <button
-            type="button"
-            disabled={!text.trim() || saving}
-            onClick={() =>
-              onCreate({
-                type,
-                title: title.trim() || text.trim().split("\n")[0]!.slice(0, 70),
-                text: text.trim(),
-                tags,
-                link: link || undefined,
-                why: why.trim() || undefined,
-              })
-            }
-            className="v2-tight ml-auto h-10 rounded-xl bg-[var(--v2-ink-900)] px-5 text-[13px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-35 disabled:hover:bg-[var(--v2-ink-900)]"
-          >
-            {saving ? "Сохранение…" : "Сохранить"}
-          </button>
-        </div>
-      </div>
-    </div>
+      ) : null}
+    </section>
   );
 }
 

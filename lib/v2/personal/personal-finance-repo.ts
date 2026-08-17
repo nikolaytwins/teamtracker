@@ -79,6 +79,7 @@ function mapAccount(
     fx_as_of: fx?.asOf ?? null,
     note: r.note ? String(r.note) : null,
     disposable: Boolean(r.disposable),
+    in_cushion: Boolean(r.in_cushion),
     goal_amount_rub: r.goal_amount_rub == null ? null : Number(r.goal_amount_rub),
     sort_order: Number(r.sort_order) || 0,
   };
@@ -663,6 +664,7 @@ function accountPatch(patch: Partial<PersonalAccountRow>): Partial<PersonalAccou
   if (patch.accent !== undefined) out.accent = patch.accent;
   if (patch.note !== undefined) out.note = patch.note;
   if (patch.disposable !== undefined) out.disposable = patch.disposable;
+  if (patch.in_cushion !== undefined) out.in_cushion = patch.in_cushion;
   if (patch.goal_amount_rub !== undefined) out.goal_amount_rub = patch.goal_amount_rub;
   if (patch.sort_order !== undefined) out.sort_order = patch.sort_order;
   if (patch.currency_code !== undefined && isPersonalAccountCurrency(patch.currency_code)) {
@@ -813,6 +815,7 @@ export async function createPersonalAccount(
     balance_rub: balances.balance_rub,
     note: input.note ?? null,
     disposable: input.disposable ?? true,
+    in_cushion: input.in_cushion ?? false,
     goal_amount_rub: input.goal_amount_rub ?? null,
     sort_order: input.sort_order ?? 0,
     created_at: now,
@@ -1815,8 +1818,8 @@ export async function updateFinanceSystem(
     if (!Number.isFinite(n) || n < 0) throw new PersonalFinanceValidationError("Проверьте сумму фондов");
     safe.funds_rub = Math.round(n);
   }
-  if (patch.moscow_job_stable != null) {
-    safe.moscow_job_stable = Boolean(patch.moscow_job_stable);
+  if (typeof patch.moscow_job_stable === "boolean") {
+    safe.moscow_job_stable = patch.moscow_job_stable;
   }
   const sb = getV2Supabase();
   const { data, error } = await sb

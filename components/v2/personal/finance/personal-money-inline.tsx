@@ -146,10 +146,11 @@ export function PersonalAccountBalanceInline({
 }) {
   const isFx = currencyCode !== "RUB";
   return (
-    <div className={`flex flex-col items-end gap-0.5 ${className}`}>
+    <div className="flex flex-col items-start gap-0.5">
       <PersonalMoneyInline
         value={value}
         allowCents={isFx}
+        className={className}
         title={isFx ? "Нажмите, чтобы изменить остаток в валюте" : "Нажмите, чтобы изменить баланс"}
         display={
           isFx ? (

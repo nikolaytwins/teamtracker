@@ -71,8 +71,9 @@
 | 050 | `050_agency_project_tracked_time.sql` | Учёт времени с личного таймера на проекте (отдельно от сметы) |
 | 051 | `051_agency_general_expense_business_line.sql` | Направление (agency/impulse/qmagic) у общих расходов |
 | 052 | `052_v2_personal_finance_system.sql` | Финансовая система: очередь целей и стабильные расходы |
+| 053 | `053_personal_account_in_cushion.sql` | Галочка «в подушку» у личного счёта |
 
-**Следующий свободный номер:** `053`
+**Следующий свободный номер:** `054`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

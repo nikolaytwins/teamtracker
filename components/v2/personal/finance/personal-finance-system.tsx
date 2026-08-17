@@ -12,7 +12,7 @@ import type {
 import { V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export type AllocatedGoal = PersonalFinanceGoalRow & {
   filled: number;
@@ -21,6 +21,10 @@ export type AllocatedGoal = PersonalFinanceGoalRow & {
   complete: boolean;
   active: boolean;
 };
+
+export function cushionPool(accounts: PersonalAccountRow[]): number {
+  return accounts.filter((a) => a.in_cushion).reduce((s, a) => s + a.balance_rub, 0);
+}
 
 export function allocateGoals(goals: PersonalFinanceGoalRow[], pool: number): AllocatedGoal[] {
   let remaining = Math.max(pool, 0);
@@ -180,10 +184,10 @@ function InlineEditMoney({
 
 export function PfNearestGoal({
   nearest,
-  accountsTotal,
+  cushionTotal,
 }: {
   nearest: AllocatedGoal | undefined;
-  accountsTotal: number;
+  cushionTotal: number;
 }) {
   if (!nearest) return null;
   const left = nearest.left;
@@ -209,12 +213,12 @@ export function PfNearestGoal({
           </div>
         </div>
         <div className="w-full shrink-0 rounded-xl bg-white/10 px-5 py-4 lg:w-[300px]">
-          <Kick className="text-white/45">На счетах сейчас</Kick>
+          <Kick className="text-white/45">В подушке сейчас</Kick>
           <div className="mt-2 grid gap-1.5 text-[13px]">
             <div className="flex justify-between text-white/70">
-              <span>Все счета</span>
+              <span>Счета с галочкой</span>
               <span className="v2-tnum">
-                <PersonalAmt v={accountsTotal} />
+                <PersonalAmt v={cushionTotal} />
               </span>
             </div>
             <div className="flex justify-between text-white/70">
@@ -271,16 +275,16 @@ export function PfMonthSplit({
   const barTotal = Math.max(income, 1);
 
   return (
-    <Sect accent="#3B6FF7" title="Распределение месяца" hint="прогноз дохода минус жизнь и фонды">
+    <Sect accent="#3B6FF7" title="Распределение месяца" hint="прибыль минус жизнь и фонды">
       <Card className="p-6">
         <div className="flex flex-col items-end gap-8 lg:flex-row">
           <div className="w-full shrink-0 lg:w-[300px]">
-            <Kick>Прогнозируемый доход месяца</Kick>
+            <Kick>Прогнозируемая прибыль месяца</Kick>
             <div className="v2-tighter v2-tnum mt-1.5 text-[36px] font-semibold text-[var(--v2-ink-900)]">
               <PersonalAmt v={income} />
             </div>
             <p className="v2-tight mt-2 text-[12.5px] text-[var(--v2-ink-500)]">
-              Из проектов за этот месяц. Жизнь и фонды можно поправить нажатием.
+              Прибыль проектов за этот месяц. Жизнь и фонды можно поправить нажатием.
             </p>
           </div>
           <div className="grid w-full flex-1 grid-cols-2 gap-3 lg:grid-cols-4">
@@ -381,7 +385,7 @@ export function PfGoalQueue({
     <Sect
       accent="#18181B"
       title="Очередь целей"
-      hint="деньги идут в одну цель, остальные ждут"
+      hint="заполняется счетами с галочкой «В подушку» — деньги идут в одну цель, остальные ждут"
       right={
         <button
           type="button"
@@ -504,21 +508,26 @@ export function PfGoalQueue({
 export function PfMoscowReady({
   allocated,
   monthly,
+  liquidity,
   jobStable,
   onJobChange,
 }: {
   allocated: AllocatedGoal[];
   monthly: number;
+  liquidity: number;
   jobStable: boolean;
   onJobChange: (v: boolean) => Promise<void>;
 }) {
+  const [stable, setStable] = useState(jobStable);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setStable(jobStable);
+  }, [jobStable]);
+
   const cushion = allocated.find((g) => g.goal_key === "cushion_min") ?? allocated[0];
   const moscow = allocated.find((g) => g.goal_key === "moscow");
-  const pool = allocated.reduce((s, g) => s + g.filled, 0);
   const moveFund = moscow?.filled ?? 0;
-  const liquidity = pool;
-  const need = jobStable ? 850_000 : 1_400_000;
-  const needHi = jobStable ? 1_100_000 : 1_700_000;
+  const need = stable ? 800_000 : 1_400_000;
   const checks = [
     {
       n: "Подушка закрыта",
@@ -536,13 +545,13 @@ export function PfMoscowReady({
       n: "Общая ликвидность",
       now: liquidity,
       need,
-      d: jobStable
-        ? "ориентир 850к—1,1 млн при стабильной работе"
-        : "без стабильной работы нужно 1,4—1,7 млн",
+      d: stable
+        ? "при стабильной работе достаточно 800к капитала"
+        : "без стабильной работы нужно 1,4 млн капитала",
     },
     {
       n: "Стабильный доход 200—240к+",
-      now: jobStable ? 1 : 0,
+      now: stable ? 1 : 0,
       need: 1,
       d: "найм или длинный контракт — инфраструктура переезда",
       bool: true,
@@ -551,6 +560,15 @@ export function PfMoscowReady({
   const gap = Math.max(need - liquidity, 0);
   const eta = monthly > 0 ? Math.ceil(gap / monthly) : null;
   const doneCount = checks.filter((c) => c.now >= c.need).length;
+
+  const toggleJob = (v: boolean) => {
+    if (v === stable || busy) return;
+    setStable(v);
+    setBusy(true);
+    void onJobChange(v)
+      .catch(() => setStable(jobStable))
+      .finally(() => setBusy(false));
+  };
 
   return (
     <Sect
@@ -568,10 +586,11 @@ export function PfMoscowReady({
             <button
               key={String(v)}
               type="button"
-              onClick={() => void onJobChange(v)}
-              className={`v2-tight h-7 rounded-lg px-3 text-[12px] font-medium transition ${
-                jobStable === v
-                  ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
+              disabled={busy}
+              onClick={() => toggleJob(v)}
+              className={`v2-tight h-7 rounded-lg px-3 text-[12px] font-medium transition disabled:opacity-60 ${
+                stable === v
+                  ? "bg-[var(--v2-ink-900)] text-white"
                   : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-900)]"
               }`}
             >
@@ -625,8 +644,7 @@ export function PfMoscowReady({
             <PersonalAmt v={gap} />
           </div>
           <div className="v2-tight v2-tnum text-[12.5px] text-[var(--v2-ink-500)]">
-            порог {formatPersonalRubShort(need)}—{formatPersonalRubShort(needHi)} · сейчас{" "}
-            {formatPersonalRubShort(liquidity)}
+            порог {formatPersonalRubShort(need)} · сейчас {formatPersonalRubShort(liquidity)}
           </div>
           <div className="v2-tight mt-5 grid gap-2.5 border-t border-[var(--v2-ink-100)] pt-5 text-[13px]">
             <div className="flex justify-between">
@@ -675,10 +693,19 @@ function AccIcon({ iconKey, className }: { iconKey: string; className?: string }
   return <Icon className={className} />;
 }
 
+async function patchAccountCushion(accountId: string, in_cushion: boolean) {
+  await fetchJson(`/api/v2/personal/finance/accounts/${accountId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ in_cushion }),
+  });
+}
+
 export function PfAccountsAsFunds({
   accounts,
   capital,
   accountsTotal,
+  cushionTotal,
   capitalSum,
   onSaved,
   onError,
@@ -688,6 +715,7 @@ export function PfAccountsAsFunds({
   accounts: PersonalAccountRow[];
   capital: PersonalCapitalRow[];
   accountsTotal: number;
+  cushionTotal: number;
   capitalSum: number;
   onSaved: () => void;
   onError: (msg: string) => void;
@@ -715,13 +743,18 @@ export function PfAccountsAsFunds({
       <Sect
         accent="#3B6FF7"
         title="Счета"
-        hint="как фонды — отдельная карточка на каждый"
+        hint="отдельная карточка на каждый"
         right={
           <div className="flex items-center gap-3">
             <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">
               Всего{" "}
               <span className="font-semibold text-[var(--v2-ink-800)]">
                 <PersonalAmt v={accountsTotal} short />
+              </span>
+              {" · "}
+              в подушке{" "}
+              <span className="font-semibold text-[var(--v2-ink-800)]">
+                <PersonalAmt v={cushionTotal} short />
               </span>
             </span>
             <Link
@@ -737,63 +770,53 @@ export function PfAccountsAsFunds({
           <Card className="p-8 text-center text-sm text-[var(--v2-ink-500)]">Счетов пока нет</Card>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {accounts.map((a) => {
-              const cap = a.goal_amount_rub;
-              const done = cap != null && cap > 0 && a.balance_rub >= cap;
-              return (
+            {accounts.map((a) => (
                 <Card key={a.id} className="px-6 py-6">
                   <div className="flex items-center gap-2.5">
                     <span
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg"
-                      style={{ background: `${a.accent}14`, color: a.accent }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-white"
+                      style={{ background: a.accent || "#52525B" }}
                     >
                       <AccIcon iconKey={a.icon_key} className="h-4 w-4" />
                     </span>
                     <span className="v2-tight min-w-0 truncate text-[16px] font-semibold text-[var(--v2-ink-900)]">
                       {a.name}
                     </span>
-                    <span
-                      className={`ml-auto text-[11px] font-semibold uppercase tracking-[0.1em] ${
-                        done ? "text-emerald-600" : "text-[var(--v2-ink-400)]"
-                      }`}
-                    >
-                      {a.disposable ? "в распоряжении" : "резерв"}
-                    </span>
                   </div>
-                  <div className="mt-5 flex items-baseline gap-2">
-                    <div className="v2-tighter text-[32px] font-semibold leading-none">
-                      <AccountBalance
-                        accountId={a.id}
-                        value={a.currency_code !== "RUB" ? a.balance_native : a.balance_rub}
-                        currencyCode={a.currency_code}
-                        rubValue={a.currency_code !== "RUB" ? a.balance_rub : undefined}
-                        onSaved={onSaved}
-                        onError={onError}
-                        className="items-start"
+                  <div className="v2-tighter mt-5 text-[32px] font-semibold leading-none">
+                    <AccountBalance
+                      accountId={a.id}
+                      value={a.currency_code !== "RUB" ? a.balance_native : a.balance_rub}
+                      currencyCode={a.currency_code}
+                      rubValue={a.currency_code !== "RUB" ? a.balance_rub : undefined}
+                      onSaved={onSaved}
+                      onError={onError}
+                      className="text-[32px] leading-none text-left"
+                    />
+                  </div>
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--v2-ink-100)] pt-4">
+                    <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[var(--v2-ink-600)]">
+                      <input
+                        type="checkbox"
+                        checked={a.in_cushion}
+                        onChange={(e) => {
+                          void patchAccountCushion(a.id, e.target.checked)
+                            .then(onSaved)
+                            .catch((err) =>
+                              onError(err instanceof Error ? err.message : "Не удалось обновить счёт")
+                            );
+                        }}
                       />
-                    </div>
-                    {cap ? (
-                      <span className="v2-tight v2-tnum text-[14px] text-[var(--v2-ink-400)]">
-                        / <PersonalAmt v={cap} />
-                      </span>
-                    ) : null}
-                  </div>
-                  {cap ? (
-                    <div className="mt-4">
-                      <PfBar pct={cap ? a.balance_rub / cap : 0} color={done ? "#10B981" : a.accent} h={7} />
-                    </div>
-                  ) : null}
-                  <div className="v2-tight mt-4 flex items-center justify-between border-t border-[var(--v2-ink-100)] pt-4 text-[13px] text-[var(--v2-ink-500)]">
-                    <span>{a.note || (a.currency_code !== "RUB" ? a.currency_code : "счёт")}</span>
-                    {cap && !done ? (
-                      <span className="v2-tnum">
-                        ещё <PersonalAmt v={Math.max(cap - a.balance_rub, 0)} short />
+                      В подушку
+                    </label>
+                    {a.note || a.currency_code !== "RUB" || !a.disposable ? (
+                      <span className="v2-tight truncate text-[13px] text-[var(--v2-ink-400)]">
+                        {a.note || (a.disposable ? a.currency_code : "резерв")}
                       </span>
                     ) : null}
                   </div>
                 </Card>
-              );
-            })}
+              ))}
           </div>
         )}
       </Sect>

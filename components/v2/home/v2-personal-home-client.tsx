@@ -81,6 +81,23 @@ function videoOpacity(status: HomeVideoStatus) {
   return 0.28;
 }
 
+function parseViews(raw: string): number | null {
+  if (!raw || raw === "—") return null;
+  const tys = raw.replace(",", ".").match(/([\d.]+)\s*тыс/i);
+  if (tys) return Math.round(parseFloat(tys[1]!) * 1000);
+  const n = Number(raw.replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatViews(n: number): string {
+  if (n >= 1000) {
+    const k = n / 1000;
+    const s = Number.isInteger(k) ? String(k) : k.toFixed(1).replace(".", ",");
+    return `${s} тыс`;
+  }
+  return homeFmt(n);
+}
+
 /* -------------------------------- ДАТЫ ----------------------------------- */
 function toYmd(d: Date) {
   const p = (n: number) => String(n).padStart(2, "0");
@@ -297,6 +314,18 @@ function WeekFocusBoard() {
     }
   };
 
+  const deleteGoal = async (goalId: string) => {
+    setFocus((prev) =>
+      prev ? { ...prev, goals: prev.goals.filter((g) => g.id !== goalId) } : prev
+    );
+    try {
+      await fetchJson(`/api/v2/personal/calendar/week-focus/goals/${goalId}`, { method: "DELETE" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить фокус");
+      await load();
+    }
+  };
+
   return (
     <section
       className="rounded-2xl px-7 py-6 text-white shadow-[var(--v2-shadow-soft)]"
@@ -327,38 +356,50 @@ function WeekFocusBoard() {
           const p = FOCUS_PRIORITY[g.priority];
           const done = Boolean(g.completed_at);
           return (
-            <button
+            <div
               key={g.id}
-              type="button"
-              onClick={() => void toggleGoal(g)}
-              className={`rounded-xl bg-white px-3.5 py-3 text-left shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] ${
+              className={`relative rounded-xl bg-white shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] ${
                 done ? "opacity-55" : ""
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-md transition ${
-                    done ? "bg-emerald-500 text-white" : "bg-[var(--v2-ink-100)] text-transparent"
-                  }`}
-                >
-                  <HI.check className="h-[11px] w-[11px]" />
-                </span>
-                <span
-                  className="v2-tight rounded px-1.5 py-[2px] text-[10px] font-semibold uppercase tracking-[0.08em]"
-                  style={{ background: p.bg, color: p.tint }}
-                >
-                  {p.label}
-                </span>
-              </div>
-              <p
-                className={`v2-tight mt-2 text-[13.5px] leading-snug text-[var(--v2-ink-800)] ${
-                  done ? "line-through" : ""
-                }`}
-                style={{ textWrap: "pretty" }}
+              <button
+                type="button"
+                onClick={() => void toggleGoal(g)}
+                className="w-full px-3.5 py-3 text-left"
               >
-                {g.title}
-              </p>
-            </button>
+                <div className="flex items-center gap-2 pr-7">
+                  <span
+                    className={`inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-md transition ${
+                      done ? "bg-emerald-500 text-white" : "bg-[var(--v2-ink-100)] text-transparent"
+                    }`}
+                  >
+                    <HI.check className="h-[11px] w-[11px]" />
+                  </span>
+                  <span
+                    className="v2-tight rounded px-1.5 py-[2px] text-[10px] font-semibold uppercase tracking-[0.08em]"
+                    style={{ background: p.bg, color: p.tint }}
+                  >
+                    {p.label}
+                  </span>
+                </div>
+                <p
+                  className={`v2-tight mt-2 text-[13.5px] leading-snug text-[var(--v2-ink-800)] ${
+                    done ? "line-through" : ""
+                  }`}
+                  style={{ textWrap: "pretty" }}
+                >
+                  {g.title}
+                </p>
+              </button>
+              <button
+                type="button"
+                title="Удалить"
+                onClick={() => void deleteGoal(g.id)}
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500"
+              >
+                <V2Icons.trash className="h-3.5 w-3.5" />
+              </button>
+            </div>
           );
         })}
         {focus && !focus.goals.length ? (
@@ -476,22 +517,27 @@ function MonthBand({ month, setMonth }: { month: string; setMonth: (id: string) 
                 {x.lead}
               </p>
               <div
-                className={`mt-4 flex flex-col gap-1.5 border-t pt-3.5 ${
-                  active ? "border-white/12" : "border-[var(--v2-ink-100)]"
+                className={`mt-4 flex flex-col gap-2 border-t pt-4 ${
+                  active ? "border-white/15" : "border-[var(--v2-ink-100)]"
                 }`}
               >
                 {x.focus.map((f, i) => (
-                  <div key={f} className="flex gap-2.5">
+                  <div
+                    key={f}
+                    className={`flex items-start gap-2.5 rounded-xl px-2.5 py-2 ${
+                      active ? "bg-white/14" : "bg-[var(--v2-ink-50)]"
+                    }`}
+                  >
                     <span
-                      className={`v2-tnum mt-[3px] shrink-0 text-[10.5px] font-semibold ${
-                        active ? "text-white/30" : "text-[var(--v2-ink-300)]"
+                      className={`v2-tnum mt-px inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-[11px] font-semibold ${
+                        active ? "bg-white/18 text-white" : "bg-white text-[var(--v2-ink-500)] shadow-sm"
                       }`}
                     >
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span
-                      className={`v2-tight text-[13px] leading-snug ${
-                        active ? "text-white/85" : "text-[var(--v2-ink-700)]"
+                      className={`v2-tight pt-px text-[14.5px] font-medium leading-snug ${
+                        active ? "text-white" : "text-[var(--v2-ink-800)]"
                       }`}
                       style={{ textWrap: "pretty" }}
                     >
@@ -842,80 +888,102 @@ function CalendarWeek() {
     })();
   }, []);
 
+  const categories = Array.from(
+    items.reduce((map, it) => {
+      if (!map.has(it.category)) map.set(it.category, it.color);
+      return map;
+    }, new Map<string, string>())
+  );
+
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-soft)]">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h2 className="v2-tight text-[19px] font-semibold text-[var(--v2-ink-900)]">Календарь недели</h2>
-        <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">{weekLabel}</span>
-        <Link
-          href={appPath(CALENDAR_HREF)}
-          className="v2-tight ml-auto shrink-0 text-[12.5px] font-medium text-[var(--v2-brand-700)] transition hover:text-[var(--v2-brand-800)]"
-        >
-          Открыть календарь →
-        </Link>
+    <section className="v2-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--v2-ink-100)] px-5 py-3.5">
+        <div>
+          <h2 className="v2-tight text-[18px] font-bold text-[var(--v2-ink-900)]">Календарь недели</h2>
+          <p className="mt-0.5 text-[11px] text-[var(--v2-ink-400)]">
+            {weekLabel}
+            {error ? ` · ${error}` : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {categories.map(([name, color]) => (
+            <span
+              key={name}
+              className="hidden items-center gap-1.5 rounded-full border border-[var(--v2-ink-100)] bg-white px-2.5 py-1 text-[11px] text-[var(--v2-ink-600)] sm:flex"
+            >
+              <i className="h-2 w-2 rounded-full" style={{ background: color }} />
+              {name}
+            </span>
+          ))}
+          <Link
+            href={appPath(CALENDAR_HREF)}
+            className="rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[12px] font-semibold text-[var(--v2-ink-700)] shadow-sm transition hover:border-[var(--v2-brand-200)] hover:text-[var(--v2-brand-700)]"
+          >
+            Открыть календарь
+          </Link>
+        </div>
       </div>
 
-      {error ? <p className="v2-tight mt-3 text-[12.5px] text-[var(--v2-ink-500)]">{error}</p> : null}
+      <div className="grid grid-cols-7 border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/70">
+        {days.map((d) => (
+          <div
+            key={`h-${d.ymd}`}
+            className="px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]"
+          >
+            {d.label}
+          </div>
+        ))}
+      </div>
 
-      <div className="mt-4 grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7">
         {days.map((d) => {
           const dayItems = items.filter((it) => it.date === d.ymd);
           return (
-            <div
+            <Link
               key={d.ymd}
-              className={`flex min-h-[136px] min-w-0 flex-col gap-1.5 rounded-xl p-2 ${
-                d.today
-                  ? "bg-[var(--v2-brand-50)] ring-1 ring-[var(--v2-brand-200)]"
-                  : d.past
-                    ? "bg-[var(--v2-ink-50)]/60"
-                    : "bg-[var(--v2-ink-50)]"
+              href={appPath(CALENDAR_HREF)}
+              className={`relative min-h-[168px] overflow-hidden border-b border-r border-[var(--v2-ink-100)] p-2.5 text-left align-top transition last:border-r-0 hover:bg-[var(--v2-ink-50)] ${
+                d.today ? "bg-[var(--v2-brand-50)]" : d.past ? "bg-white" : "bg-white"
               }`}
             >
-              <div className="flex items-baseline gap-1.5 px-0.5">
-                <span
-                  className={`text-[10.5px] font-semibold uppercase tracking-[0.08em] ${
-                    d.today ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-400)]"
-                  }`}
-                >
-                  {d.label}
-                </span>
-                <span
-                  className={`v2-tnum text-[13px] font-semibold ${
-                    d.today ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-700)]"
-                  }`}
-                >
-                  {d.n}
-                </span>
-              </div>
-              {dayItems.map((it) => {
-                const done = Boolean(it.completed_at);
-                return (
-                  <Link
-                    key={it.id}
-                    href={appPath(CALENDAR_HREF)}
-                    title={`${it.category} — ${it.title}`}
-                    className={`min-w-0 rounded-lg px-1.5 py-1.5 transition hover:brightness-95 ${done ? "opacity-45" : ""}`}
-                    style={{ background: `${it.color}1A` }}
-                  >
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: it.color }} />
-                      {it.time ? (
-                        <span className="v2-tnum text-[10px] text-[var(--v2-ink-500)]">{it.time}</span>
-                      ) : null}
-                      {done ? <HI.check className="ml-auto h-3 w-3 shrink-0" style={{ color: it.color }} /> : null}
-                    </span>
-                    <span
-                      className={`v2-tight mt-1 block text-[11.5px] leading-snug text-[var(--v2-ink-800)] ${
-                        done ? "line-through" : ""
+              <span
+                className={`v2-tnum inline-flex h-7 min-w-7 items-center justify-center rounded-lg px-1 text-[12px] font-semibold ${
+                  d.today
+                    ? "bg-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]"
+                    : "text-[var(--v2-ink-700)]"
+                }`}
+              >
+                {d.n}
+              </span>
+              <div className="mt-2 space-y-1">
+                {dayItems.slice(0, 4).map((it) => {
+                  const done = Boolean(it.completed_at);
+                  return (
+                    <div
+                      key={it.id}
+                      title={`${it.category} — ${it.title}`}
+                      className={`truncate rounded-md px-1.5 py-1 text-[11px] font-semibold leading-none ${
+                        done ? "line-through decoration-[1.5px] opacity-45" : ""
                       }`}
-                      style={{ textWrap: "pretty", overflowWrap: "anywhere" }}
+                      style={{
+                        color: done ? "#71717A" : it.color,
+                        background: done ? "#F4F4F5" : `${it.color}14`,
+                      }}
                     >
+                      <span
+                        className="mr-1 inline-block h-1.5 w-1.5 rounded-full"
+                        style={{ background: done ? "#A1A1AA" : it.color }}
+                      />
+                      {it.time ? `${it.time} ` : ""}
                       {it.title}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
+                    </div>
+                  );
+                })}
+                {dayItems.length > 4 ? (
+                  <p className="px-1 text-[10px] font-medium text-[var(--v2-ink-400)]">ещё {dayItems.length - 4}</p>
+                ) : null}
+              </div>
+            </Link>
           );
         })}
       </div>
@@ -995,17 +1063,50 @@ function RulesBand() {
 
 /* -------------------------------- РОЛИКИ --------------------------------- */
 function VideoCard() {
-  const pub = HOME_VIDEO.yt.filter((v) => v.st === "опубликовано").length;
+  const published = HOME_VIDEO.yt.filter((v) => v.st === "опубликовано");
+  const editing = HOME_VIDEO.yt.filter((v) => v.st === "монтаж" || v.st === "сценарий");
+  const ideas = HOME_VIDEO.yt.filter((v) => v.st === "идея");
+  const viewsTotal = HOME_VIDEO.yt.reduce((sum, v) => sum + (parseViews(v.views) ?? 0), 0);
+  const stats = [
+    { label: "Опубликовано", value: String(published.length), hint: `из ${HOME_VIDEO.goal} на YouTube` },
+    { label: "В работе", value: String(editing.length), hint: "монтаж и сценарий" },
+    { label: "Идеи", value: String(ideas.length), hint: "ещё не в производстве" },
+    { label: "Просмотры", value: viewsTotal ? formatViews(viewsTotal) : "—", hint: "сумма опубликованных" },
+  ];
+
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">
-      <div className="flex items-center gap-2">
-        <HI.video className="h-[16px] w-[16px] text-[var(--v2-ink-400)]" />
-        <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">Ролики</h3>
-        <span className="v2-tnum v2-tight ml-auto text-[12px] text-[var(--v2-ink-500)]">
-          {pub} из {HOME_VIDEO.goal} на YouTube
-        </span>
+    <section className="v2-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--v2-ink-100)] px-5 py-3.5">
+        <div className="flex items-center gap-2">
+          <HI.video className="h-[18px] w-[18px] text-[var(--v2-ink-400)]" />
+          <div>
+            <h2 className="v2-tight text-[18px] font-bold text-[var(--v2-ink-900)]">Ролики</h2>
+            <p className="mt-0.5 text-[11px] text-[var(--v2-ink-400)]">{HOME_VIDEO.question}</p>
+          </div>
+        </div>
+        <Link
+          href={appPath(HOME_LINKS.brand)}
+          className="rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[12px] font-semibold text-[var(--v2-ink-700)] shadow-sm transition hover:border-[var(--v2-brand-200)] hover:text-[var(--v2-brand-700)]"
+        >
+          Личный бренд
+        </Link>
       </div>
-      <div className="mt-2.5 flex gap-1">
+
+      <div className="grid grid-cols-4 gap-px border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-100)]">
+        {stats.map((s) => (
+          <div key={s.label} className="bg-white px-5 py-4">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
+              {s.label}
+            </div>
+            <div className="v2-tighter v2-tnum mt-1.5 text-[26px] font-semibold leading-none text-[var(--v2-ink-900)]">
+              {s.value}
+            </div>
+            <div className="v2-tight mt-1.5 text-[12px] text-[var(--v2-ink-500)]">{s.hint}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-1 px-5 pt-4">
         {HOME_VIDEO.yt.map((v) => (
           <span
             key={`bar-${v.n}`}
@@ -1014,50 +1115,53 @@ function VideoCard() {
           />
         ))}
       </div>
-      <div className="mt-3 flex flex-col divide-y divide-[var(--v2-ink-100)]">
+
+      <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
         {HOME_VIDEO.yt.map((v) => {
           const s = HOME_VIDEO_ST[v.st];
           return (
-            <div key={v.n} className="py-2.5">
-              <div className="flex items-start gap-2">
-                <span className="v2-tnum mt-[3px] shrink-0 text-[10.5px] font-semibold text-[var(--v2-ink-300)]">
-                  {v.n}
-                </span>
+            <article
+              key={v.n}
+              className="flex flex-col rounded-2xl border border-[var(--v2-ink-100)] bg-white p-4"
+              style={{ opacity: videoOpacity(v.st) < 1 && v.st === "идея" ? 0.85 : 1 }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="v2-tnum text-[11px] font-semibold text-[var(--v2-ink-400)]">{v.n}</span>
                 <span
-                  className="v2-tight flex-1 text-[13px] font-medium leading-snug text-[var(--v2-ink-900)]"
-                  style={{ textWrap: "pretty" }}
-                >
-                  {v.t}
-                </span>
-                <span
-                  className="v2-tight shrink-0 rounded px-1.5 py-[2px] text-[10.5px] font-semibold"
+                  className="v2-tight rounded-md px-1.5 py-[3px] text-[10.5px] font-semibold"
                   style={{ background: s.bg, color: s.tint }}
                 >
                   {v.st}
                 </span>
+                <span className="v2-tnum ml-auto text-[12px] text-[var(--v2-ink-400)]">{v.date}</span>
               </div>
-              <div className="v2-tight mt-1 flex items-center gap-2 pl-[22px] text-[11.5px] text-[var(--v2-ink-500)]">
-                <span className="v2-tnum">{v.date}</span>
-                {v.views !== "—" ? (
-                  <>
-                    <span className="text-[var(--v2-ink-300)]">·</span>
-                    <span className="v2-tnum font-medium text-[var(--v2-ink-700)]">{v.views} просмотров</span>
-                  </>
-                ) : null}
+              <h3
+                className="v2-tight mt-2.5 text-[16px] font-semibold leading-snug text-[var(--v2-ink-900)]"
+                style={{ textWrap: "pretty" }}
+              >
+                {v.t}
+              </h3>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                    Просмотры
+                  </div>
+                  <div className="v2-tnum mt-1 text-[15px] font-semibold text-[var(--v2-ink-900)]">
+                    {v.views === "—" ? "—" : v.views}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                    Отклик
+                  </div>
+                  <div className="v2-tight mt-1 text-[13px] font-medium leading-snug text-[var(--v2-ink-800)]">
+                    {v.react}
+                  </div>
+                </div>
               </div>
-              <div className="v2-tight mt-0.5 pl-[22px] text-[11.5px] text-[var(--v2-ink-500)]">{v.react}</div>
-            </div>
+            </article>
           );
         })}
-      </div>
-      <div className="mt-3 border-t border-[var(--v2-ink-100)] pt-3">
-        <p className="v2-tight text-[12px] leading-relaxed text-[var(--v2-ink-500)]">{HOME_VIDEO.question}</p>
-        <Link
-          href={appPath(HOME_LINKS.brand)}
-          className="v2-tight mt-2.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--v2-brand-700)] transition hover:text-[var(--v2-brand-800)]"
-        >
-          Личный бренд <HI.arrowR className="h-3 w-3" />
-        </Link>
       </div>
     </section>
   );
@@ -1080,10 +1184,8 @@ export function V2PersonalHomeClient() {
         <SprintGoals />
         <BetCards />
         <NotNow />
-        <div className="grid grid-cols-[minmax(0,1fr)_336px] items-start gap-6">
-          <CalendarWeek />
-          <VideoCard />
-        </div>
+        <CalendarWeek />
+        <VideoCard />
         <RulesBand />
       </div>
     </div>

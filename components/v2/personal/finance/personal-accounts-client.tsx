@@ -75,6 +75,7 @@ function emptyAccount(): Partial<PersonalAccountRow> {
     balance_native: 0,
     note: "",
     disposable: true,
+    in_cushion: false,
     goal_amount_rub: null,
   };
 }
@@ -133,6 +134,7 @@ export function PersonalAccountsClient() {
         accent: accountDraft.accent,
         note: accountDraft.note,
         disposable: accountDraft.disposable,
+        in_cushion: accountDraft.in_cushion,
         goal_amount_rub: accountDraft.goal_amount_rub,
         currency_code: currency,
         balance_native: isFx
@@ -328,6 +330,7 @@ export function PersonalAccountsClient() {
                       <div className="text-[12px] text-[var(--v2-ink-500)]">
                         {ACCOUNT_TYPES.find((t) => t.value === a.account_type)?.label ?? a.account_type}
                         {a.disposable ? " · в обороте" : " · резерв"}
+                        {a.in_cushion ? " · в подушке" : ""}
                         {fxMeta && a.fx_rate
                           ? ` · 1 ${a.currency_code} = ${a.fx_rate.toFixed(2).replace(".", ",")} ₽`
                           : ""}
@@ -473,9 +476,14 @@ export function PersonalAccountsClient() {
                   <select
                     className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
                     value={accountDraft.account_type ?? "card"}
-                    onChange={(e) =>
-                      setAccountDraft({ ...accountDraft, account_type: e.target.value as PersonalAccountType })
-                    }
+                    onChange={(e) => {
+                      const account_type = e.target.value as PersonalAccountType;
+                      setAccountDraft({
+                        ...accountDraft,
+                        account_type,
+                        ...(account_type === "cushion" ? { in_cushion: true } : {}),
+                      });
+                    }}
                   >
                     {ACCOUNT_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>
@@ -555,6 +563,14 @@ export function PersonalAccountsClient() {
                     onChange={(e) => setAccountDraft({ ...accountDraft, disposable: e.target.checked })}
                   />
                   Учитывать в «свободных деньгах»
+                </label>
+                <label className="flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)]">
+                  <input
+                    type="checkbox"
+                    checked={accountDraft.in_cushion ?? false}
+                    onChange={(e) => setAccountDraft({ ...accountDraft, in_cushion: e.target.checked })}
+                  />
+                  В подушку — этот счёт заполняет очередь целей
                 </label>
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
                   Заметка

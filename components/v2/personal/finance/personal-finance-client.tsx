@@ -13,6 +13,7 @@ import {
 import { PersonalOperationModal } from "./personal-operation-modal";
 import {
   allocateGoals,
+  cushionPool,
   PfAccountsAsFunds,
   PfGoalQueue,
   PfMonthSplit,
@@ -376,7 +377,7 @@ function PfHeroCards({
   month: number;
 }) {
   const capSeries = history.map((h) => h.capital_total_rub);
-  const cushion = accounts.find((a) => a.account_type === "cushion");
+  const cushionTotal = cushionPool(accounts);
   const goal = accounts.find((a) => a.account_type === "goal");
   const incomeExpected = summary.projectExpectedRevenue || summary.incomeExpected;
   const incomeReceived = summary.projectActualRevenue || summary.incomeReceived;
@@ -448,11 +449,11 @@ function PfHeroCards({
         sparkColor="#10B981"
         footer={
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {cushion ? (
+            {cushionTotal > 0 ? (
               <span>
                 Подушка{" "}
                 <span className="font-medium text-[var(--v2-ink-700)]">
-                  <PersonalAmt v={cushion.balance_rub} short />
+                  <PersonalAmt v={cushionTotal} short />
                 </span>
               </span>
             ) : null}
@@ -1727,9 +1728,10 @@ export function PersonalFinanceClient() {
   const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, history, incomeHistory, system, goals } =
     data;
   const accountsTotal = summary.disposable + summary.reserves;
-  const allocated = allocateGoals(goals ?? [], accountsTotal);
+  const cushionTotal = cushionPool(accounts);
+  const allocated = allocateGoals(goals ?? [], cushionTotal);
   const nearest = allocated.find((g) => g.active);
-  const monthIncome = summary.projectExpectedRevenue || summary.incomeExpected;
+  const monthIncome = summary.monthProfit;
   const toGoal = monthIncome - (system?.life_expenses_rub ?? 0) - (system?.funds_rub ?? 0);
   const monthlySurplus = Math.max(toGoal, 0);
 
@@ -1772,7 +1774,7 @@ export function PersonalFinanceClient() {
 
             <div className="space-y-7">
               <PfHeroCards summary={summary} accounts={accounts} history={history} year={year} month={month} />
-              <PfNearestGoal nearest={nearest} accountsTotal={accountsTotal} />
+              <PfNearestGoal nearest={nearest} cushionTotal={cushionTotal} />
               {system ? (
                 <PfMonthSplit
                   income={monthIncome}
@@ -1787,6 +1789,7 @@ export function PersonalFinanceClient() {
               <PfMoscowReady
                 allocated={allocated}
                 monthly={monthlySurplus}
+                liquidity={summary.netWorth}
                 jobStable={system?.moscow_job_stable !== false}
                 onJobChange={async (v) => {
                   await patchSystem({ moscow_job_stable: v });
@@ -1796,6 +1799,7 @@ export function PersonalFinanceClient() {
                 accounts={accounts}
                 capital={capital}
                 accountsTotal={accountsTotal}
+                cushionTotal={cushionTotal}
                 capitalSum={summary.capitalSum}
                 onSaved={() => void reload()}
                 onError={setError}

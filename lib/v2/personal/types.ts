@@ -20,6 +20,8 @@ export type PersonalAccountRow = {
   fx_as_of: string | null;
   note: string | null;
   disposable: boolean;
+  /** Счёт входит в подушку: его баланс заполняет очередь целей */
+  in_cushion: boolean;
   goal_amount_rub: number | null;
   sort_order: number;
 };
