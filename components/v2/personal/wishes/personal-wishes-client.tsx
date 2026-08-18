@@ -1,6 +1,7 @@
 "use client";
 
 import { apiUrl } from "@/lib/api-url";
+import { compressImageForUpload, uploadNetworkError } from "@/lib/v2/client/compress-image";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PersonalWish, PersonalWishImage } from "@/lib/v2/personal/personal-wishes-repo";
 import {
@@ -23,6 +24,24 @@ function filesFromDropOrInput(list: FileList | File[] | null): File[] {
   return Array.from(list).filter((f) => f.type.startsWith("image/") && f.size > 0);
 }
 
+async function postWishImages(wishId: string, files: File[]): Promise<void> {
+  const prepared: File[] = [];
+  for (const file of files.slice(0, MAX_WISH_IMAGES)) {
+    prepared.push(await compressImageForUpload(file));
+  }
+  for (const file of prepared) {
+    const fd = new FormData();
+    fd.append("files", file);
+    const res = await fetch(apiUrl(`/api/v2/personal/wishes/${wishId}/images`), {
+      method: "POST",
+      credentials: "include",
+      body: fd,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data as { error?: string }).error || "Не удалось загрузить фото");
+  }
+}
+
 type Mode = "visual" | "text" | "day";
 
 const MODES: { id: Mode; label: string }[] = [
@@ -30,12 +49,6 @@ const MODES: { id: Mode; label: string }[] = [
   { id: "text", label: "Текстом" },
   { id: "day", label: "Мой день" },
 ];
-
-const SUBS: Record<Mode, string> = {
-  visual: "Не задачи и не цели. Карта того, какой должна ощущаться жизнь — можно просто смотреть.",
-  text: "Те же желания, собранные в одно связное описание желаемой жизни.",
-  day: "Сценарий одного дня, ради которого всё это строится.",
-};
 
 const MANIFESTO_BRIEF = [
   "Я строю новую индустрию AI-творчества.",
@@ -73,59 +86,56 @@ const MANIFESTO_PATH: { title: string; body: string }[] = [
 function ManifestoPlate() {
   const [open, setOpen] = useState(false);
   return (
-    <section className="mb-8 overflow-hidden rounded-[28px] bg-white shadow-[var(--v2-shadow-soft)]">
-      <div className="px-10 py-9 sm:px-12 sm:py-10">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--v2-brand-700)]">Кратко</p>
+    <section className="mb-7 overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-soft)]">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="group flex w-full items-center gap-6 px-7 py-5 text-left sm:px-8"
+      >
         <p
-          className="v2-tighter mt-4 max-w-[28ch] text-[34px] font-light leading-[1.18] text-[var(--v2-ink-900)] sm:text-[40px]"
+          className="v2-tighter min-w-0 flex-1 text-[26px] font-light leading-[1.2] text-[var(--v2-ink-900)] sm:text-[30px]"
           style={{ textWrap: "pretty" }}
         >
           {MANIFESTO_BRIEF[0]}
         </p>
-        <div className="mt-6 flex flex-col gap-4">
-          {MANIFESTO_BRIEF.slice(1).map((p) => (
-            <p
-              key={p}
-              className="v2-tight max-w-[54ch] text-[20px] font-light leading-[1.45] text-[var(--v2-ink-800)] sm:text-[22px]"
-              style={{ textWrap: "pretty" }}
-            >
-              {p}
-            </p>
-          ))}
-        </div>
-      </div>
-      <div className="border-t border-[var(--v2-ink-100)]">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-          className="group flex w-full items-center gap-3 px-10 py-4 text-left transition hover:bg-[var(--v2-ink-50)]/70 sm:px-12"
-        >
-          <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-ink-500)] group-hover:text-[var(--v2-ink-800)]">
+        <V2Icons.chev
+          className={`h-5 w-5 shrink-0 text-[var(--v2-ink-300)] transition group-hover:text-[var(--v2-ink-500)] ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open ? (
+        <div className="border-t border-[var(--v2-ink-100)] px-7 pb-8 pt-6 sm:px-8">
+          <div className="flex max-w-[62ch] flex-col gap-3">
+            {MANIFESTO_BRIEF.slice(1).map((p) => (
+              <p
+                key={p}
+                className="v2-tight text-[16px] font-light leading-[1.55] text-[var(--v2-ink-700)]"
+                style={{ textWrap: "pretty" }}
+              >
+                {p}
+              </p>
+            ))}
+          </div>
+          <p className="mt-8 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">
             Как я к этому прихожу
-          </span>
-          <V2Icons.chev
-            className={`ml-auto h-4 w-4 shrink-0 text-[var(--v2-ink-300)] transition group-hover:text-[var(--v2-ink-500)] ${
-              open ? "rotate-180" : ""
-            }`}
-          />
-        </button>
-        {open ? (
-          <ol className="grid gap-6 px-10 pb-10 sm:grid-cols-2 sm:px-12 sm:pb-12">
+          </p>
+          <ol className="mt-4 grid gap-5 sm:grid-cols-2">
             {MANIFESTO_PATH.map((step, i) => (
-              <li key={step.title} className="flex gap-4">
-                <span className="v2-tnum mt-0.5 w-6 shrink-0 text-[13px] font-medium text-[var(--v2-brand-700)]">
+              <li key={step.title} className="flex gap-3.5">
+                <span className="v2-tnum mt-0.5 w-5 shrink-0 text-[13px] font-medium text-[var(--v2-brand-700)]">
                   {i + 1}
                 </span>
                 <div>
                   <h3
-                    className="v2-tighter text-[20px] font-light leading-snug text-[var(--v2-ink-900)]"
+                    className="v2-tighter text-[18px] font-light leading-snug text-[var(--v2-ink-900)]"
                     style={{ textWrap: "pretty" }}
                   >
                     {step.title}
                   </h3>
                   <p
-                    className="v2-tight mt-1.5 text-[14.5px] leading-relaxed text-[var(--v2-ink-500)]"
+                    className="v2-tight mt-1 text-[13.5px] leading-relaxed text-[var(--v2-ink-500)]"
                     style={{ textWrap: "pretty" }}
                   >
                     {step.body}
@@ -134,8 +144,8 @@ function ManifestoPlate() {
               </li>
             ))}
           </ol>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1343,15 +1353,15 @@ export function PersonalWishesClient() {
         }),
       });
       if (payload.files.length) {
-        const fd = new FormData();
-        payload.files.slice(0, MAX_WISH_IMAGES).forEach((f) => fd.append("files", f));
-        const res = await fetch(apiUrl(`/api/v2/personal/wishes/${wish.id}/images`), {
-          method: "POST",
-          credentials: "include",
-          body: fd,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Не удалось загрузить фото");
+        try {
+          await postWishImages(wish.id, payload.files);
+        } catch (e) {
+          await reload();
+          setAdding(false);
+          throw new Error(
+            `${uploadNetworkError(e, "Не удалось загрузить фото")} Желание сохранено — фото можно добавить, открыв карточку.`
+          );
+        }
       }
       await reload();
       setAdding(false);
@@ -1376,18 +1386,10 @@ export function PersonalWishesClient() {
     setUploading(true);
     setError(null);
     try {
-      const fd = new FormData();
-      list.slice(0, room).forEach((f) => fd.append("files", f));
-      const res = await fetch(apiUrl(`/api/v2/personal/wishes/${open}/images`), {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Не удалось загрузить фото");
+      await postWishImages(open, list.slice(0, room));
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось загрузить фото");
+      setError(uploadNetworkError(e, "Не удалось загрузить фото"));
     } finally {
       setUploading(false);
     }
@@ -1434,12 +1436,9 @@ export function PersonalWishesClient() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-16 pt-6">
-      <div className="mb-7 flex items-end justify-between gap-8">
-        <div>
-          <h1 className="v2-tighter text-[54px] font-light leading-none text-[var(--v2-ink-900)]">Желания</h1>
-          <p className="v2-tight mt-3 max-w-[56ch] text-[14.5px] text-[var(--v2-ink-500)]">{SUBS[mode]}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2.5 pb-1">
+      <div className="mb-7 flex items-center justify-between gap-8">
+        <h1 className="v2-tighter text-[54px] font-light leading-none text-[var(--v2-ink-900)]">Желания</h1>
+        <div className="flex shrink-0 items-center gap-2.5">
           <ModeSwitch mode={mode} setMode={setMode} />
           <button
             type="button"
