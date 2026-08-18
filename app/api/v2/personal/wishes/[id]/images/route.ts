@@ -12,7 +12,12 @@ type Ctx = { params: Promise<{ id: string }> };
 export const maxDuration = 60;
 
 function blobsFromFormData(formData: FormData): Blob[] {
-  return formData.getAll("files").filter((value): value is Blob => value instanceof Blob && value.size > 0);
+  const out: Blob[] = [];
+  for (const value of formData.getAll("files")) {
+    if (typeof value === "string" || value.size <= 0) continue;
+    out.push(value);
+  }
+  return out;
 }
 
 function buffersFromJson(body: unknown): { name: string; contentType: string; buffer: Buffer }[] {
