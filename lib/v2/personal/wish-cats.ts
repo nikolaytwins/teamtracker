@@ -83,6 +83,9 @@ export function allWishCatMetas(custom: WishCustomCategory[]): WishCatMeta[] {
 
 export function gridSizeForWish(imageCount: number, hasDesc: boolean): { col: number; row: number } {
   const imgs = Math.min(MAX_WISH_IMAGES, Math.max(0, imageCount));
+  if (imgs === 0) {
+    return { col: 1, row: hasDesc ? 5 : 4 };
+  }
   return {
     col: imgs > 2 ? 2 : 1,
     row: hasDesc ? 7 : 6,

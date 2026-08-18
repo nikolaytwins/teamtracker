@@ -9,6 +9,7 @@ import {
   WISH_SCALES,
   WISH_SCALE_META,
   allWishCatMetas,
+  gridSizeForWish,
   resolveWishCat,
   type WishCatMeta,
   type WishCustomCategory,
@@ -35,6 +36,109 @@ const SUBS: Record<Mode, string> = {
   text: "Те же желания, собранные в одно связное описание желаемой жизни.",
   day: "Сценарий одного дня, ради которого всё это строится.",
 };
+
+const MANIFESTO_BRIEF = [
+  "Я строю новую индустрию AI-творчества.",
+  "Я выращиваю творцов нового типа — людей, способных с помощью ИИ создавать дизайн, продукты, фильмы и целые миры на уровне больших студий.",
+  "Я создаю для них образование, технологии, реальные проекты и команды, чтобы путь от воображения до воплощения больше не зависел от огромного капитала, штата и разрешения индустрии.",
+] as const;
+
+const MANIFESTO_PATH: { title: string; body: string }[] = [
+  {
+    title: "Сначала доказываю метод в дизайне",
+    body: "Развиваю Импульс, создаю сильные коммерческие AI-кейсы через TwinLabs и превращаю Qmagic в рабочий инструмент для творцов.",
+  },
+  {
+    title: "Затем осваиваю AI-видео",
+    body: "Создаю рекламные ролики, клипы и короткие фильмы. Формирую команду и собственную технологию видеопроизводства.",
+  },
+  {
+    title: "Расширяюсь в новые формы творчества",
+    body: "Добавляю 3D и worldbuilding. Вайбкодинг, звук и интерактивность использую как инструменты для создания продуктов и новых впечатлений.",
+  },
+  {
+    title: "Создаю институт AI-творцов",
+    body: "Объединяю образование, коммерческую студию, технологии и сеть сильных специалистов. Человек проходит путь от обучения до реальных проектов и собственных произведений.",
+  },
+  {
+    title: "Запускаю собственные Originals",
+    body: "Мы создаём короткометражки, визуальные эксперименты, персонажей и новые вселенные, постепенно формируя собственный язык и международное имя.",
+  },
+  {
+    title: "Создаю Аркалиум",
+    body: "Аркалиум становится самым красивым, масштабным и дорогим фильмом, созданным моей студией, — главным доказательством возможностей нового поколения AI-творцов.",
+  },
+];
+
+function ManifestoPlate() {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="mb-8 overflow-hidden rounded-[28px] bg-white shadow-[var(--v2-shadow-soft)]">
+      <div className="px-10 py-9 sm:px-12 sm:py-10">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[var(--v2-brand-700)]">Кратко</p>
+        <p
+          className="v2-tighter mt-4 max-w-[28ch] text-[34px] font-light leading-[1.18] text-[var(--v2-ink-900)] sm:text-[40px]"
+          style={{ textWrap: "pretty" }}
+        >
+          {MANIFESTO_BRIEF[0]}
+        </p>
+        <div className="mt-6 flex flex-col gap-4">
+          {MANIFESTO_BRIEF.slice(1).map((p) => (
+            <p
+              key={p}
+              className="v2-tight max-w-[54ch] text-[20px] font-light leading-[1.45] text-[var(--v2-ink-800)] sm:text-[22px]"
+              style={{ textWrap: "pretty" }}
+            >
+              {p}
+            </p>
+          ))}
+        </div>
+      </div>
+      <div className="border-t border-[var(--v2-ink-100)]">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="group flex w-full items-center gap-3 px-10 py-4 text-left transition hover:bg-[var(--v2-ink-50)]/70 sm:px-12"
+        >
+          <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-ink-500)] group-hover:text-[var(--v2-ink-800)]">
+            Как я к этому прихожу
+          </span>
+          <V2Icons.chev
+            className={`ml-auto h-4 w-4 shrink-0 text-[var(--v2-ink-300)] transition group-hover:text-[var(--v2-ink-500)] ${
+              open ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+        {open ? (
+          <ol className="grid gap-6 px-10 pb-10 sm:grid-cols-2 sm:px-12 sm:pb-12">
+            {MANIFESTO_PATH.map((step, i) => (
+              <li key={step.title} className="flex gap-4">
+                <span className="v2-tnum mt-0.5 w-6 shrink-0 text-[13px] font-medium text-[var(--v2-brand-700)]">
+                  {i + 1}
+                </span>
+                <div>
+                  <h3
+                    className="v2-tighter text-[20px] font-light leading-snug text-[var(--v2-ink-900)]"
+                    style={{ textWrap: "pretty" }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p
+                    className="v2-tight mt-1.5 text-[14.5px] leading-relaxed text-[var(--v2-ink-500)]"
+                    style={{ textWrap: "pretty" }}
+                  >
+                    {step.body}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 const ESSAY: { text: string; lead?: boolean; pull?: boolean }[] = [
   { lead: true, text: "Я хочу жизнь, в которой дело — часть меня, а не вместо меня." },
@@ -333,61 +437,86 @@ function WishCard({
   onCat: (k: string) => void;
 }) {
   const imgs = w.images.length;
+  const hasPhotos = imgs > 0;
+  const size = gridSizeForWish(imgs, Boolean(w.description.trim()));
   return (
     <article
       className="v2-card-in group relative flex flex-col overflow-hidden rounded-[20px] bg-white shadow-[var(--v2-shadow-card)] transition-all duration-300 hover:shadow-[var(--v2-shadow-cardHv)]"
       style={{
-        gridColumn: `span ${w.grid_col}`,
-        gridRow: `span ${w.grid_row}`,
+        gridColumn: `span ${size.col}`,
+        gridRow: `span ${size.row}`,
         animationDelay: `${i * 30}ms`,
       }}
     >
-      <div className="relative min-h-0 flex-1 bg-[var(--v2-ink-100)]">
-        <CardImages images={w.images} />
-        {imgs > 1 ? (
-          <span className="pointer-events-none absolute left-3 top-3 v2-tnum inline-flex h-6 items-center gap-1 rounded-full bg-[var(--v2-ink-900)]/55 px-2 text-[11px] font-medium text-white backdrop-blur">
-            <IcImages className="h-3 w-3" /> {imgs}
-          </span>
-        ) : null}
+      {hasPhotos ? (
+        <div className="relative min-h-0 flex-1 bg-[var(--v2-ink-100)]">
+          <CardImages images={w.images} />
+          {imgs > 1 ? (
+            <span className="pointer-events-none absolute left-3 top-3 v2-tnum inline-flex h-6 items-center gap-1 rounded-full bg-[var(--v2-ink-900)]/55 px-2 text-[11px] font-medium text-white backdrop-blur">
+              <IcImages className="h-3 w-3" /> {imgs}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => onOpen(w.id)}
+            title="Открыть"
+            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-[var(--v2-ink-700)] opacity-0 backdrop-blur transition hover:bg-white group-hover:opacity-100"
+          >
+            <V2Icons.arrowR className="h-[17px] w-[17px]" />
+          </button>
+        </div>
+      ) : (
         <button
           type="button"
           onClick={() => onOpen(w.id)}
           title="Открыть"
-          className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-[var(--v2-ink-700)] opacity-0 backdrop-blur transition hover:bg-white group-hover:opacity-100"
+          className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-700)] opacity-0 transition hover:bg-[var(--v2-ink-200)] group-hover:opacity-100"
         >
           <V2Icons.arrowR className="h-[17px] w-[17px]" />
         </button>
-      </div>
-      <div className="px-5 pb-4 pt-4">
-        <h3
-          onClick={() => onOpen(w.id)}
-          className="v2-tight cursor-pointer text-[16px] font-medium leading-snug text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)]"
-          style={{ textWrap: "pretty" }}
-        >
-          {w.title}
-        </h3>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span
-            className="v2-tight rounded-full px-2 py-[3px] text-[11px] font-medium"
-            style={{ background: WISH_SCALE_META[w.scale].bg, color: WISH_SCALE_META[w.scale].tint }}
-          >
-            {WISH_SCALE_META[w.scale].label}
-          </span>
-          {w.is_near ? (
-            <span className="v2-tight rounded-full bg-[var(--v2-ink-900)] px-2 py-[3px] text-[11px] font-medium text-white">
-              ближайшее
-            </span>
-          ) : null}
-        </div>
-        {w.description ? (
-          <p
-            className="v2-tight mt-1.5 text-[12.5px] leading-relaxed text-[var(--v2-ink-500)]"
+      )}
+      <div
+        className={
+          hasPhotos
+            ? "px-5 pb-4 pt-4"
+            : "flex min-h-0 flex-1 flex-col justify-between px-6 pb-5 pt-6"
+        }
+      >
+        <div>
+          <h3
+            onClick={() => onOpen(w.id)}
+            className={`v2-tight cursor-pointer leading-snug text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] ${
+              hasPhotos ? "text-[16px] font-medium" : "v2-tighter text-[22px] font-light"
+            }`}
             style={{ textWrap: "pretty" }}
           >
-            {w.description}
-          </p>
-        ) : null}
-        <div className="mt-3 flex flex-wrap gap-1.5">
+            {w.title}
+          </h3>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span
+              className="v2-tight rounded-full px-2 py-[3px] text-[11px] font-medium"
+              style={{ background: WISH_SCALE_META[w.scale].bg, color: WISH_SCALE_META[w.scale].tint }}
+            >
+              {WISH_SCALE_META[w.scale].label}
+            </span>
+            {w.is_near ? (
+              <span className="v2-tight rounded-full bg-[var(--v2-ink-900)] px-2 py-[3px] text-[11px] font-medium text-white">
+                ближайшее
+              </span>
+            ) : null}
+          </div>
+          {w.description ? (
+            <p
+              className={`v2-tight mt-2 leading-relaxed text-[var(--v2-ink-500)] ${
+                hasPhotos ? "text-[12.5px]" : "line-clamp-5 text-[13.5px]"
+              }`}
+              style={{ textWrap: "pretty" }}
+            >
+              {w.description}
+            </p>
+          ) : null}
+        </div>
+        <div className={`flex flex-wrap gap-1.5 ${hasPhotos ? "mt-3" : "mt-4"}`}>
           {w.categories.map((k) => {
             const meta = resolveWishCat(k, catById);
             return (
@@ -462,17 +591,42 @@ function Fullscreen({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative min-w-0 flex-1 bg-[var(--v2-ink-100)]">
-          <PhotoSlot
-            url={current?.url}
-            placeholder={
-              canAddMore
-                ? "Перетащите фото или нажмите, чтобы добавить"
-                : "Достигнут лимит фото"
-            }
-            onPick={canAddMore ? () => fileRef.current?.click() : undefined}
-            onClear={current ? () => onRemoveImage(current.id) : undefined}
-            onFiles={canAddMore ? (files) => onUpload(files) : undefined}
-          />
+          {current ? (
+            <PhotoSlot
+              url={current.url}
+              placeholder={
+                canAddMore
+                  ? "Перетащите фото или нажмите, чтобы добавить"
+                  : "Достигнут лимит фото"
+              }
+              onPick={canAddMore ? () => fileRef.current?.click() : undefined}
+              onClear={() => onRemoveImage(current.id)}
+              onFiles={canAddMore ? (files) => onUpload(files) : undefined}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => canAddMore && fileRef.current?.click()}
+              onDragOver={(e) => {
+                if (!canAddMore) return;
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                if (!canAddMore) return;
+                e.preventDefault();
+                e.stopPropagation();
+                onUpload(filesFromDropOrInput(e.dataTransfer.files));
+              }}
+              className="flex h-full w-full flex-col items-center justify-center gap-2 px-8 text-center transition hover:bg-[var(--v2-ink-200)]/40"
+            >
+              <V2Icons.upload className="h-7 w-7 text-[var(--v2-ink-400)]" />
+              <span className="v2-tighter text-[22px] font-light text-[var(--v2-ink-700)]">Без фото</span>
+              <span className="v2-tight max-w-[28ch] text-[13.5px] leading-relaxed text-[var(--v2-ink-500)]">
+                Можно оставить так или добавить изображение — карточка сама встанет в ленту.
+              </span>
+            </button>
+          )}
           <input
             ref={fileRef}
             type="file"
@@ -771,9 +925,11 @@ function AddModal({
               >
                 <V2Icons.upload className="h-6 w-6 text-[var(--v2-ink-400)]" />
                 <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">
-                  Перетащите фото сюда или нажмите, чтобы выбрать
+                  Фото по желанию — перетащите или нажмите
                 </span>
-                <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">до {MAX_WISH_IMAGES} изображений</span>
+                <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">
+                  можно сохранить и без фото · до {MAX_WISH_IMAGES} изображений
+                </span>
               </button>
             ) : (
               <div className="p-3">
@@ -1295,6 +1451,8 @@ export function PersonalWishesClient() {
         </div>
       </div>
 
+      <ManifestoPlate />
+
       {error ? (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</div>
       ) : null}
@@ -1371,7 +1529,7 @@ export function PersonalWishesClient() {
               <p className="v2-tight mx-auto mt-3 max-w-[42ch] text-[14px] text-[var(--v2-ink-500)]">
                 {nearOnly
                   ? "Отметьте желание тумблером «Ближайшее» — так можно увидеть, что реально сделать в ближайшее время, не только крупные."
-                  : "Добавьте первое желание — с названием, описанием и фотографиями."}
+                  : "Добавьте первое желание — с названием. Фото не обязательно."}
               </p>
               {nearOnly ? (
                 <button

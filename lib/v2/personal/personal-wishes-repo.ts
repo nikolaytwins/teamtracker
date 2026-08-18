@@ -215,7 +215,7 @@ export async function updatePersonalWish(
   if (input.scale !== undefined) patch.scale = normalizeWishScale(input.scale);
   if (input.is_near !== undefined) patch.is_near = Boolean(input.is_near);
   if (input.grid_col !== undefined) patch.grid_col = Math.min(2, Math.max(1, Math.round(input.grid_col)));
-  if (input.grid_row !== undefined) patch.grid_row = Math.min(12, Math.max(4, Math.round(input.grid_row)));
+  if (input.grid_row !== undefined) patch.grid_row = Math.min(12, Math.max(3, Math.round(input.grid_row)));
 
   const { error } = await sb.from("v2_personal_wishes").update(patch).eq("id", id).eq("user_id", userId);
   if (error) throw error;
