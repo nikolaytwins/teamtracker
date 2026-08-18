@@ -76,7 +76,7 @@ function mapWish(r: Record<string, unknown>, images: PersonalWishImage[]): Perso
   };
 }
 
-async function ownWish(userId: string, id: string): Promise<boolean> {
+export async function ownWish(userId: string, id: string): Promise<boolean> {
   const sb = getV2Supabase();
   const { data, error } = await sb
     .from("v2_personal_wishes")

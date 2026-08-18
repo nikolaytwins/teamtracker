@@ -2,15 +2,15 @@
 
 import { apiUrl } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import type { PersonalWish, PersonalWishImage } from "@/lib/v2/personal/personal-wishes-repo";
+import type { PersonalWish } from "@/lib/v2/personal/personal-wishes-repo";
 import {
   MAX_WISH_IMAGES,
   WISH_CATS,
   WISH_SCALES,
   WISH_SCALE_META,
   allWishCatMetas,
-  gridSizeForWish,
   resolveWishCat,
+  wishScaleRank,
   type WishCatMeta,
   type WishCustomCategory,
   type WishScale,
@@ -31,18 +31,65 @@ function uploadErrorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
+async function postWishImagesViaProxy(wishId: string, files: File[]): Promise<void> {
+  const fd = new FormData();
+  files.forEach((file) => fd.append("files", file));
+  const res = await fetch(apiUrl(`/api/v2/personal/wishes/${wishId}/images`), {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error || "Не удалось загрузить фото");
+}
+
 async function postWishImages(wishId: string, files: File[]): Promise<void> {
-  for (const file of files.slice(0, MAX_WISH_IMAGES)) {
-    const fd = new FormData();
-    fd.append("files", file);
-    const res = await fetch(apiUrl(`/api/v2/personal/wishes/${wishId}/images`), {
+  const batch = files.slice(0, MAX_WISH_IMAGES);
+  if (!batch.length) return;
+  let uploads: { signedUrl: string; publicUrl: string; name: string }[] = [];
+  try {
+    const signed = await fetchJson<{
+      uploads: { signedUrl: string; publicUrl: string; name: string }[];
+    }>(`/api/v2/personal/wishes/${wishId}/images/sign`, {
       method: "POST",
-      credentials: "include",
-      body: fd,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        files: batch.map((f) => ({ name: f.name, type: f.type || "image/jpeg" })),
+      }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error((data as { error?: string }).error || "Не удалось загрузить фото");
+    uploads = signed.uploads;
+    if (uploads.length !== batch.length) throw new Error("sign mismatch");
+    await Promise.all(
+      uploads.map(async (u, i) => {
+        const file = batch[i]!;
+        const res = await fetch(u.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!res.ok) throw new Error("direct upload failed");
+      })
+    );
+  } catch {
+    await postWishImagesViaProxy(wishId, batch);
+    return;
   }
+  await fetchJson(`/api/v2/personal/wishes/${wishId}/images`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      registered: uploads.map((u) => ({ url: u.publicUrl, name: u.name })),
+    }),
+  });
+}
+
+function sortWishes(list: PersonalWish[]): PersonalWish[] {
+  return [...list].sort(
+    (a, b) =>
+      wishScaleRank(a.scale) - wishScaleRank(b.scale) ||
+      Number(b.is_near) - Number(a.is_near) ||
+      a.sort_order - b.sort_order
+  );
 }
 
 type Mode = "visual" | "text" | "day";
@@ -225,20 +272,6 @@ function IcClose(p: { className?: string }) {
   );
 }
 
-function IcImages(p: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={p.className}>
-      <rect x="3.5" y="6.5" width="13" height="11" rx="2.4" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M8 6.5V5.4A1.9 1.9 0 0 1 9.9 3.5h8.7a1.9 1.9 0 0 1 1.9 1.9v8.7a1.9 1.9 0 0 1-1.9 1.9h-1.1"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function IcSun(p: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={p.className}>
@@ -304,12 +337,16 @@ function PhotoSlot({
   onPick,
   onClear,
   onFiles,
+  fit = "cover",
+  onImageClick,
 }: {
   url?: string | null;
   placeholder: string;
   onPick?: () => void;
   onClear?: () => void;
   onFiles?: (files: File[]) => void;
+  fit?: "cover" | "contain";
+  onImageClick?: () => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
   return (
@@ -338,7 +375,14 @@ function PhotoSlot({
     >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="h-full w-full object-cover" />
+        <img
+          src={url}
+          alt=""
+          onClick={onImageClick}
+          className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${
+            onImageClick ? "cursor-zoom-in" : ""
+          }`}
+        />
       ) : (
         <button
           type="button"
@@ -375,67 +419,6 @@ function PhotoSlot({
   );
 }
 
-function CardImages({
-  images,
-  onAddPhoto,
-}: {
-  images: PersonalWishImage[];
-  onAddPhoto?: () => void;
-}) {
-  const n = Math.max(1, Math.min(3, images.length || 1));
-  const ph = "Перетащите фото";
-  const slot = (i: number, placeholder: string) => (
-    <PhotoSlot
-      key={images[i]?.id ?? `empty-${i}`}
-      url={images[i]?.url}
-      placeholder={placeholder}
-      onPick={!images[i] && onAddPhoto ? onAddPhoto : undefined}
-    />
-  );
-
-  if (n <= 1) {
-    return <div className="h-full w-full overflow-hidden">{slot(0, ph)}</div>;
-  }
-  if (n === 2) {
-    return (
-      <div
-        className="grid h-full w-full overflow-hidden"
-        style={{
-          gridTemplateRows: "minmax(0,1.9fr) minmax(0,1fr)",
-          gridTemplateColumns: "minmax(0,1fr)",
-          gap: "2px",
-        }}
-      >
-        {slot(0, ph)}
-        {slot(1, "фото")}
-      </div>
-    );
-  }
-  return (
-    <div
-      className="grid h-full w-full overflow-hidden"
-      style={{
-        gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)",
-        gridTemplateRows: "minmax(0,1fr)",
-        gap: "2px",
-      }}
-    >
-      {slot(0, ph)}
-      <div
-        className="grid overflow-hidden"
-        style={{
-          gridTemplateRows: "minmax(0,1fr) minmax(0,1fr)",
-          gridTemplateColumns: "minmax(0,1fr)",
-          gap: "2px",
-        }}
-      >
-        {slot(1, "фото")}
-        {slot(2, "фото")}
-      </div>
-    </div>
-  );
-}
-
 function WishCard({
   w,
   i,
@@ -447,30 +430,30 @@ function WishCard({
   w: PersonalWish;
   i: number;
   catById: Map<string, WishCustomCategory>;
-  onOpen: (id: string) => void;
+  onOpen: (id: string, imageIndex?: number) => void;
   onCat: (k: string) => void;
   onDelete: (id: string) => void;
 }) {
   const imgs = w.images.length;
   const hasPhotos = imgs > 0;
-  const size = gridSizeForWish(imgs, Boolean(w.description.trim()));
   return (
     <article
       className="v2-card-in group relative flex flex-col overflow-hidden rounded-[20px] bg-white shadow-[var(--v2-shadow-card)] transition-all duration-300 hover:shadow-[var(--v2-shadow-cardHv)]"
-      style={{
-        gridColumn: `span ${size.col}`,
-        gridRow: `span ${size.row}`,
-        animationDelay: `${i * 30}ms`,
-      }}
+      style={{ animationDelay: `${i * 30}ms` }}
     >
       {hasPhotos ? (
-        <div className="relative min-h-0 flex-1 bg-[var(--v2-ink-100)]">
-          <CardImages images={w.images} />
-          {imgs > 1 ? (
-            <span className="pointer-events-none absolute left-3 top-3 v2-tnum inline-flex h-6 items-center gap-1 rounded-full bg-[var(--v2-ink-900)]/55 px-2 text-[11px] font-medium text-white backdrop-blur">
-              <IcImages className="h-3 w-3" /> {imgs}
-            </span>
-          ) : null}
+        <div className={`relative bg-[var(--v2-ink-50)] ${imgs > 1 ? "grid grid-cols-2 items-start gap-px" : ""}`}>
+          {w.images.map((img, idx) => (
+            <button
+              key={img.id}
+              type="button"
+              onClick={() => onOpen(w.id, idx)}
+              className={`block overflow-hidden bg-[var(--v2-ink-100)] ${imgs === 1 || (imgs % 2 === 1 && idx === imgs - 1) ? "col-span-2" : ""}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={img.url} alt="" className="block h-auto w-full cursor-zoom-in" />
+            </button>
+          ))}
           <button
             type="button"
             title="Удалить"
@@ -562,6 +545,8 @@ function Fullscreen({
   w,
   catById,
   catOptions,
+  startIndex = 0,
+  startZoomed = false,
   onClose,
   onPrev,
   onNext,
@@ -575,6 +560,8 @@ function Fullscreen({
   w: PersonalWish;
   catById: Map<string, WishCustomCategory>;
   catOptions: WishCatMeta[];
+  startIndex?: number;
+  startZoomed?: boolean;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -591,7 +578,8 @@ function Fullscreen({
   onCreateCategory: (name: string) => Promise<WishCatMeta | null>;
   uploading: boolean;
 }) {
-  const [n, setN] = useState(0);
+  const [n, setN] = useState(startIndex);
+  const [zoomed, setZoomed] = useState(startZoomed);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(w.title);
   const [desc, setDesc] = useState(w.description);
@@ -603,14 +591,22 @@ function Fullscreen({
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setN(0);
+    setN(Math.max(0, startIndex));
+    setZoomed(startZoomed);
     setEditing(false);
     setTitle(w.title);
     setDesc(w.description);
     setCats(w.categories);
     setAddingCat(false);
     setNewCatName("");
-  }, [w.id]);
+  }, [w.id, startIndex, startZoomed]);
+
+  useEffect(() => {
+    setN((cur) => {
+      const last = Math.max(0, w.images.length - 1);
+      return Math.min(cur, last);
+    });
+  }, [w.images.length]);
 
   useEffect(() => {
     if (editing) return;
@@ -622,6 +618,10 @@ function Fullscreen({
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (zoomed) {
+          setZoomed(false);
+          return;
+        }
         if (editing) {
           setEditing(false);
           setTitle(w.title);
@@ -632,13 +632,13 @@ function Fullscreen({
         onClose();
         return;
       }
-      if (editing) return;
+      if (editing || zoomed) return;
       if (e.key === "ArrowRight") onNext();
       if (e.key === "ArrowLeft") onPrev();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [onClose, onPrev, onNext, editing, w.title, w.description, w.categories]);
+  }, [onClose, onPrev, onNext, editing, zoomed, w.title, w.description, w.categories]);
 
   const imgs = w.images;
   const current = imgs[n] ?? imgs[0];
@@ -692,6 +692,7 @@ function Fullscreen({
           {current ? (
             <PhotoSlot
               url={current.url}
+              fit="contain"
               placeholder={
                 canAddMore
                   ? "Перетащите фото или нажмите, чтобы добавить"
@@ -700,6 +701,7 @@ function Fullscreen({
               onPick={canAddMore ? () => fileRef.current?.click() : undefined}
               onClear={() => onRemoveImage(current.id)}
               onFiles={canAddMore ? (files) => onUpload(files) : undefined}
+              onImageClick={() => setZoomed(true)}
             />
           ) : (
             <button
@@ -998,6 +1000,23 @@ function Fullscreen({
           <IcClose className="h-[18px] w-[18px]" />
         </button>
       </div>
+      {zoomed && current ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--v2-ink-900)]/92 p-6"
+          onClick={(e) => {
+            e.stopPropagation();
+            setZoomed(false);
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={current.url}
+            alt=""
+            className="max-h-full max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1462,6 +1481,8 @@ export function PersonalWishesClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [openImageIndex, setOpenImageIndex] = useState(0);
+  const [openZoomed, setOpenZoomed] = useState(false);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1507,12 +1528,18 @@ export function PersonalWishesClient() {
     return list;
   }, [items, cat, nearOnly]);
 
-  const openWish = useCallback((id: string) => setOpen(id), []);
+  const openWish = useCallback((id: string, imageIndex?: number) => {
+    setOpenImageIndex(imageIndex ?? 0);
+    setOpenZoomed(imageIndex != null);
+    setOpen(id);
+  }, []);
   const step = useCallback(
     (d: number) =>
       setOpen((cur) => {
         if (!cur || !shown.length) return cur;
         const i = shown.findIndex((w) => w.id === cur);
+        setOpenImageIndex(0);
+        setOpenZoomed(false);
         if (i < 0) return shown[0]?.id ?? null;
         return shown[(i + d + shown.length) % shown.length]!.id;
       }),
@@ -1568,19 +1595,37 @@ export function PersonalWishesClient() {
           is_near: payload.is_near,
         }),
       });
-      if (payload.files.length) {
+      const blobUrls = payload.files.map((f) => URL.createObjectURL(f));
+      const optimistic: PersonalWish = {
+        ...wish,
+        images: blobUrls.map((url, i) => ({
+          id: `pending-${wish.id}-${i}`,
+          wish_id: wish.id,
+          url,
+          name: payload.files[i]?.name || "photo.jpg",
+          sort_order: i,
+          created_at: wish.created_at,
+        })),
+      };
+      setItems((prev) => sortWishes([optimistic, ...prev.filter((x) => x.id !== wish.id)]));
+      setAdding(false);
+      setSaving(false);
+      if (!payload.files.length) return;
+      setUploading(true);
+      void (async () => {
         try {
           await postWishImages(wish.id, payload.files);
+          await reload();
         } catch (e) {
           await reload();
-          setAdding(false);
-          throw new Error(
+          setError(
             `${uploadErrorMessage(e, "Не удалось загрузить фото")} Желание сохранено — фото можно добавить, открыв карточку.`
           );
+        } finally {
+          blobUrls.forEach((url) => URL.revokeObjectURL(url));
+          setUploading(false);
         }
-      }
-      await reload();
-      setAdding(false);
+      })();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось сохранить");
       throw e;
@@ -1681,6 +1726,11 @@ export function PersonalWishesClient() {
 
       {error ? (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</div>
+      ) : null}
+      {uploading && !current ? (
+        <div className="mb-4 rounded-xl border border-[var(--v2-ink-200)] bg-white px-4 py-3 text-[13px] text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)]">
+          Фото загружаются в фоне — карточка уже в ленте.
+        </div>
       ) : null}
 
       {mode === "visual" ? (
@@ -1801,6 +1851,8 @@ export function PersonalWishesClient() {
           w={current}
           catById={catById}
           catOptions={catOptions}
+          startIndex={openImageIndex}
+          startZoomed={openZoomed}
           onClose={() => setOpen(null)}
           onPrev={() => step(-1)}
           onNext={() => step(1)}

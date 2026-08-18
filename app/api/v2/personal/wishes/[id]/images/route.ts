@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Personal } from "@/lib/v2/auth/require-v2-personal";
-import { uploadAttachmentBuffers, uploadAttachmentFiles } from "@/lib/v2/files/attachment-upload";
+import { uploadAttachmentFiles } from "@/lib/v2/files/attachment-upload";
 import {
   addPersonalWishImages,
   deletePersonalWishImage,
@@ -20,20 +20,20 @@ function blobsFromFormData(formData: FormData): Blob[] {
   return out;
 }
 
-function buffersFromJson(body: unknown): { name: string; contentType: string; buffer: Buffer }[] {
+function registeredFromJson(body: unknown): { url: string; name: string }[] {
   if (!body || typeof body !== "object") return [];
   const rec = body as Record<string, unknown>;
-  const items = Array.isArray(rec.files) ? rec.files : [rec];
-  const out: { name: string; contentType: string; buffer: Buffer }[] = [];
+  const items = Array.isArray(rec.registered) ? rec.registered : rec.url ? [rec] : [];
+  const out: { url: string; name: string }[] = [];
   for (const item of items) {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
-    const data = typeof row.data === "string" ? row.data : "";
-    if (!data) continue;
-    const name = typeof row.name === "string" && row.name.trim() ? row.name.trim() : "photo.jpg";
-    const contentType =
-      typeof row.type === "string" && row.type.trim() ? row.type.trim() : "image/jpeg";
-    out.push({ name, contentType, buffer: Buffer.from(data, "base64") });
+    const url = typeof row.url === "string" ? row.url.trim() : "";
+    if (!url) continue;
+    out.push({
+      url,
+      name: typeof row.name === "string" && row.name.trim() ? row.name.trim() : "photo.jpg",
+    });
   }
   return out;
 }
@@ -44,16 +44,26 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   try {
     const { id } = await params;
     const contentType = request.headers.get("content-type") || "";
-    const upload = contentType.includes("application/json")
-      ? await uploadAttachmentBuffers("wishes", id, buffersFromJson(await request.json()), { imagesOnly: true })
-      : await uploadAttachmentFiles("wishes", id, blobsFromFormData(await request.formData()), { imagesOnly: true });
-    if (!upload.ok) return NextResponse.json({ error: upload.error }, { status: 400 });
+    let uploaded: { url: string; name: string }[] = [];
+    if (contentType.includes("application/json")) {
+      const body = await request.json();
+      const registered = registeredFromJson(body);
+      if (!registered.length) {
+        return NextResponse.json({ error: "Выберите одно или несколько изображений" }, { status: 400 });
+      }
+      uploaded = registered;
+    } else {
+      const result = await uploadAttachmentFiles("wishes", id, blobsFromFormData(await request.formData()), {
+        imagesOnly: true,
+      });
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      uploaded = result.uploaded.map((u) => ({ url: u.url, name: u.name }));
+    }
+    if (!uploaded.length) {
+      return NextResponse.json({ error: "Выберите одно или несколько изображений" }, { status: 400 });
+    }
 
-    const images = await addPersonalWishImages(
-      auth.ctx,
-      id,
-      upload.uploaded.map((u) => ({ url: u.url, name: u.name }))
-    );
+    const images = await addPersonalWishImages(auth.ctx, id, uploaded);
     return NextResponse.json({ images });
   } catch (e) {
     if (e instanceof PersonalWishesValidationError) {

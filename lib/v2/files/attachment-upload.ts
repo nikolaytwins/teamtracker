@@ -35,6 +35,61 @@ function storagePath(prefix: AttachmentPrefix, entityId: string, filename: strin
   return `${prefix}/${safeEntity}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
 }
 
+export type SignedAttachmentUpload = {
+  name: string;
+  path: string;
+  token: string;
+  signedUrl: string;
+  publicUrl: string;
+};
+
+export async function createSignedAttachmentUploads(
+  prefix: AttachmentPrefix,
+  entityId: string,
+  files: { name: string; contentType: string }[],
+  opts?: { imagesOnly?: boolean }
+): Promise<{ ok: true; uploads: SignedAttachmentUpload[] } | { ok: false; error: string }> {
+  if (!files.length) return { ok: false, error: "Выберите хотя бы один файл" };
+  if (!isAttachmentUploadConfigured()) {
+    return { ok: false, error: "Хранилище не настроено (Supabase Storage)" };
+  }
+  let sb: ReturnType<typeof createSupabaseServiceClient>;
+  try {
+    sb = createSupabaseServiceClient();
+  } catch {
+    return { ok: false, error: "Хранилище не настроено (Supabase Storage)" };
+  }
+
+  const bucket = getAttachmentStorageBucket();
+  const imagesOnly = opts?.imagesOnly ?? (prefix === "ideas" || prefix === "wishes");
+  const uploads: SignedAttachmentUpload[] = [];
+
+  for (const file of files) {
+    const contentType = file.contentType?.trim() || "application/octet-stream";
+    if (imagesOnly && !contentType.startsWith("image/")) {
+      return { ok: false, error: `«${file.name}» — нужен файл изображения` };
+    }
+    const path = storagePath(prefix, entityId, file.name || "photo.jpg");
+    const { data, error } = await sb.storage.from(bucket).createSignedUploadUrl(path);
+    if (error || !data?.signedUrl || !data.token) {
+      console.error("Supabase signed upload url", error);
+      return { ok: false, error: error?.message || "Не удалось подготовить загрузку" };
+    }
+    const { data: pub } = sb.storage.from(bucket).getPublicUrl(path);
+    const publicUrl = pub?.publicUrl?.trim();
+    if (!publicUrl) return { ok: false, error: `Не удалось получить ссылку для «${file.name}»` };
+    uploads.push({
+      name: sanitizeUploadFilename(file.name || "photo.jpg"),
+      path,
+      token: data.token,
+      signedUrl: data.signedUrl,
+      publicUrl,
+    });
+  }
+
+  return { ok: true, uploads };
+}
+
 export async function uploadAttachmentBuffers(
   prefix: AttachmentPrefix,
   entityId: string,
