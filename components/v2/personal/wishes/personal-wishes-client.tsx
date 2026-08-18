@@ -1,7 +1,6 @@
 "use client";
 
 import { apiUrl } from "@/lib/api-url";
-import { compressImageForUpload, uploadNetworkError } from "@/lib/v2/client/compress-image";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PersonalWish, PersonalWishImage } from "@/lib/v2/personal/personal-wishes-repo";
 import {
@@ -24,12 +23,16 @@ function filesFromDropOrInput(list: FileList | File[] | null): File[] {
   return Array.from(list).filter((f) => f.type.startsWith("image/") && f.size > 0);
 }
 
-async function postWishImages(wishId: string, files: File[]): Promise<void> {
-  const prepared: File[] = [];
-  for (const file of files.slice(0, MAX_WISH_IMAGES)) {
-    prepared.push(await compressImageForUpload(file));
+function uploadErrorMessage(e: unknown, fallback: string): string {
+  if (e instanceof TypeError) {
+    return "Не удалось загрузить фото. Обновите страницу и попробуйте ещё раз.";
   }
-  for (const file of prepared) {
+  if (e instanceof Error && e.message.trim()) return e.message;
+  return fallback;
+}
+
+async function postWishImages(wishId: string, files: File[]): Promise<void> {
+  for (const file of files.slice(0, MAX_WISH_IMAGES)) {
     const fd = new FormData();
     fd.append("files", file);
     const res = await fetch(apiUrl(`/api/v2/personal/wishes/${wishId}/images`), {
@@ -439,12 +442,14 @@ function WishCard({
   catById,
   onOpen,
   onCat,
+  onDelete,
 }: {
   w: PersonalWish;
   i: number;
   catById: Map<string, WishCustomCategory>;
   onOpen: (id: string) => void;
   onCat: (k: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const imgs = w.images.length;
   const hasPhotos = imgs > 0;
@@ -468,21 +473,27 @@ function WishCard({
           ) : null}
           <button
             type="button"
-            onClick={() => onOpen(w.id)}
-            title="Открыть"
-            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-[var(--v2-ink-700)] opacity-0 backdrop-blur transition hover:bg-white group-hover:opacity-100"
+            title="Удалить"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(w.id);
+            }}
+            className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-400)] shadow-sm backdrop-blur transition hover:bg-red-50 hover:text-red-600"
           >
-            <V2Icons.arrowR className="h-[17px] w-[17px]" />
+            <IcClose className="h-3.5 w-3.5" />
           </button>
         </div>
       ) : (
         <button
           type="button"
-          onClick={() => onOpen(w.id)}
-          title="Открыть"
-          className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-700)] opacity-0 transition hover:bg-[var(--v2-ink-200)] group-hover:opacity-100"
+          title="Удалить"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(w.id);
+          }}
+          className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-400)] transition hover:bg-red-50 hover:text-red-600"
         >
-          <V2Icons.arrowR className="h-[17px] w-[17px]" />
+          <IcClose className="h-3.5 w-3.5" />
         </button>
       )}
       <div
@@ -550,6 +561,7 @@ function WishCard({
 function Fullscreen({
   w,
   catById,
+  catOptions,
   onClose,
   onPrev,
   onNext,
@@ -557,39 +569,115 @@ function Fullscreen({
   onUpload,
   onRemoveImage,
   onPatch,
+  onCreateCategory,
   uploading,
 }: {
   w: PersonalWish;
   catById: Map<string, WishCustomCategory>;
+  catOptions: WishCatMeta[];
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
   onDelete: () => void;
   onUpload: (files: FileList | File[] | null) => void;
   onRemoveImage: (imageId: string) => void;
-  onPatch: (patch: { scale?: WishScale; is_near?: boolean }) => void;
+  onPatch: (patch: {
+    title?: string;
+    description?: string;
+    categories?: string[];
+    scale?: WishScale;
+    is_near?: boolean;
+  }) => Promise<void>;
+  onCreateCategory: (name: string) => Promise<WishCatMeta | null>;
   uploading: boolean;
 }) {
   const [n, setN] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(w.title);
+  const [desc, setDesc] = useState(w.description);
+  const [cats, setCats] = useState<string[]>(w.categories);
+  const [addingCat, setAddingCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [catBusy, setCatBusy] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setN(0);
+    setEditing(false);
+    setTitle(w.title);
+    setDesc(w.description);
+    setCats(w.categories);
+    setAddingCat(false);
+    setNewCatName("");
   }, [w.id]);
 
   useEffect(() => {
+    if (editing) return;
+    setTitle(w.title);
+    setDesc(w.description);
+    setCats(w.categories);
+  }, [w.title, w.description, w.categories, editing]);
+
+  useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (editing) {
+          setEditing(false);
+          setTitle(w.title);
+          setDesc(w.description);
+          setCats(w.categories);
+          return;
+        }
+        onClose();
+        return;
+      }
+      if (editing) return;
       if (e.key === "ArrowRight") onNext();
       if (e.key === "ArrowLeft") onPrev();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [onClose, onPrev, onNext]);
+  }, [onClose, onPrev, onNext, editing, w.title, w.description, w.categories]);
 
   const imgs = w.images;
   const current = imgs[n] ?? imgs[0];
   const canAddMore = imgs.length < MAX_WISH_IMAGES;
+
+  const toggleCat = (k: string) =>
+    setCats((c) => (c.includes(k) ? c.filter((x) => x !== k) : [...c, k]));
+
+  const submitCat = async () => {
+    const name = newCatName.trim();
+    if (!name || catBusy) return;
+    setCatBusy(true);
+    try {
+      const created = await onCreateCategory(name);
+      if (created) {
+        setCats((c) => (c.includes(created.id) ? c : [...c, created.id]));
+        setNewCatName("");
+        setAddingCat(false);
+      }
+    } finally {
+      setCatBusy(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    const nextTitle = title.trim();
+    if (!nextTitle || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      await onPatch({
+        title: nextTitle,
+        description: desc.trim(),
+        categories: cats.length ? cats : ["life"],
+      });
+      setEditing(false);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   return (
     <div
@@ -671,35 +759,129 @@ function Fullscreen({
             </div>
           ) : null}
         </div>
-        <div className="flex w-[400px] shrink-0 flex-col px-9 py-8">
-          <div className="flex flex-wrap gap-1.5">
-            {w.categories.map((k) => {
-              const meta = resolveWishCat(k, catById);
-              return (
-                <span
-                  key={k}
-                  className="v2-tight rounded-full px-2.5 py-[4px] text-[11px] font-medium"
-                  style={{ background: meta.bg, color: meta.tint }}
-                >
-                  {meta.label}
+        <div className="flex w-[400px] shrink-0 flex-col overflow-y-auto px-9 py-8">
+          {editing ? (
+            <>
+              <label className="block">
+                <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                  Название
                 </span>
-              );
-            })}
-          </div>
-          <h2
-            className="v2-tighter mt-5 text-[32px] font-light leading-[1.12] text-[var(--v2-ink-900)]"
-            style={{ textWrap: "pretty" }}
-          >
-            {w.title}
-          </h2>
-          {w.description ? (
-            <p className="v2-tight mt-4 text-[15px] leading-relaxed text-[var(--v2-ink-600)]">{w.description}</p>
-          ) : null}
-          {w.note ? (
-            <p className="mt-5 border-l-2 border-[var(--v2-ink-200)] pl-4 text-[14px] italic leading-relaxed text-[var(--v2-ink-500)]">
-              {w.note}
-            </p>
-          ) : null}
+                <input
+                  autoFocus
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white"
+                />
+              </label>
+              <label className="mt-4 block">
+                <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                  Описание
+                </span>
+                <textarea
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  rows={4}
+                  placeholder="Как это должно ощущаться"
+                  className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
+                />
+              </label>
+              <div className="mt-4">
+                <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                  Категории
+                </span>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {catOptions.map((meta) => {
+                    const on = cats.includes(meta.id);
+                    return (
+                      <button
+                        key={meta.id}
+                        type="button"
+                        onClick={() => toggleCat(meta.id)}
+                        className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition"
+                        style={
+                          on
+                            ? { background: meta.tint, color: "#fff", borderColor: meta.tint }
+                            : { background: "#fff", color: "#52525B", borderColor: "#E4E4E7" }
+                        }
+                      >
+                        {meta.label}
+                      </button>
+                    );
+                  })}
+                  {addingCat ? (
+                    <span className="inline-flex h-8 items-center gap-1">
+                      <input
+                        autoFocus
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void submitCat();
+                          }
+                          if (e.key === "Escape") {
+                            e.stopPropagation();
+                            setAddingCat(false);
+                            setNewCatName("");
+                          }
+                        }}
+                        placeholder="Название"
+                        className="v2-tight h-8 w-[140px] rounded-full border border-[var(--v2-ink-200)] px-3 text-[12.5px] outline-none focus:border-[var(--v2-brand-400)]"
+                      />
+                      <button
+                        type="button"
+                        disabled={!newCatName.trim() || catBusy}
+                        onClick={() => void submitCat()}
+                        className="h-8 rounded-full bg-[var(--v2-ink-900)] px-3 text-[12px] font-medium text-white disabled:opacity-40"
+                      >
+                        Ок
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAddingCat(true)}
+                      className="v2-tight inline-flex h-8 items-center gap-1 rounded-full border border-dashed border-[var(--v2-ink-300)] px-3 text-[12.5px] font-medium text-[var(--v2-ink-400)]"
+                    >
+                      <V2Icons.plus className="h-3.5 w-3.5" /> категория
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {w.categories.map((k) => {
+                  const meta = resolveWishCat(k, catById);
+                  return (
+                    <span
+                      key={k}
+                      className="v2-tight rounded-full px-2.5 py-[4px] text-[11px] font-medium"
+                      style={{ background: meta.bg, color: meta.tint }}
+                    >
+                      {meta.label}
+                    </span>
+                  );
+                })}
+              </div>
+              <h2
+                className="v2-tighter mt-5 text-[32px] font-light leading-[1.12] text-[var(--v2-ink-900)]"
+                style={{ textWrap: "pretty" }}
+              >
+                {w.title}
+              </h2>
+              {w.description ? (
+                <p className="v2-tight mt-4 text-[15px] leading-relaxed text-[var(--v2-ink-600)]">{w.description}</p>
+              ) : null}
+              {w.note ? (
+                <p className="mt-5 border-l-2 border-[var(--v2-ink-200)] pl-4 text-[14px] italic leading-relaxed text-[var(--v2-ink-500)]">
+                  {w.note}
+                </p>
+              ) : null}
+            </>
+          )}
           <div className="mt-6">
             <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
               Масштаб
@@ -712,7 +894,7 @@ function Fullscreen({
                   <button
                     key={id}
                     type="button"
-                    onClick={() => onPatch({ scale: id })}
+                    onClick={() => void onPatch({ scale: id })}
                     className="v2-tight h-8 rounded-full border px-3 text-[12px] font-medium transition"
                     style={
                       on
@@ -727,7 +909,7 @@ function Fullscreen({
             </div>
             <button
               type="button"
-              onClick={() => onPatch({ is_near: !w.is_near })}
+              onClick={() => void onPatch({ is_near: !w.is_near })}
               className={`v2-tight mt-3 inline-flex h-9 items-center gap-2 rounded-full px-3 text-[12.5px] font-medium transition ${
                 w.is_near
                   ? "bg-[var(--v2-ink-900)] text-white"
@@ -749,29 +931,63 @@ function Fullscreen({
             </button>
           </div>
           <div className="mt-auto flex items-center gap-2 pt-8">
-            <button
-              type="button"
-              onClick={onPrev}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)]"
-            >
-              <V2Icons.chevL className="h-[18px] w-[18px]" />
-            </button>
-            <button
-              type="button"
-              onClick={onNext}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)]"
-            >
-              <V2Icons.arrowR className="h-[18px] w-[18px]" />
-            </button>
-            <span className="v2-tight ml-2 text-[11.5px] text-[var(--v2-ink-400)]">← → между желаниями · Esc закрыть</span>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-medium text-red-600 transition hover:bg-red-50"
-            >
-              <V2Icons.trash className="h-4 w-4" />
-              Удалить
-            </button>
+            {editing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(false);
+                    setTitle(w.title);
+                    setDesc(w.description);
+                    setCats(w.categories);
+                  }}
+                  className="h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-100)]"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  disabled={!title.trim() || savingEdit}
+                  onClick={() => void saveEdit()}
+                  className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-40"
+                >
+                  {savingEdit ? "Сохранение…" : "Сохранить"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onPrev}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)]"
+                >
+                  <V2Icons.chevL className="h-[18px] w-[18px]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onNext}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)]"
+                >
+                  <V2Icons.arrowR className="h-[18px] w-[18px]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-100)] px-3 text-[12.5px] font-medium text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-200)]"
+                >
+                  <V2Icons.edit className="h-4 w-4" />
+                  Изменить
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-medium text-red-600 transition hover:bg-red-50"
+                >
+                  <V2Icons.trash className="h-4 w-4" />
+                  Удалить
+                </button>
+              </>
+            )}
           </div>
         </div>
         <button
@@ -1359,7 +1575,7 @@ export function PersonalWishesClient() {
           await reload();
           setAdding(false);
           throw new Error(
-            `${uploadNetworkError(e, "Не удалось загрузить фото")} Желание сохранено — фото можно добавить, открыв карточку.`
+            `${uploadErrorMessage(e, "Не удалось загрузить фото")} Желание сохранено — фото можно добавить, открыв карточку.`
           );
         }
       }
@@ -1389,7 +1605,7 @@ export function PersonalWishesClient() {
       await postWishImages(open, list.slice(0, room));
       await reload();
     } catch (e) {
-      setError(uploadNetworkError(e, "Не удалось загрузить фото"));
+      setError(uploadErrorMessage(e, "Не удалось загрузить фото"));
     } finally {
       setUploading(false);
     }
@@ -1407,19 +1623,29 @@ export function PersonalWishesClient() {
     }
   };
 
-  const deleteWish = async () => {
-    if (!open) return;
+  const deleteWish = async (id?: string) => {
+    const wishId = id ?? open;
+    if (!wishId) return;
     if (!confirm("Удалить это желание?")) return;
     try {
-      await fetchJson(`/api/v2/personal/wishes/${open}`, { method: "DELETE" });
-      setOpen(null);
+      await fetchJson(`/api/v2/personal/wishes/${wishId}`, { method: "DELETE" });
+      if (open === wishId) setOpen(null);
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось удалить");
     }
   };
 
-  const patchWish = async (id: string, patch: { scale?: WishScale; is_near?: boolean }) => {
+  const patchWish = async (
+    id: string,
+    patch: {
+      title?: string;
+      description?: string;
+      categories?: string[];
+      scale?: WishScale;
+      is_near?: boolean;
+    }
+  ) => {
     try {
       await fetchJson(`/api/v2/personal/wishes/${id}`, {
         method: "PATCH",
@@ -1429,6 +1655,7 @@ export function PersonalWishesClient() {
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось сохранить");
+      throw e;
     }
   };
 
@@ -1558,6 +1785,7 @@ export function PersonalWishesClient() {
                   catById={catById}
                   onOpen={openWish}
                   onCat={setCat}
+                  onDelete={(id) => void deleteWish(id)}
                 />
               ))}
             </div>
@@ -1572,13 +1800,15 @@ export function PersonalWishesClient() {
         <Fullscreen
           w={current}
           catById={catById}
+          catOptions={catOptions}
           onClose={() => setOpen(null)}
           onPrev={() => step(-1)}
           onNext={() => step(1)}
           onDelete={() => void deleteWish()}
           onUpload={(files) => void uploadToOpen(files)}
           onRemoveImage={(id) => void removeImage(id)}
-          onPatch={(patch) => void patchWish(current.id, patch)}
+          onPatch={(patch) => patchWish(current.id, patch)}
+          onCreateCategory={createCategory}
           uploading={uploading}
         />
       ) : null}

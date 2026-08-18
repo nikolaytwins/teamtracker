@@ -209,7 +209,9 @@ export async function updatePersonalWish(
     if (!title) throw new PersonalWishesValidationError("Укажите название желания");
     patch.title = title;
   }
-  if (input.description !== undefined) patch.description = input.description.trim();
+  if (input.description !== undefined) {
+    patch.description = input.description.trim();
+  }
   if (input.note !== undefined) patch.note = input.note.trim();
   if (input.categories !== undefined) patch.categories = normalizeWishCategories(input.categories);
   if (input.scale !== undefined) patch.scale = normalizeWishScale(input.scale);
@@ -219,6 +221,10 @@ export async function updatePersonalWish(
 
   const { error } = await sb.from("v2_personal_wishes").update(patch).eq("id", id).eq("user_id", userId);
   if (error) throw error;
+
+  if (input.description !== undefined && input.grid_row === undefined) {
+    await syncWishGrid(userId, id);
+  }
 
   const wishes = await loadPersonalWishes(ctx);
   const wish = wishes.find((w) => w.id === id);

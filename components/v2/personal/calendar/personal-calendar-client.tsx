@@ -970,9 +970,11 @@ export function PersonalCalendarClient() {
                             type="button"
                             title="Удалить"
                             onClick={() => void deleteGoal(goal.id)}
-                            className="hidden h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500"
                           >
-                            <V2Icons.trash className="h-3.5 w-3.5" />
+                            <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                              <path d="m6.5 6.5 11 11m0-11-11 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
                           </button>
                         </div>
                       </li>

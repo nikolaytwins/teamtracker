@@ -353,6 +353,7 @@ export function PfGoalQueue({
   const [hint, setHint] = useState("");
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
@@ -378,6 +379,21 @@ export function PfGoalQueue({
       setError(e instanceof Error ? e.message : "Не удалось добавить");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const remove = async (id: string, name: string) => {
+    if (deletingId) return;
+    if (!confirm(`Удалить цель «${name}»?`)) return;
+    setDeletingId(id);
+    setError(null);
+    try {
+      await fetchJson(`/api/v2/personal/finance/goals/${id}`, { method: "DELETE" });
+      onReload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -453,8 +469,23 @@ export function PfGoalQueue({
               >
                 {g.sort_order + 1}
               </span>
+              <button
+                type="button"
+                title="Удалить цель"
+                disabled={deletingId === g.id}
+                onClick={() => void remove(g.id, g.title)}
+                className={`absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full transition ${
+                  g.active
+                    ? "bg-white/15 text-white/80 hover:bg-white hover:text-[var(--v2-ink-900)]"
+                    : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-600"
+                } disabled:opacity-40`}
+              >
+                <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                  <path d="m6.5 6.5 11 11m0-11-11 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </button>
               <div className="relative">
-                <div className={`v2-tight text-[19px] font-semibold ${g.active ? "text-white" : "text-[var(--v2-ink-900)]"}`}>
+                <div className={`v2-tight pr-8 text-[19px] font-semibold ${g.active ? "text-white" : "text-[var(--v2-ink-900)]"}`}>
                   {g.title}
                 </div>
                 {g.hint ? (
@@ -501,6 +532,7 @@ export function PfGoalQueue({
           );
         })}
       </div>
+      {error && !adding ? <p className="mt-3 text-[12px] text-red-600">{error}</p> : null}
     </Sect>
   );
 }
