@@ -88,3 +88,28 @@ export function gridSizeForWish(imageCount: number, hasDesc: boolean): { col: nu
     row: hasDesc ? 7 : 6,
   };
 }
+
+export const WISH_SCALES = ["critical", "large", "small"] as const;
+export type WishScale = (typeof WISH_SCALES)[number];
+
+export const WISH_SCALE_META: Record<
+  WishScale,
+  { label: string; rank: number; tint: string; bg: string }
+> = {
+  critical: { label: "Крайне важное", rank: 0, tint: "#BE185D", bg: "#FDECF3" },
+  large: { label: "Крупное", rank: 1, tint: "#C2410C", bg: "#FFF1E8" },
+  small: { label: "Маленькое", rank: 2, tint: "#0E7490", bg: "#E6F6FA" },
+};
+
+export function isWishScale(v: string): v is WishScale {
+  return (WISH_SCALES as readonly string[]).includes(v);
+}
+
+export function normalizeWishScale(raw: unknown): WishScale {
+  const v = String(raw ?? "").trim();
+  return isWishScale(v) ? v : "large";
+}
+
+export function wishScaleRank(scale: unknown): number {
+  return WISH_SCALE_META[normalizeWishScale(scale)].rank;
+}

@@ -516,6 +516,15 @@ function MonthBand({ month, setMonth }: { month: string; setMonth: (id: string) 
               >
                 {x.lead}
               </p>
+              {x.warn ? (
+                <p
+                  className={`v2-tight mt-3 whitespace-pre-wrap rounded-xl px-2.5 py-2 text-[12.5px] font-semibold leading-snug ${
+                    active ? "bg-amber-400/20 text-amber-50" : "bg-amber-50 text-amber-800"
+                  }`}
+                >
+                  {x.warn}
+                </p>
+              ) : null}
               <div
                 className={`mt-4 flex flex-col gap-2 border-t pt-4 ${
                   active ? "border-white/15" : "border-[var(--v2-ink-100)]"
@@ -562,7 +571,7 @@ function SprintGoals() {
         <h2 className="v2-tight text-[19px] font-semibold text-[var(--v2-ink-900)]">{HOME_SPRINT.label}</h2>
         <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">{HOME_SPRINT.dates}</span>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         {HOME_SPRINT_GOALS.map((g) => (
           <div
             key={g.id}
@@ -580,14 +589,18 @@ function SprintGoals() {
                 {g.goal}
               </div>
             </div>
-            <div className="mt-3.5 flex flex-col gap-2">
-              {g.items.map((it) => (
-                <div key={it} className="v2-tight flex gap-2.5 text-[13px] leading-relaxed text-[var(--v2-ink-600)]">
-                  <HI.minus className="mt-[4px] h-3.5 w-3.5 shrink-0 text-[var(--v2-ink-300)]" />
-                  <span>{it}</span>
-                </div>
-              ))}
-            </div>
+            {g.items.length ? (
+              <div className="mt-3.5 flex flex-col gap-2">
+                {g.items.map((it, i) => (
+                  <div key={it} className="v2-tight flex gap-2.5 text-[13px] leading-relaxed text-[var(--v2-ink-600)]">
+                    <span className="v2-tnum mt-px w-4 shrink-0 text-[12px] font-semibold text-[var(--v2-ink-400)]">
+                      {g.id === "agency" ? String(i + 2) : "–"}
+                    </span>
+                    <span>{it}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ))}
       </div>

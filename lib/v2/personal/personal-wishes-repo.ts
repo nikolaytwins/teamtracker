@@ -4,8 +4,11 @@ import {
   gridSizeForWish,
   MAX_WISH_IMAGES,
   normalizeWishCategories,
+  normalizeWishScale,
   pickCustomCatColors,
+  wishScaleRank,
   type WishCustomCategory,
+  type WishScale,
 } from "@/lib/v2/personal/wish-cats";
 
 export class PersonalWishesValidationError extends Error {
@@ -30,6 +33,8 @@ export type PersonalWish = {
   description: string;
   note: string;
   categories: string[];
+  scale: WishScale;
+  is_near: boolean;
   grid_col: number;
   grid_row: number;
   sort_order: number;
@@ -60,6 +65,8 @@ function mapWish(r: Record<string, unknown>, images: PersonalWishImage[]): Perso
     description: String(r.description || ""),
     note: String(r.note || ""),
     categories: normalizeWishCategories(r.categories),
+    scale: normalizeWishScale(r.scale),
+    is_near: Boolean(r.is_near),
     grid_col: Number(r.grid_col) || 1,
     grid_row: Number(r.grid_row) || 6,
     sort_order: Number(r.sort_order) || 0,
@@ -111,7 +118,14 @@ export async function loadPersonalWishes(ctx: V2SessionContext): Promise<Persona
     byWish.set(img.wish_id, arr);
   }
 
-  return list.map((r) => mapWish(r, byWish.get(String(r.id)) ?? []));
+  return list
+    .map((r) => mapWish(r, byWish.get(String(r.id)) ?? []))
+    .sort(
+      (a, b) =>
+        wishScaleRank(a.scale) - wishScaleRank(b.scale) ||
+        Number(b.is_near) - Number(a.is_near) ||
+        a.sort_order - b.sort_order
+    );
 }
 
 export async function createPersonalWish(
@@ -121,6 +135,8 @@ export async function createPersonalWish(
     description?: string;
     note?: string;
     categories?: unknown;
+    scale?: unknown;
+    is_near?: boolean;
     grid_col?: number;
     grid_row?: number;
   }
@@ -131,6 +147,8 @@ export async function createPersonalWish(
   const description = (input.description ?? "").trim();
   const note = (input.note ?? "").trim();
   const categories = normalizeWishCategories(input.categories);
+  const scale = normalizeWishScale(input.scale);
+  const isNear = Boolean(input.is_near);
   const size = gridSizeForWish(0, Boolean(description));
   const userId = uid(ctx);
   const sb = getV2Supabase();
@@ -151,6 +169,8 @@ export async function createPersonalWish(
     description,
     note,
     categories,
+    scale,
+    is_near: isNear,
     grid_col: input.grid_col ?? size.col,
     grid_row: input.grid_row ?? size.row,
     sort_order: nextSort,
@@ -171,6 +191,8 @@ export async function updatePersonalWish(
     description?: string;
     note?: string;
     categories?: unknown;
+    scale?: unknown;
+    is_near?: boolean;
     grid_col?: number;
     grid_row?: number;
   }
@@ -190,6 +212,8 @@ export async function updatePersonalWish(
   if (input.description !== undefined) patch.description = input.description.trim();
   if (input.note !== undefined) patch.note = input.note.trim();
   if (input.categories !== undefined) patch.categories = normalizeWishCategories(input.categories);
+  if (input.scale !== undefined) patch.scale = normalizeWishScale(input.scale);
+  if (input.is_near !== undefined) patch.is_near = Boolean(input.is_near);
   if (input.grid_col !== undefined) patch.grid_col = Math.min(2, Math.max(1, Math.round(input.grid_col)));
   if (input.grid_row !== undefined) patch.grid_row = Math.min(12, Math.max(4, Math.round(input.grid_row)));
 

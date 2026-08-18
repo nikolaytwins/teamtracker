@@ -387,6 +387,28 @@ export async function deletePersonalObservation(ctx: V2SessionContext, id: strin
   if (error) throw error;
 }
 
+export async function deletePersonalObservationTag(ctx: V2SessionContext, nameRaw: string) {
+  const name = normalizeTagName(nameRaw);
+  if (!name) throw new PersonalObservationsValidationError("Укажите название тега");
+  const userId = uid(ctx);
+  const existing = await listTagsRaw(userId);
+  const found = existing.find((t) => String(t.name).toLowerCase() === name);
+  if (!found) return;
+  const tagId = String(found.id);
+  const sb = getV2Supabase();
+  const { error: linkErr } = await sb
+    .from("v2_personal_observation_tag_links")
+    .delete()
+    .eq("tag_id", tagId);
+  if (linkErr) throw linkErr;
+  const { error } = await sb
+    .from("v2_personal_observation_tags")
+    .delete()
+    .eq("id", tagId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
 export type ObservationExportItem = {
   id: string;
   observed_at: string;

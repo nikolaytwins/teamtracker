@@ -6,10 +6,13 @@ import type { PersonalWish, PersonalWishImage } from "@/lib/v2/personal/personal
 import {
   MAX_WISH_IMAGES,
   WISH_CATS,
+  WISH_SCALES,
+  WISH_SCALE_META,
   allWishCatMetas,
   resolveWishCat,
   type WishCatMeta,
   type WishCustomCategory,
+  type WishScale,
 } from "@/lib/v2/personal/wish-cats";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -363,6 +366,19 @@ function WishCard({
         >
           {w.title}
         </h3>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span
+            className="v2-tight rounded-full px-2 py-[3px] text-[11px] font-medium"
+            style={{ background: WISH_SCALE_META[w.scale].bg, color: WISH_SCALE_META[w.scale].tint }}
+          >
+            {WISH_SCALE_META[w.scale].label}
+          </span>
+          {w.is_near ? (
+            <span className="v2-tight rounded-full bg-[var(--v2-ink-900)] px-2 py-[3px] text-[11px] font-medium text-white">
+              ближайшее
+            </span>
+          ) : null}
+        </div>
         {w.description ? (
           <p
             className="v2-tight mt-1.5 text-[12.5px] leading-relaxed text-[var(--v2-ink-500)]"
@@ -401,6 +417,7 @@ function Fullscreen({
   onDelete,
   onUpload,
   onRemoveImage,
+  onPatch,
   uploading,
 }: {
   w: PersonalWish;
@@ -411,6 +428,7 @@ function Fullscreen({
   onDelete: () => void;
   onUpload: (files: FileList | File[] | null) => void;
   onRemoveImage: (imageId: string) => void;
+  onPatch: (patch: { scale?: WishScale; is_near?: boolean }) => void;
   uploading: boolean;
 }) {
   const [n, setN] = useState(0);
@@ -518,6 +536,54 @@ function Fullscreen({
               {w.note}
             </p>
           ) : null}
+          <div className="mt-6">
+            <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+              Масштаб
+            </span>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {WISH_SCALES.map((id) => {
+                const meta = WISH_SCALE_META[id];
+                const on = w.scale === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => onPatch({ scale: id })}
+                    className="v2-tight h-8 rounded-full border px-3 text-[12px] font-medium transition"
+                    style={
+                      on
+                        ? { background: meta.tint, color: "#fff", borderColor: meta.tint }
+                        : { background: "#fff", color: "#52525B", borderColor: "#E4E4E7" }
+                    }
+                  >
+                    {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => onPatch({ is_near: !w.is_near })}
+              className={`v2-tight mt-3 inline-flex h-9 items-center gap-2 rounded-full px-3 text-[12.5px] font-medium transition ${
+                w.is_near
+                  ? "bg-[var(--v2-ink-900)] text-white"
+                  : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-200)]"
+              }`}
+            >
+              <span
+                className={`relative h-4 w-7 rounded-full transition ${
+                  w.is_near ? "bg-white/30" : "bg-[var(--v2-ink-300)]"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${
+                    w.is_near ? "left-3.5" : "left-0.5"
+                  }`}
+                />
+              </span>
+              Ближайшее
+            </button>
+          </div>
           <div className="mt-auto flex items-center gap-2 pt-8">
             <button
               type="button"
@@ -568,6 +634,8 @@ function AddModal({
     title: string;
     description: string;
     categories: string[];
+    scale: WishScale;
+    is_near: boolean;
     files: File[];
   }) => Promise<void>;
   saving: boolean;
@@ -577,6 +645,8 @@ function AddModal({
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [cats, setCats] = useState<string[]>([]);
+  const [scale, setScale] = useState<WishScale>("large");
+  const [isNear, setIsNear] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [addingCat, setAddingCat] = useState(false);
@@ -646,6 +716,8 @@ function AddModal({
       title: title.trim(),
       description: desc.trim(),
       categories: cats.length ? cats : ["life"],
+      scale,
+      is_near: isNear,
       files,
     });
   };
@@ -833,6 +905,53 @@ function AddModal({
               )}
             </div>
           </div>
+          <div className="mt-4">
+            <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+              Масштаб
+            </span>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {WISH_SCALES.map((id) => {
+                const meta = WISH_SCALE_META[id];
+                const on = scale === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setScale(id)}
+                    className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition"
+                    style={
+                      on
+                        ? { background: meta.tint, color: "#fff", borderColor: meta.tint }
+                        : { background: "#fff", color: "#52525B", borderColor: "#E4E4E7" }
+                    }
+                  >
+                    {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsNear((v) => !v)}
+              className={`v2-tight mt-3 inline-flex h-9 items-center gap-2 rounded-full px-3 text-[12.5px] font-medium transition ${
+                isNear
+                  ? "bg-[var(--v2-ink-900)] text-white"
+                  : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-200)]"
+              }`}
+            >
+              <span className={`relative h-4 w-7 rounded-full transition ${isNear ? "bg-white/30" : "bg-[var(--v2-ink-300)]"}`}>
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${
+                    isNear ? "left-3.5" : "left-0.5"
+                  }`}
+                />
+              </span>
+              Ближайшее
+            </button>
+            <p className="v2-tight mt-1.5 text-[12px] text-[var(--v2-ink-400)]">
+              Можно сделать в ближайшее время — не только крупные.
+            </p>
+          </div>
         </div>
         <div className="flex items-center justify-end gap-2 bg-[var(--v2-ink-50)] px-8 py-4">
           <button
@@ -955,6 +1074,7 @@ function DayMode() {
 export function PersonalWishesClient() {
   const [mode, setMode] = useState<Mode>("visual");
   const [cat, setCat] = useState<"all" | string>("all");
+  const [nearOnly, setNearOnly] = useState(false);
   const [items, setItems] = useState<PersonalWish[]>([]);
   const [customCats, setCustomCats] = useState<WishCustomCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -999,10 +1119,11 @@ export function PersonalWishesClient() {
     return c;
   }, [items]);
 
-  const shown = useMemo(
-    () => (cat === "all" ? items : items.filter((w) => w.categories.includes(cat))),
-    [items, cat]
-  );
+  const shown = useMemo(() => {
+    let list = cat === "all" ? items : items.filter((w) => w.categories.includes(cat));
+    if (nearOnly) list = list.filter((w) => w.is_near);
+    return list;
+  }, [items, cat, nearOnly]);
 
   const openWish = useCallback((id: string) => setOpen(id), []);
   const step = useCallback(
@@ -1047,6 +1168,8 @@ export function PersonalWishesClient() {
     title: string;
     description: string;
     categories: string[];
+    scale: WishScale;
+    is_near: boolean;
     files: File[];
   }) => {
     setSaving(true);
@@ -1059,6 +1182,8 @@ export function PersonalWishesClient() {
           title: payload.title,
           description: payload.description,
           categories: payload.categories,
+          scale: payload.scale,
+          is_near: payload.is_near,
         }),
       });
       if (payload.files.length) {
@@ -1136,6 +1261,19 @@ export function PersonalWishesClient() {
     }
   };
 
+  const patchWish = async (id: string, patch: { scale?: WishScale; is_near?: boolean }) => {
+    try {
+      await fetchJson(`/api/v2/personal/wishes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось сохранить");
+    }
+  };
+
   const current = open ? items.find((w) => w.id === open) : null;
 
   return (
@@ -1198,23 +1336,60 @@ export function PersonalWishesClient() {
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={() => setNearOnly((v) => !v)}
+              className={`v2-tight ml-1 inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-medium shadow-[var(--v2-shadow-card)] transition ${
+                nearOnly
+                  ? "bg-[var(--v2-ink-900)] text-white"
+                  : "bg-white/80 text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
+              }`}
+            >
+              <span
+                className={`relative h-4 w-7 rounded-full transition ${
+                  nearOnly ? "bg-white/30" : "bg-[var(--v2-ink-300)]"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${
+                    nearOnly ? "left-3.5" : "left-0.5"
+                  }`}
+                />
+              </span>
+              Ближайшее
+              <span className="v2-tnum text-[11.5px] opacity-60">{items.filter((w) => w.is_near).length}</span>
+            </button>
           </div>
 
           {loading ? (
             <p className="v2-tight text-[14px] text-[var(--v2-ink-500)]">Загрузка…</p>
           ) : shown.length === 0 ? (
             <div className="rounded-[24px] bg-white px-10 py-16 text-center shadow-[var(--v2-shadow-soft)]">
-              <p className="v2-tighter text-[28px] font-light text-[var(--v2-ink-900)]">Пока пусто</p>
-              <p className="v2-tight mx-auto mt-3 max-w-[42ch] text-[14px] text-[var(--v2-ink-500)]">
-                Добавьте первое желание — с названием, описанием и фотографиями.
+              <p className="v2-tighter text-[28px] font-light text-[var(--v2-ink-900)]">
+                {nearOnly ? "Нет ближайших" : "Пока пусто"}
               </p>
-              <button
-                type="button"
-                onClick={() => setAdding(true)}
-                className="mt-6 inline-flex h-10 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white"
-              >
-                <V2Icons.plus className="h-4 w-4" /> Добавить желание
-              </button>
+              <p className="v2-tight mx-auto mt-3 max-w-[42ch] text-[14px] text-[var(--v2-ink-500)]">
+                {nearOnly
+                  ? "Отметьте желание тумблером «Ближайшее» — так можно увидеть, что реально сделать в ближайшее время, не только крупные."
+                  : "Добавьте первое желание — с названием, описанием и фотографиями."}
+              </p>
+              {nearOnly ? (
+                <button
+                  type="button"
+                  onClick={() => setNearOnly(false)}
+                  className="mt-6 inline-flex h-10 items-center rounded-xl bg-[var(--v2-ink-100)] px-4 text-[13px] font-medium text-[var(--v2-ink-800)]"
+                >
+                  Показать все
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAdding(true)}
+                  className="mt-6 inline-flex h-10 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white"
+                >
+                  <V2Icons.plus className="h-4 w-4" /> Добавить желание
+                </button>
+              )}
             </div>
           ) : (
             <div className="wish-masonry grid gap-[22px]">
@@ -1246,6 +1421,7 @@ export function PersonalWishesClient() {
           onDelete={() => void deleteWish()}
           onUpload={(files) => void uploadToOpen(files)}
           onRemoveImage={(id) => void removeImage(id)}
+          onPatch={(patch) => void patchWish(current.id, patch)}
           uploading={uploading}
         />
       ) : null}

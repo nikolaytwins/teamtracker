@@ -19,6 +19,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       description: body.description ?? body.desc,
       note: body.note,
       categories: body.categories ?? body.cats,
+      scale: body.scale,
+      is_near: body.is_near ?? body.isNear,
       grid_col: body.grid_col,
       grid_row: body.grid_row,
     });
