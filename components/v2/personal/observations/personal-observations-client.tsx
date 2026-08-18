@@ -87,6 +87,29 @@ function monthLabel(key: string) {
   return new Date(y, m - 1, 1).toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 }
 
+/** Сворачивать только очень длинные записи — обычная заметка всегда целиком. */
+const COLLAPSE_AFTER_CHARS = 2200;
+
+function rebuildTagCounts(observations: PersonalObservation[]): PersonalObservationTag[] {
+  const map = new Map<string, number>();
+  for (const o of observations) {
+    for (const t of o.tags) map.set(t, (map.get(t) || 0) + 1);
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ru"))
+    .map(([name, count]) => ({ id: name, name, count }));
+}
+
+function displayText(it: PersonalObservation): string {
+  const title = it.title.trim();
+  const body = it.body.trim();
+  if (!body) return title;
+  if (!title) return body;
+  const first = body.split("\n")[0]?.trim() ?? "";
+  if (first === title || body.startsWith(title)) return body;
+  return `${title}\n\n${body}`;
+}
+
 type Board = {
   observations: PersonalObservation[];
   tags: PersonalObservationTag[];
@@ -100,12 +123,21 @@ export function PersonalObservationsClient() {
   const [type, setType] = useState<ObservationType | "all">("all");
   const [link, setLink] = useState("all");
   const [period, setPeriod] = useState("all");
+  const [periodReady, setPeriodReady] = useState(false);
   const [tag, setTag] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
   const [openIds, setOpenIds] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [extraKnownTags, setExtraKnownTags] = useState<string[]>([]);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  const rememberTag = useCallback((name: string) => {
+    const v = name.trim().replace(/^#/, "").toLowerCase();
+    if (!v) return;
+    setExtraKnownTags((prev) => (prev.includes(v) ? prev : [...prev, v]));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -141,6 +173,12 @@ export function PersonalObservationsClient() {
     return Array.from(keys).sort((a, b) => b.localeCompare(a));
   }, [board]);
 
+  useEffect(() => {
+    if (!board || periodReady) return;
+    if (periodOptions[0]) setPeriod(periodOptions[0]);
+    setPeriodReady(true);
+  }, [board, periodOptions, periodReady]);
+
   const list = useMemo(() => {
     const items = board?.observations ?? [];
     return items.filter((i) => {
@@ -157,25 +195,54 @@ export function PersonalObservationsClient() {
   }, [board, type, link, tag, period, q]);
 
   const counts = board?.counts ?? { all: 0 };
-  const tagCounts = (board?.tags ?? []).map((t) => [t.name, t.count] as [string, number]);
+  const tagCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of board?.tags ?? []) map.set(t.name, t.count);
+    for (const name of extraKnownTags) {
+      if (!map.has(name)) map.set(name, 0);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ru"));
+  }, [board, extraKnownTags]);
   const knownTags = useMemo(
-    () => Array.from(new Set(tagCounts.map(([n]) => n))),
+    () => tagCounts.map(([n]) => n),
     [tagCounts]
   );
 
   const monthStats = useMemo(() => {
-    const now = new Date();
-    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prev = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
     const all = board?.observations ?? [];
+    const key = period !== "all" ? period : periodOptions[0] || "";
+    if (!key) {
+      return { key: "", month: "—", total: all.length, prevMonth: "", prevTotal: 0 };
+    }
+    const idx = periodOptions.indexOf(key);
+    const prevKey = idx >= 0 ? periodOptions[idx + 1] : "";
     return {
-      month: monthLabel(cur),
-      total: all.filter((o) => monthKey(o.observed_at) === cur).length,
-      prevMonth: monthLabel(prev),
-      prevTotal: all.filter((o) => monthKey(o.observed_at) === prev).length,
+      key,
+      month: monthLabel(key),
+      total: all.filter((o) => monthKey(o.observed_at) === key).length,
+      prevMonth: prevKey ? monthLabel(prevKey) : "",
+      prevTotal: prevKey ? all.filter((o) => monthKey(o.observed_at) === prevKey).length : 0,
     };
-  }, [board]);
+  }, [board, period, periodOptions]);
+
+  const periodIndex = period === "all" ? -1 : periodOptions.indexOf(period);
+  const canNewer = period === "all" ? periodOptions.length > 0 : periodIndex > 0;
+  const canOlder = period === "all" ? periodOptions.length > 0 : periodIndex >= 0 && periodIndex < periodOptions.length - 1;
+
+  const goNewer = () => {
+    if (period === "all") {
+      if (periodOptions[0]) setPeriod(periodOptions[0]);
+      return;
+    }
+    if (canNewer) setPeriod(periodOptions[periodIndex - 1]!);
+  };
+  const goOlder = () => {
+    if (period === "all") {
+      if (periodOptions[0]) setPeriod(periodOptions[0]);
+      return;
+    }
+    if (canOlder) setPeriod(periodOptions[periodIndex + 1]!);
+  };
 
   const create = async (payload: {
     type: ObservationType;
@@ -200,20 +267,56 @@ export function PersonalObservationsClient() {
           why: payload.why || "",
         }),
       });
-      setBoard((prev) =>
-        prev
-          ? {
-              ...prev,
-              observations: [res.observation, ...prev.observations],
-              counts: {
-                ...prev.counts,
-                all: (prev.counts.all || 0) + 1,
-                [res.observation.type]: (prev.counts[res.observation.type] || 0) + 1,
-              },
-            }
-          : prev
-      );
+      setBoard((prev) => {
+        if (!prev) return prev;
+        const observations = [res.observation, ...prev.observations.filter((o) => o.id !== res.observation.id)];
+        return {
+          ...prev,
+          observations,
+          tags: rebuildTagCounts(observations),
+          counts: {
+            ...prev.counts,
+            all: observations.length,
+            [res.observation.type]: (prev.counts[res.observation.type] || 0) + 1,
+          },
+        };
+      });
       setOpenIds((ids) => [...ids, res.observation.id]);
+      await load();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось сохранить");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const update = async (
+    id: string,
+    payload: { type: ObservationType; title: string; text: string; tags: string[]; link?: string; why?: string }
+  ): Promise<boolean> => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetchJson<{ observation: PersonalObservation }>(`/api/v2/personal/observations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: payload.type,
+          title: payload.title,
+          body: payload.text,
+          tags: payload.tags,
+          linkKey: payload.link || null,
+          why: payload.why || "",
+        }),
+      });
+      setBoard((prev) => {
+        if (!prev) return prev;
+        const observations = prev.observations.map((o) => (o.id === id ? res.observation : o));
+        return { ...prev, observations, tags: rebuildTagCounts(observations) };
+      });
+      setEditingId(null);
       await load();
       return true;
     } catch (e) {
@@ -352,20 +455,37 @@ export function PersonalObservationsClient() {
             </select>
             <IcChev className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--v2-ink-400)]" />
           </div>
-          <div className="relative">
+          <div className="flex items-center gap-1 rounded-full bg-white py-0.5 pl-1 pr-1 shadow-[var(--v2-shadow-card)]">
+            <button
+              type="button"
+              onClick={goOlder}
+              disabled={!canOlder}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-50)] disabled:opacity-30"
+              title="Предыдущий месяц"
+            >
+              <span className="text-[15px] leading-none">‹</span>
+            </button>
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="v2-tight h-8 cursor-pointer appearance-none rounded-full bg-white pl-3 pr-8 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] outline-none"
+              className="v2-tight h-7 min-w-[9.5rem] cursor-pointer appearance-none bg-transparent px-1 text-center text-[12.5px] font-medium text-[var(--v2-ink-800)] outline-none"
             >
-              <option value="all">Период: всё</option>
+              <option value="all">Все месяцы</option>
               {periodOptions.map((k) => (
                 <option key={k} value={k}>
                   {monthLabel(k)}
                 </option>
               ))}
             </select>
-            <IcChev className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--v2-ink-400)]" />
+            <button
+              type="button"
+              onClick={goNewer}
+              disabled={!canNewer}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-50)] disabled:opacity-30"
+              title="Следующий месяц"
+            >
+              <span className="text-[15px] leading-none">›</span>
+            </button>
           </div>
         </div>
 
@@ -377,6 +497,7 @@ export function PersonalObservationsClient() {
                 saving={saving}
                 textareaRef={composerRef}
                 onCreate={(p) => create(p)}
+                onTagAdded={rememberTag}
               />
               {loading && !board ? (
                 <p className="v2-tight px-1 text-[14px] text-[var(--v2-ink-500)]">Загрузка…</p>
@@ -387,9 +508,11 @@ export function PersonalObservationsClient() {
                 <div className="relative divide-y divide-[var(--v2-ink-100)]">
                   {list.map((it, i) => {
                     const t = OBSERVATION_TYPE_META[it.type];
-                    const open = openIds.includes(it.id);
-                    const paras = it.body.split(/\n\n+/).filter(Boolean);
-                    const shown = open ? paras : paras.slice(0, 1);
+                    const text = displayText(it);
+                    const isLong = text.length > COLLAPSE_AFTER_CHARS;
+                    const open = !isLong || openIds.includes(it.id);
+                    const shown = open ? text : `${text.slice(0, COLLAPSE_AFTER_CHARS).trimEnd()}…`;
+                    const editing = editingId === it.id;
                     return (
                       <article key={it.id} className="relative py-7 pl-7 pr-1" style={{ animationDelay: `${Math.min(i, 10) * 28}ms` }}>
                         <span
@@ -407,75 +530,91 @@ export function PersonalObservationsClient() {
                           <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">
                             {formatDateFull(it.observed_at)}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => void remove(it.id)}
-                            className="v2-tight ml-auto text-[11.5px] text-[var(--v2-ink-300)] hover:text-red-600"
-                          >
-                            Удалить
-                          </button>
+                          <div className="ml-auto flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(editing ? null : it.id)}
+                              className="v2-tight text-[11.5px] text-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
+                            >
+                              {editing ? "Закрыть" : "Редактировать"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void remove(it.id)}
+                              className="v2-tight text-[11.5px] text-[var(--v2-ink-300)] hover:text-red-600"
+                            >
+                              Удалить
+                            </button>
+                          </div>
                         </div>
-                        <h3
-                          className="v2-tight mt-2.5 max-w-[52ch] text-[20px] font-semibold leading-[1.25] text-[var(--v2-ink-900)]"
-                          style={{ textWrap: "pretty" }}
-                        >
-                          {it.title}
-                        </h3>
-                        <div
-                          className={`relative mt-3 flex max-w-[68ch] flex-col gap-3.5 ${open ? "" : "max-h-[132px] overflow-hidden"}`}
-                        >
-                          {shown.map((p, idx) => (
-                            <p
-                              key={idx}
-                              className="v2-tight text-[15px] leading-[1.7] text-[var(--v2-ink-700)]"
+                        {editing ? (
+                          <div className="mt-3">
+                            <Composer
+                              knownTags={knownTags}
+                              onTagAdded={rememberTag}
+                              defaultType={it.type}
+                              saving={saving}
+                              initial={{
+                                text: it.body,
+                                type: it.type,
+                                tags: it.tags,
+                                title: it.title,
+                                link: it.link_key ?? "",
+                                why: it.why,
+                              }}
+                              submitLabel="Сохранить"
+                              onCreate={(p) => update(it.id, p)}
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <h3
+                              className="v2-tight mt-2.5 max-w-[62ch] whitespace-pre-wrap text-[20px] font-semibold leading-[1.35] text-[var(--v2-ink-900)]"
                               style={{ textWrap: "pretty" }}
                             >
-                              {p}
-                            </p>
-                          ))}
-                          {!open && paras.length > 1 ? (
-                            <span className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white to-transparent" />
-                          ) : null}
-                        </div>
-                        {paras.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setOpenIds((p) => (p.includes(it.id) ? p.filter((x) => x !== it.id) : [...p, it.id]))
-                            }
-                            className="v2-tight mt-2.5 text-[12.5px] font-medium text-[var(--v2-brand-700)] hover:text-[var(--v2-brand-800)]"
-                          >
-                            {open ? "Свернуть" : `Читать дальше · ещё ${paras.length - 1} абз.`}
-                          </button>
-                        ) : null}
-                        {it.why && open ? (
-                          <p className="v2-tight mt-4 max-w-[62ch] border-l-2 border-[var(--v2-ink-200)] pl-3.5 text-[13.5px] leading-relaxed text-[var(--v2-ink-500)]">
-                            Почему может быть интересно: {it.why}
-                          </p>
-                        ) : null}
-                        <div className="mt-4 flex flex-wrap items-center gap-1.5">
-                          {it.tags.map((tg) => (
-                            <button
-                              key={tg}
-                              type="button"
-                              onClick={() => setTag(tag === tg ? null : tg)}
-                              className={`v2-tight inline-flex h-[26px] items-center gap-1 rounded-md px-2 text-[11.5px] font-medium transition ${
-                                tag === tg
-                                  ? "bg-[var(--v2-ink-900)] text-white"
-                                  : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-200)]/70 hover:text-[var(--v2-ink-900)]"
-                              }`}
-                            >
-                              <span className={tag === tg ? "text-white/50" : "text-[var(--v2-ink-400)]"}>#</span>
-                              {tg}
-                            </button>
-                          ))}
-                          {it.link_key && OBSERVATION_LINKS[it.link_key] ? (
-                            <span className="v2-tight inline-flex h-[26px] items-center gap-1.5 rounded-md bg-white px-2 text-[11.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)]">
-                              <IcLink className="h-3 w-3 text-[var(--v2-ink-400)]" />
-                              {OBSERVATION_LINKS[it.link_key]!.label}
-                            </span>
-                          ) : null}
-                        </div>
+                              {shown}
+                            </h3>
+                            {isLong ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenIds((p) => (p.includes(it.id) ? p.filter((x) => x !== it.id) : [...p, it.id]))
+                                }
+                                className="v2-tight mt-2.5 text-[12.5px] font-medium text-[var(--v2-brand-700)] hover:text-[var(--v2-brand-800)]"
+                              >
+                                {open ? "Свернуть" : "Читать дальше"}
+                              </button>
+                            ) : null}
+                            {it.why ? (
+                              <p className="v2-tight mt-4 max-w-[62ch] border-l-2 border-[var(--v2-ink-200)] pl-3.5 text-[13.5px] leading-relaxed text-[var(--v2-ink-500)]">
+                                Почему может быть интересно: {it.why}
+                              </p>
+                            ) : null}
+                            <div className="mt-4 flex flex-wrap items-center gap-1.5">
+                              {it.tags.map((tg) => (
+                                <button
+                                  key={tg}
+                                  type="button"
+                                  onClick={() => setTag(tag === tg ? null : tg)}
+                                  className={`v2-tight inline-flex h-[26px] items-center gap-1 rounded-md px-2 text-[11.5px] font-medium transition ${
+                                    tag === tg
+                                      ? "bg-[var(--v2-ink-900)] text-white"
+                                      : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-200)]/70 hover:text-[var(--v2-ink-900)]"
+                                  }`}
+                                >
+                                  <span className={tag === tg ? "text-white/50" : "text-[var(--v2-ink-400)]"}>#</span>
+                                  {tg}
+                                </button>
+                              ))}
+                              {it.link_key && OBSERVATION_LINKS[it.link_key] ? (
+                                <span className="v2-tight inline-flex h-[26px] items-center gap-1.5 rounded-md bg-white px-2 text-[11.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)]">
+                                  <IcLink className="h-3 w-3 text-[var(--v2-ink-400)]" />
+                                  {OBSERVATION_LINKS[it.link_key]!.label}
+                                </span>
+                              ) : null}
+                            </div>
+                          </>
+                        )}
                       </article>
                     );
                   })}
@@ -538,15 +677,45 @@ export function PersonalObservationsClient() {
               </section>
 
               <section className="rounded-2xl bg-[var(--v2-ink-900)] p-5 text-white shadow-[var(--v2-shadow-soft)]">
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/45">
-                  Обзор за период · {monthStats.month}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={goOlder}
+                    disabled={!canOlder}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 disabled:opacity-25"
+                    title="Предыдущий месяц"
+                  >
+                    ‹
+                  </button>
+                  <div className="min-w-0 flex-1 text-center text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/45">
+                    {period === "all" ? "Все месяцы" : monthStats.month}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={goNewer}
+                    disabled={!canNewer}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 disabled:opacity-25"
+                    title="Следующий месяц"
+                  >
+                    ›
+                  </button>
                 </div>
                 <p className="v2-tight mt-2 text-[16px] leading-snug">
-                  За этот месяц накопилось <span className="v2-tnum">{monthStats.total}</span> записей.
+                  {period === "all" ? (
+                    <>
+                      Всего <span className="v2-tnum">{board?.observations.length ?? 0}</span> записей.
+                    </>
+                  ) : (
+                    <>
+                      За этот месяц накопилось <span className="v2-tnum">{monthStats.total}</span> записей.
+                    </>
+                  )}
                 </p>
-                <p className="v2-tight v2-tnum mt-1.5 text-[13px] text-white/55">
-                  В {monthStats.prevMonth.toLowerCase()} было {monthStats.prevTotal}.
-                </p>
+                {period !== "all" && monthStats.prevMonth ? (
+                  <p className="v2-tight v2-tnum mt-1.5 text-[13px] text-white/55">
+                    В {monthStats.prevMonth.toLowerCase()} было {monthStats.prevTotal}.
+                  </p>
+                ) : null}
                 <p className="v2-tight mt-4 border-t border-white/10 pt-4 text-[13.5px]">
                   Есть ли здесь что-то, что меняет твою стратегию?
                 </p>
@@ -578,11 +747,24 @@ function Composer({
   saving,
   textareaRef,
   onCreate,
+  onTagAdded,
+  initial,
+  submitLabel = "Опубликовать",
 }: {
   knownTags: string[];
   defaultType: ObservationType;
   saving: boolean;
-  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  textareaRef?: RefObject<HTMLTextAreaElement | null>;
+  initial?: {
+    text: string;
+    type: ObservationType;
+    tags: string[];
+    title: string;
+    link: string;
+    why: string;
+  };
+  submitLabel?: string;
+  onTagAdded?: (name: string) => void;
   onCreate: (p: {
     type: ObservationType;
     title: string;
@@ -592,32 +774,50 @@ function Composer({
     why?: string;
   }) => Promise<boolean>;
 }) {
-  const [text, setText] = useState("");
-  const [type, setType] = useState<ObservationType>(defaultType);
-  const [tags, setTags] = useState<string[]>([]);
+  const [text, setText] = useState(initial?.text ?? "");
+  const [type, setType] = useState<ObservationType>(initial?.type ?? defaultType);
+  const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
   const [draft, setDraft] = useState("");
-  const [more, setMore] = useState(false);
-  const [title, setTitle] = useState("");
-  const [link, setLink] = useState("");
-  const [why, setWhy] = useState("");
+  const [more, setMore] = useState(Boolean(initial?.title || initial?.link || initial?.why));
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [link, setLink] = useState(initial?.link ?? "");
+  const [why, setWhy] = useState(initial?.why ?? "");
+  const localRef = useRef<HTMLTextAreaElement>(null);
+  const areaRef = textareaRef ?? localRef;
 
   useEffect(() => {
     if (!text.trim()) setType(defaultType);
   }, [defaultType, text]);
 
   const addTag = (t: string) => {
-    const v = t.trim().replace(/^#/, "").toLowerCase();
-    if (v && !tags.includes(v)) setTags([...tags, v]);
+    const v = t.trim().replace(/^#/, "").toLowerCase().slice(0, 48);
+    if (!v) return;
+    setTags((prev) => (prev.includes(v) ? prev : [...prev, v]));
+    onTagAdded?.(v);
     setDraft("");
   };
+
+  const tagsForSave = () => {
+    const pending = draft.trim().replace(/^#/, "").toLowerCase().slice(0, 48);
+    if (pending && !tags.includes(pending)) {
+      onTagAdded?.(pending);
+      return [...tags, pending];
+    }
+    return tags;
+  };
+
   const suggestions = knownTags
     .filter((t) => !tags.includes(t) && (!draft || t.includes(draft.toLowerCase().replace(/^#/, ""))))
-    .slice(0, 6);
+    .slice(0, 12);
 
   const grow = (el: HTMLTextAreaElement) => {
     el.style.height = "auto";
     el.style.height = `${Math.min(Math.max(el.scrollHeight, 52), 280)}px`;
   };
+
+  useEffect(() => {
+    if (areaRef.current) grow(areaRef.current);
+  }, [areaRef]);
 
   const submit = async () => {
     const body = text.trim();
@@ -626,11 +826,12 @@ function Composer({
       type,
       title: title.trim() || body.split("\n")[0]!.slice(0, 70),
       text: body,
-      tags,
+      tags: tagsForSave(),
       link: link || undefined,
       why: why.trim() || undefined,
     });
     if (!ok) return;
+    if (initial) return;
     setText("");
     setTags([]);
     setDraft("");
@@ -638,16 +839,16 @@ function Composer({
     setLink("");
     setWhy("");
     setMore(false);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "52px";
-      textareaRef.current.focus();
+    if (areaRef.current) {
+      areaRef.current.style.height = "52px";
+      areaRef.current.focus();
     }
   };
 
   return (
     <section className="rounded-2xl bg-white px-5 py-4 shadow-[var(--v2-shadow-soft)]">
       <textarea
-        ref={textareaRef}
+        ref={areaRef}
         value={text}
         rows={2}
         placeholder="Что произошло?"
@@ -706,17 +907,31 @@ function Composer({
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => {
+              if (draft.trim()) addTag(draft);
+            }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === ",") {
-                e.preventDefault();
-                addTag(draft);
+              if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                if (draft.trim()) {
+                  e.preventDefault();
+                  addTag(draft);
+                }
               }
               if (e.key === "Backspace" && !draft && tags.length) setTags(tags.slice(0, -1));
             }}
-            placeholder={tags.length ? "" : "Тег…"}
+            placeholder={tags.length ? "" : "Тег… Enter"}
             className="v2-tight h-6 min-w-[80px] flex-1 bg-transparent text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
           />
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (draft.trim()) addTag(draft);
+          }}
+          className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-800)]"
+        >
+          + тег
+        </button>
         <button
           type="button"
           onClick={() => setMore((v) => !v)}
@@ -730,15 +945,16 @@ function Composer({
           onClick={() => void submit()}
           className="v2-tight ml-auto h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-35 disabled:hover:bg-[var(--v2-ink-900)]"
         >
-          {saving ? "…" : "Опубликовать"}
+          {saving ? "…" : submitLabel}
         </button>
       </div>
-      {suggestions.length && draft ? (
+      {suggestions.length ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {suggestions.map((t) => (
             <button
               key={t}
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => addTag(t)}
               className="v2-tight inline-flex h-[26px] items-center gap-1 rounded-md bg-[var(--v2-ink-100)] px-2 text-[11.5px] font-medium text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
             >

@@ -219,7 +219,11 @@ export async function loadPersonalObservationsBoard(
     counts[o.type] = (counts[o.type] || 0) + 1;
   }
 
+  const catalog = await listTagsRaw(userId);
   const tagCountMap = new Map<string, number>();
+  for (const row of catalog) {
+    tagCountMap.set(String(row.name), 0);
+  }
   for (const o of all) {
     for (const t of o.tags) {
       tagCountMap.set(t, (tagCountMap.get(t) || 0) + 1);
@@ -231,6 +235,24 @@ export async function loadPersonalObservationsBoard(
 
   const observations = all.filter((o) => matchesFilter(o, filter));
   return { observations, tags, counts };
+}
+
+export async function getPersonalObservation(
+  ctx: V2SessionContext,
+  id: string
+): Promise<PersonalObservation | null> {
+  const userId = uid(ctx);
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_observations")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const tagMap = await loadTagMap([id]);
+  return mapObs(data as Record<string, unknown>, tagMap.get(id) ?? []);
 }
 
 export async function createPersonalObservation(
@@ -350,7 +372,7 @@ export async function updatePersonalObservation(
     .select("*")
     .single();
   if (error) throw error;
-  if (input.tagNames) await setObservationTags(ctx, id, input.tagNames);
+  if (input.tagNames !== undefined) await setObservationTags(ctx, id, input.tagNames);
   const tagMap = await loadTagMap([id]);
   return mapObs(data as Record<string, unknown>, tagMap.get(id) ?? []);
 }

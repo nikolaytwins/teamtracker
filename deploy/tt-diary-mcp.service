@@ -1,0 +1,18 @@
+[Unit]
+Description=Team Tracker diary MCP (read-only)
+After=network.target team-tracker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/teamtracker/mcp/diary
+EnvironmentFile=-/etc/team-tracker.env
+Environment=TT_MCP_PUBLIC_ORIGIN=https://tt.twinlabs.ru
+Environment=TT_MCP_PORT=3107
+Environment=TT_DIARY_API_URL=http://127.0.0.1:3005/api/integrations/sophia/diary
+ExecStart=/root/teamtracker/mcp/diary/node_modules/.bin/tsx src/http.ts
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
