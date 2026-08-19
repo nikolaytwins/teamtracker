@@ -92,16 +92,17 @@ export function gridSizeForWish(imageCount: number, hasDesc: boolean): { col: nu
   };
 }
 
-export const WISH_SCALES = ["critical", "large", "small"] as const;
+export const WISH_SCALES = ["lifestyle", "critical", "large", "small"] as const;
 export type WishScale = (typeof WISH_SCALES)[number];
 
 export const WISH_SCALE_META: Record<
   WishScale,
   { label: string; rank: number; tint: string; bg: string }
 > = {
-  critical: { label: "Крайне важное", rank: 0, tint: "#BE185D", bg: "#FDECF3" },
-  large: { label: "Крупное", rank: 1, tint: "#C2410C", bg: "#FFF1E8" },
-  small: { label: "Маленькое", rank: 2, tint: "#0E7490", bg: "#E6F6FA" },
+  lifestyle: { label: "Лайфстайл", rank: 0, tint: "#9333EA", bg: "#FAF5FF" },
+  critical: { label: "Крайне важное", rank: 1, tint: "#BE185D", bg: "#FDECF3" },
+  large: { label: "Крупное", rank: 2, tint: "#C2410C", bg: "#FFF1E8" },
+  small: { label: "Маленькое", rank: 3, tint: "#0E7490", bg: "#E6F6FA" },
 };
 
 export function isWishScale(v: string): v is WishScale {

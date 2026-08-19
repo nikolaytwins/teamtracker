@@ -849,6 +849,45 @@ function Fullscreen({
                   )}
                 </div>
               </div>
+              <div className="mt-4">
+                <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">
+                  Фото
+                </span>
+                <div className="mt-2 grid grid-cols-4 gap-2">
+                  {imgs.map((img) => (
+                    <div
+                      key={img.id}
+                      className="relative aspect-square overflow-hidden rounded-xl bg-[var(--v2-ink-100)]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => onRemoveImage(img.id)}
+                        className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)] shadow-sm"
+                      >
+                        <IcClose className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {canAddMore ? (
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-[var(--v2-ink-300)] text-[var(--v2-ink-400)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-600)]"
+                    >
+                      <V2Icons.plus className="h-4 w-4" />
+                      <span className="text-[10px]">Ещё</span>
+                    </button>
+                  ) : null}
+                </div>
+                {uploading ? (
+                  <p className="v2-tight mt-2 text-[12px] text-[var(--v2-ink-500)]">Загрузка…</p>
+                ) : null}
+                <p className="v2-tnum mt-1.5 text-[11px] text-[var(--v2-ink-400)]">
+                  {imgs.length} из {MAX_WISH_IMAGES}
+                </p>
+              </div>
             </>
           ) : (
             <>
