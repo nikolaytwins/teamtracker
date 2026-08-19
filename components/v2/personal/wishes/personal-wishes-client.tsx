@@ -439,19 +439,22 @@ function WishCard({
   return (
     <article
       className="v2-card-in group relative flex flex-col overflow-hidden rounded-[20px] bg-white shadow-[var(--v2-shadow-card)] transition-all duration-300 hover:shadow-[var(--v2-shadow-cardHv)]"
-      style={{ animationDelay: `${i * 30}ms` }}
+      style={{
+        animationDelay: `${i * 30}ms`,
+        gridColumn: hasPhotos ? "span 2" : undefined,
+      }}
     >
       {hasPhotos ? (
-        <div className={`relative bg-[var(--v2-ink-50)] ${imgs > 1 ? "grid grid-cols-2 items-start gap-px" : ""}`}>
+        <div className={`relative bg-[var(--v2-ink-50)] ${imgs > 1 ? "wish-photo-masonry" : ""}`}>
           {w.images.map((img, idx) => (
             <button
               key={img.id}
               type="button"
               onClick={() => onOpen(w.id, idx)}
-              className={`block overflow-hidden bg-[var(--v2-ink-100)] ${imgs === 1 || (imgs % 2 === 1 && idx === imgs - 1) ? "col-span-2" : ""}`}
+              className="block w-full overflow-hidden bg-[var(--v2-ink-100)]"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.url} alt="" className="block h-auto w-full cursor-zoom-in" />
+              <img src={img.url} alt="" className="block h-auto w-full" />
             </button>
           ))}
           <button
@@ -546,7 +549,6 @@ function Fullscreen({
   catById,
   catOptions,
   startIndex = 0,
-  startZoomed = false,
   onClose,
   onPrev,
   onNext,
@@ -561,7 +563,6 @@ function Fullscreen({
   catById: Map<string, WishCustomCategory>;
   catOptions: WishCatMeta[];
   startIndex?: number;
-  startZoomed?: boolean;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -579,7 +580,6 @@ function Fullscreen({
   uploading: boolean;
 }) {
   const [n, setN] = useState(startIndex);
-  const [zoomed, setZoomed] = useState(startZoomed);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(w.title);
   const [desc, setDesc] = useState(w.description);
@@ -592,14 +592,13 @@ function Fullscreen({
 
   useEffect(() => {
     setN(Math.max(0, startIndex));
-    setZoomed(startZoomed);
     setEditing(false);
     setTitle(w.title);
     setDesc(w.description);
     setCats(w.categories);
     setAddingCat(false);
     setNewCatName("");
-  }, [w.id, startIndex, startZoomed]);
+  }, [w.id, startIndex]);
 
   useEffect(() => {
     setN((cur) => {
@@ -618,10 +617,6 @@ function Fullscreen({
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (zoomed) {
-          setZoomed(false);
-          return;
-        }
         if (editing) {
           setEditing(false);
           setTitle(w.title);
@@ -632,13 +627,13 @@ function Fullscreen({
         onClose();
         return;
       }
-      if (editing || zoomed) return;
+      if (editing) return;
       if (e.key === "ArrowRight") onNext();
       if (e.key === "ArrowLeft") onPrev();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [onClose, onPrev, onNext, editing, zoomed, w.title, w.description, w.categories]);
+  }, [onClose, onPrev, onNext, editing, w.title, w.description, w.categories]);
 
   const imgs = w.images;
   const current = imgs[n] ?? imgs[0];
@@ -701,7 +696,6 @@ function Fullscreen({
               onPick={canAddMore ? () => fileRef.current?.click() : undefined}
               onClear={() => onRemoveImage(current.id)}
               onFiles={canAddMore ? (files) => onUpload(files) : undefined}
-              onImageClick={() => setZoomed(true)}
             />
           ) : (
             <button
@@ -1000,23 +994,6 @@ function Fullscreen({
           <IcClose className="h-[18px] w-[18px]" />
         </button>
       </div>
-      {zoomed && current ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--v2-ink-900)]/92 p-6"
-          onClick={(e) => {
-            e.stopPropagation();
-            setZoomed(false);
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={current.url}
-            alt=""
-            className="max-h-full max-w-full object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -1482,7 +1459,6 @@ export function PersonalWishesClient() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [openImageIndex, setOpenImageIndex] = useState(0);
-  const [openZoomed, setOpenZoomed] = useState(false);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1530,7 +1506,6 @@ export function PersonalWishesClient() {
 
   const openWish = useCallback((id: string, imageIndex?: number) => {
     setOpenImageIndex(imageIndex ?? 0);
-    setOpenZoomed(imageIndex != null);
     setOpen(id);
   }, []);
   const step = useCallback(
@@ -1539,7 +1514,6 @@ export function PersonalWishesClient() {
         if (!cur || !shown.length) return cur;
         const i = shown.findIndex((w) => w.id === cur);
         setOpenImageIndex(0);
-        setOpenZoomed(false);
         if (i < 0) return shown[0]?.id ?? null;
         return shown[(i + d + shown.length) % shown.length]!.id;
       }),
@@ -1852,7 +1826,6 @@ export function PersonalWishesClient() {
           catById={catById}
           catOptions={catOptions}
           startIndex={openImageIndex}
-          startZoomed={openZoomed}
           onClose={() => setOpen(null)}
           onPrev={() => step(-1)}
           onNext={() => step(1)}
