@@ -445,18 +445,22 @@ function WishCard({
       }}
     >
       {hasPhotos ? (
-        <div className={`relative bg-[var(--v2-ink-50)] ${imgs > 1 ? "wish-photo-masonry" : ""}`}>
-          {w.images.map((img, idx) => (
-            <button
-              key={img.id}
-              type="button"
-              onClick={() => onOpen(w.id, idx)}
-              className="block w-full overflow-hidden bg-[var(--v2-ink-100)]"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.url} alt="" className="block h-auto w-full" />
-            </button>
-          ))}
+        <div className="relative">
+          {/* photo grid */}
+          <div className={imgs > 1 ? "wish-photo-masonry" : ""}>
+            {w.images.map((img, idx) => (
+              <button
+                key={img.id}
+                type="button"
+                onClick={() => onOpen(w.id, idx)}
+                className="block w-full overflow-hidden bg-[var(--v2-ink-100)]"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.url} alt="" className="block h-auto w-full" />
+              </button>
+            ))}
+          </div>
+          {/* delete button sits outside the masonry flow */}
           <button
             type="button"
             title="Удалить"
@@ -493,7 +497,7 @@ function WishCard({
           <h3
             onClick={() => onOpen(w.id)}
             className={`v2-tight cursor-pointer leading-snug text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] ${
-              hasPhotos ? "text-[16px] font-medium" : "v2-tighter text-[22px] font-light"
+              hasPhotos ? "text-[19px] font-semibold" : "v2-tighter text-[22px] font-light"
             }`}
             style={{ textWrap: "pretty" }}
           >
