@@ -47,6 +47,11 @@ export async function middleware(request: NextRequest) {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
   const pathname = normalizePath(request.nextUrl.pathname, basePath);
 
+  /** VK Callback API: подтверждение сервера без браузерной сессии. */
+  if (pathname === "/api/integrations/vk/webhook") {
+    return NextResponse.next();
+  }
+
   /** Машинный доступ из Sophia OS (секрет в env). Без браузерной сессии Teamtracker. */
   if (pathname.startsWith("/api/integrations/sophia/")) {
     /** CORS preflight: браузер не шлёт кастомные заголовки на OPTIONS — только после успешного preflight. */

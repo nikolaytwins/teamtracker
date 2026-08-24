@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseDiaryMessage } from "@/lib/v2/integrations/parse-diary-message";
 import {
+  mergeResolvedDiaryTags,
+  resolveDiaryTagNames,
+} from "@/lib/v2/integrations/resolve-diary-tags";
+import {
   resolveSophiaIntegrationContext,
   SophiaIntegrationConfigError,
 } from "@/lib/v2/integrations/sophia-integration-context";
@@ -33,6 +37,13 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveSophiaIntegrationContext();
     const sp = request.nextUrl.searchParams;
+    if (sp.get("tags") === "1" || sp.get("list") === "tags") {
+      const board = await loadPersonalObservationsBoard(ctx, { type: "all" });
+      return NextResponse.json(
+        { ok: true, tags: board.tags },
+        { headers: { ...corsHeaders } }
+      );
+    }
     const id = sp.get("id")?.trim();
     if (id) {
       const observation = await getPersonalObservation(ctx, id);
@@ -83,7 +94,8 @@ export async function GET(request: NextRequest) {
  * Запись в личный дневник из Sophia (Telegram).
  * Доступ: x-tt-integration-secret = TT_INTEGRATION_SECRET (мин. 16 символов).
  *
- * Body: { "message": "текст\n#tag1 #tag2" } или { "body": "...", "tags": ["tag1"] }
+ * Body: { "message": "..." } | { "body", "tags" | "tagHints", "preferExistingTags"?, "allowNewTags"? }
+ * tagHints сопоставляются с существующими тегами (в т.ч. с эмодzi). По умолчанию новые теги не создаются.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -101,12 +113,56 @@ export async function POST(request: NextRequest) {
       : Array.isArray(body.tagNames)
         ? body.tagNames.map(String)
         : [];
-    const tagNames = [
-      ...new Set([
-        ...parsed.tagNames,
-        ...explicitTags.map((t: string) => t.replace(/^#/, "")),
-      ]),
+    const tagHints = Array.isArray(body.tagHints)
+      ? body.tagHints.map(String)
+      : typeof body.tagHint === "string"
+        ? [body.tagHint]
+        : [];
+
+    const ctx = await resolveSophiaIntegrationContext();
+    const board = await loadPersonalObservationsBoard(ctx, { type: "all" });
+
+    const preferExisting = body.preferExistingTags !== false;
+    const allowNew = body.allowNewTags === true;
+
+    const rawTagInputs = [
+      ...parsed.tagNames,
+      ...explicitTags.map((t: string) => t.replace(/^#/, "")),
+      ...tagHints.map((t: string) => t.replace(/^#/, "")),
     ];
+
+    const resolution = resolveDiaryTagNames(rawTagInputs, board.tags);
+    let tagNames = resolution.resolved;
+
+    if (resolution.ambiguous.length) {
+      return NextResponse.json(
+        {
+          error: "Неоднозначный тег — уточни",
+          ambiguous: resolution.ambiguous,
+          tags: board.tags.slice(0, 30),
+        },
+        { status: 409, headers: { ...corsHeaders } }
+      );
+    }
+
+    if (resolution.unmatched.length) {
+      if (allowNew) {
+        tagNames = mergeResolvedDiaryTags(tagNames, resolution.unmatched);
+      } else if (preferExisting) {
+        return NextResponse.json(
+          {
+            error: "Не нашла подходящий существующий тег",
+            unmatched: resolution.unmatched,
+            tags: board.tags.slice(0, 30),
+          },
+          { status: 400, headers: { ...corsHeaders } }
+        );
+      } else {
+        tagNames = mergeResolvedDiaryTags(tagNames, resolution.unmatched);
+      }
+    }
+
+    tagNames = [...new Set(tagNames)];
 
     const observationBody = String(body.body ?? parsed.body ?? rawMessage).trim();
     if (!observationBody) {
@@ -116,7 +172,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ctx = await resolveSophiaIntegrationContext();
     const observation = await createPersonalObservation(ctx, {
       type: typeof body.type === "string" ? body.type : "other",
       title: typeof body.title === "string" ? body.title : undefined,

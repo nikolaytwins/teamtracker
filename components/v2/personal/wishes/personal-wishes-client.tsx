@@ -17,6 +17,78 @@ import {
 } from "@/lib/v2/personal/wish-cats";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+/** Переносы строк в markdown (одиночный \n → hard break). */
+function preserveSourceLineBreaks(md: string) {
+  return md.replace(/([^\n])\n(?!\n)/g, "$1  \n");
+}
+
+function WishDescriptionProse({ text, className }: { text: string; className?: string }) {
+  return (
+    <div className={className}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => (
+            <h3 className="v2-tight mb-3 mt-5 text-[18px] font-semibold text-[var(--v2-ink-900)] first:mt-0">
+              {children}
+            </h3>
+          ),
+          h2: ({ children }) => (
+            <h4 className="v2-tight mb-2 mt-4 text-[16px] font-semibold text-[var(--v2-ink-900)] first:mt-0">
+              {children}
+            </h4>
+          ),
+          h3: ({ children }) => (
+            <h5 className="v2-tight mb-2 mt-3 text-[15px] font-semibold text-[var(--v2-ink-800)] first:mt-0">
+              {children}
+            </h5>
+          ),
+          p: ({ children }) => (
+            <p className="v2-tight mb-3 whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--v2-ink-600)] last:mb-0">
+              {children}
+            </p>
+          ),
+          ul: ({ children }) => (
+            <ul className="mb-3 list-disc space-y-1 pl-5 text-[15px] leading-relaxed text-[var(--v2-ink-600)]">
+              {children}
+            </ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="mb-3 list-decimal space-y-1 pl-5 text-[15px] leading-relaxed text-[var(--v2-ink-600)]">
+              {children}
+            </ol>
+          ),
+          li: ({ children }) => <li className="pl-0.5">{children}</li>,
+          strong: ({ children }) => (
+            <strong className="font-semibold text-[var(--v2-ink-800)]">{children}</strong>
+          ),
+          em: ({ children }) => <em className="italic">{children}</em>,
+          blockquote: ({ children }) => (
+            <blockquote className="my-3 border-l-2 border-[var(--v2-ink-200)] pl-4 text-[14px] italic leading-relaxed text-[var(--v2-ink-500)]">
+              {children}
+            </blockquote>
+          ),
+          hr: () => <hr className="my-4 border-[var(--v2-ink-100)]" />,
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              className="font-medium text-[var(--v2-brand-600)] underline underline-offset-2"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {preserveSourceLineBreaks(text)}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 function filesFromDropOrInput(list: FileList | File[] | null): File[] {
   if (!list) return [];
@@ -518,8 +590,8 @@ function WishCard({
           </div>
           {w.description ? (
             <p
-              className={`v2-tight mt-2 leading-relaxed text-[var(--v2-ink-500)] ${
-                hasPhotos ? "text-[12.5px]" : "line-clamp-5 text-[13.5px]"
+              className={`v2-tight mt-2 line-clamp-2 leading-relaxed text-[var(--v2-ink-500)] ${
+                hasPhotos ? "text-[12.5px]" : "text-[13.5px]"
               }`}
               style={{ textWrap: "pretty" }}
             >
@@ -912,7 +984,7 @@ function Fullscreen({
                 {w.title}
               </h2>
               {w.description ? (
-                <p className="v2-tight mt-4 text-[15px] leading-relaxed text-[var(--v2-ink-600)]">{w.description}</p>
+                <WishDescriptionProse text={w.description} className="mt-4" />
               ) : null}
               {w.note ? (
                 <p className="mt-5 border-l-2 border-[var(--v2-ink-200)] pl-4 text-[14px] italic leading-relaxed text-[var(--v2-ink-500)]">
