@@ -16,6 +16,7 @@ import {
   type WishScale,
 } from "@/lib/v2/personal/wish-cats";
 import { V2Icons } from "@/components/v2/ui/icons";
+import { WishPhotosInCard, WishesMasonryGrid } from "@/components/v2/personal/wishes/wish-masonry-ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -506,33 +507,15 @@ function WishCard({
   onCat: (k: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const imgs = w.images.length;
-  const hasPhotos = imgs > 0;
+  const hasPhotos = w.images.length > 0;
   return (
     <article
       className="v2-card-in group relative flex flex-col overflow-hidden rounded-[20px] bg-white shadow-[var(--v2-shadow-card)] transition-all duration-300 hover:shadow-[var(--v2-shadow-cardHv)]"
-      style={{
-        animationDelay: `${i * 30}ms`,
-        gridColumn: hasPhotos ? "span 2" : undefined,
-      }}
+      style={{ animationDelay: `${i * 30}ms` }}
     >
       {hasPhotos ? (
-        <div className="relative">
-          {/* photo grid */}
-          <div className={imgs > 1 ? "wish-photo-masonry" : ""}>
-            {w.images.map((img, idx) => (
-              <button
-                key={img.id}
-                type="button"
-                onClick={() => onOpen(w.id, idx)}
-                className="block w-full overflow-hidden bg-[var(--v2-ink-100)]"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.url} alt="" className="block h-auto w-full" />
-              </button>
-            ))}
-          </div>
-          {/* delete button sits outside the masonry flow */}
+        <div className="relative px-4 pb-0 pt-4">
+          <WishPhotosInCard images={w.images} onPhotoPress={(idx) => onOpen(w.id, idx)} />
           <button
             type="button"
             title="Удалить"
@@ -540,7 +523,7 @@ function WishCard({
               e.stopPropagation();
               onDelete(w.id);
             }}
-            className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-400)] shadow-sm backdrop-blur transition hover:bg-red-50 hover:text-red-600"
+            className="absolute right-6 top-6 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-400)] shadow-sm backdrop-blur transition hover:bg-red-50 hover:text-red-600"
           >
             <IcClose className="h-3.5 w-3.5" />
           </button>
@@ -706,12 +689,27 @@ function Fullscreen({
         return;
       }
       if (editing) return;
-      if (e.key === "ArrowRight") onNext();
-      if (e.key === "ArrowLeft") onPrev();
+      const count = w.images.length;
+      if (e.key === "ArrowRight") {
+        if (count > 1) {
+          e.preventDefault();
+          setN((cur) => (cur + 1) % count);
+        } else {
+          onNext();
+        }
+      }
+      if (e.key === "ArrowLeft") {
+        if (count > 1) {
+          e.preventDefault();
+          setN((cur) => (cur - 1 + count) % count);
+        } else {
+          onPrev();
+        }
+      }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [onClose, onPrev, onNext, editing, w.title, w.description, w.categories]);
+  }, [onClose, onPrev, onNext, editing, w.title, w.description, w.categories, w.images.length]);
 
   const imgs = w.images;
   const current = imgs[n] ?? imgs[0];
@@ -1957,8 +1955,9 @@ export function PersonalWishesClient() {
               )}
             </div>
           ) : (
-            <div className="wish-masonry grid gap-[22px]">
-              {shown.map((w, i) => (
+            <WishesMasonryGrid
+              wishes={shown}
+              renderCard={(w, i) => (
                 <WishCard
                   key={w.id}
                   w={w}
@@ -1968,8 +1967,8 @@ export function PersonalWishesClient() {
                   onCat={setCat}
                   onDelete={(id) => void deleteWish(id)}
                 />
-              ))}
-            </div>
+              )}
+            />
           )}
         </>
       ) : null}
