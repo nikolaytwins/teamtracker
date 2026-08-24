@@ -13,7 +13,7 @@ export const WISH_CATS: Record<WishBuiltinCategoryId, { label: string; tint: str
   life: { label: "жизнь", tint: "#0E9F6E", bg: "#E8F7F1" },
 };
 
-export const MAX_WISH_IMAGES = 10;
+export const MAX_WISH_IMAGES = 15;
 
 const CUSTOM_PALETTE = [
   { tint: "#0E7490", bg: "#E0F2FE" },

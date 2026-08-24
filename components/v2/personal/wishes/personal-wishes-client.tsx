@@ -511,7 +511,7 @@ function WishCard({
   return (
     <article
       className="v2-card-in group relative flex flex-col overflow-hidden rounded-[20px] bg-white shadow-[var(--v2-shadow-card)] transition-all duration-300 hover:shadow-[var(--v2-shadow-cardHv)]"
-      style={{ animationDelay: `${i * 30}ms` }}
+      style={{ animationDelay: `${Math.min(i * 30, 360)}ms` }}
     >
       {hasPhotos ? (
         <div className="relative px-4 pb-0 pt-4">
@@ -1959,7 +1959,6 @@ export function PersonalWishesClient() {
               wishes={shown}
               renderCard={(w, i) => (
                 <WishCard
-                  key={w.id}
                   w={w}
                   i={i}
                   catById={catById}

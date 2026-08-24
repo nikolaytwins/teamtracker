@@ -111,15 +111,21 @@ export function WishPhotosInCard({
   );
 }
 
-export function useWishMasonryColumns() {
+export function useWishMasonryColumns(container: HTMLElement | null) {
   const [colCount, setColCount] = useState(3);
 
   useEffect(() => {
-    const update = () => setColCount(wishMasonryColumnCount(window.innerWidth));
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+    if (!container) return;
+    const measure = () => setColCount(wishMasonryColumnCount(container.clientWidth));
+    measure();
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(measure);
+      ro.observe(container);
+      return () => ro.disconnect();
+    }
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [container]);
 
   return colCount;
 }
@@ -131,17 +137,28 @@ export function WishesMasonryGrid({
   wishes: PersonalWish[];
   renderCard: (w: PersonalWish, index: number) => ReactNode;
 }) {
-  const colCount = useWishMasonryColumns();
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const colCount = useWishMasonryColumns(container);
   const columns = useMemo(
     () => distributeWishesMasonryColumns(wishes, colCount, MASONRY_GAP),
     [wishes, colCount]
   );
 
+  let index = 0;
+
   return (
-    <div className="flex items-start" style={{ gap: MASONRY_GAP }}>
+    <div ref={setContainer} className="flex w-full items-start" style={{ gap: MASONRY_GAP }}>
       {columns.map((col, ci) => (
         <div key={`col-${ci}`} className="flex min-w-0 flex-1 flex-col" style={{ gap: MASONRY_GAP }}>
-          {col.map((w, wi) => renderCard(w, ci * 1000 + wi))}
+          {col.map((w) => {
+            const cardIndex = index;
+            index += 1;
+            return (
+              <div key={w.id} className="min-w-0">
+                {renderCard(w, cardIndex)}
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
