@@ -492,38 +492,6 @@ export function PersonalObservationsClient() {
         ) : null}
 
         <div className="mb-6 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setTag(null)}
-            className={`v2-tight inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium transition ${
-              !tag
-                ? "bg-[var(--v2-ink-900)] text-white shadow-[var(--v2-shadow-card)]"
-                : "bg-white text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-cardHv)]"
-            }`}
-          >
-            Все
-          </button>
-          {tagCounts.map(([name, n]) => {
-            const active = tag === name;
-            return (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setTag(active ? null : name)}
-                className={`v2-tight inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium transition ${
-                  active
-                    ? "bg-[var(--v2-ink-900)] text-white shadow-[var(--v2-shadow-card)]"
-                    : "bg-white text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-cardHv)]"
-                }`}
-              >
-                {name}
-                <span className={`v2-tnum text-[11px] ${active ? "text-white/60" : "text-[var(--v2-ink-400)]"}`}>
-                  {n}
-                </span>
-              </button>
-            );
-          })}
-          <span className="mx-1 h-5 w-px bg-[var(--v2-ink-200)]" />
           <div className="relative">
             <select
               value={link}
