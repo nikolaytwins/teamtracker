@@ -1,20 +1,46 @@
 "use client";
 
 import type { PersonalWish } from "@/lib/v2/personal/personal-wishes-repo";
+import { buildWishPhotoLayout } from "@/lib/v2/personal/wish-photo-layout";
 import {
   distributeWishesMasonryColumns,
   wishMasonryColumnCount,
 } from "@/lib/v2/personal/wish-masonry";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 const MASONRY_GAP = 12;
 
-function WishPhotoNatural({ url, onOpen }: { url: string; onOpen?: () => void }) {
-  const [aspect, setAspect] = useState(4 / 3);
+function WishPhotoNatural({
+  url,
+  aspect,
+  onAspect,
+  onOpen,
+}: {
+  url: string;
+  aspect?: number | null;
+  onAspect?: (aspect: number) => void;
+  onOpen?: () => void;
+}) {
+  const [localAspect, setLocalAspect] = useState(aspect ?? 4 / 3);
+  const ratio = aspect ?? localAspect;
+
+  const applyAspect = useCallback(
+    (w: number, h: number) => {
+      if (w <= 0 || h <= 0) return;
+      const next = w / h;
+      setLocalAspect(next);
+      onAspect?.(next);
+    },
+    [onAspect]
+  );
+
+  useEffect(() => {
+    if (aspect != null) setLocalAspect(aspect);
+  }, [aspect]);
 
   const inner = (
     <div className="w-full overflow-hidden rounded-xl bg-[var(--v2-ink-100)]">
-      <div className="w-full" style={{ aspectRatio: aspect }}>
+      <div className="w-full" style={{ aspectRatio: ratio }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={url}
@@ -22,9 +48,7 @@ function WishPhotoNatural({ url, onOpen }: { url: string; onOpen?: () => void })
           className="h-full w-full object-contain"
           onLoad={(e) => {
             const img = e.currentTarget;
-            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-              setAspect(img.naturalWidth / img.naturalHeight);
-            }
+            applyAspect(img.naturalWidth, img.naturalHeight);
           }}
         />
       </div>
@@ -41,37 +65,92 @@ function WishPhotoNatural({ url, onOpen }: { url: string; onOpen?: () => void })
 
 function WishPhotoRow({
   images,
-  baseIndex,
+  sourceIndices,
+  aspects,
+  onAspectAt,
   onPhotoPress,
 }: {
   images: PersonalWish["images"];
-  baseIndex: number;
+  sourceIndices: number[];
+  aspects: Array<number | null>;
+  onAspectAt: (sourceIndex: number, aspect: number) => void;
   onPhotoPress?: (index: number) => void;
 }) {
   if (images.length === 0) return null;
   if (images.length === 1) {
+    const src = sourceIndices[0]!;
     return (
       <WishPhotoNatural
         url={images[0]!.url}
-        onOpen={onPhotoPress ? () => onPhotoPress(baseIndex) : undefined}
+        aspect={aspects[src]}
+        onAspect={(a) => onAspectAt(src, a)}
+        onOpen={onPhotoPress ? () => onPhotoPress(src) : undefined}
       />
     );
   }
   return (
     <div className="flex w-full items-start gap-2">
-      {images.map((img, i) => (
-        <div key={img.id} className="min-w-0 flex-1">
-          <WishPhotoNatural
-            url={img.url}
-            onOpen={onPhotoPress ? () => onPhotoPress(baseIndex + i) : undefined}
-          />
-        </div>
-      ))}
+      {images.map((img, i) => {
+        const src = sourceIndices[i]!;
+        return (
+          <div key={img.id} className="min-w-0 flex-1">
+            <WishPhotoNatural
+              url={img.url}
+              aspect={aspects[src]}
+              onAspect={(a) => onAspectAt(src, a)}
+              onOpen={onPhotoPress ? () => onPhotoPress(src) : undefined}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-/** 1 фото — на всю ширину; 2 — один ряд; 3+ — сетка по 2 в ряд. */
+function useWishPhotoAspects(images: PersonalWish["images"]) {
+  const [aspects, setAspects] = useState<Array<number | null>>(() => images.map(() => null));
+
+  useEffect(() => {
+    setAspects(images.map(() => null));
+    let cancelled = false;
+
+    images.forEach((img, i) => {
+      const probe = new window.Image();
+      probe.onload = () => {
+        if (cancelled) return;
+        const w = probe.naturalWidth;
+        const h = probe.naturalHeight;
+        if (w <= 0 || h <= 0) return;
+        setAspects((prev) => {
+          if (prev[i] != null) return prev;
+          const next = [...prev];
+          next[i] = w / h;
+          return next;
+        });
+      };
+      probe.src = img.url;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [images]);
+
+  const setAspectAt = useCallback((index: number, aspect: number) => {
+    setAspects((prev) => {
+      if (prev[index] === aspect) return prev;
+      const next = [...prev];
+      next[index] = aspect;
+      return next;
+    });
+  }, []);
+
+  return { aspects, setAspectAt };
+}
+
+/**
+ * Раскладка: портреты парами в ряд, альбомные парами в ряд (не смешиваем в одной строке).
+ */
 export function WishPhotosInCard({
   images,
   onPhotoPress,
@@ -79,33 +158,23 @@ export function WishPhotosInCard({
   images: PersonalWish["images"];
   onPhotoPress?: (index: number) => void;
 }) {
+  const { aspects, setAspectAt } = useWishPhotoAspects(images);
+
+  const rows = useMemo(() => buildWishPhotoLayout(aspects), [aspects]);
+
   if (images.length === 0) return null;
-
-  const rows: PersonalWish["images"][] = [];
-  for (let i = 0; i < images.length; i += 2) {
-    rows.push(images.slice(i, i + 2));
-  }
-
-  if (images.length === 1) {
-    return (
-      <div className="mt-0.5 flex flex-col gap-2.5">
-        <WishPhotoNatural url={images[0]!.url} onOpen={onPhotoPress ? () => onPhotoPress(0) : undefined} />
-      </div>
-    );
-  }
-
-  if (images.length === 2) {
-    return (
-      <div className="mt-0.5">
-        <WishPhotoRow images={images} baseIndex={0} onPhotoPress={onPhotoPress} />
-      </div>
-    );
-  }
 
   return (
     <div className="mt-0.5 flex w-full flex-col gap-2.5">
-      {rows.map((pair, ri) => (
-        <WishPhotoRow key={`row-${pair[0]?.id ?? ri}`} images={pair} baseIndex={ri * 2} onPhotoPress={onPhotoPress} />
+      {rows.map((row, ri) => (
+        <WishPhotoRow
+          key={row.indices.map((i) => images[i]?.id ?? i).join("-") || `row-${ri}`}
+          images={row.indices.map((i) => images[i]!)}
+          sourceIndices={row.indices}
+          aspects={aspects}
+          onAspectAt={setAspectAt}
+          onPhotoPress={onPhotoPress}
+        />
       ))}
     </div>
   );
