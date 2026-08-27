@@ -17,6 +17,7 @@ import {
   type HomeMonth,
   type HomeSeasonTask,
 } from "@/lib/v2/personal/seeds/home-seed";
+import { HomeTaskCheckbox } from "@/components/v2/home/personal/home-task-checkbox";
 
 const HERO_BLUE = "#2d5eef";
 
@@ -24,9 +25,9 @@ function ExternalLinkIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
       <path
-        d="M14 5h5v5M10 14 19 5M15 5h4v4M19 19H5V5h7"
+        d="M14 3h7v7M10 14 20 4M15 3h5v5M5 12v7h7"
         stroke="currentColor"
-        strokeWidth="1.6"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -36,23 +37,30 @@ function ExternalLinkIcon({ className }: { className?: string }) {
 
 function TaskLabel({ task, done }: { task: HomeSeasonTask; done: boolean }) {
   return (
-    <span className="inline-flex min-w-0 flex-1 items-start gap-2">
-      <span className="v2-tight min-w-0 text-[17.5px] font-semibold leading-snug tracking-[-0.018em]">{task.text}</span>
+    <span className="flex min-w-0 flex-1 flex-col gap-2.5">
+      <span
+        className={`v2-tight text-[17.5px] font-semibold leading-snug tracking-[-0.018em] ${
+          done ? "text-white" : "text-[var(--v2-ink-800)]"
+        }`}
+      >
+        {task.text}
+      </span>
       {task.href ? (
         <a
           href={task.href}
           target="_blank"
           rel="noopener noreferrer"
-          title="Открыть документ"
+          title="Открыть в Google Docs"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${
+          className={`inline-flex w-fit items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[13px] font-semibold shadow-sm transition ${
             done
-              ? "text-white/70 hover:bg-white/15 hover:text-white"
-              : "text-[var(--v2-ink-400)] hover:bg-white hover:text-[var(--v2-brand-600)]"
+              ? "border border-white/35 bg-white/15 text-white hover:bg-white/25"
+              : "border border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)] hover:border-[var(--v2-brand-400)] hover:bg-[var(--v2-brand-100)]"
           }`}
         >
-          <ExternalLinkIcon className="h-3.5 w-3.5" />
+          <ExternalLinkIcon className="h-3.5 w-3.5 shrink-0" />
+          Открыть документ
         </a>
       ) : null}
     </span>
@@ -242,22 +250,14 @@ function MonthPanel({
             onDragStart={() => onDragStart(task.id)}
             onDragEnd={onDragEnd}
             onClick={() => onToggle(task.id, !task.done)}
-            className={`flex min-h-[92px] cursor-grab items-center gap-4 rounded-2xl px-[22px] py-5 text-left transition active:cursor-grabbing ${
+            className={`flex min-h-[92px] cursor-grab items-start gap-4 rounded-2xl px-[22px] py-5 text-left transition active:cursor-grabbing ${
               task.done
                 ? "text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
                 : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
             }`}
             style={task.done ? { background: HERO_BLUE } : undefined}
           >
-            <span
-              className={`inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-2 text-[15px] ${
-                task.done
-                  ? "border-white bg-white font-bold text-[var(--v2-brand-600)]"
-                  : "border-[var(--v2-ink-300)] bg-white text-transparent"
-              }`}
-            >
-              ✓
-            </span>
+            <HomeTaskCheckbox done={task.done} tone={task.done ? "on-blue" : "default"} />
             <TaskLabel task={task} done={task.done} />
           </button>
         ))}

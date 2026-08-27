@@ -91,8 +91,8 @@ function GoalsAndNotNow() {
   const capitalBase = dashboard?.summary.netWorth ?? 0;
 
   return (
-    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-      <section className="v2-card px-7 py-6">
+    <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+      <section className="v2-card flex h-full flex-col px-7 py-6">
         <div className="mb-[18px] flex flex-wrap items-baseline gap-3.5">
           <h2 className="v2-tight text-[24px] font-semibold tracking-[-0.028em] text-[var(--v2-ink-900)]">Цели</h2>
           <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">
@@ -100,11 +100,11 @@ function GoalsAndNotNow() {
           </span>
         </div>
         {goals.length ? (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <div className="grid flex-1 grid-cols-1 gap-3.5 sm:grid-cols-2">
             {goals.map((g) => {
               const pct = Math.min(100, Math.round(g.pct * 100));
               return (
-                <div key={g.id} className="rounded-[18px] bg-[var(--v2-ink-50)] px-[22px] py-5">
+                <div key={g.id} className="flex flex-col rounded-[18px] bg-[var(--v2-ink-50)] px-[22px] py-5">
                   <div className="v2-tight text-[17px] font-semibold tracking-[-0.02em] text-[var(--v2-ink-900)]">
                     {g.title}
                   </div>
@@ -139,14 +139,17 @@ function GoalsAndNotNow() {
         )}
       </section>
 
-      <section className="v2-card px-7 py-6">
+      <section className="v2-card flex h-full flex-col px-7 py-6">
         <div className="mb-[18px] flex flex-wrap items-baseline gap-3.5">
           <h2 className="v2-tight text-[24px] font-semibold tracking-[-0.028em] text-[var(--v2-ink-900)]">Не сейчас</h2>
           <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">отложено до Review</span>
         </div>
-        <div className="flex flex-col gap-2.5">
+        <div className="grid flex-1 grid-cols-1 gap-2.5 sm:grid-cols-2">
           {HOME_NOT_NOW.map((n) => (
-            <div key={n} className="v2-tight text-[15px] text-[var(--v2-ink-700)]">
+            <div
+              key={n}
+              className="v2-tight flex min-h-[72px] items-center rounded-[18px] bg-[var(--v2-ink-50)] px-4 py-3.5 text-[15px] font-medium leading-snug text-[var(--v2-ink-700)]"
+            >
               {n}
             </div>
           ))}

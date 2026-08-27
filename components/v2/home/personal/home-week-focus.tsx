@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { HomeTaskCheckbox } from "@/components/v2/home/personal/home-task-checkbox";
 
 type WeekFocusPriority = "high" | "medium" | "low";
 
@@ -180,15 +181,7 @@ export function HomeWeekFocus() {
                   : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
               }`}
             >
-              <span
-                className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[14px] ${
-                  done
-                    ? "border-white bg-white font-bold text-[#2d5eef]"
-                    : "border-[var(--v2-ink-300)] bg-white text-transparent"
-                }`}
-              >
-                ✓
-              </span>
+              <HomeTaskCheckbox done={done} tone={done ? "on-blue" : "default"} />
               <span className="v2-tight min-w-0 flex-1 text-[17px] font-semibold leading-snug tracking-[-0.018em]">
                 {g.title}
               </span>
