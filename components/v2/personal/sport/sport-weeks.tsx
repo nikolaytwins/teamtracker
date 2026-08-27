@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { SP_DAYS, fatPct, n1, n2, num, spAvg } from "@/lib/v2/personal/sport-helpers";
 import type { SportWeek } from "@/lib/v2/personal/seeds/sport-seed";
@@ -22,8 +22,89 @@ function Td({ children, className = "" }: { children?: React.ReactNode; classNam
   return <td className={`px-3 py-3.5 align-middle ${className}`}>{children}</td>;
 }
 
-function NumCell({ v }: { v: string }) {
-  return <span className="v2-tnum text-[15px] font-semibold text-[var(--v2-ink-900)]">{v}</span>;
+/** Цифра в таблице: клик → поле ввода → Enter/blur сохраняет */
+function EditableNumCell({
+  display,
+  editValue,
+  onCommit,
+  w = "64px",
+  placeholder = "—",
+}: {
+  display: string;
+  editValue: string;
+  onCommit: (raw: string) => void;
+  w?: string;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(editValue);
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    setDraft(editValue);
+    ref.current?.focus();
+    ref.current?.select();
+  }, [editing, editValue]);
+
+  const commit = () => {
+    onCommit(draft);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={ref}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={placeholder}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          }
+          if (e.key === "Escape") {
+            setDraft(editValue);
+            setEditing(false);
+          }
+        }}
+        className="v2-tnum rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 py-1.5 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] shadow-[0_0_0_3px_rgba(59,111,247,0.10)] outline-none"
+        style={{ width: w }}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      title="Нажми, чтобы изменить"
+      className={`v2-tnum inline-block rounded-lg px-2 py-1.5 text-right text-[15px] font-semibold transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-brand-700)] ${
+        display === "—" ? "text-[var(--v2-ink-300)]" : "text-[var(--v2-ink-900)]"
+      }`}
+      style={{ minWidth: w }}
+    >
+      {display}
+    </button>
+  );
+}
+
+function setManualAvg(set: (k: keyof SportWeek, v: unknown) => void, a: ReturnType<typeof spAvg>, patch: { w?: number | null; f?: number | null }) {
+  const w = patch.w !== undefined ? patch.w : (a?.w ?? null);
+  const f = patch.f !== undefined ? patch.f : (a?.f ?? null);
+  set("days", []);
+  set("avg", {
+    w,
+    f,
+    l: w != null && f != null ? w - f : null,
+  });
+}
+
+function fmtEdit(n: number | null | undefined, dec: 1 | 2 = 2): string {
+  if (n == null || Number.isNaN(n)) return "";
+  return dec === 2 ? n.toFixed(2) : n.toFixed(1);
 }
 
 function SpWeekRow({
@@ -83,13 +164,21 @@ function SpWeekRow({
           </div>
         </Td>
         <Td className="text-right">
-          <NumCell v={n2(a?.w)} />
+          <EditableNumCell
+            display={n2(a?.w)}
+            editValue={fmtEdit(a?.w)}
+            onCommit={(raw) => setManualAvg(set, a, { w: num(raw) })}
+          />
         </Td>
         <Td className="text-right">
           <SpDelta v={dd("w")} d={2} good="up" />
         </Td>
         <Td className="text-right">
-          <NumCell v={n2(a?.f)} />
+          <EditableNumCell
+            display={n2(a?.f)}
+            editValue={fmtEdit(a?.f)}
+            onCommit={(raw) => setManualAvg(set, a, { f: num(raw) })}
+          />
         </Td>
         <Td className="text-right">
           <SpDelta v={dd("f")} d={2} good="down" />
@@ -98,22 +187,42 @@ function SpWeekRow({
           <span className="v2-tnum text-[15px] font-semibold text-[var(--v2-ink-600)]">{n1(pc)}</span>
         </Td>
         <Td className="text-right">
-          <NumCell v={n2(a?.l)} />
+          <span className="v2-tnum text-[15px] font-semibold text-[var(--v2-ink-900)]">{n2(a?.l)}</span>
         </Td>
         <Td className="text-right">
           <SpDelta v={dd("l")} d={2} good="up" />
         </Td>
         <Td className="text-right">
-          <SpInp value={wk.wn} onChange={(v) => set("wn", num(v))} w="54px" size="15px" />
+          <EditableNumCell
+            display={wk.wn != null ? n1(wk.wn) : "—"}
+            editValue={fmtEdit(wk.wn, 1)}
+            w="54px"
+            onCommit={(raw) => set("wn", num(raw))}
+          />
         </Td>
         <Td className="text-right">
-          <SpInp value={wk.ww} onChange={(v) => set("ww", num(v))} w="54px" size="15px" />
+          <EditableNumCell
+            display={wk.ww != null ? n1(wk.ww) : "—"}
+            editValue={fmtEdit(wk.ww, 1)}
+            w="54px"
+            onCommit={(raw) => set("ww", num(raw))}
+          />
         </Td>
         <Td className="text-right">
-          <SpInp value={wk.kcal} onChange={(v) => set("kcal", num(v))} w="62px" size="15px" />
+          <EditableNumCell
+            display={wk.kcal != null ? String(wk.kcal) : "—"}
+            editValue={wk.kcal != null ? String(wk.kcal) : ""}
+            w="62px"
+            onCommit={(raw) => set("kcal", num(raw))}
+          />
         </Td>
         <Td className="text-right">
-          <SpInp value={wk.protein} onChange={(v) => set("protein", num(v))} w="52px" size="15px" />
+          <EditableNumCell
+            display={wk.protein != null ? String(wk.protein) : "—"}
+            editValue={wk.protein != null ? String(wk.protein) : ""}
+            w="52px"
+            onCommit={(raw) => set("protein", num(raw))}
+          />
         </Td>
         <Td className="pr-4">
           <SpArea value={wk.note || ""} onChange={(v) => set("note", v)} ph="Заметки, аномалии: сон, соль, стресс, пропуски…" rows={2} />

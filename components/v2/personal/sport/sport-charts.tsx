@@ -34,6 +34,7 @@ function SportChartSvg({
   dec = 1,
   height = 132,
   compact = false,
+  interactive = true,
 }: {
   title: string;
   unit: string;
@@ -42,9 +43,13 @@ function SportChartSvg({
   dec?: number;
   height?: number;
   compact?: boolean;
+  interactive?: boolean;
 }) {
   const geo = useMemo(() => chartGeometry(pts, height), [pts, height]);
   const gid = `g-${title.replace(/[^a-zA-Zа-яА-Я]/g, "")}`;
+  const [hover, setHover] = useState<number | null>(() =>
+    pts.length ? pts.length - 1 : null
+  );
 
   if (!geo) {
     return (
@@ -56,6 +61,11 @@ function SportChartSvg({
   }
 
   const { W, H, line, area, last, first, X, Y } = geo;
+  const hi = hover != null && pts[hover]?.y != null ? hover : pts.length - 1;
+  const hp = pts[hi];
+  const hx = X(hi);
+  const hy = hp?.y != null ? Y(hp.y) : 0;
+  const colW = pts.length > 1 ? (W - geo.pad * 2) / (pts.length - 1) : W;
 
   return (
     <SpCard className={compact ? "p-4" : "p-5"}>
@@ -73,7 +83,13 @@ function SportChartSvg({
           <span className="ml-1 text-[12px] text-[var(--v2-ink-400)]">{unit}</span>
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full" style={{ height }} preserveAspectRatio="none">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="mt-2 w-full"
+        style={{ height }}
+        preserveAspectRatio="none"
+        onMouseLeave={() => setHover(pts.length - 1)}
+      >
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.16" />
@@ -90,24 +106,64 @@ function SportChartSvg({
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />
+        {interactive
+          ? pts.map((p, i) =>
+              p.y == null ? null : (
+                <rect
+                  key={`hit-${i}`}
+                  x={X(i) - colW / 2}
+                  y={0}
+                  width={colW}
+                  height={H}
+                  fill="transparent"
+                  onMouseEnter={() => setHover(i)}
+                  style={{ cursor: "pointer" }}
+                />
+              )
+            )
+          : null}
         {pts.map((p, i) =>
           p.y == null ? null : (
             <circle
               key={i}
               cx={X(i)}
               cy={Y(p.y)}
-              r={i === pts.length - 1 ? 3.6 : 2.4}
-              fill={i === pts.length - 1 ? color : "#fff"}
+              r={i === hi ? 4.2 : 2.4}
+              fill={i === hi ? color : "#fff"}
               stroke={color}
               strokeWidth="1.8"
               vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
             />
           )
         )}
+        {interactive && hp?.y != null ? (
+          <g pointerEvents="none">
+            <line
+              x1={hx}
+              x2={hx}
+              y1={8}
+              y2={H - 4}
+              stroke={color}
+              strokeOpacity="0.2"
+              strokeWidth="1"
+              strokeDasharray="3 3"
+            />
+            <g transform={`translate(${Math.min(Math.max(hx, 52), W - 52)}, ${Math.max(hy - 10, 22)})`}>
+              <rect x={-46} y={-28} width={92} height={34} rx={8} fill="#0A0A0B" />
+              <text x={0} y={-14} textAnchor="middle" fontSize="10" fill="#A1A1AA">
+                {hp.x}
+              </text>
+              <text x={0} y={-1} textAnchor="middle" fontSize="12.5" fontWeight="600" fill="#fff">
+                {hp.y!.toFixed(dec)} {unit}
+              </text>
+            </g>
+          </g>
+        ) : null}
       </svg>
       <div className="mt-2 flex justify-between text-[10.5px] text-[var(--v2-ink-400)]">
         {pts.map((p, i) => (
-          <span key={i} className={i === pts.length - 1 ? "font-medium text-[var(--v2-ink-700)]" : ""}>
+          <span key={i} className={i === hi ? "v2-tnum font-semibold text-[var(--v2-ink-800)]" : ""}>
             {p.x}
           </span>
         ))}
@@ -133,6 +189,8 @@ function SportChartModal({
   pts: SportChartPoint[];
   dec: number;
 }) {
+  const [hover, setHover] = useState<number | null>(() => (pts.length ? pts.length - 1 : null));
+
   if (!open) return null;
   const geo = chartGeometry(pts, 280);
   const vals = pts.filter((p) => p.y != null);
@@ -162,7 +220,12 @@ function SportChartModal({
 
         {geo ? (
           <>
-            <svg viewBox={`0 0 680 280`} className="w-full" style={{ height: 280 }}>
+            <svg
+              viewBox={`0 0 680 280`}
+              className="w-full"
+              style={{ height: 280 }}
+              onMouseLeave={() => setHover(pts.length - 1)}
+            >
               <defs>
                 <linearGradient id="sp-modal-fill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={color} stopOpacity="0.18" />
@@ -191,35 +254,77 @@ function SportChartModal({
                 const padY = 16;
                 const plotH = H - padY * 2;
                 const lo = Math.min(...geo.vals);
-                const hi = Math.max(...geo.vals);
-                const span = hi - lo || 1;
+                const maxVal = Math.max(...geo.vals);
+                const span = maxVal - lo || 1;
                 const y0 = lo - span * 0.2;
-                const y1 = hi + span * 0.2;
+                const y1 = maxVal + span * 0.2;
                 const X = (i: number) => padX + (i * (W - padX * 2)) / (pts.length - 1);
                 const Y = (v: number) => padY + plotH - ((v - y0) / (y1 - y0)) * plotH;
                 const line = pts.map((p, i) => (p.y != null ? `${X(i)},${Y(p.y)}` : null)).filter(Boolean).join(" ");
                 const area = `${padX},${padY + plotH} ${line} ${W - padX},${padY + plotH}`;
+                const colW = pts.length > 1 ? (W - padX * 2) / (pts.length - 1) : W;
+                const hoverIdx = hover != null && pts[hover]?.y != null ? hover : pts.length - 1;
+                const hp = pts[hoverIdx];
+                const hx = X(hoverIdx);
+                const hy = hp?.y != null ? Y(hp.y) : 0;
                 return (
                   <>
                     <polygon points={area} fill="url(#sp-modal-fill)" />
                     <polyline points={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" />
                     {pts.map((p, i) =>
                       p.y == null ? null : (
-                        <g key={i}>
-                          <circle cx={X(i)} cy={Y(p.y)} r={i === pts.length - 1 ? 5 : 3.5} fill={color} />
+                        <rect
+                          key={`mhit-${i}`}
+                          x={X(i) - colW / 2}
+                          y={0}
+                          width={colW}
+                          height={H}
+                          fill="transparent"
+                          onMouseEnter={() => setHover(i)}
+                          style={{ cursor: "pointer" }}
+                        />
+                      )
+                    )}
+                    {pts.map((p, i) =>
+                      p.y == null ? null : (
+                        <g key={i} pointerEvents="none">
+                          <circle cx={X(i)} cy={Y(p.y)} r={i === hoverIdx ? 5.5 : 3.5} fill={color} />
                           <text
                             x={X(i)}
                             y={H - 4}
                             textAnchor="middle"
                             fontSize="11"
                             fill="#71717A"
-                            fontWeight={i === pts.length - 1 ? 600 : 400}
+                            fontWeight={i === hoverIdx ? 600 : 400}
                           >
                             {p.x}
                           </text>
                         </g>
                       )
                     )}
+                    {hp?.y != null ? (
+                      <g pointerEvents="none">
+                        <line
+                          x1={hx}
+                          x2={hx}
+                          y1={padY}
+                          y2={padY + plotH}
+                          stroke={color}
+                          strokeOpacity="0.25"
+                          strokeWidth="1.5"
+                          strokeDasharray="3 3"
+                        />
+                        <g transform={`translate(${Math.min(Math.max(hx, 64), W - 64)}, ${Math.max(hy - 12, 36)})`}>
+                          <rect x={-58} y={-32} width={116} height={38} rx={9} fill="#0A0A0B" />
+                          <text x={0} y={-16} textAnchor="middle" fontSize="10.5" fill="#A1A1AA">
+                            {hp.x}
+                          </text>
+                          <text x={0} y={-1} textAnchor="middle" fontSize="13" fontWeight="600" fill="#fff">
+                            {hp.y!.toFixed(dec)} {unit}
+                          </text>
+                        </g>
+                      </g>
+                    ) : null}
                   </>
                 );
               })()}

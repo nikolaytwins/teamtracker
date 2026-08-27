@@ -85,8 +85,10 @@ export const WEEK_FOCUS_PLANS: WeekFocusPlan[] = [
 export type CalendarSeedDeadline = {
   title: string;
   date: string;
-  project: "Курс" | "Медийка" | "Курс + медийка";
+  project: "Курс" | "Медийка" | "Курс + медийка" | "Личное";
   priority: "urgent" | "high" | "medium";
+  /** Подпись времени на плашке, напр. «10–12». */
+  time?: string;
 };
 
 /** Дедлайны календаря из плана — заменяют прежний сид. */
@@ -221,6 +223,14 @@ export const CALENDAR_SEED_DEADLINES: CalendarSeedDeadline[] = [
     date: "2026-08-25",
     project: "Курс",
     priority: "high",
+  },
+  // Октябрь
+  {
+    title: "Разговор с Лерой",
+    date: "2026-10-03",
+    project: "Личное",
+    priority: "high",
+    time: "10–12",
   },
 ];
 

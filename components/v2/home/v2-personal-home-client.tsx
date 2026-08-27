@@ -11,7 +11,6 @@ import {
   HOME_CHECKS,
   HOME_LILA_BAN,
   HOME_LINKS,
-  HOME_MONEY,
   HOME_MONTHS,
   HOME_NOT_NOW,
   HOME_RULES,
@@ -23,9 +22,9 @@ import {
   HOME_VIDEO,
   HOME_VIDEO_ST,
   homeFmt,
-  homeFmtK,
   type HomeVideoStatus,
 } from "@/lib/v2/personal/seeds/home-seed";
+import type { HomeFinanceStripPayload } from "@/lib/v2/home/load-home-finance";
 
 const CALENDAR_HREF = "/v2/personal/calendar";
 
@@ -679,18 +678,6 @@ function NotNow() {
 }
 
 /* --------------------- ДЕНЬГИ: ИТОГИ ПО ВСЕМ ПРОЕКТАМ --------------------- */
-type HomeFinanceSummary = {
-  expectedRevenue: number;
-  actualRevenue: number;
-  projectExpenses: number;
-  manualGeneralExpenses: number;
-  taxAmount: number;
-  totalExpenses: number;
-  profit: number;
-  margin: number;
-  projectCount: number;
-};
-
 function ProjectsKpiCard({
   label,
   value,
@@ -728,26 +715,25 @@ function ProjectsKpiCard({
   );
 }
 
-function ProjectsMoneyStrip() {
-  const [summary, setSummary] = useState<HomeFinanceSummary | null>(null);
-  const [monthLabel, setMonthLabel] = useState("");
+function ProjectsMoneyStrip({ initialFinance }: { initialFinance: HomeFinanceStripPayload | null }) {
+  const [finance, setFinance] = useState(initialFinance);
 
   useEffect(() => {
+    if (finance) return;
     void (async () => {
       try {
-        const data = await fetchJson<{ year: number; month: number; summary: HomeFinanceSummary }>(
-          "/api/v2/finance/dashboard"
-        );
-        setSummary(data.summary);
-        setMonthLabel(`${FINANCE_MONTH_NAMES[data.month - 1]?.toLowerCase() ?? ""} ${data.year}`);
+        const data = await fetchJson<HomeFinanceStripPayload>("/api/v2/finance/dashboard");
+        setFinance({ year: data.year, month: data.month, summary: data.summary });
       } catch {
-        setSummary(null);
+        setFinance(null);
       }
     })();
-  }, []);
+  }, [finance]);
 
-  if (!summary) return null;
+  if (!finance) return null;
 
+  const { summary } = finance;
+  const monthLabel = `${FINANCE_MONTH_NAMES[finance.month - 1]?.toLowerCase() ?? ""} ${finance.year}`;
   const paidShare = summary.expectedRevenue
     ? Math.round((summary.actualRevenue / summary.expectedRevenue) * 100)
     : 0;
@@ -783,70 +769,6 @@ function ProjectsMoneyStrip() {
         accent={summary.profit >= 0 ? "#10B981" : "#EF4444"}
         icon={V2Icons.reports}
         tone={summary.profit >= 0 ? "green" : "red"}
-      />
-    </section>
-  );
-}
-
-/* -------------------------------- ДЕНЬГИ --------------------------------- */
-function MoneyCard({
-  label,
-  value,
-  note,
-  href,
-  good,
-}: {
-  label: string;
-  value: string;
-  note: string;
-  href: string;
-  good?: boolean;
-}) {
-  return (
-    <Link
-      href={appPath(href)}
-      className="block rounded-2xl bg-white p-4 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
-    >
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">{label}</div>
-      <div
-        className={`v2-tnum v2-tighter mt-1.5 text-[24px] font-semibold ${
-          good ? "text-emerald-600" : "text-[var(--v2-ink-900)]"
-        }`}
-      >
-        {value}
-      </div>
-      <div className="v2-tight mt-1 text-[11.5px] text-[var(--v2-ink-500)]">{note}</div>
-    </Link>
-  );
-}
-
-function MoneyStrip() {
-  return (
-    <section className="grid grid-cols-4 gap-3">
-      <MoneyCard
-        label="Капитал всего"
-        value={`${homeFmt(HOME_MONEY.capital)} ₽`}
-        note="+86 тыс ₽ за 2026 год"
-        href={HOME_LINKS.finance}
-      />
-      <MoneyCard
-        label="В распоряжении"
-        value={`${homeFmt(HOME_MONEY.available)} ₽`}
-        note="карта, ИП и наличные"
-        href={HOME_LINKS.finance}
-      />
-      <MoneyCard
-        label={`Ожидается за ${HOME_MONEY.month}`}
-        value={`${homeFmt(HOME_MONEY.expected)} ₽`}
-        note={`оплачено ${homeFmt(HOME_MONEY.paid)} ₽ · 9 проектов`}
-        href={HOME_LINKS.agencyFinance}
-      />
-      <MoneyCard
-        label="Прогноз конца месяца"
-        value={`+${homeFmt(HOME_MONEY.forecast)} ₽`}
-        note={`расходы ${homeFmtK(HOME_MONEY.expenses)} ₽`}
-        href={HOME_LINKS.finance}
-        good
       />
     </section>
   );
@@ -1181,19 +1103,22 @@ function VideoCard() {
 }
 
 /* --------------------------------- HOME ---------------------------------- */
-export function V2PersonalHomeClient() {
+export function V2PersonalHomeClient({
+  initialFinance,
+}: {
+  initialFinance: HomeFinanceStripPayload | null;
+}) {
   const [month, setMonth] = useState("aug");
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <Topbar />
       <div className="flex flex-col gap-6 px-8 pb-20 pt-3">
-        <ProjectsMoneyStrip />
-        <MoneyStrip />
+        <ProjectsMoneyStrip initialFinance={initialFinance} />
+        <MonthBand month={month} setMonth={setMonth} />
         <SeasonHero />
         <LilaBanner />
         <WeekFocusBoard />
-        <MonthBand month={month} setMonth={setMonth} />
         <SprintGoals />
         <BetCards />
         <NotNow />
