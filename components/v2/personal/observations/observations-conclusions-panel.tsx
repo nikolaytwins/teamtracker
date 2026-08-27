@@ -101,6 +101,13 @@ function ConclusionComposer({
 
   return (
     <section className="rounded-2xl border border-dashed border-[var(--v2-ink-200)] bg-white px-5 py-4 shadow-[var(--v2-shadow-card)]">
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onFocus={() => setExpanded(true)}
+        placeholder="Заголовок (необязательно)"
+        className="v2-tight mb-2 w-full bg-transparent text-[14px] font-semibold text-[var(--v2-ink-900)] outline-none placeholder:font-normal placeholder:text-[var(--v2-ink-400)]"
+      />
       <textarea
         ref={ref}
         value={text}
@@ -117,39 +124,31 @@ function ConclusionComposer({
             void submit();
           }
         }}
-        className="v2-tight w-full resize-none bg-transparent text-[15px] leading-[1.6] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+        className="v2-tight w-full resize-none bg-transparent text-[15px] leading-[1.6] text-[var(--v2-ink-700)] outline-none placeholder:text-[var(--v2-ink-400)]"
         style={{ minHeight: 52 }}
       />
       {expanded ? (
-        <div className="mt-3 border-t border-[var(--v2-ink-100)] pt-3">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Заголовок (необязательно)"
-            className="v2-tight mb-3 w-full bg-transparent text-[14px] font-medium text-[var(--v2-ink-800)] outline-none placeholder:text-[var(--v2-ink-400)]"
-          />
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setExpanded(false);
-                setText("");
-                setTitle("");
-              }}
-              className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
-            >
-              Отмена
-            </button>
-            <button
-              type="button"
-              disabled={!text.trim() || saving}
-              onClick={() => void submit()}
-              className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-50"
-            >
-              <V2Icons.plus className="h-3.5 w-3.5" />
-              {saving ? "Сохранение…" : "Добавить вывод"}
-            </button>
-          </div>
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-[var(--v2-ink-100)] pt-3">
+          <button
+            type="button"
+            onClick={() => {
+              setExpanded(false);
+              setText("");
+              setTitle("");
+            }}
+            className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            disabled={!text.trim() || saving}
+            onClick={() => void submit()}
+            className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-50"
+          >
+            <V2Icons.plus className="h-3.5 w-3.5" />
+            {saving ? "Сохранение…" : "Добавить вывод"}
+          </button>
         </div>
       ) : null}
     </section>
