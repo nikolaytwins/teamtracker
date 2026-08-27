@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/api-url";
 import {
   buildSeasonMonths,
+  deleteSeasonTask,
   moveSeasonTaskToMonth,
   readSeasonStorage,
   toggleSeasonTaskDone,
@@ -18,6 +19,7 @@ import {
   type HomeSeasonTask,
 } from "@/lib/v2/personal/seeds/home-seed";
 import { HomeTaskCheckbox } from "@/components/v2/home/personal/home-task-checkbox";
+import { V2Icons } from "@/components/v2/ui/icons";
 
 const HERO_BLUE = "#2d5eef";
 
@@ -89,6 +91,10 @@ export function HomeSeasonBand() {
 
   const onToggle = (taskId: string, done: boolean) => {
     refreshStorage(toggleSeasonTaskDone(taskId, done));
+  };
+
+  const onDelete = (taskId: string) => {
+    refreshStorage(deleteSeasonTask(taskId));
   };
 
   const onDropToMonth = (monthId: string) => {
@@ -188,6 +194,7 @@ export function HomeSeasonBand() {
           setDropMonthId(null);
         }}
         onToggle={onToggle}
+        onDelete={onDelete}
         onDropToMonth={onDropToMonth}
       />
     </section>
@@ -200,6 +207,7 @@ function MonthPanel({
   onDragStart,
   onDragEnd,
   onToggle,
+  onDelete,
   onDropToMonth,
 }: {
   month: MonthView;
@@ -207,6 +215,7 @@ function MonthPanel({
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onToggle: (id: string, done: boolean) => void;
+  onDelete: (id: string) => void;
   onDropToMonth: (monthId: string) => void;
 }) {
   const done = month.tasks.filter((t) => t.done).length;
@@ -243,23 +252,37 @@ function MonthPanel({
 
       <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
         {month.tasks.map((task) => (
-          <button
-            key={task.id}
-            type="button"
-            draggable
-            onDragStart={() => onDragStart(task.id)}
-            onDragEnd={onDragEnd}
-            onClick={() => onToggle(task.id, !task.done)}
-            className={`flex min-h-[92px] cursor-grab items-start gap-4 rounded-2xl px-[22px] py-5 text-left transition active:cursor-grabbing ${
-              task.done
-                ? "text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
-                : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
-            }`}
-            style={task.done ? { background: HERO_BLUE } : undefined}
-          >
-            <HomeTaskCheckbox done={task.done} tone={task.done ? "on-blue" : "default"} />
-            <TaskLabel task={task} done={task.done} />
-          </button>
+          <div key={task.id} className="group relative">
+            <button
+              type="button"
+              draggable
+              onDragStart={() => onDragStart(task.id)}
+              onDragEnd={onDragEnd}
+              onClick={() => onToggle(task.id, !task.done)}
+              className={`flex min-h-[92px] w-full cursor-grab items-start gap-4 rounded-2xl px-[22px] py-5 pr-12 text-left transition active:cursor-grabbing ${
+                task.done
+                  ? "text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
+                  : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
+              }`}
+              style={task.done ? { background: HERO_BLUE } : undefined}
+            >
+              <HomeTaskCheckbox done={task.done} tone={task.done ? "on-blue" : "default"} />
+              <TaskLabel task={task} done={task.done} />
+            </button>
+            <button
+              type="button"
+              title="Удалить"
+              aria-label="Удалить задачу"
+              onClick={() => onDelete(task.id)}
+              className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
+                task.done
+                  ? "text-white/70 hover:bg-white/15 hover:text-white"
+                  : "text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
+              }`}
+            >
+              <V2Icons.trash className="h-3.5 w-3.5" />
+            </button>
+          </div>
         ))}
       </div>
 

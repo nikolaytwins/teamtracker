@@ -9,10 +9,12 @@ export type SeasonStorageState = {
   taskOrder: Record<string, string[]>;
   /** taskId → done */
   taskDone: Record<string, boolean>;
+  /** скрытые пользователем плашки */
+  taskHidden: string[];
 };
 
 function emptyState(): SeasonStorageState {
-  return { taskMonth: {}, taskOrder: {}, taskDone: {} };
+  return { taskMonth: {}, taskOrder: {}, taskDone: {}, taskHidden: [] };
 }
 
 export function readSeasonStorage(): SeasonStorageState {
@@ -25,6 +27,7 @@ export function readSeasonStorage(): SeasonStorageState {
       taskMonth: parsed.taskMonth ?? {},
       taskOrder: parsed.taskOrder ?? {},
       taskDone: parsed.taskDone ?? {},
+      taskHidden: parsed.taskHidden ?? [],
     };
   } catch {
     return emptyState();
@@ -55,6 +58,7 @@ export function buildSeasonMonths(
   for (const m of seed) byMonth.set(m.id, []);
 
   for (const [taskId, task] of allTasks) {
+    if (storage.taskHidden.includes(taskId)) continue;
     const monthId = storage.taskMonth[taskId] ?? task.defaultMonthId;
     const list = byMonth.get(monthId) ?? [];
     list.push({ ...task, done: Boolean(storage.taskDone[taskId]) });
@@ -109,6 +113,20 @@ export function moveSeasonTaskToMonth(
     }
   }
 
+  writeSeasonStorage(storage);
+  return storage;
+}
+
+export function deleteSeasonTask(taskId: string): SeasonStorageState {
+  const storage = readSeasonStorage();
+  if (!storage.taskHidden.includes(taskId)) {
+    storage.taskHidden = [...storage.taskHidden, taskId];
+  }
+  delete storage.taskDone[taskId];
+  delete storage.taskMonth[taskId];
+  for (const monthId of Object.keys(storage.taskOrder)) {
+    storage.taskOrder[monthId] = storage.taskOrder[monthId]!.filter((id) => id !== taskId);
+  }
   writeSeasonStorage(storage);
   return storage;
 }

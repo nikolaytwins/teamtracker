@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { HomeTaskCheckbox } from "@/components/v2/home/personal/home-task-checkbox";
+import { V2Icons } from "@/components/v2/ui/icons";
 
 type WeekFocusPriority = "high" | "medium" | "low";
 
@@ -122,6 +123,16 @@ export function HomeWeekFocus() {
     }
   };
 
+  const deleteGoal = async (goalId: string) => {
+    setFocus((prev) => (prev ? { ...prev, goals: prev.goals.filter((g) => g.id !== goalId) } : prev));
+    try {
+      await fetchJson(`/api/v2/personal/calendar/week-focus/goals/${goalId}`, { method: "DELETE" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить фокус");
+      await load();
+    }
+  };
+
   const badge = isCurrentWeek ? "эта неделя" : isPastWeek ? "прошлая" : "план";
 
   return (
@@ -171,30 +182,44 @@ export function HomeWeekFocus() {
           const p = PRIO[g.priority];
           const done = Boolean(g.completed_at);
           return (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => void toggleGoal(g)}
-              className={`flex min-h-[82px] items-center gap-3.5 rounded-2xl px-5 py-[18px] text-left transition ${
-                done
-                  ? "bg-[#2d5eef] text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
-                  : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
-              }`}
-            >
-              <HomeTaskCheckbox done={done} tone={done ? "on-blue" : "default"} />
-              <span className="v2-tight min-w-0 flex-1 text-[17px] font-semibold leading-snug tracking-[-0.018em]">
-                {g.title}
-              </span>
-              <span
-                className="shrink-0 rounded-lg px-2 py-1 text-[11.5px] font-semibold whitespace-nowrap"
-                style={{
-                  background: done ? "rgba(255,255,255,0.2)" : p.bg,
-                  color: done ? "#fff" : p.tint,
-                }}
+            <div key={g.id} className="group relative">
+              <button
+                type="button"
+                onClick={() => void toggleGoal(g)}
+                className={`flex min-h-[82px] w-full items-center gap-3.5 rounded-2xl px-5 py-[18px] pr-12 text-left transition ${
+                  done
+                    ? "bg-[#2d5eef] text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
+                    : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
+                }`}
               >
-                {p.label}
-              </span>
-            </button>
+                <HomeTaskCheckbox done={done} tone={done ? "on-blue" : "default"} />
+                <span className="v2-tight min-w-0 flex-1 text-[17px] font-semibold leading-snug tracking-[-0.018em]">
+                  {g.title}
+                </span>
+                <span
+                  className="shrink-0 rounded-lg px-2 py-1 text-[11.5px] font-semibold whitespace-nowrap"
+                  style={{
+                    background: done ? "rgba(255,255,255,0.2)" : p.bg,
+                    color: done ? "#fff" : p.tint,
+                  }}
+                >
+                  {p.label}
+                </span>
+              </button>
+              <button
+                type="button"
+                title="Удалить"
+                aria-label="Удалить фокус"
+                onClick={() => void deleteGoal(g.id)}
+                className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
+                  done
+                    ? "text-white/70 hover:bg-white/15 hover:text-white"
+                    : "text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
+                }`}
+              >
+                <V2Icons.trash className="h-3.5 w-3.5" />
+              </button>
+            </div>
           );
         })}
         {focus && !focus.goals.length ? (
