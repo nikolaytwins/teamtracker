@@ -18,6 +18,12 @@ export type HomeMonthMarker = {
   text: string;
 };
 
+export type HomeSeasonTask = {
+  id: string;
+  text: string;
+  href?: string;
+};
+
 export type HomeMonth = {
   id: string;
   label: string;
@@ -27,8 +33,29 @@ export type HomeMonth = {
   lead: string;
   warn?: string;
   markers?: HomeMonthMarker[];
-  focus: string[];
+  /** @deprecated используйте tasks */
+  focus?: string[];
+  tasks: HomeSeasonTask[];
 };
+
+const DOC_AGENCY_RULES =
+  "https://docs.google.com/document/d/1eGGnwy5yCqVFAMdmrvAcmv9iL85WxLol_zD3St8rBWk/edit?usp=sharing";
+const DOC_LERA_REGLEMENT =
+  "https://docs.google.com/document/d/18kGrtjAbPvvViHcE3pJnH-GkDDHKUH5NuHmALaFGVGw/edit?usp=sharing";
+
+/** Какой период сезона «сейчас» по календарной дате. */
+export function resolveCurrentSeasonMonthId(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  if (y === 2026 && m === 8 && day >= 15) return "prelude";
+  if (y === 2026 && m === 9 && day <= 4) return "prelude";
+  if (y === 2026 && m === 9) return "sep";
+  if (y === 2026 && m === 10) return "oct";
+  if (y === 2026 && m === 11) return "nov";
+  if (y < 2026 || (y === 2026 && m < 8)) return "prelude";
+  return "nov";
+}
 
 export type HomeLilaBan = {
   mark: string;
@@ -164,18 +191,16 @@ export const HOME_SEASON: HomeSeason = {
 
 export const HOME_MONTHS: HomeMonth[] = [
   {
-    id: "aug",
-    label: "15–31 августа",
+    id: "prelude",
+    label: "15 августа — 4 сентября",
     tag: "Прелюдия",
     state: "сейчас",
-    headline: "Закрыть старую главу",
-    lead: "Ещё даже не основной Season of Exploration. Задача — не открыть новую жизнь раньше времени.",
-    focus: [
-      "Закончить курс",
-      "Закрыть текущие обязательства",
-      "Подготовить переезд",
-      "Обслуживать агентство",
-      "Не запускать полноценную новую жизнь раньше времени",
+    headline: "Закрыть переходный период",
+    lead: "Финал старой главы перед полноценным сезоном.",
+    tasks: [
+      { id: "prelude-move", text: "Съехать с квартиры" },
+      { id: "prelude-deco", text: "Дозаписать видео от деко" },
+      { id: "prelude-clients", text: "Дозаписать модуль по клиентам" },
     ],
   },
   {
@@ -186,13 +211,33 @@ export const HOME_MONTHS: HomeMonth[] = [
     headline: "Создать опору + выйти в реальность",
     lead: "Переезд и первый выход на рынок найма. Среда важнее скорости.",
     warn: "следить за расходами! не раздувать! даже на команду!",
-    focus: [
-      "Переехать",
-      "Выйти на рынок найма",
-      "Реактивировать базу",
-      "Обслуживать существующее агентство",
-      "Начать direct validation одного SaaS",
-      "Обжить новую среду",
+    tasks: [
+      {
+        id: "sep-webinar-time",
+        text: "Начать считать вебинарные проекты и трату времени на них",
+        href: DOC_AGENCY_RULES,
+      },
+      {
+        id: "sep-urgent-rules",
+        text: "Сформулировать правила срочных проектов",
+        href: DOC_AGENCY_RULES,
+      },
+      {
+        id: "sep-finance-thresholds",
+        text: "Сформулировать финансовые пороги",
+        href: DOC_AGENCY_RULES,
+      },
+      {
+        id: "sep-lera-reglament",
+        text: "Прописать регламент перед разговором с Лерой",
+        href: DOC_LERA_REGLEMENT,
+      },
+      { id: "sep-portfolio", text: "Оформить портфолио агентства" },
+      { id: "sep-model-fix", text: "Разобрать косяки прошлой модели и исправить" },
+      { id: "sep-cv", text: "Сделать 2 CV — одно на поддержку, одно на ИИ-внедрение" },
+      { id: "sep-reactivate", text: "Реактивировать базу" },
+      { id: "sep-housing", text: "Разобраться с жильём" },
+      { id: "sep-youtube-script", text: "Написать сценарий ютуб" },
     ],
   },
   {
@@ -202,9 +247,14 @@ export const HOME_MONTHS: HomeMonth[] = [
     state: "дальше",
     headline: "Проверять магнит и асимметрию",
     lead: "После появления возможности нормально снимать.",
-    markers: [{ date: "3 октября", time: "10–12", text: "Разговор с Лерой" }],
-    warn: "следить за расходами! не раздувать! даже на команду!\n\nвсе договоренности фиксируем письменно\n20–29 октября не принимать важных решений (расставание, переезд, закрытие проекта). Поставить отдых",
-    focus: ["YouTube", "Короткие форматы", "Qmagic", "Продолжение найма", "Новые люди и среды"],
+    warn:
+      "следить за расходами! не раздувать! даже на команду!\n\nвсе договоренности фиксируем письменно\n20–29 октября не принимать важных решений (расставание, переезд, закрытие проекта). Поставить отдых",
+    tasks: [
+      { id: "oct-lera-talk", text: "3 октября провести разговор с Лерой" },
+      { id: "oct-youtube", text: "Снять и выложить хотя бы 2 ролика на ютуб (в идеале 3)" },
+      { id: "oct-carousels", text: "Старт каруселей в инстаграм" },
+      { id: "oct-project-launch", text: "Запуск проекта" },
+    ],
   },
   {
     id: "nov",
@@ -212,14 +262,9 @@ export const HOME_MONTHS: HomeMonth[] = [
     tag: "Схождение",
     state: "дальше",
     headline: "Накопить данные и сделать вывод",
-    lead: "Новые ставки не открываются. Только два вопроса: что реально работает и что стало очевидным, чего я не знал в августе.",
+    lead: "Новые ставки не открываются. Только Review и выводы.",
     warn: "следить за расходами! не раздувать! даже на команду! может быть соблазн!",
-    focus: [
-      "Не открывать новые ставки",
-      "Что реально работает?",
-      "Что стало очевидным, чего я не знал в августе?",
-      "30 ноября — Review",
-    ],
+    tasks: [{ id: "nov-review", text: "Ревью сделанного" }],
   },
 ];
 

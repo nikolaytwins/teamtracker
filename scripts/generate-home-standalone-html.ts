@@ -109,7 +109,7 @@ const paidShare = FINANCE.expectedRevenue
   : 0;
 
 const monthsHtml = HOME_MONTHS.map((x) => {
-  const active = x.id === "aug";
+  const active = x.id === "prelude";
   const markers = (x.markers ?? [])
     .map(
       (m) => `
@@ -119,12 +119,12 @@ const monthsHtml = HOME_MONTHS.map((x) => {
       </div>`
     )
     .join("");
-  const focus = x.focus
+  const focus = x.tasks
     .map(
       (f, i) => `
       <div class="focus-item ${active ? "focus-item--on" : ""}">
         <span class="focus-num">${String(i + 1).padStart(2, "0")}</span>
-        <span>${esc(f)}</span>
+        <span>${esc(f.text)}</span>
       </div>`
     )
     .join("");
