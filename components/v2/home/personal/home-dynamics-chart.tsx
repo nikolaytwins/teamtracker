@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useHomePersonalFinance } from "@/components/v2/home/personal/home-personal-finance-context";
+import { allocateGoals, cushionPool } from "@/components/v2/personal/finance/personal-finance-system";
 import { homeFmt } from "@/lib/v2/personal/seeds/home-seed";
 import type { PersonalIncomeHistoryRow } from "@/lib/v2/personal/types";
 
@@ -36,6 +37,63 @@ function pctChange(cur: number, prev: number): string {
   if (!prev) return "—";
   const d = ((cur - prev) / Math.abs(prev)) * 100;
   return `${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(1).replace(".", ",")}%`;
+}
+
+function sortedHistory(rows: PersonalIncomeHistoryRow[]): PersonalIncomeHistoryRow[] {
+  return [...rows].sort((a, b) => a.year - b.year || a.month - b.month);
+}
+
+function avgProfitLast6(rows: PersonalIncomeHistoryRow[]): number | null {
+  const last6 = sortedHistory(rows).slice(-6);
+  const profits = last6.map((r) => r.profit_rub).filter((v): v is number => v != null);
+  if (!profits.length) return null;
+  return Math.round(profits.reduce((s, v) => s + v, 0) / profits.length);
+}
+
+function avgMarginLast6(rows: PersonalIncomeHistoryRow[]): number | null {
+  const last6 = sortedHistory(rows).slice(-6);
+  const margins: number[] = [];
+  for (const r of last6) {
+    if (r.earned_rub != null && r.earned_rub > 0 && r.profit_rub != null) {
+      margins.push((r.profit_rub / r.earned_rub) * 100);
+    }
+  }
+  if (!margins.length) return null;
+  return Math.round(margins.reduce((s, v) => s + v, 0) / margins.length);
+}
+
+function marginDeltaLast6(rows: PersonalIncomeHistoryRow[]): string {
+  const sorted = sortedHistory(rows);
+  const cur = avgMarginFromSlice(sorted.slice(-6));
+  const prev = avgMarginFromSlice(sorted.slice(-12, -6));
+  if (cur == null || prev == null) return "—";
+  const d = cur - prev;
+  return `${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(1).replace(".", ",")} п.п.`;
+}
+
+function avgMarginFromSlice(slice: PersonalIncomeHistoryRow[]): number | null {
+  const margins: number[] = [];
+  for (const r of slice) {
+    if (r.earned_rub != null && r.earned_rub > 0 && r.profit_rub != null) {
+      margins.push((r.profit_rub / r.earned_rub) * 100);
+    }
+  }
+  if (!margins.length) return null;
+  return margins.reduce((s, v) => s + v, 0) / margins.length;
+}
+
+function profitDeltaLast6(rows: PersonalIncomeHistoryRow[]): string {
+  const sorted = sortedHistory(rows);
+  const cur = avgProfitFromSlice(sorted.slice(-6));
+  const prev = avgProfitFromSlice(sorted.slice(-12, -6));
+  if (cur == null || prev == null) return "—";
+  return pctChange(cur, prev);
+}
+
+function avgProfitFromSlice(slice: PersonalIncomeHistoryRow[]): number | null {
+  const profits = slice.map((r) => r.profit_rub).filter((v): v is number => v != null);
+  if (!profits.length) return null;
+  return profits.reduce((s, v) => s + v, 0) / profits.length;
 }
 
 export function HomeDynamicsChart() {
@@ -103,33 +161,40 @@ export function HomeDynamicsChart() {
 
   const stats = useMemo(() => {
     const vals = series.values;
-    if (!vals.length) return [];
+    const history = dashboard?.incomeHistory ?? [];
+    if (!vals.length || !dashboard) return [];
+
     if (seriesKey === "profit") {
-      const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+      const avg6 = avgProfitLast6(history) ?? dashboard.summary.avgProfit6m;
+      const margin6 = avgMarginLast6(history);
       const best = Math.max(...vals);
       const bestIdx = vals.indexOf(best);
       return [
-        ["Средняя прибыль", fmtRub(Math.round(avg)), pctChange(avg, vals[vals.length - 2] ?? avg)],
-        [
-          "Маржа",
-          dashboard
-            ? `${Math.round(
-                dashboard.summary.monthProfit && dashboard.summary.projectExpectedRevenue
-                  ? (dashboard.summary.monthProfit / dashboard.summary.projectExpectedRevenue) * 100
-                  : 0
-              )}%`
-            : "—",
-          "—",
-        ],
+        ["Средняя прибыль · 6 мес.", avg6 != null ? fmtRub(avg6) : "—", profitDeltaLast6(history)],
+        ["Маржа · 6 мес.", margin6 != null ? `${margin6}%` : "—", marginDeltaLast6(history)],
         ["Лучший месяц", fmtRub(best), series.labels[bestIdx] ?? ""],
       ];
     }
+
     const last = vals[vals.length - 1] ?? 0;
     const prev = vals[vals.length - 2] ?? last;
+    const pool = cushionPool(dashboard.accounts);
+    const allocated = allocateGoals(dashboard.goals, pool);
+    const cushionGoal =
+      allocated.find((g) => g.goal_key === "cushion_goal") ??
+      allocated.find((g) => g.target_rub === 1_000_000);
+    const cushionTarget = cushionGoal?.target_rub ?? 1_000_000;
+    const leftToCushion = cushionGoal?.left ?? Math.max(0, cushionTarget - pool);
+    const filledPct = cushionTarget > 0 ? Math.round(((cushionTarget - leftToCushion) / cushionTarget) * 100) : 0;
+
     return [
       ["Капитал сейчас", fmtRub(last), pctChange(last, prev)],
       ["Прирост за месяц", fmtRub(last - prev), pctChange(last - prev, prev)],
-      ["Целей в подушке", String(dashboard?.goals.length ?? 0), "—"],
+      [
+        "До цели подушки",
+        fmtRub(leftToCushion),
+        `${filledPct}% · цель ${homeFmt(cushionTarget)} ₽`,
+      ],
     ];
   }, [series, seriesKey, dashboard]);
 
