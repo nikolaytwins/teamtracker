@@ -63,37 +63,11 @@ function SpBanner({
   const pp = fatPct(prev);
 
   return (
-    <SpCard className="relative overflow-hidden">
-      {/* Широкий hero: женщина справа, плавный переход с белой плашки слева */}
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 w-[min(62%,560px)] min-w-[220px] sm:min-w-[280px]"
-        aria-hidden
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={appPath("/sport/hero-banner.png")}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ objectPosition: "78% 18%" }}
-        />
-        <div
-          className="absolute inset-y-0 left-0 w-[62%]"
-          style={{
-            background:
-              "linear-gradient(90deg, #ffffff 0%, rgba(255,255,255,0.96) 14%, rgba(255,255,255,0.72) 36%, rgba(255,255,255,0.28) 58%, rgba(255,255,255,0) 100%)",
-          }}
-        />
-      </div>
-      <div
-        className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-[min(52%,480px)]"
-        aria-hidden
-        style={{
-          background:
-            "linear-gradient(90deg, #ffffff 0%, rgba(255,255,255,0.88) 55%, rgba(255,255,255,0) 100%)",
-        }}
-      />
-
-      <div className="relative z-10 min-w-0 max-w-[min(100%,640px)] px-7 py-6 pr-[min(34%,200px)] sm:pr-[min(38%,240px)]">
+    <SpCard
+      className="relative grid overflow-hidden max-sm:grid-cols-1"
+      style={{ gridTemplateColumns: "minmax(0,1fr) minmax(190px,290px)" }}
+    >
+      <div className="relative z-10 min-w-0 px-7 py-6">
         <SpKick className="text-[var(--v2-brand-600)]">Спорт · {weekLabel}</SpKick>
         <h1 className="v2-tighter v2-tnum mt-2 text-[27px] font-semibold leading-[1.15] text-[var(--v2-ink-900)]">
           {verdict.head}
@@ -107,6 +81,34 @@ function SpBanner({
           <SpKpi label="Безжировая" value={n1(cur?.l)} unit="кг" delta={d("l")} good="up" />
           <SpKpi label="Жир" value={n1(pc)} unit="%" delta={pc != null && pp != null ? pc - pp : null} good="down" />
         </div>
+      </div>
+
+      <div className="relative hidden min-h-[300px] overflow-hidden pointer-events-none sm:block" aria-hidden>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={appPath("/sport/mascot.png")}
+          alt=""
+          width={1122}
+          height={1402}
+          decoding="async"
+          fetchPriority="high"
+          className="absolute inset-0 h-full w-full object-cover object-[52%_8%]"
+          style={{
+            transform: "scale(1.42)",
+            transformOrigin: "50% 12%",
+            WebkitMaskImage:
+              "linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 16%, rgba(0,0,0,0.75) 32%, rgba(0,0,0,0.95) 46%, #000 58%)",
+            maskImage:
+              "linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 16%, rgba(0,0,0,0.75) 32%, rgba(0,0,0,0.95) 46%, #000 58%)",
+          }}
+        />
+        <div
+          className="absolute inset-y-0 left-0 w-[38%]"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.45) 45%, rgba(255,255,255,0) 100%)",
+          }}
+        />
       </div>
     </SpCard>
   );

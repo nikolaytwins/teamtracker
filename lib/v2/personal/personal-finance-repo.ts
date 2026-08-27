@@ -338,8 +338,68 @@ export async function loadPersonalFinanceDashboard(
   const sb = getV2Supabase();
   const userId = uid(ctx);
 
-  // Курсы ЦБ раз в сутки + пересчёт balance_rub у валютных счетов.
-  const rateLookup = await loadFxRateLookup();
+  const agencyPromise =
+    ctx.role === "admin"
+      ? Promise.all([
+          listFinanceProjectsForMonth(ctx, year, month),
+          listFinanceGeneralExpenses(ctx, year, month),
+        ])
+      : Promise.resolve(null);
+
+  const [
+    rateLookup,
+    tax,
+    budget,
+    systemGoals,
+    batch,
+    agencyPair,
+    incomeHistoryRaw,
+  ] = await Promise.all([
+    loadFxRateLookup(),
+    ensureTaxProfile(userId),
+    ensureBudgetMonth(userId, year, month),
+    Promise.all([ensureFinanceSystem(userId), ensureFinanceGoals(userId)]).catch((e) => {
+      console.warn("personal finance system tables unavailable — apply migration 052", e);
+      return [
+        {
+          user_id: userId,
+          life_expenses_rub: DEFAULT_LIFE_EXPENSES_RUB,
+          funds_rub: DEFAULT_FUNDS_RUB,
+          moscow_job_stable: true,
+        } satisfies PersonalFinanceSystemRow,
+        [] as PersonalFinanceGoalRow[],
+      ] as const;
+    }),
+    Promise.all([
+      sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order"),
+      sb.from("v2_personal_capital_items").select("*").eq("user_id", userId).order("sort_order"),
+      sb
+        .from("v2_personal_incomes")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("year", year)
+        .eq("month", month)
+        .order("created_at", { ascending: false }),
+      sb.from("v2_personal_tax_advances").select("*").eq("user_id", userId).order("sort_order"),
+      sb
+        .from("v2_personal_budget_categories")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("year", year)
+        .eq("month", month)
+        .order("sort_order"),
+      sb
+        .from("v2_personal_month_snapshots")
+        .select("*")
+        .eq("user_id", userId)
+        .order("year")
+        .order("month"),
+      listForecastExtras(userId, year, month),
+    ]),
+    agencyPromise,
+    listPersonalIncomeHistory(ctx),
+  ]);
+
   const fxRates: FxRateRow[] = [...rateLookup.entries()].map(([currency_code, v]) => ({
     currency_code,
     rate_to_rub: v.rate,
@@ -348,21 +408,7 @@ export async function loadPersonalFinanceDashboard(
     updated_at: nowIso(),
   }));
 
-  const tax = await ensureTaxProfile(userId);
-  const budget = await ensureBudgetMonth(userId, year, month);
-  let system: PersonalFinanceSystemRow = {
-    user_id: userId,
-    life_expenses_rub: DEFAULT_LIFE_EXPENSES_RUB,
-    funds_rub: DEFAULT_FUNDS_RUB,
-    moscow_job_stable: true,
-  };
-  let goals: PersonalFinanceGoalRow[] = [];
-  try {
-    [system, goals] = await Promise.all([ensureFinanceSystem(userId), ensureFinanceGoals(userId)]);
-  } catch (e) {
-    console.warn("personal finance system tables unavailable — apply migration 052", e);
-  }
-
+  const [system, goals] = systemGoals;
   const [
     accountsRes,
     capitalRes,
@@ -371,32 +417,7 @@ export async function loadPersonalFinanceDashboard(
     categoriesRes,
     historyRes,
     forecastExtras,
-  ] = await Promise.all([
-    sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order"),
-    sb.from("v2_personal_capital_items").select("*").eq("user_id", userId).order("sort_order"),
-    sb
-      .from("v2_personal_incomes")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("year", year)
-      .eq("month", month)
-      .order("created_at", { ascending: false }),
-    sb.from("v2_personal_tax_advances").select("*").eq("user_id", userId).order("sort_order"),
-    sb
-      .from("v2_personal_budget_categories")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("year", year)
-      .eq("month", month)
-      .order("sort_order"),
-    sb
-      .from("v2_personal_month_snapshots")
-      .select("*")
-      .eq("user_id", userId)
-      .order("year")
-      .order("month"),
-    listForecastExtras(userId, year, month),
-  ]);
+  ] = batch;
 
   if (accountsRes.error) throw accountsRes.error;
   if (capitalRes.error) throw capitalRes.error;
@@ -459,26 +480,24 @@ export async function loadPersonalFinanceDashboard(
   let projectCount = 0;
   let monthProfit = 0;
   let agencyTotalExpenses = 0;
-  try {
-    const [projects, generalExpenses] = await Promise.all([
-      listFinanceProjectsForMonth(ctx, year, month),
-      listFinanceGeneralExpenses(ctx, year, month),
-    ]);
-    const fin = computeFinanceMonthSummary(projects, generalExpenses, year, month);
-    projectExpectedRevenue = fin.expectedRevenue;
-    projectActualRevenue = fin.actualRevenue;
-    projectCount = fin.projectCount;
-    monthProfit = fin.profit;
-    agencyTotalExpenses = fin.totalExpenses;
-  } catch (e) {
-    console.warn("personal finance: agency month summary unavailable", e);
+  if (agencyPair) {
+    try {
+      const [projects, generalExpenses] = agencyPair;
+      const fin = computeFinanceMonthSummary(projects, generalExpenses, year, month);
+      projectExpectedRevenue = fin.expectedRevenue;
+      projectActualRevenue = fin.actualRevenue;
+      projectCount = fin.projectCount;
+      monthProfit = fin.profit;
+      agencyTotalExpenses = fin.totalExpenses;
+    } catch (e) {
+      console.warn("personal finance: agency month summary unavailable", e);
+    }
   }
 
   let avgProfit6m = 0;
   let capitalYearDelta: number | null = null;
-  let incomeHistory: PersonalIncomeHistoryRow[] = [];
+  let incomeHistory: PersonalIncomeHistoryRow[] = incomeHistoryRaw;
   try {
-    incomeHistory = await listPersonalIncomeHistory(ctx);
     const historyProfit = incomeHistory.find((r) => r.year === year && r.month === month)?.profit_rub;
     if (
       (projectCount === 0 && projectExpectedRevenue === 0 && projectActualRevenue === 0) &&
@@ -525,7 +544,9 @@ export async function loadPersonalFinanceDashboard(
     summary.incomePending = Math.max(projectExpectedRevenue - projectActualRevenue, 0);
   }
 
-  await upsertCurrentSnapshot(userId, year, month, summary);
+  void upsertCurrentSnapshot(userId, year, month, summary).catch((e) => {
+    console.warn("personal finance: snapshot upsert failed", e);
+  });
 
   // Для графиков: история дохода (счета) + текущий месяц из живых данных
   const chartFromIncome = incomeHistory

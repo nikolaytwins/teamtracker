@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { appPath } from "@/lib/api-url";
 import { HomePersonalFinanceProvider, useHomePersonalFinance } from "@/components/v2/home/personal/home-personal-finance-context";
+import type { HomePersonalFinancePayload } from "@/lib/v2/home/load-home-finance";
 import { HomeDynamicsChart } from "@/components/v2/home/personal/home-dynamics-chart";
 import { HomeFinanceHero } from "@/components/v2/home/personal/home-finance-hero";
 import { HomeSeasonBand } from "@/components/v2/home/personal/home-season-band";
@@ -231,9 +232,9 @@ function RulesBand() {
   );
 }
 
-export function V2PersonalHomeClient() {
+export function V2PersonalHomeClient({ initialFinance }: { initialFinance?: HomePersonalFinancePayload | null }) {
   return (
-    <HomePersonalFinanceProvider>
+    <HomePersonalFinanceProvider initial={initialFinance}>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-[1720px] flex-col gap-7 px-9 pb-24 pt-7">
           <HomeFinanceHero />

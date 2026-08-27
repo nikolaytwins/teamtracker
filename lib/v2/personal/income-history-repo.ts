@@ -177,11 +177,16 @@ async function sync2026JanAprSeed(userId: string) {
   }
 }
 
-export async function listPersonalIncomeHistory(ctx: V2SessionContext): Promise<PersonalIncomeHistoryRow[]> {
+export async function listPersonalIncomeHistory(
+  ctx: V2SessionContext,
+  opts?: { sync?: boolean }
+): Promise<PersonalIncomeHistoryRow[]> {
   const userId = uid(ctx);
-  await seedIfEmpty(userId);
-  await syncHistoricalSeed(userId);
-  await sync2026JanAprSeed(userId);
+  if (opts?.sync !== false) {
+    await seedIfEmpty(userId);
+    await syncHistoricalSeed(userId);
+    await sync2026JanAprSeed(userId);
+  }
 
   const sb = getV2Supabase();
   const { data, error } = await sb
