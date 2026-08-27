@@ -458,6 +458,7 @@ export async function loadPersonalFinanceDashboard(
   let projectActualRevenue = 0;
   let projectCount = 0;
   let monthProfit = 0;
+  let agencyTotalExpenses = 0;
   try {
     const [projects, generalExpenses] = await Promise.all([
       listFinanceProjectsForMonth(ctx, year, month),
@@ -468,6 +469,7 @@ export async function loadPersonalFinanceDashboard(
     projectActualRevenue = fin.actualRevenue;
     projectCount = fin.projectCount;
     monthProfit = fin.profit;
+    agencyTotalExpenses = fin.totalExpenses;
   } catch (e) {
     console.warn("personal finance: agency month summary unavailable", e);
   }
@@ -597,6 +599,7 @@ export async function loadPersonalFinanceDashboard(
       projectActualRevenue,
       projectCount,
       monthProfit,
+      agencyTotalExpenses,
       avgProfit6m,
       avgIncome6m: avgProfit6m,
       capitalYearDelta,

@@ -3,6 +3,97 @@
 import type { PersonalObservation } from "@/lib/v2/personal/personal-observations-repo";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+function preserveSourceLineBreaks(md: string) {
+  return md.replace(/([^\n])\n(?!\n)/g, "$1  \n");
+}
+
+function conclusionBody(it: PersonalObservation): string {
+  const title = it.title.trim();
+  let body = it.body.trim();
+  if (!body || body === title) return "";
+  const firstLine = body.split("\n")[0]?.trim() ?? "";
+  if (title && (firstLine === title || body.startsWith(`${title}\n`))) {
+    body = body.slice(title.length).replace(/^\n+/, "").trim();
+  }
+  if (!body || body === title) return "";
+  return body;
+}
+
+function ConclusionMarkdown({ text }: { text: string }) {
+  return (
+    <div className="obs-conclusion-md mt-3 max-w-[68ch]">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => (
+            <h4 className="v2-tight mb-2 mt-4 text-[17px] font-semibold text-[var(--v2-ink-900)] first:mt-0">
+              {children}
+            </h4>
+          ),
+          h2: ({ children }) => (
+            <h5 className="v2-tight mb-2 mt-3 text-[16px] font-semibold text-[var(--v2-ink-900)] first:mt-0">
+              {children}
+            </h5>
+          ),
+          h3: ({ children }) => (
+            <h6 className="v2-tight mb-2 mt-3 text-[15px] font-semibold text-[var(--v2-ink-800)] first:mt-0">
+              {children}
+            </h6>
+          ),
+          p: ({ children }) => (
+            <p
+              className="v2-tight mb-3 whitespace-pre-wrap text-[15px] leading-[1.7] text-[var(--v2-ink-700)] last:mb-0"
+              style={{ textWrap: "pretty" }}
+            >
+              {children}
+            </p>
+          ),
+          ul: ({ children }) => (
+            <ul className="mb-3 list-disc space-y-1 pl-5 text-[15px] leading-[1.7] text-[var(--v2-ink-700)]">
+              {children}
+            </ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="mb-3 list-decimal space-y-1 pl-5 text-[15px] leading-[1.7] text-[var(--v2-ink-700)]">
+              {children}
+            </ol>
+          ),
+          li: ({ children }) => <li className="pl-0.5">{children}</li>,
+          strong: ({ children }) => (
+            <strong className="font-semibold text-[var(--v2-ink-900)]">{children}</strong>
+          ),
+          em: ({ children }) => <em className="italic">{children}</em>,
+          blockquote: ({ children }) => (
+            <blockquote className="my-3 border-l-2 border-[var(--v2-ink-200)] pl-4 text-[14px] italic leading-[1.65] text-[var(--v2-ink-500)]">
+              {children}
+            </blockquote>
+          ),
+          hr: () => <hr className="my-4 border-[var(--v2-ink-100)]" />,
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              className="font-medium text-[var(--v2-brand-600)] underline underline-offset-2"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {children}
+            </a>
+          ),
+          code: ({ children }) => (
+            <code className="rounded bg-[var(--v2-ink-50)] px-1 py-0.5 font-mono text-[13px] text-[var(--v2-ink-800)]">
+              {children}
+            </code>
+          ),
+        }}
+      >
+        {preserveSourceLineBreaks(text)}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 export function obsMonthKey(iso: string): string {
   const d = new Date(iso);
@@ -50,18 +141,6 @@ export function isoForObsMonth(key: string): string {
   const isCurrent = key === currentObsMonthKey();
   if (isCurrent) return now.toISOString();
   return new Date(y, m - 1, 15, 12, 0, 0).toISOString();
-}
-
-function bodyParagraphs(it: PersonalObservation): string[] {
-  const title = it.title.trim();
-  let body = it.body.trim();
-  if (!body || body === title) return [];
-  const firstLine = body.split("\n")[0]?.trim() ?? "";
-  if (title && (firstLine === title || body.startsWith(`${title}\n`))) {
-    body = body.slice(title.length).replace(/^\n+/, "").trim();
-  }
-  if (!body || body === title) return [];
-  return body.split(/\n\n+/).filter(Boolean);
 }
 
 function ConclusionComposer({
@@ -112,7 +191,7 @@ function ConclusionComposer({
         ref={ref}
         value={text}
         rows={2}
-        placeholder="Вывод месяца — что стало яснее, что меняет стратегию…"
+        placeholder="Вывод месяца — что стало яснее, что меняет стратегию… (Markdown: **жирный**, списки, ссылки)"
         onChange={(e) => {
           setText(e.target.value);
           grow(e.target);
@@ -177,8 +256,8 @@ function ConclusionCard({
     }
   }, [item, editing]);
 
-  const paras = bodyParagraphs(item);
   const meta = item.updated_at !== item.created_at;
+  const bodyMd = conclusionBody(item);
 
   return (
     <article className="rounded-2xl bg-white px-6 py-5 shadow-[var(--v2-shadow-soft)]">
@@ -219,6 +298,7 @@ function ConclusionCard({
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={6}
+            placeholder="Markdown: **жирный**, списки, [ссылки](url)"
             className="v2-tight w-full resize-y rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/50 px-3 py-2 text-[15px] leading-[1.65] text-[var(--v2-ink-700)] outline-none focus:border-[var(--v2-brand-400)]"
           />
           <button
@@ -240,21 +320,11 @@ function ConclusionCard({
               {item.title.trim()}
             </h3>
           ) : null}
-          {paras.length ? (
-            <div className="mt-3 flex max-w-[68ch] flex-col gap-3">
-              {paras.map((p, idx) => (
-                <p
-                  key={idx}
-                  className="v2-tight whitespace-pre-wrap text-[15px] leading-[1.7] text-[var(--v2-ink-700)]"
-                  style={{ textWrap: "pretty" }}
-                >
-                  {p}
-                </p>
-              ))}
-            </div>
-          ) : (
-            <p className="v2-tight mt-3 text-[15px] leading-[1.7] text-[var(--v2-ink-700)]">{item.body}</p>
-          )}
+          {bodyMd ? (
+            <ConclusionMarkdown text={bodyMd} />
+          ) : item.body.trim() ? (
+            <ConclusionMarkdown text={item.body.trim()} />
+          ) : null}
         </>
       )}
     </article>

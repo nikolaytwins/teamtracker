@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { appPath } from "@/lib/api-url";
-import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { useHomePersonalFinance } from "@/components/v2/home/personal/home-personal-finance-context";
 import { FINANCE_MONTH_NAMES, formatRub } from "@/lib/v2/finance/meta";
 import { homeFmt } from "@/lib/v2/personal/seeds/home-seed";
-import type { HomeFinanceStripPayload } from "@/lib/v2/home/load-home-finance";
 
 const HERO_BLUE = "#2d5eef";
 
@@ -20,55 +19,41 @@ function formatPct(n: number): string {
   return `${sign} ${Math.abs(n).toFixed(1).replace(".", ",")}%`;
 }
 
-export function HomeFinanceHero({ initialFinance }: { initialFinance?: HomeFinanceStripPayload | null }) {
-  const [finance, setFinance] = useState(initialFinance ?? null);
-  const [prevProfit, setPrevProfit] = useState<number | null>(null);
+function currentMonthLabel(): string {
+  const now = new Date();
+  const month = FINANCE_MONTH_NAMES[now.getMonth()]?.toLowerCase() ?? "";
+  return `${month} ${now.getFullYear()}`;
+}
 
-  useEffect(() => {
-    if (finance) return;
-    void (async () => {
-      try {
-        const data = await fetchJson<HomeFinanceStripPayload>("/api/v2/finance/dashboard");
-        setFinance({ year: data.year, month: data.month, summary: data.summary });
-      } catch {
-        setFinance(null);
-      }
-    })();
-  }, [finance]);
+function HeroSkeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded-lg bg-[var(--v2-ink-100)] ${className ?? ""}`} aria-hidden />;
+}
 
-  useEffect(() => {
-    if (!finance) return;
-    let py = finance.year;
-    let pm = finance.month - 1;
+export function HomeFinanceHero() {
+  const { dashboard, loading } = useHomePersonalFinance();
+
+  const monthLabel = useMemo(() => {
+    if (!dashboard) return currentMonthLabel();
+    return `${FINANCE_MONTH_NAMES[dashboard.month - 1]?.toLowerCase() ?? ""} ${dashboard.year}`;
+  }, [dashboard]);
+
+  const prevProfit = useMemo(() => {
+    if (!dashboard) return null;
+    let py = dashboard.year;
+    let pm = dashboard.month - 1;
     if (pm < 1) {
       pm = 12;
       py -= 1;
     }
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const data = await fetchJson<HomeFinanceStripPayload>(
-            `/api/v2/finance/dashboard?year=${py}&month=${pm}`
-          );
-          setPrevProfit(data.summary.profit);
-        } catch {
-          setPrevProfit(null);
-        }
-      })();
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [finance]);
+    const row = dashboard.incomeHistory.find((r) => r.year === py && r.month === pm);
+    return row?.profit_rub ?? null;
+  }, [dashboard]);
 
-  const monthLabel = useMemo(() => {
-    if (!finance) return "";
-    return `${FINANCE_MONTH_NAMES[finance.month - 1]?.toLowerCase() ?? ""} ${finance.year}`;
-  }, [finance]);
-
-  if (!finance) return null;
-
-  const { summary } = finance;
-  const delta = prevProfit != null ? pctDelta(summary.profit, prevProfit) : null;
-  const deltaRub = prevProfit != null ? summary.profit - prevProfit : null;
+  const summary = dashboard?.summary;
+  const profit = summary?.monthProfit ?? 0;
+  const delta = prevProfit != null && summary ? pctDelta(profit, prevProfit) : null;
+  const deltaRub = prevProfit != null && summary ? profit - prevProfit : null;
+  const ready = Boolean(summary);
 
   return (
     <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,560px)]">
@@ -85,63 +70,66 @@ export function HomeFinanceHero({ initialFinance }: { initialFinance?: HomeFinan
             <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-white/60">
               Прибыль · {monthLabel}
             </span>
-            <span className="h-[5px] w-[5px] rounded-full bg-white/35" />
-            <span className="v2-tight text-[13.5px] text-white/60">
-              {summary.projectCount} проектов
-            </span>
+            {ready ? (
+              <>
+                <span className="h-[5px] w-[5px] rounded-full bg-white/35" />
+                <span className="v2-tight text-[13.5px] text-white/60">
+                  {summary!.projectCount} проектов
+                </span>
+              </>
+            ) : loading ? (
+              <HeroSkeleton className="ml-1 h-4 w-24 bg-white/20" />
+            ) : null}
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-4">
-            <span className="v2-tnum text-[62px] font-semibold leading-none tracking-[-0.042em]">
-              {formatRub(summary.profit)}
-            </span>
-            {delta != null ? (
+            {ready ? (
+              <span className="v2-tnum text-[62px] font-semibold leading-none tracking-[-0.042em]">
+                {formatRub(profit)}
+              </span>
+            ) : (
+              <HeroSkeleton className="h-[62px] w-[min(280px,70%)] bg-white/20" />
+            )}
+            {ready && delta != null ? (
               <span className="v2-tight inline-flex items-center gap-1 rounded-[10px] bg-white/16 px-[11px] py-1.5 text-[15px] font-semibold">
                 {formatPct(delta)}
               </span>
             ) : null}
           </div>
-          {deltaRub != null ? (
+          {ready && deltaRub != null ? (
             <p className="v2-tnum v2-tight mt-3 text-[14.5px] text-white/65">
               К прошлому месяцу {deltaRub >= 0 ? "+" : "−"}
               {homeFmt(Math.abs(deltaRub))} ₽
             </p>
+          ) : loading ? (
+            <HeroSkeleton className="mt-3 h-4 w-52 bg-white/15" />
           ) : null}
         </div>
 
         <div className="mt-3 grid max-w-[880px] grid-cols-1 gap-3.5 sm:grid-cols-[1.18fr_1fr_1fr]">
-          <Link
-            href={appPath("/v2/agency")}
-            className="block rounded-2xl bg-[var(--v2-ink-50)] px-[18px] py-4 transition hover:bg-[var(--v2-ink-100)]"
-          >
-            <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-[var(--v2-ink-400)]">
-              Предполагаемая выручка
-            </span>
-            <div className="v2-tnum v2-tight mt-2 text-[25px] font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)]">
-              {formatRub(summary.expectedRevenue)}
-            </div>
-          </Link>
-          <Link
-            href={appPath("/v2/agency")}
-            className="block rounded-2xl bg-[var(--v2-ink-50)] px-[18px] py-4 transition hover:bg-[var(--v2-ink-100)]"
-          >
-            <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-[var(--v2-ink-400)]">
-              Фактическая выручка
-            </span>
-            <div className="v2-tnum v2-tight mt-2 text-[25px] font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)]">
-              {formatRub(summary.actualRevenue)}
-            </div>
-          </Link>
-          <Link
-            href={appPath("/v2/agency")}
-            className="block rounded-2xl bg-[var(--v2-ink-50)] px-[18px] py-4 transition hover:bg-[var(--v2-ink-100)]"
-          >
-            <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-[var(--v2-ink-400)]">
-              Расходы
-            </span>
-            <div className="v2-tnum v2-tight mt-2 text-[25px] font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)]">
-              {formatRub(summary.totalExpenses)}
-            </div>
-          </Link>
+          {(
+            [
+              ["Предполагаемая выручка", summary?.projectExpectedRevenue],
+              ["Фактическая выручка", summary?.projectActualRevenue],
+              ["Расходы", summary?.agencyTotalExpenses],
+            ] as const
+          ).map(([label, value]) => (
+            <Link
+              key={label}
+              href={appPath("/v2/agency")}
+              className="block rounded-2xl bg-[var(--v2-ink-50)] px-[18px] py-4 transition hover:bg-[var(--v2-ink-100)]"
+            >
+              <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-[var(--v2-ink-400)]">
+                {label}
+              </span>
+              {ready && value != null ? (
+                <div className="v2-tnum v2-tight mt-2 text-[21px] font-medium tracking-[-0.02em] text-[var(--v2-ink-800)]">
+                  {formatRub(value)}
+                </div>
+              ) : (
+                <HeroSkeleton className="mt-2 h-7 w-[min(140px,80%)]" />
+              )}
+            </Link>
+          ))}
         </div>
       </div>
 

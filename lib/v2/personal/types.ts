@@ -213,6 +213,8 @@ export type PersonalFinanceDashboard = {
     projectCount: number;
     /** Прибыль месяца из «Проекты и финансы» / истории */
     monthProfit: number;
+    /** Расходы месяца из «Проекты и финансы» */
+    agencyTotalExpenses: number;
     /** Средняя прибыль за прошлые 6 месяцев */
     avgProfit6m: number;
     /** @deprecated — то же, что avgProfit6m */
