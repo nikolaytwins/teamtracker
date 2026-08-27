@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { appPath } from "@/lib/api-url";
-import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { HomePersonalFinanceProvider, useHomePersonalFinance } from "@/components/v2/home/personal/home-personal-finance-context";
 import { HomeDynamicsChart } from "@/components/v2/home/personal/home-dynamics-chart";
 import { HomeFinanceHero } from "@/components/v2/home/personal/home-finance-hero";
 import { HomeSeasonBand } from "@/components/v2/home/personal/home-season-band";
 import { HomeWeekFocus } from "@/components/v2/home/personal/home-week-focus";
 import { allocateGoals, cushionPool } from "@/components/v2/personal/finance/personal-finance-system";
-import type { HomeFinanceStripPayload } from "@/lib/v2/home/load-home-finance";
 import {
   HOME_BETS,
   HOME_CHECKS,
@@ -20,7 +19,6 @@ import {
   HOME_TRAININGS,
   homeFmt,
 } from "@/lib/v2/personal/seeds/home-seed";
-import type { PersonalFinanceDashboard } from "@/lib/v2/personal/types";
 
 function LilaBan() {
   return (
@@ -82,18 +80,7 @@ function BetCards() {
 }
 
 function GoalsAndNotNow() {
-  const [dashboard, setDashboard] = useState<PersonalFinanceDashboard | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const data = await fetchJson<PersonalFinanceDashboard>("/api/v2/personal/finance/dashboard");
-        setDashboard(data);
-      } catch {
-        setDashboard(null);
-      }
-    })();
-  }, []);
+  const { dashboard } = useHomePersonalFinance();
 
   const goals = useMemo(() => {
     if (!dashboard) return [];
@@ -241,23 +228,21 @@ function RulesBand() {
   );
 }
 
-export function V2PersonalHomeClient({
-  initialFinance,
-}: {
-  initialFinance: HomeFinanceStripPayload | null;
-}) {
+export function V2PersonalHomeClient() {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex max-w-[1720px] flex-col gap-7 px-9 pb-24 pt-7">
-        <HomeFinanceHero initialFinance={initialFinance} />
-        <LilaBan />
-        <HomeWeekFocus />
-        <HomeSeasonBand />
-        <BetCards />
-        <HomeDynamicsChart />
-        <GoalsAndNotNow />
-        <RulesBand />
+    <HomePersonalFinanceProvider>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-[1720px] flex-col gap-7 px-9 pb-24 pt-7">
+          <HomeFinanceHero />
+          <LilaBan />
+          <HomeWeekFocus />
+          <HomeSeasonBand />
+          <BetCards />
+          <HomeDynamicsChart />
+          <GoalsAndNotNow />
+          <RulesBand />
+        </div>
       </div>
-    </div>
+    </HomePersonalFinanceProvider>
   );
 }

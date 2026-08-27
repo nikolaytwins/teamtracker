@@ -139,16 +139,20 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
     setBootError(null);
     try {
       const fetchOpts = { credentials: "include" as const };
-      const [meRes, projRes, taskRes] = await Promise.all([
-        fetchWithTimeout(apiUrl("/api/v2/auth/me"), fetchOpts).then((r) => r.json()),
-        fetchWithTimeout(apiUrl("/api/v2/projects"), fetchOpts).then((r) => r.json()),
-        fetchWithTimeout(apiUrl("/api/v2/tasks?grouped=1"), fetchOpts).then((r) => r.json()),
-      ]);
+      const meRes = await fetchWithTimeout(apiUrl("/api/v2/auth/me"), fetchOpts).then((r) => r.json());
       setMe(meRes.user ?? null);
       setWorkspace(meRes.workspace ?? null);
       setMembers(meRes.members ?? []);
-      setProjects(projRes.projects ?? []);
-      setTasks(taskRes.tasks ?? []);
+
+      void fetchWithTimeout(apiUrl("/api/v2/projects"), fetchOpts)
+        .then((r) => r.json())
+        .then((projRes) => setProjects(projRes.projects ?? []))
+        .catch(() => {});
+
+      void fetchWithTimeout(apiUrl("/api/v2/tasks?grouped=1"), fetchOpts)
+        .then((r) => r.json())
+        .then((taskRes) => setTasks(taskRes.tasks ?? []))
+        .catch(() => {});
     } catch (e) {
       setBootError(e instanceof Error ? e.message : "Не удалось загрузить данные");
     }

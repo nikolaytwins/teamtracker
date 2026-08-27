@@ -20,8 +20,8 @@ function formatPct(n: number): string {
   return `${sign} ${Math.abs(n).toFixed(1).replace(".", ",")}%`;
 }
 
-export function HomeFinanceHero({ initialFinance }: { initialFinance: HomeFinanceStripPayload | null }) {
-  const [finance, setFinance] = useState(initialFinance);
+export function HomeFinanceHero({ initialFinance }: { initialFinance?: HomeFinanceStripPayload | null }) {
+  const [finance, setFinance] = useState(initialFinance ?? null);
   const [prevProfit, setPrevProfit] = useState<number | null>(null);
 
   useEffect(() => {
@@ -44,16 +44,19 @@ export function HomeFinanceHero({ initialFinance }: { initialFinance: HomeFinanc
       pm = 12;
       py -= 1;
     }
-    void (async () => {
-      try {
-        const data = await fetchJson<HomeFinanceStripPayload>(
-          `/api/v2/finance/dashboard?year=${py}&month=${pm}`
-        );
-        setPrevProfit(data.summary.profit);
-      } catch {
-        setPrevProfit(null);
-      }
-    })();
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const data = await fetchJson<HomeFinanceStripPayload>(
+            `/api/v2/finance/dashboard?year=${py}&month=${pm}`
+          );
+          setPrevProfit(data.summary.profit);
+        } catch {
+          setPrevProfit(null);
+        }
+      })();
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [finance]);
 
   const monthLabel = useMemo(() => {

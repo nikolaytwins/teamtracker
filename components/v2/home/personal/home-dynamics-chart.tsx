@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useHomePersonalFinance } from "@/components/v2/home/personal/home-personal-finance-context";
 import { homeFmt } from "@/lib/v2/personal/seeds/home-seed";
-import type { PersonalFinanceDashboard, PersonalIncomeHistoryRow } from "@/lib/v2/personal/types";
+import type { PersonalIncomeHistoryRow } from "@/lib/v2/personal/types";
 type SeriesKey = "profit" | "capital";
 
 const MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
@@ -34,22 +34,11 @@ function pctChange(cur: number, prev: number): string {
 }
 
 export function HomeDynamicsChart() {
-  const [dashboard, setDashboard] = useState<PersonalFinanceDashboard | null>(null);
+  const { dashboard } = useHomePersonalFinance();
   const [seriesKey, setSeriesKey] = useState<SeriesKey>("profit");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const data = await fetchJson<PersonalFinanceDashboard>("/api/v2/personal/finance/dashboard");
-        setDashboard(data);
-      } catch {
-        setDashboard(null);
-      }
-    })();
-  }, []);
 
   useEffect(() => {
     const el = wrapRef.current;
