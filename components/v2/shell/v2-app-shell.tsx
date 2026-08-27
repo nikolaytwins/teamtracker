@@ -1,6 +1,7 @@
 "use client";
 
 import { apiUrl, appPath } from "@/lib/api-url";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import type { V2ProjectRow, V2TaskWithMeta, V2WorkspaceRow } from "@/lib/v2/types";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { ProfileModal } from "@/components/ProfileModal";
@@ -132,17 +133,25 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
     [taskCreationContext, projects]
   );
 
+  const [bootError, setBootError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    const [meRes, projRes, taskRes] = await Promise.all([
-      fetch(apiUrl("/api/v2/auth/me"), { credentials: "include" }).then((r) => r.json()),
-      fetch(apiUrl("/api/v2/projects"), { credentials: "include" }).then((r) => r.json()),
-      fetch(apiUrl("/api/v2/tasks?grouped=1"), { credentials: "include" }).then((r) => r.json()),
-    ]);
-    setMe(meRes.user ?? null);
-    setWorkspace(meRes.workspace ?? null);
-    setMembers(meRes.members ?? []);
-    setProjects(projRes.projects ?? []);
-    setTasks(taskRes.tasks ?? []);
+    setBootError(null);
+    try {
+      const fetchOpts = { credentials: "include" as const };
+      const [meRes, projRes, taskRes] = await Promise.all([
+        fetchWithTimeout(apiUrl("/api/v2/auth/me"), fetchOpts).then((r) => r.json()),
+        fetchWithTimeout(apiUrl("/api/v2/projects"), fetchOpts).then((r) => r.json()),
+        fetchWithTimeout(apiUrl("/api/v2/tasks?grouped=1"), fetchOpts).then((r) => r.json()),
+      ]);
+      setMe(meRes.user ?? null);
+      setWorkspace(meRes.workspace ?? null);
+      setMembers(meRes.members ?? []);
+      setProjects(projRes.projects ?? []);
+      setTasks(taskRes.tasks ?? []);
+    } catch (e) {
+      setBootError(e instanceof Error ? e.message : "Не удалось загрузить данные");
+    }
   }, []);
 
   useEffect(() => {
@@ -232,7 +241,17 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
           onOpenProfile={() => setProfileOpen(true)}
           onLogout={logout}
         />
-        <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+        <main className="flex min-w-0 flex-1 flex-col">
+          {bootError ? (
+            <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[12.5px] text-amber-900">
+              {bootError}.{" "}
+              <button type="button" className="font-semibold underline" onClick={() => void refresh()}>
+                Повторить
+              </button>
+            </div>
+          ) : null}
+          {children}
+        </main>
         <CommandPalette
           open={paletteOpen}
           onClose={() => setPaletteOpen(false)}

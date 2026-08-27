@@ -1,6 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 let cached: SupabaseClient | null = null;
+
+const SUPABASE_FETCH_TIMEOUT_MS = 20_000;
 
 /**
  * Серверный клиент с service_role: обходит RLS. Не импортировать в клиентские компоненты.
@@ -17,6 +20,9 @@ export function createSupabaseServiceClient(): SupabaseClient {
   }
   cached = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (input, init) => fetchWithTimeout(input, init, SUPABASE_FETCH_TIMEOUT_MS),
+    },
   });
   return cached;
 }

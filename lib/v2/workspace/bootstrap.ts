@@ -52,13 +52,34 @@ export async function syncAllWorkspaceMembers(): Promise<number> {
   return users.length;
 }
 
+const MEMBERS_SYNC_TTL_MS = 10 * 60 * 1000;
+let membersSyncedAt = 0;
+let membersSyncInFlight: Promise<void> | null = null;
+
+/** Полная синхронизация участников — не чаще раза в 10 мин на инстанс. */
+async function maybeSyncAllWorkspaceMembers() {
+  const now = Date.now();
+  if (now - membersSyncedAt < MEMBERS_SYNC_TTL_MS) return;
+  if (membersSyncInFlight) {
+    await membersSyncInFlight;
+    return;
+  }
+  membersSyncInFlight = syncAllWorkspaceMembers()
+    .then(() => {
+      membersSyncedAt = Date.now();
+    })
+    .finally(() => {
+      membersSyncInFlight = null;
+    });
+  await membersSyncInFlight;
+}
+
 export async function buildV2SessionContext(
   userId: string,
   userName: string,
   role: TtUserRole
 ): Promise<V2SessionContext> {
-  await syncAllWorkspaceMembers();
-  await ensureWorkspaceMember(userId, role);
+  await Promise.all([maybeSyncAllWorkspaceMembers(), ensureWorkspaceMember(userId, role)]);
   return {
     userId,
     userName,
