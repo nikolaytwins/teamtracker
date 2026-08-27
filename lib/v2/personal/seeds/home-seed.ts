@@ -12,6 +12,12 @@ export type HomeSeason = {
   day: string;
 };
 
+export type HomeMonthMarker = {
+  date: string;
+  time?: string;
+  text: string;
+};
+
 export type HomeMonth = {
   id: string;
   label: string;
@@ -20,6 +26,7 @@ export type HomeMonth = {
   headline: string;
   lead: string;
   warn?: string;
+  markers?: HomeMonthMarker[];
   focus: string[];
 };
 
@@ -195,6 +202,7 @@ export const HOME_MONTHS: HomeMonth[] = [
     state: "дальше",
     headline: "Проверять магнит и асимметрию",
     lead: "После появления возможности нормально снимать.",
+    markers: [{ date: "3 октября", time: "10–12", text: "Разговор с Лерой" }],
     warn: "следить за расходами! не раздувать! даже на команду!\n\nвсе договоренности фиксируем письменно\n20–29 октября не принимать важных решений (расставание, переезд, закрытие проекта). Поставить отдых",
     focus: ["YouTube", "Короткие форматы", "Qmagic", "Продолжение найма", "Новые люди и среды"],
   },

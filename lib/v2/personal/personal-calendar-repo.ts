@@ -20,23 +20,14 @@ const CALENDAR_PROJECTS = [
   { name: "Курс", color: "#3B6FF7", icon_key: "book" },
   { name: "Медийка", color: "#F97316", icon_key: "spark" },
   { name: "Курс + медийка", color: "#8B5CF6", icon_key: "camera" },
-  { name: "Личное", color: "#E11D48", icon_key: "heart" },
 ] as const;
-
-function calendarTimeLabel(row: Record<string, unknown>): string | null {
-  const description = row.description ? String(row.description).trim() : "";
-  if (description) return description;
-  if (!row.due_time) return null;
-  const due = String(row.due_time).slice(0, 5);
-  return due === "23:59" ? null : due;
-}
 
 function mapItem(row: Record<string, unknown>): PersonalCalendarItem {
   return {
     id: String(row.id),
     title: String(row.title),
     date: String(row.scheduled_date ?? row.due_date).slice(0, 10),
-    time: calendarTimeLabel(row),
+    time: row.due_time ? String(row.due_time).slice(0, 5) : null,
     completed_at: row.completed_at ? String(row.completed_at) : null,
     priority: (row.priority as V2TaskPriority | null) ?? null,
     category: String(row.project_name ?? "Без категории"),
@@ -108,10 +99,10 @@ async function ensureInitialCalendarDeadlines(ctx: V2SessionContext) {
       project_id: projectIds.get(item.project) ?? null,
       parent_id: null,
       title: item.title,
-      description: item.time ?? null,
+      description: null,
       priority: item.priority,
       due_date: item.date,
-      due_time: item.time ? "10:00:00" : "23:59:00",
+      due_time: "23:59:00",
       scheduled_date: item.date,
       completed_at: null,
       sort_order: Math.floor(Date.now() / 1000) + index,
@@ -138,7 +129,7 @@ export async function loadPersonalCalendar(
   const { data, error } = await sb
     .from("v2_personal_todos")
     .select(
-      "id, title, description, due_date, due_time, scheduled_date, completed_at, priority, project:v2_personal_todo_projects(name, color)"
+      "id, title, due_date, due_time, scheduled_date, completed_at, priority, project:v2_personal_todo_projects(name, color)"
     )
     .eq("user_id", ctx.userId)
     .is("deleted_at", null)

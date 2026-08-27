@@ -85,10 +85,8 @@ export const WEEK_FOCUS_PLANS: WeekFocusPlan[] = [
 export type CalendarSeedDeadline = {
   title: string;
   date: string;
-  project: "Курс" | "Медийка" | "Курс + медийка" | "Личное";
+  project: "Курс" | "Медийка" | "Курс + медийка";
   priority: "urgent" | "high" | "medium";
-  /** Подпись времени на плашке, напр. «10–12». */
-  time?: string;
 };
 
 /** Дедлайны календаря из плана — заменяют прежний сид. */
@@ -224,14 +222,6 @@ export const CALENDAR_SEED_DEADLINES: CalendarSeedDeadline[] = [
     project: "Курс",
     priority: "high",
   },
-  // Октябрь
-  {
-    title: "Разговор с Лерой",
-    date: "2026-10-03",
-    project: "Личное",
-    priority: "high",
-    time: "10–12",
-  },
 ];
 
 /** Старые сиды — удаляем по паре title+date. */
@@ -241,6 +231,7 @@ export const LEGACY_CALENDAR_SEEDS: ReadonlyArray<{ title: string; date: string 
   { title: "Общий съёмочный день: курс + YouTube", date: "2026-07-25" },
   { title: "Второй съёмочный спринт курса", date: "2026-07-29" },
   { title: "Монтаж, оформление и загрузка модуля", date: "2026-08-01" },
+  { title: "Разговор с Лерой", date: "2026-10-03" },
 ];
 
 export function weekMondayYmd(ymd: string): string {

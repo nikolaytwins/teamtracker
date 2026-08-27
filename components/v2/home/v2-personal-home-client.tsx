@@ -515,6 +515,28 @@ function MonthBand({ month, setMonth }: { month: string; setMonth: (id: string) 
               >
                 {x.lead}
               </p>
+              {x.markers?.length ? (
+                <div className="mt-3 flex flex-col gap-2">
+                  {x.markers.map((m) => (
+                    <div
+                      key={`${m.date}-${m.text}`}
+                      className={`v2-tight rounded-xl px-2.5 py-2 ${
+                        active ? "bg-white/16 text-white" : "bg-rose-50 text-rose-900"
+                      }`}
+                    >
+                      <div
+                        className={`v2-tnum text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                          active ? "text-white/70" : "text-rose-600"
+                        }`}
+                      >
+                        {m.date}
+                        {m.time ? ` · ${m.time}` : ""}
+                      </div>
+                      <div className="mt-0.5 text-[13px] font-semibold leading-snug">{m.text}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {x.warn ? (
                 <p
                   className={`v2-tight mt-3 whitespace-pre-wrap rounded-xl px-2.5 py-2 text-[12.5px] font-semibold leading-snug ${
