@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { appPath } from "@/lib/api-url";
 import { SP_GOAL, normalizeSportDoc, type SportDoc, type SportView, type SportWeek } from "@/lib/v2/personal/seeds/sport-seed";
 import { fatPct, n1, sgn, spAvg, spVerdict } from "@/lib/v2/personal/sport-helpers";
 import { SportChartsGrid } from "@/components/v2/personal/sport/sport-charts";
@@ -69,14 +69,12 @@ function SpBanner({
         className="pointer-events-none absolute inset-y-0 right-0 w-[min(62%,560px)] min-w-[220px] sm:min-w-[280px]"
         aria-hidden
       >
-        <Image
-          src="/sport/hero-banner.jpg"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={appPath("/sport/hero-banner.png")}
           alt=""
-          fill
-          sizes="(max-width: 768px) 55vw, 560px"
-          className="object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
           style={{ objectPosition: "78% 18%" }}
-          priority
         />
         <div
           className="absolute inset-y-0 left-0 w-[62%]"
