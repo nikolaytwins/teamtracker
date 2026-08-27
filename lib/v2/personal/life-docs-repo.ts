@@ -1,7 +1,7 @@
 import { getV2Supabase, nowIso } from "@/lib/v2/db/client";
 import type { V2SessionContext } from "@/lib/v2/types";
 
-export type LifeDocKind = "time" | "brand" | "life_strategy" | "mycode";
+export type LifeDocKind = "time" | "brand" | "life_strategy" | "mycode" | "sport";
 
 export class PersonalLifeDocsValidationError extends Error {
   constructor(message: string) {

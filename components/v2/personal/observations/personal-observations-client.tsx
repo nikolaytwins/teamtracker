@@ -7,6 +7,10 @@ import type {
   PersonalObservation,
   PersonalObservationTag,
 } from "@/lib/v2/personal/personal-observations-repo";
+import {
+  isoForObsMonth,
+  ObservationsConclusionsPanel,
+} from "@/components/v2/personal/observations/observations-conclusions-panel";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
@@ -184,8 +188,11 @@ type Board = {
   counts: Record<string, number>;
 };
 
+type DiaryTab = "entries" | "conclusions";
+
 export function PersonalObservationsClient() {
   const [board, setBoard] = useState<Board | null>(null);
+  const [tab, setTab] = useState<DiaryTab>("entries");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [link, setLink] = useState("all");
@@ -233,14 +240,23 @@ export function PersonalObservationsClient() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
+  const diaryObservations = useMemo(
+    () => (board?.observations ?? []).filter((o) => o.type !== "conclusion"),
+    [board]
+  );
+  const conclusions = useMemo(
+    () => (board?.observations ?? []).filter((o) => o.type === "conclusion"),
+    [board]
+  );
+
   const periodOptions = useMemo(() => {
     const keys = new Set<string>();
-    for (const o of board?.observations ?? []) {
+    for (const o of diaryObservations) {
       const k = monthKey(o.observed_at);
       if (k) keys.add(k);
     }
     return Array.from(keys).sort((a, b) => b.localeCompare(a));
-  }, [board]);
+  }, [diaryObservations]);
 
   useEffect(() => {
     if (!board || periodReady) return;
@@ -249,8 +265,7 @@ export function PersonalObservationsClient() {
   }, [board, periodOptions, periodReady]);
 
   const list = useMemo(() => {
-    const items = board?.observations ?? [];
-    return items.filter((i) => {
+    return diaryObservations.filter((i) => {
       if (link !== "all" && i.link_key !== link) return false;
       if (tag && !i.tags.includes(tag)) return false;
       if (period !== "all" && monthKey(i.observed_at) !== period) return false;
@@ -260,23 +275,26 @@ export function PersonalObservationsClient() {
       }
       return true;
     });
-  }, [board, link, tag, period, q]);
+  }, [diaryObservations, link, tag, period, q]);
 
   const tagCounts = useMemo(() => {
     const map = new Map<string, number>();
-    for (const t of board?.tags ?? []) map.set(t.name, t.count);
+    for (const t of board?.tags ?? []) map.set(t.name, 0);
+    for (const o of diaryObservations) {
+      for (const name of o.tags) map.set(name, (map.get(name) || 0) + 1);
+    }
     for (const name of extraKnownTags) {
       if (!map.has(name)) map.set(name, 0);
     }
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ru"));
-  }, [board, extraKnownTags]);
+  }, [board, diaryObservations, extraKnownTags]);
   const knownTags = useMemo(
     () => tagCounts.map(([n]) => n),
     [tagCounts]
   );
 
   const monthStats = useMemo(() => {
-    const all = board?.observations ?? [];
+    const all = diaryObservations;
     const key = period !== "all" ? period : periodOptions[0] || "";
     if (!key) {
       return { key: "", month: "—", total: all.length, prevMonth: "", prevTotal: 0 };
@@ -290,7 +308,7 @@ export function PersonalObservationsClient() {
       prevMonth: prevKey ? monthLabel(prevKey) : "",
       prevTotal: prevKey ? all.filter((o) => monthKey(o.observed_at) === prevKey).length : 0,
     };
-  }, [board, period, periodOptions]);
+  }, [diaryObservations, period, periodOptions]);
 
   const periodIndex = period === "all" ? -1 : periodOptions.indexOf(period);
   const canNewer = period === "all" ? periodOptions.length > 0 : periodIndex > 0;
@@ -395,6 +413,82 @@ export function PersonalObservationsClient() {
     }
   };
 
+  const createConclusion = async (
+    monthKey: string,
+    payload: { title: string; text: string }
+  ): Promise<boolean> => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetchJson<{ observation: PersonalObservation }>("/api/v2/personal/observations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "conclusion",
+          title: payload.title,
+          body: payload.text,
+          tags: [],
+          observedAt: isoForObsMonth(monthKey),
+        }),
+      });
+      setBoard((prev) => {
+        if (!prev) return prev;
+        const observations = [res.observation, ...prev.observations.filter((o) => o.id !== res.observation.id)];
+        return {
+          ...prev,
+          observations,
+          tags: rebuildTagCounts(observations.filter((o) => o.type !== "conclusion")),
+          counts: {
+            ...prev.counts,
+            all: observations.length,
+            conclusion: (prev.counts.conclusion || 0) + 1,
+          },
+        };
+      });
+      await load();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось сохранить");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateConclusion = async (
+    id: string,
+    payload: { title: string; text: string }
+  ): Promise<boolean> => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetchJson<{ observation: PersonalObservation }>(`/api/v2/personal/observations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "conclusion",
+          title: payload.title,
+          body: payload.text,
+          tags: [],
+          linkKey: null,
+          why: "",
+        }),
+      });
+      setBoard((prev) => {
+        if (!prev) return prev;
+        const observations = prev.observations.map((o) => (o.id === id ? res.observation : o));
+        return { ...prev, observations };
+      });
+      await load();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось сохранить");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const remove = async (id: string) => {
     if (!confirm("Удалить запись?")) return;
     try {
@@ -454,9 +548,12 @@ export function PersonalObservationsClient() {
               Дневник
             </h1>
             <p className="v2-tight mt-2.5 text-[14.5px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
-              Не выводы о всей жизни. Просто то, что реально произошло и может оказаться значимым.
+              {tab === "entries"
+                ? "Не выводы о всей жизни. Просто то, что реально произошло и может оказаться значимым."
+                : "Месячные выводы — что стало яснее и что меняет стратегию. Лента по месяцам."}
             </p>
           </div>
+          {tab === "entries" ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <div className="flex h-10 w-[210px] items-center gap-2 rounded-xl bg-white px-3 shadow-[var(--v2-shadow-card)]">
               <V2Icons.search className="h-[15px] w-[15px] shrink-0 text-[var(--v2-ink-400)]" />
@@ -485,12 +582,53 @@ export function PersonalObservationsClient() {
               <V2Icons.plus className="h-4 w-4" /> Запись
             </button>
           </div>
+          ) : null}
+        </div>
+
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-xl bg-white p-1 shadow-[var(--v2-shadow-card)]">
+            <button
+              type="button"
+              onClick={() => setTab("entries")}
+              className={`v2-tight h-8 rounded-lg px-3.5 text-[13px] font-medium transition ${
+                tab === "entries"
+                  ? "bg-[var(--v2-ink-900)] text-white"
+                  : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-900)]"
+              }`}
+            >
+              Записи
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("conclusions")}
+              className={`v2-tight h-8 rounded-lg px-3.5 text-[13px] font-medium transition ${
+                tab === "conclusions"
+                  ? "bg-[var(--v2-ink-900)] text-white"
+                  : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-900)]"
+              }`}
+            >
+              Выводы
+              {conclusions.length ? (
+                <span className="v2-tnum ml-1.5 text-[11px] opacity-70">{conclusions.length}</span>
+              ) : null}
+            </button>
+          </div>
         </div>
 
         {error ? (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</div>
         ) : null}
 
+        {tab === "conclusions" ? (
+          <ObservationsConclusionsPanel
+            conclusions={conclusions}
+            saving={saving}
+            onCreate={createConclusion}
+            onUpdate={updateConclusion}
+            onRemove={(id) => void remove(id)}
+          />
+        ) : (
+          <>
         <div className="mb-6 flex flex-wrap items-center gap-2">
           <div className="relative">
             <select
@@ -739,7 +877,7 @@ export function PersonalObservationsClient() {
                 <p className="v2-tight mt-2 text-[16px] leading-snug">
                   {period === "all" ? (
                     <>
-                      Всего <span className="v2-tnum">{board?.observations.length ?? 0}</span> записей.
+                      Всего <span className="v2-tnum">{diaryObservations.length}</span> записей.
                     </>
                   ) : (
                     <>
@@ -762,6 +900,8 @@ export function PersonalObservationsClient() {
               </p>
             </div>
           </div>
+          </>
+        )}
       </div>
 
       {exportOpen ? (

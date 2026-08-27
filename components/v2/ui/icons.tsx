@@ -372,6 +372,13 @@ export const V2Icons = {
       <path d="M8 18V6h5a3.5 3.5 0 0 1 0 7H6m0 0h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  sport: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M6.5 8.5 9 6l2.5 2.5M15 6l2.5 2.5L15 11M8.5 15.5 6 18l2.5 2.5M18 15.5l2.5 2.5L18 21" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M9 12h6M12 9v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  ),
   check: (p: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path d="m5 12.5 5 5 9-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

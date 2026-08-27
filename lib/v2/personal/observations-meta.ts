@@ -8,6 +8,7 @@ export const OBSERVATION_TYPES = [
   "place",
   "love",
   "other",
+  "conclusion",
 ] as const;
 
 export type ObservationType = (typeof OBSERVATION_TYPES)[number];
@@ -25,6 +26,7 @@ export const OBSERVATION_TYPE_META: Record<
   place: { emoji: "🌍", label: "Среда", short: "Среда", tint: "#4D7C0F", bg: "#F1F7E4", border: "#DCE9BE" },
   love: { emoji: "❤️", label: "Отношения", short: "Отношения", tint: "#BE185D", bg: "#FDECF3", border: "#F8CEDF" },
   other: { emoji: "✦", label: "Другое", short: "Другое", tint: "#52525B", bg: "#F2F2F4", border: "#E1E1E6" },
+  conclusion: { emoji: "◆", label: "Вывод", short: "Выводы", tint: "#1F3AAF", bg: "#EFF4FF", border: "#CDDCFE" },
 };
 
 export const OBSERVATION_FILTER_TYPES: ObservationType[] = [
