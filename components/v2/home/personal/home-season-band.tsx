@@ -10,6 +10,7 @@ import {
   moveSeasonTaskToMonth,
   readSeasonStorage,
   toggleSeasonTaskDone,
+  updateSeasonTask,
   type SeasonStorageState,
 } from "@/lib/v2/home/home-season-storage";
 import {
@@ -72,6 +73,73 @@ function TaskLabel({ task, done }: { task: HomeSeasonTask; done: boolean }) {
 
 type MonthView = Omit<HomeMonth, "tasks"> & { tasks: Array<HomeSeasonTask & { done: boolean }> };
 
+function SeasonCardForm({
+  draftText,
+  draftHref,
+  onTextChange,
+  onHrefChange,
+  onSubmit,
+  onCancel,
+  submitLabel = "Сохранить",
+  autoFocus = false,
+}: {
+  draftText: string;
+  draftHref: string;
+  onTextChange: (value: string) => void;
+  onHrefChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  submitLabel?: string;
+  autoFocus?: boolean;
+}) {
+  return (
+    <div className="flex min-h-[92px] flex-col gap-3 rounded-2xl border-2 border-dashed border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)] px-[22px] py-5">
+      <input
+        type="text"
+        value={draftText}
+        onChange={(e) => onTextChange(e.target.value)}
+        placeholder="Текст карточки"
+        autoFocus={autoFocus}
+        className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[15px] text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onSubmit();
+          }
+          if (e.key === "Escape") onCancel();
+        }}
+      />
+      <input
+        type="url"
+        value={draftHref}
+        onChange={(e) => onHrefChange(e.target.value)}
+        placeholder="Ссылка на документ (необязательно)"
+        className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[14px] text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onCancel();
+        }}
+      />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!draftText.trim()}
+          className="v2-tight rounded-xl bg-[var(--v2-brand-600)] px-4 py-2 text-[13.5px] font-semibold text-white transition hover:bg-[var(--v2-brand-700)] disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {submitLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="v2-tight rounded-xl px-4 py-2 text-[13.5px] font-semibold text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)]"
+        >
+          Отмена
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function HomeSeasonBand() {
   const currentId = useMemo(() => resolveCurrentSeasonMonthId(new Date()), []);
   const [storage, setStorage] = useState<SeasonStorageState>(() => readSeasonStorage());
@@ -100,6 +168,10 @@ export function HomeSeasonBand() {
 
   const onAdd = (monthId: string, input: { text: string; href?: string }) => {
     refreshStorage(addSeasonTask(monthId, input));
+  };
+
+  const onEdit = (taskId: string, input: { text: string; href?: string }) => {
+    refreshStorage(updateSeasonTask(taskId, input));
   };
 
   const onDropToMonth = (monthId: string) => {
@@ -201,6 +273,7 @@ export function HomeSeasonBand() {
         onToggle={onToggle}
         onDelete={onDelete}
         onAdd={onAdd}
+        onEdit={onEdit}
         onDropToMonth={onDropToMonth}
       />
     </section>
@@ -215,6 +288,7 @@ function MonthPanel({
   onToggle,
   onDelete,
   onAdd,
+  onEdit,
   onDropToMonth,
 }: {
   month: MonthView;
@@ -224,28 +298,53 @@ function MonthPanel({
   onToggle: (id: string, done: boolean) => void;
   onDelete: (id: string) => void;
   onAdd: (monthId: string, input: { text: string; href?: string }) => void;
+  onEdit: (taskId: string, input: { text: string; href?: string }) => void;
   onDropToMonth: (monthId: string) => void;
 }) {
   const done = month.tasks.filter((t) => t.done).length;
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
   const [draftHref, setDraftHref] = useState("");
 
-  function resetAddForm() {
+  function resetDraft() {
     setAdding(false);
+    setEditingId(null);
     setDraftText("");
     setDraftHref("");
   }
 
   useEffect(() => {
-    resetAddForm();
+    resetDraft();
   }, [month.id]);
+
+  function startAdd() {
+    setEditingId(null);
+    setDraftText("");
+    setDraftHref("");
+    setAdding(true);
+  }
+
+  function startEdit(task: HomeSeasonTask) {
+    setAdding(false);
+    setEditingId(task.id);
+    setDraftText(task.text);
+    setDraftHref(task.href ?? "");
+  }
 
   function submitAdd() {
     const text = draftText.trim();
     if (!text) return;
     onAdd(month.id, { text, href: draftHref.trim() || undefined });
-    resetAddForm();
+    resetDraft();
+  }
+
+  function submitEdit() {
+    if (!editingId) return;
+    const text = draftText.trim();
+    if (!text) return;
+    onEdit(editingId, { text, href: draftHref.trim() || undefined });
+    resetDraft();
   }
 
   return (
@@ -270,10 +369,10 @@ function MonthPanel({
         <span className="v2-tnum v2-tight ml-auto text-[14px] font-semibold text-[var(--v2-ink-500)]">
           {done} из {month.tasks.length} сделано
         </span>
-        {!adding ? (
+        {!adding && !editingId ? (
           <button
             type="button"
-            onClick={() => setAdding(true)}
+            onClick={startAdd}
             className="v2-tight inline-flex items-center gap-1.5 rounded-xl border border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] px-3.5 py-2 text-[13.5px] font-semibold text-[var(--v2-brand-700)] transition hover:border-[var(--v2-brand-400)] hover:bg-[var(--v2-brand-100)]"
           >
             <V2Icons.plus className="h-3.5 w-3.5" />
@@ -289,91 +388,86 @@ function MonthPanel({
       ) : null}
 
       <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
-        {month.tasks.map((task) => (
-          <div key={task.id} className="group relative">
-            <button
-              type="button"
-              draggable
-              onDragStart={() => onDragStart(task.id)}
-              onDragEnd={onDragEnd}
-              onClick={() => onToggle(task.id, !task.done)}
-              className={`flex min-h-[92px] w-full cursor-grab items-start gap-4 rounded-2xl px-[22px] py-5 pr-12 text-left transition active:cursor-grabbing ${
-                task.done
-                  ? "text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
-                  : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
-              }`}
-              style={task.done ? { background: HERO_BLUE } : undefined}
-            >
-              <HomeTaskCheckbox done={task.done} tone={task.done ? "on-blue" : "default"} />
-              <TaskLabel task={task} done={task.done} />
-            </button>
-            <button
-              type="button"
-              title="Удалить"
-              aria-label="Удалить задачу"
-              onClick={() => onDelete(task.id)}
-              className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
-                task.done
-                  ? "text-white/70 hover:bg-white/15 hover:text-white"
-                  : "text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
-              }`}
-            >
-              <V2Icons.trash className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
-        {adding ? (
-          <div className="flex min-h-[92px] flex-col gap-3 rounded-2xl border-2 border-dashed border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)] px-[22px] py-5">
-            <input
-              type="text"
-              value={draftText}
-              onChange={(e) => setDraftText(e.target.value)}
-              placeholder="Текст карточки"
+        {month.tasks.map((task) =>
+          editingId === task.id ? (
+            <SeasonCardForm
+              key={task.id}
+              draftText={draftText}
+              draftHref={draftHref}
+              onTextChange={setDraftText}
+              onHrefChange={setDraftHref}
+              onSubmit={submitEdit}
+              onCancel={resetDraft}
+              submitLabel="Сохранить изменения"
               autoFocus
-              className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[15px] text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  submitAdd();
-                }
-                if (e.key === "Escape") resetAddForm();
-              }}
             />
-            <input
-              type="url"
-              value={draftHref}
-              onChange={(e) => setDraftHref(e.target.value)}
-              placeholder="Ссылка на документ (необязательно)"
-              className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[14px] text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
-            />
-            <div className="flex flex-wrap gap-2">
+          ) : (
+            <div key={task.id} className="group relative">
               <button
                 type="button"
-                onClick={submitAdd}
-                disabled={!draftText.trim()}
-                className="v2-tight rounded-xl bg-[var(--v2-brand-600)] px-4 py-2 text-[13.5px] font-semibold text-white transition hover:bg-[var(--v2-brand-700)] disabled:cursor-not-allowed disabled:opacity-45"
+                draggable={!adding && !editingId}
+                onDragStart={() => onDragStart(task.id)}
+                onDragEnd={onDragEnd}
+                onClick={() => onToggle(task.id, !task.done)}
+                className={`flex min-h-[92px] w-full cursor-grab items-start gap-4 rounded-2xl px-[22px] py-5 pr-[4.5rem] text-left transition active:cursor-grabbing ${
+                  task.done
+                    ? "text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
+                    : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
+                }`}
+                style={task.done ? { background: HERO_BLUE } : undefined}
               >
-                Сохранить
+                <HomeTaskCheckbox done={task.done} tone={task.done ? "on-blue" : "default"} />
+                <TaskLabel task={task} done={task.done} />
               </button>
               <button
                 type="button"
-                onClick={resetAddForm}
-                className="v2-tight rounded-xl px-4 py-2 text-[13.5px] font-semibold text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)]"
+                title="Редактировать"
+                aria-label="Редактировать карточку"
+                onClick={() => startEdit(task)}
+                className={`absolute right-10 top-2 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
+                  task.done
+                    ? "text-white/70 hover:bg-white/15 hover:text-white"
+                    : "text-[var(--v2-ink-400)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)]"
+                }`}
               >
-                Отмена
+                <V2Icons.edit className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Удалить"
+                aria-label="Удалить задачу"
+                onClick={() => onDelete(task.id)}
+                className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
+                  task.done
+                    ? "text-white/70 hover:bg-white/15 hover:text-white"
+                    : "text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
+                }`}
+              >
+                <V2Icons.trash className="h-3.5 w-3.5" />
               </button>
             </div>
-          </div>
-        ) : (
+          )
+        )}
+        {adding ? (
+          <SeasonCardForm
+            draftText={draftText}
+            draftHref={draftHref}
+            onTextChange={setDraftText}
+            onHrefChange={setDraftHref}
+            onSubmit={submitAdd}
+            onCancel={resetDraft}
+            autoFocus
+          />
+        ) : !editingId ? (
           <button
             type="button"
-            onClick={() => setAdding(true)}
+            onClick={startAdd}
             className="flex min-h-[92px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-[22px] py-5 text-[var(--v2-ink-500)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)]"
           >
             <V2Icons.plus className="h-5 w-5" />
             <span className="v2-tight text-[14.5px] font-semibold">Добавить карточку</span>
           </button>
-        )}
+        ) : null}
       </div>
 
       {month.warn ? (

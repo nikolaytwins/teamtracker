@@ -577,7 +577,7 @@ function StatementImportModal({
         <div className="border-b border-[var(--v2-ink-100)] px-6 py-4">
           <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Импорт выписки</h2>
           <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
-            PDF Т-Банка («Движение средств за период») или CSV. Дубликаты пропускаются автоматически.
+            PDF Т-Банка («Движение средств за период») или CSV из раздела «Операции». Дубликаты пропускаются автоматически.
           </p>
         </div>
 

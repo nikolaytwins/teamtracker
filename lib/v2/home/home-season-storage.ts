@@ -9,6 +9,11 @@ export type SeasonCustomTask = {
   href?: string;
 };
 
+export type SeasonTaskEdit = {
+  text: string;
+  href?: string;
+};
+
 export type SeasonStorageState = {
   /** taskId → monthId (если перенесли drag-and-drop) */
   taskMonth: Record<string, string>;
@@ -20,10 +25,12 @@ export type SeasonStorageState = {
   taskHidden: string[];
   /** пользовательские карточки */
   customTasks: SeasonCustomTask[];
+  /** правки встроенных карточек */
+  taskEdits: Record<string, SeasonTaskEdit>;
 };
 
 function emptyState(): SeasonStorageState {
-  return { taskMonth: {}, taskOrder: {}, taskDone: {}, taskHidden: [], customTasks: [] };
+  return { taskMonth: {}, taskOrder: {}, taskDone: {}, taskHidden: [], customTasks: [], taskEdits: {} };
 }
 
 export function readSeasonStorage(): SeasonStorageState {
@@ -38,6 +45,7 @@ export function readSeasonStorage(): SeasonStorageState {
       taskDone: parsed.taskDone ?? {},
       taskHidden: parsed.taskHidden ?? [],
       customTasks: parsed.customTasks ?? [],
+      taskEdits: parsed.taskEdits ?? {},
     };
   } catch {
     return emptyState();
@@ -70,8 +78,14 @@ export function buildSeasonMonths(
   for (const [taskId, task] of allTasks) {
     if (storage.taskHidden.includes(taskId)) continue;
     const monthId = storage.taskMonth[taskId] ?? task.defaultMonthId;
+    const edit = storage.taskEdits[taskId];
     const list = byMonth.get(monthId) ?? [];
-    list.push({ ...task, done: Boolean(storage.taskDone[taskId]) });
+    list.push({
+      id: task.id,
+      text: edit?.text ?? task.text,
+      href: edit ? edit.href?.trim() || undefined : task.href,
+      done: Boolean(storage.taskDone[taskId]),
+    });
     byMonth.set(monthId, list);
   }
 
@@ -149,6 +163,7 @@ export function deleteSeasonTask(taskId: string): SeasonStorageState {
   }
   delete storage.taskDone[taskId];
   delete storage.taskMonth[taskId];
+  delete storage.taskEdits[taskId];
   for (const monthId of Object.keys(storage.taskOrder)) {
     storage.taskOrder[monthId] = storage.taskOrder[monthId]!.filter((id) => id !== taskId);
   }
@@ -186,6 +201,29 @@ export function addSeasonTask(
   storage.customTasks = [...(storage.customTasks ?? []), task];
   const order = storage.taskOrder[monthId] ?? [];
   storage.taskOrder[monthId] = [id, ...order.filter((existingId) => existingId !== id)];
+  writeSeasonStorage(storage);
+  return storage;
+}
+
+export function updateSeasonTask(
+  taskId: string,
+  input: { text: string; href?: string }
+): SeasonStorageState {
+  const text = input.text.trim();
+  if (!text) return readSeasonStorage();
+
+  const storage = readSeasonStorage();
+  const href = input.href?.trim();
+
+  if (taskId.startsWith("custom-")) {
+    storage.customTasks = (storage.customTasks ?? []).map((task) => {
+      if (task.id !== taskId) return task;
+      return href ? { ...task, text, href } : { id: task.id, monthId: task.monthId, text };
+    });
+  } else {
+    storage.taskEdits[taskId] = href ? { text, href } : { text };
+  }
+
   writeSeasonStorage(storage);
   return storage;
 }

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireV2PersonalFinance } from "@/lib/v2/auth/require-v2-personal";
 import { loadPersonalFinanceDashboard } from "@/lib/v2/personal/personal-finance-repo";
 import {
+  decodeStatementBytes,
   guessBudgetCategoryName,
+  looksLikeBankCsv,
   parseBankStatementCsv,
   parseBankStatementText,
   type ParsedStatementOp,
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
         rawText = await extractPdfText(buf);
       } else {
         source = "csv";
-        rawText = buf.toString("utf-8");
+        rawText = decodeStatementBytes(buf);
       }
     } else {
       const body = await request.json();
@@ -58,7 +60,9 @@ export async function POST(request: NextRequest) {
     }
 
     const parsed =
-      source === "csv" || (!rawText.includes("Движение средств") && rawText.includes(";"))
+      source === "csv" ||
+      looksLikeBankCsv(rawText) ||
+      (!rawText.includes("Движение средств") && /[;\t]/.test(rawText.split(/\r?\n/)[0] ?? ""))
         ? parseBankStatementCsv(rawText)
         : parseBankStatementText(rawText);
 

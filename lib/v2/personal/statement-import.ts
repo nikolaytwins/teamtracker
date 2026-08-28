@@ -38,7 +38,9 @@ const GENERIC_LINE =
 function parseMoneyRub(raw: string): number | null {
   const cleaned = raw
     .replace(/₽/g, "")
+    .replace(/\u2212/g, "-")
     .replace(/\u00a0/g, " ")
+    .replace(/\b(RUB|USD|EUR|RUR)\b/gi, "")
     .replace(/\s/g, "")
     .replace(",", ".")
     .trim();
@@ -207,41 +209,240 @@ export function parseBankStatementCsv(csv: string): StatementParseResult {
   const warnings: string[] = [];
   const operations: ParsedStatementOp[] = [];
   let skipped = 0;
-  const lines = csv.split(/\r?\n/).filter((l) => l.trim());
+  const normalized = csv.replace(/^\uFEFF/, "").trim();
+  const rows = parseCsvRows(normalized);
+  if (rows.length === 0) {
+    return { bank: "generic", operations, skipped, warnings: ["Пустой CSV"] };
+  }
 
-  for (const line of lines) {
-    if (/дата|date|описание|сумма/i.test(line) && !DATE_START.test(line.trim())) continue;
-    const parts = line.includes(";") ? line.split(";") : line.split(",");
-    if (parts.length < 3) {
+  const headerIdx = rows.findIndex((row) => isHeaderRow(row));
+  const header = headerIdx >= 0 ? rows[headerIdx] : null;
+  const dataRows = headerIdx >= 0 ? rows.slice(headerIdx + 1) : rows;
+  const columns = header ? mapCsvColumns(header) : null;
+
+  for (const parts of dataRows) {
+    if (!parts.length || parts.every((p) => !p.trim())) continue;
+    if (isHeaderRow(parts)) continue;
+
+    let dateRaw = "";
+    let timeRaw: string | null = null;
+    let descRaw = "";
+    let amountRaw = "";
+    let cardRaw: string | null = null;
+
+    if (columns && columns.date >= 0 && columns.amount >= 0) {
+      dateRaw = pickField(parts, columns.date) ?? "";
+      timeRaw = extractTimeFromDate(dateRaw);
+      descRaw = pickField(parts, columns.description) ?? "";
+      amountRaw = pickField(parts, columns.amount) ?? "";
+      cardRaw = columns.card >= 0 ? pickField(parts, columns.card) : null;
+    } else if (parts.length >= 3) {
+      dateRaw = parts[0]?.trim() ?? "";
+      timeRaw = extractTimeFromDate(dateRaw);
+      descRaw = parts.slice(1, -1).join(" ").trim();
+      amountRaw = parts[parts.length - 1]?.trim() ?? "";
+    } else {
       skipped++;
       continue;
     }
-    const dateRaw = parts[0].trim().replace(/^"|"$/g, "");
-    const descRaw = parts.slice(1, -1).join(" ").trim().replace(/^"|"$/g, "");
-    const amountRaw = parts[parts.length - 1].trim().replace(/^"|"$/g, "");
+
+    dateRaw = dateRaw.trim().replace(/^"|"$/g, "");
+    amountRaw = amountRaw.trim().replace(/^"|"$/g, "");
+    descRaw = descRaw.trim().replace(/^"|"$/g, "");
+
     let iso: string | null = null;
     if (/^\d{2}\.\d{2}\.\d{4}/.test(dateRaw)) iso = dmyToIso(dateRaw.slice(0, 10));
     else if (/^\d{4}-\d{2}-\d{2}/.test(dateRaw)) iso = dateRaw.slice(0, 10);
+
     const amount = parseMoneyRub(amountRaw);
     if (!iso || amount == null || amount === 0) {
       skipped++;
-      warnings.push(`CSV: ${line.slice(0, 80)}`);
+      if (dateRaw || amountRaw) warnings.push(`CSV: ${[dateRaw, descRaw, amountRaw].filter(Boolean).join(" · ").slice(0, 80)}`);
       continue;
     }
-    const { description, card_last4 } = cleanDescription(descRaw || "Операция");
+
+    const cleaned = cleanDescription(descRaw || "Операция");
+    const card_last4 =
+      cardRaw && /\d{4}/.test(cardRaw)
+        ? (cardRaw.match(/(\d{4})\s*$/)?.[1] ?? null)
+        : cleaned.card_last4;
+
     operations.push({
       date: iso,
-      time: null,
+      time: timeRaw,
       amount_rub: Math.abs(amount),
       txn_type: amount < 0 ? "expense" : "income",
-      description,
+      description: cleaned.description,
       card_last4,
-      external_id: makeExternalId({ date: iso, time: null, amount, description }),
-      raw_line: line,
+      external_id: makeExternalId({ date: iso, time: timeRaw, amount, description: cleaned.description }),
+      raw_line: parts.join(";"),
     });
   }
 
-  return { bank: "generic", operations, skipped, warnings: warnings.slice(0, 20) };
+  const bank =
+    header && columns && columns.amount >= 0 && /дата операции|сумма операции|tbank|tinkoff/i.test(normalized)
+      ? "tbank"
+      : "generic";
+
+  return { bank, operations, skipped, warnings: warnings.slice(0, 20) };
+}
+
+export function looksLikeBankCsv(text: string): boolean {
+  const rows = parseCsvRows(text.replace(/^\uFEFF/, "").trim());
+  const first = rows[0];
+  if (!first?.length) return false;
+  if (isHeaderRow(first)) return true;
+  const dateCell = first[0]?.trim() ?? "";
+  return first.length >= 3 && (/^\d{2}\.\d{2}\.\d{4}/.test(dateCell) || /^\d{4}-\d{2}-\d{2}/.test(dateCell));
+}
+
+function parseCsvRows(csv: string): string[][] {
+  const rows: string[][] = [];
+  for (const line of csv.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    rows.push(parseCsvLine(line));
+  }
+  return rows;
+}
+
+function parseCsvLine(line: string): string[] {
+  const delimiter = detectCsvDelimiter(line);
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === delimiter && !inQuotes) {
+      result.push(stripCsvCell(current));
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+
+  result.push(stripCsvCell(current));
+  return result;
+}
+
+function stripCsvCell(value: string): string {
+  return value.trim().replace(/^"|"$/g, "").trim();
+}
+
+function detectCsvDelimiter(line: string): ";" | "\t" | "," {
+  const semicolons = (line.match(/;/g) ?? []).length;
+  const tabs = (line.match(/\t/g) ?? []).length;
+  const commas = (line.match(/,/g) ?? []).length;
+  if (semicolons >= tabs && semicolons >= commas && semicolons > 0) return ";";
+  if (tabs >= commas && tabs > 0) return "\t";
+  return ",";
+}
+
+function normalizeHeader(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\u00a0/g, " ")
+    .replace(/ё/g, "е")
+    .trim();
+}
+
+function isHeaderRow(parts: string[]): boolean {
+  const joined = normalizeHeader(parts.join(" "));
+  if (!joined) return false;
+  if (DATE_START.test(parts[0]?.trim() ?? "")) return false;
+  return (
+    /(дата операции|дата проведения|date|описание|description|сумма операции|amount|номер карты)/.test(
+      joined
+    ) && !/^\d{4}-\d{2}-\d{2}/.test(parts[0]?.trim() ?? "")
+  );
+}
+
+function mapCsvColumns(header: string[]): {
+  date: number;
+  amount: number;
+  description: number;
+  card: number;
+} {
+  const idx = (patterns: RegExp[]) =>
+    header.findIndex((cell) => {
+      const h = normalizeHeader(cell);
+      return patterns.some((p) => p.test(h));
+    });
+
+  const date =
+    idx([/^дата операции$/, /^operation date$/, /^date$/, /^дата$/]) >= 0
+      ? idx([/^дата операции$/, /^operation date$/, /^date$/, /^дата$/])
+      : idx([/дата/]);
+
+  const amount = idx([
+    /^сумма операции$/,
+    /^сумма операции в валюте счета$/,
+    /^сумма в валюте счета$/,
+    /^amount$/,
+    /^сумма$/,
+  ]);
+
+  const description = idx([
+    /^описание операции$/,
+    /^описание$/,
+    /^description$/,
+    /^назначение платежа$/,
+    /^merchant$/,
+  ]);
+
+  const card = idx([/^номер карты$/, /^card$/, /^карта$/]);
+
+  return { date, amount, description, card };
+}
+
+function pickField(parts: string[], index: number): string | null {
+  if (index < 0 || index >= parts.length) return null;
+  const value = parts[index]?.trim();
+  return value ? value : null;
+}
+
+function extractTimeFromDate(value: string): string | null {
+  const match = /(\d{2}:\d{2})/.exec(value);
+  return match?.[1] ?? null;
+}
+
+/** Decode bank statement bytes (UTF-8/UTF-16/Windows-1251). */
+export function decodeStatementBytes(buf: Buffer): string {
+  if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) {
+    return buf.subarray(3).toString("utf-8").replace(/^\uFEFF/, "");
+  }
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+    return buf.subarray(2).toString("utf16le").replace(/^\uFEFF/, "");
+  }
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    const swapped = Buffer.alloc(buf.length - 2);
+    for (let i = 2; i + 1 < buf.length; i += 2) {
+      swapped[i - 2] = buf[i + 1];
+      swapped[i - 1] = buf[i];
+    }
+    return swapped.toString("utf16le").replace(/^\uFEFF/, "");
+  }
+
+  const utf8 = buf.toString("utf-8").replace(/^\uFEFF/, "");
+  if (!utf8.includes("\ufffd") && /[А-Яа-яЁё]/.test(utf8.slice(0, 2000))) return utf8;
+
+  try {
+    const win1251 = new TextDecoder("windows-1251").decode(buf);
+    if (/[А-Яа-яЁё]/.test(win1251.slice(0, 2000))) return win1251.replace(/^\uFEFF/, "");
+  } catch {
+    /* ignore */
+  }
+
+  return utf8;
 }
 
 const CATEGORY_HINTS: { keys: string[]; name: string }[] = [
