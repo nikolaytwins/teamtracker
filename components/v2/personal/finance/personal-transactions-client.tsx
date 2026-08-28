@@ -2,6 +2,7 @@
 
 import { PersonalAmt, PersonalMaskProvider } from "./personal-finance-mask";
 import { PersonalOperationModal } from "./personal-operation-modal";
+import { PersonalTransactionAmountInline } from "./personal-money-inline";
 import { fetchJson, IMPORT_FETCH_TIMEOUT_MS } from "@/lib/v2/client/fetch-json";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { apiUrl, appPath } from "@/lib/api-url";
@@ -188,8 +189,7 @@ export function PersonalTransactionsClient({
             <button
               type="button"
               onClick={() => setOperationOpen(true)}
-              disabled={accounts.length === 0}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-40"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
             >
               <V2Icons.plus className="h-4 w-4" />
               Операция
@@ -360,7 +360,12 @@ export function PersonalTransactionsClient({
                     <PfCard className="divide-y divide-[var(--v2-ink-100)]/80 overflow-hidden">
                       {rows.map((t) => {
                         const meta = typeMeta(t.txn_type);
-                        const sign = t.txn_type === "income" ? "+" : t.txn_type === "expense" ? "−" : "";
+                        const amountClass =
+                          t.txn_type === "income"
+                            ? "text-emerald-600"
+                            : t.txn_type === "expense"
+                              ? "text-[var(--v2-ink-900)]"
+                              : "text-[var(--v2-ink-700)]";
                         return (
                           <div
                             key={t.id}
@@ -407,18 +412,16 @@ export function PersonalTransactionsClient({
                                 {t.import_batch_id ? <span>· импорт</span> : null}
                               </div>
                             </div>
-                            <div
-                              className={`v2-tnum shrink-0 text-[15px] font-semibold ${
-                                t.txn_type === "income"
-                                  ? "text-emerald-600"
-                                  : t.txn_type === "expense"
-                                    ? "text-[var(--v2-ink-900)]"
-                                    : "text-[var(--v2-ink-700)]"
-                              }`}
-                            >
-                              {sign}
-                              <PersonalAmt v={t.amount_rub} />
-                            </div>
+                            <PersonalTransactionAmountInline
+                              transactionId={t.id}
+                              value={t.amount_rub}
+                              txnType={t.txn_type}
+                              className={amountClass}
+                              onSaved={(txn) => {
+                                setTransactions((prev) => prev.map((row) => (row.id === txn.id ? txn : row)));
+                              }}
+                              onError={(msg) => setError(msg)}
+                            />
                             <button
                               type="button"
                               onClick={() => void deleteTxn(t.id)}
@@ -443,7 +446,6 @@ export function PersonalTransactionsClient({
           onClose={() => setOperationOpen(false)}
           year={year}
           month={month}
-          accounts={accounts}
           budgetCategories={budgetCategories}
           onDone={() => void load(year, month)}
         />

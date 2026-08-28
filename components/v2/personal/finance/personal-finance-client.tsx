@@ -289,7 +289,7 @@ function PfTopbar({
           type="button"
           onClick={onOperation}
           disabled={!canOperate}
-          title={canOperate ? undefined : "Сначала добавьте счёт"}
+          title={canOperate ? undefined : "Недоступно"}
           className="v2-tight ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <V2Icons.plus className="h-4 w-4" />
@@ -1751,7 +1751,7 @@ export function PersonalFinanceClient() {
           masked={masked}
           setMasked={setMasked}
           onOperation={() => setOperationOpen(true)}
-          canOperate={accounts.length > 0}
+          canOperate
         />
 
         <div className="flex-1 overflow-y-auto">
@@ -1836,7 +1836,6 @@ export function PersonalFinanceClient() {
           onClose={() => setOperationOpen(false)}
           year={year}
           month={month}
-          accounts={accounts}
           budgetCategories={budgetCategories}
           onDone={() => void reload()}
         />

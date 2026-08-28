@@ -3,7 +3,7 @@
 import { PersonalAmt } from "./personal-finance-mask";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { formatPersonalNative } from "@/lib/v2/personal/formatters";
-import type { PersonalAccountRow, PersonalCapitalRow } from "@/lib/v2/personal/types";
+import type { PersonalAccountRow, PersonalCapitalRow, PersonalTransactionRow, PersonalTxnType } from "@/lib/v2/personal/types";
 import { useEffect, useRef, useState } from "react";
 
 function parseMoneyInput(raw: string, allowCents = false): number | null {
@@ -180,6 +180,50 @@ export function PersonalAccountBalanceInline({
         </span>
       ) : null}
     </div>
+  );
+}
+
+export function PersonalTransactionAmountInline({
+  transactionId,
+  value,
+  txnType,
+  onSaved,
+  onError,
+  className = "",
+}: {
+  transactionId: string;
+  value: number;
+  txnType: PersonalTxnType;
+  onSaved?: (transaction: PersonalTransactionRow) => void;
+  onError?: (msg: string) => void;
+  className?: string;
+}) {
+  const sign = txnType === "income" ? "+" : txnType === "expense" ? "−" : "";
+  return (
+    <PersonalMoneyInline
+      value={value}
+      className={className}
+      title="Нажмите, чтобы изменить сумму"
+      display={
+        <>
+          {sign}
+          <PersonalAmt v={value} />
+        </>
+      }
+      onSave={async (next) => {
+        const { transaction } = await fetchJson<{ transaction: PersonalTransactionRow }>(
+          `/api/v2/personal/finance/transactions/${transactionId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount_rub: next }),
+          }
+        );
+        onSaved?.(transaction);
+        return transaction.amount_rub;
+      }}
+      onError={onError}
+    />
   );
 }
 

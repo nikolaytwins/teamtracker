@@ -3,16 +3,38 @@ import { requireV2PersonalFinance } from "@/lib/v2/auth/require-v2-personal";
 import {
   deletePersonalTransaction,
   PersonalFinanceValidationError,
+  updatePersonalTransactionAmount,
 } from "@/lib/v2/personal/personal-finance-repo";
+
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function PATCH(request: NextRequest, { params }: Ctx) {
+  const auth = await requireV2PersonalFinance();
+  if (!auth.ok) return auth.response;
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const amount_rub = Number(body.amount_rub);
+    const transaction = await updatePersonalTransactionAmount(auth.ctx, id, amount_rub);
+    if (!transaction) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ transaction });
+  } catch (e) {
+    if (e instanceof PersonalFinanceValidationError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    console.error("update personal transaction:", e);
+    return NextResponse.json({ error: "Failed to update transaction" }, { status: 500 });
+  }
+}
 
 export async function DELETE(
   _request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  _context: Ctx
 ) {
   const auth = await requireV2PersonalFinance();
   if (!auth.ok) return auth.response;
   try {
-    const { id } = await context.params;
+    const { id } = await _context.params;
     await deletePersonalTransaction(auth.ctx, id);
     return NextResponse.json({ ok: true });
   } catch (e) {
