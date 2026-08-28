@@ -117,7 +117,7 @@ export function PersonalTransactionsClient({
   }, [year, month, load]);
 
   const deleteTxn = async (id: string) => {
-    if (!confirm("Удалить операцию? Баланс и траты по категории откатятся.")) return;
+    if (!confirm("Удалить операцию?")) return;
     try {
       await fetchJson(`/api/v2/personal/finance/transactions/${id}`, { method: "DELETE" });
       await load(year, month);
@@ -517,7 +517,6 @@ function StatementImportModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<ImportPreviewItem[]>([]);
   const [accountId, setAccountId] = useState("");
-  const [applyBalances, setApplyBalances] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -533,7 +532,6 @@ function StatementImportModal({
     setItems([]);
     setError(null);
     setMeta(null);
-    setApplyBalances(false);
     setCategoriesByMonth({});
     setCreatingForIdx(null);
     setNewCategoryName("");
@@ -627,7 +625,6 @@ function StatementImportModal({
           body: JSON.stringify({
             from_account_id: accountId,
             to_account_id: accountId,
-            apply_balances: applyBalances,
             items: selected,
           }),
         },
@@ -707,13 +704,13 @@ function StatementImportModal({
             </div>
           ) : (
             <>
-              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="mb-4">
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
-                  Счёт
+                  Счёт (для привязки операций)
                   <select
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-[13px]"
+                    className="mt-1 h-10 w-full max-w-sm rounded-xl border border-[var(--v2-ink-200)] px-3 text-[13px]"
                   >
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>
@@ -722,22 +719,6 @@ function StatementImportModal({
                     ))}
                   </select>
                 </label>
-                <div className="flex flex-col justify-end">
-                  <label className="flex items-start gap-2 text-[12.5px] text-[var(--v2-ink-600)]">
-                    <input
-                      type="checkbox"
-                      checked={applyBalances}
-                      onChange={(e) => setApplyBalances(e.target.checked)}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      Менять баланс счёта
-                      <span className="mt-0.5 block text-[11.5px] text-[var(--v2-ink-400)]">
-                        Выкл., если баланс уже актуален — учтём только траты по категориям
-                      </span>
-                    </span>
-                  </label>
-                </div>
               </div>
 
               <div className="mb-3 flex items-center justify-between text-[12.5px] text-[var(--v2-ink-500)]">

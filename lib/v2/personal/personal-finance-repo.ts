@@ -256,6 +256,70 @@ async function listForecastExtras(
   return (data ?? []).map((r) => mapForecastExtra(r as Record<string, unknown>));
 }
 
+/** Синхронизирует spent_rub категорий и общий budgetSpent из expense-транзакций месяца. */
+async function syncBudgetSpentFromTransactions(
+  userId: string,
+  year: number,
+  month: number,
+  budgetCategories: PersonalBudgetCategoryRow[]
+): Promise<{ categories: PersonalBudgetCategoryRow[]; totalSpent: number }> {
+  const sb = getV2Supabase();
+  const { data: txns, error } = await sb
+    .from("v2_personal_transactions")
+    .select("amount_rub, budget_category_id")
+    .eq("user_id", userId)
+    .eq("year", year)
+    .eq("month", month)
+    .eq("txn_type", "expense");
+  if (error) throw error;
+
+  const spentByCategory = new Map<string, number>();
+  let totalSpent = 0;
+  for (const t of txns ?? []) {
+    const amount = Number(t.amount_rub) || 0;
+    totalSpent += amount;
+    const catId = t.budget_category_id ? String(t.budget_category_id) : null;
+    if (catId) {
+      spentByCategory.set(catId, (spentByCategory.get(catId) ?? 0) + amount);
+    }
+  }
+
+  const now = nowIso();
+  const categories = budgetCategories.map((c) => ({
+    ...c,
+    spent_rub: spentByCategory.get(c.id) ?? 0,
+  }));
+
+  await Promise.all(
+    categories.map((c) =>
+      sb
+        .from("v2_personal_budget_categories")
+        .update({ spent_rub: c.spent_rub, updated_at: now })
+        .eq("id", c.id)
+        .eq("user_id", userId)
+    )
+  );
+
+  return { categories, totalSpent };
+}
+
+async function syncBudgetSpentForMonth(userId: string, year: number, month: number): Promise<void> {
+  await ensureBudgetMonth(userId, year, month);
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_budget_categories")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("year", year)
+    .eq("month", month)
+    .order("sort_order");
+  if (error) throw error;
+  const categories = (data ?? []).map((r) =>
+    mapBudgetCategoryRow(r as Record<string, unknown>, userId, year, month)
+  );
+  await syncBudgetSpentFromTransactions(userId, year, month, categories);
+}
+
 function buildSummary(
   accounts: PersonalAccountRow[],
   capital: PersonalCapitalRow[],
@@ -263,7 +327,8 @@ function buildSummary(
   tax: PersonalTaxProfileRow,
   budget: PersonalBudgetMonthRow,
   budgetCategories: PersonalBudgetCategoryRow[],
-  paidContributions: number
+  paidContributions: number,
+  budgetSpentOverride?: number
 ) {
   const disposable = accounts.filter((a) => a.disposable).reduce((s, a) => s + a.balance_rub, 0);
   const reserves = accounts.filter((a) => !a.disposable).reduce((s, a) => s + a.balance_rub, 0);
@@ -289,7 +354,8 @@ function buildSummary(
     taxFixedContributions - taxPaidContributions + taxRevenueTax + taxPatentRemaining,
     0
   );
-  const budgetSpent = budgetCategories.reduce((s, c) => s + c.spent_rub, 0);
+  const budgetSpent =
+    budgetSpentOverride ?? budgetCategories.reduce((s, c) => s + c.spent_rub, 0);
   const budgetLeft = budget.limit_rub - budgetSpent;
   return {
     disposable,
@@ -443,7 +509,7 @@ export async function loadPersonalFinanceDashboard(
         sort_order: Number(r.sort_order) || 0,
       }) satisfies PersonalTaxAdvanceRow
   );
-  const budgetCategories = (categoriesRes.data ?? []).map(
+  let budgetCategories = (categoriesRes.data ?? []).map(
     (r) =>
       ({
         id: String(r.id),
@@ -472,7 +538,18 @@ export async function loadPersonalFinanceDashboard(
   const paidContributions = taxAdvances
     .filter((a) => !a.planned)
     .reduce((s, a) => s + a.amount_rub, 0);
-  const summary = buildSummary(accounts, capital, incomes, tax, budget, budgetCategories, paidContributions);
+  const syncedBudget = await syncBudgetSpentFromTransactions(userId, year, month, budgetCategories);
+  budgetCategories = syncedBudget.categories;
+  const summary = buildSummary(
+    accounts,
+    capital,
+    incomes,
+    tax,
+    budget,
+    budgetCategories,
+    paidContributions,
+    syncedBudget.totalSpent
+  );
 
   // Прибыль / выручка из «Проекты и финансы» + среднее за 6 мес. из истории
   let projectExpectedRevenue = 0;
@@ -719,62 +796,6 @@ async function resolveRubBalance(
     return { balance_native: native, balance_rub: Math.round(native) };
   }
   return { balance_native: native, balance_rub: rubFromNative(native, rate) };
-}
-
-/** Сдвиг баланса счёта на deltaRub с поддержкой валютных счетов. */
-async function adjustAccountBalanceRub(
-  accountId: string,
-  userId: string,
-  deltaRub: number
-): Promise<void> {
-  if (!deltaRub) return;
-  const sb = getV2Supabase();
-  const { data: acc } = await sb
-    .from("v2_personal_accounts")
-    .select("balance_rub, balance_native, currency_code")
-    .eq("id", accountId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!acc) return;
-
-  const currency = isPersonalAccountCurrency(acc.currency_code) ? acc.currency_code : "RUB";
-  const now = nowIso();
-
-  if (currency === "RUB") {
-    const next = Math.round(Number(acc.balance_rub) || 0) + deltaRub;
-    await sb
-      .from("v2_personal_accounts")
-      .update({
-        balance_rub: next,
-        balance_native: next,
-        updated_at: now,
-      })
-      .eq("id", accountId);
-    return;
-  }
-
-  const rates = await getFxRateMap();
-  const rate = rates.get(currency);
-  if (rate == null || rate <= 0) {
-    await sb
-      .from("v2_personal_accounts")
-      .update({
-        balance_rub: Math.round(Number(acc.balance_rub) || 0) + deltaRub,
-        updated_at: now,
-      })
-      .eq("id", accountId);
-    return;
-  }
-
-  const nextNative = roundMoney((Number(acc.balance_native) || 0) + deltaRub / rate);
-  await sb
-    .from("v2_personal_accounts")
-    .update({
-      balance_native: nextNative,
-      balance_rub: rubFromNative(nextNative, rate),
-      updated_at: now,
-    })
-    .eq("id", accountId);
 }
 
 function capitalPatch(patch: Partial<PersonalCapitalRow>): Partial<PersonalCapitalRow> {
@@ -1165,33 +1186,7 @@ export async function createPersonalTransaction(
     throw insErr;
   }
 
-  if (input.txn_type === "expense" && input.from_account_id) {
-    await adjustAccountBalanceRub(input.from_account_id, userId, -input.amount_rub);
-    if (input.budget_category_id) {
-      const { data: cat } = await sb
-        .from("v2_personal_budget_categories")
-        .select("spent_rub")
-        .eq("id", input.budget_category_id)
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (cat) {
-        await sb
-          .from("v2_personal_budget_categories")
-          .update({ spent_rub: Number(cat.spent_rub) + input.amount_rub, updated_at: now })
-          .eq("id", input.budget_category_id)
-          .eq("user_id", userId);
-      }
-    }
-  }
-
-  if (input.txn_type === "income" && input.to_account_id) {
-    await adjustAccountBalanceRub(input.to_account_id, userId, input.amount_rub);
-  }
-
-  if (input.txn_type === "transfer" && input.from_account_id && input.to_account_id) {
-    await adjustAccountBalanceRub(input.from_account_id, userId, -input.amount_rub);
-    await adjustAccountBalanceRub(input.to_account_id, userId, input.amount_rub);
-  }
+  await syncBudgetSpentForMonth(userId, input.year, input.month);
 
   return {
     id,
@@ -1312,40 +1307,13 @@ export async function deletePersonalTransaction(ctx: V2SessionContext, id: strin
   if (error) throw error;
   if (!data) throw new PersonalFinanceValidationError("Операция не найдена");
 
-  const amount = Number(data.amount_rub) || 0;
-  const now = nowIso();
-  const txnType = String(data.txn_type) as PersonalTxnType;
-
-  if (txnType === "expense" && data.from_account_id) {
-    await adjustAccountBalanceRub(String(data.from_account_id), userId, amount);
-    if (data.budget_category_id) {
-      const { data: cat } = await sb
-        .from("v2_personal_budget_categories")
-        .select("spent_rub")
-        .eq("id", data.budget_category_id)
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (cat) {
-        await sb
-          .from("v2_personal_budget_categories")
-          .update({ spent_rub: Math.max(0, Number(cat.spent_rub) - amount), updated_at: now })
-          .eq("id", data.budget_category_id)
-          .eq("user_id", userId);
-      }
-    }
-  }
-
-  if (txnType === "income" && data.to_account_id) {
-    await adjustAccountBalanceRub(String(data.to_account_id), userId, -amount);
-  }
-
-  if (txnType === "transfer" && data.from_account_id && data.to_account_id) {
-    await adjustAccountBalanceRub(String(data.from_account_id), userId, amount);
-    await adjustAccountBalanceRub(String(data.to_account_id), userId, -amount);
-  }
+  const year = Number(data.year);
+  const month = Number(data.month);
 
   const { error: delErr } = await sb.from("v2_personal_transactions").delete().eq("id", id).eq("user_id", userId);
   if (delErr) throw delErr;
+
+  await syncBudgetSpentForMonth(userId, year, month);
 }
 
 export async function updatePersonalTransactionAmount(
@@ -1374,38 +1342,6 @@ export async function updatePersonalTransactionAmount(
     return mapTransaction(data as Record<string, unknown>, new Map(), new Map());
   }
 
-  const now = nowIso();
-  const txnType = String(data.txn_type) as PersonalTxnType;
-  const delta = amount_rub - oldAmount;
-
-  if (txnType === "expense" && data.from_account_id) {
-    await adjustAccountBalanceRub(String(data.from_account_id), userId, -delta);
-    if (data.budget_category_id) {
-      const { data: cat } = await sb
-        .from("v2_personal_budget_categories")
-        .select("spent_rub")
-        .eq("id", data.budget_category_id)
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (cat) {
-        await sb
-          .from("v2_personal_budget_categories")
-          .update({ spent_rub: Math.max(0, Number(cat.spent_rub) + delta), updated_at: now })
-          .eq("id", data.budget_category_id)
-          .eq("user_id", userId);
-      }
-    }
-  }
-
-  if (txnType === "income" && data.to_account_id) {
-    await adjustAccountBalanceRub(String(data.to_account_id), userId, delta);
-  }
-
-  if (txnType === "transfer" && data.from_account_id && data.to_account_id) {
-    await adjustAccountBalanceRub(String(data.from_account_id), userId, -delta);
-    await adjustAccountBalanceRub(String(data.to_account_id), userId, delta);
-  }
-
   const { data: updated, error: updErr } = await sb
     .from("v2_personal_transactions")
     .update({ amount_rub })
@@ -1415,6 +1351,8 @@ export async function updatePersonalTransactionAmount(
     .maybeSingle();
   if (updErr) throw updErr;
   if (!updated) throw new PersonalFinanceValidationError("Операция не найдена");
+
+  await syncBudgetSpentForMonth(userId, Number(data.year), Number(data.month));
 
   const [{ data: accounts }, { data: categories }] = await Promise.all([
     sb.from("v2_personal_accounts").select("id, name").eq("user_id", userId),
@@ -1469,50 +1407,17 @@ export async function updatePersonalTransactionCategory(
     throw new PersonalFinanceValidationError("Категория бюджета не найдена");
   }
 
-  const amount = Number(data.amount_rub) || 0;
-  const now = nowIso();
-
-  if (oldCategoryId) {
-    const { data: cat } = await sb
-      .from("v2_personal_budget_categories")
-      .select("spent_rub")
-      .eq("id", oldCategoryId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (cat) {
-      await sb
-        .from("v2_personal_budget_categories")
-        .update({ spent_rub: Math.max(0, Number(cat.spent_rub) - amount), updated_at: now })
-        .eq("id", oldCategoryId)
-        .eq("user_id", userId);
-    }
-  }
-
-  if (newCategoryId) {
-    const { data: cat } = await sb
-      .from("v2_personal_budget_categories")
-      .select("spent_rub")
-      .eq("id", newCategoryId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (cat) {
-      await sb
-        .from("v2_personal_budget_categories")
-        .update({ spent_rub: Number(cat.spent_rub) + amount, updated_at: now })
-        .eq("id", newCategoryId)
-        .eq("user_id", userId);
-    }
-  }
-
   const { data: updated, error: updErr } = await sb
     .from("v2_personal_transactions")
-    .update({ budget_category_id: newCategoryId })
+    .update({ budget_category_id: newCategoryId, updated_at: nowIso() })
     .eq("id", id)
     .eq("user_id", userId)
     .select("*")
     .maybeSingle();
   if (updErr) throw updErr;
   if (!updated) throw new PersonalFinanceValidationError("Операция не найдена");
+
+  await syncBudgetSpentForMonth(userId, year, month);
 
   const [{ data: accounts }, { data: categories }] = await Promise.all([
     sb.from("v2_personal_accounts").select("id, name").eq("user_id", userId),
@@ -1546,7 +1451,6 @@ export async function importPersonalTransactions(
     }[];
     from_account_id: string;
     to_account_id?: string | null;
-    apply_balances: boolean;
   }
 ): Promise<{ created: number; skipped: number; batchId: string }> {
   const userId = uid(ctx);
@@ -1608,8 +1512,6 @@ export async function importPersonalTransactions(
   );
 
   const insertRows: Record<string, unknown>[] = [];
-  const balanceDelta = new Map<string, number>();
-  const categorySpentDelta = new Map<string, number>();
 
   for (const item of selectedItems) {
     if (existingExternalIds.has(item.external_id)) {
@@ -1656,23 +1558,6 @@ export async function importPersonalTransactions(
       import_batch_id: batchId,
       created_at: now,
     });
-
-    if (input.apply_balances) {
-      if (item.txn_type === "expense") {
-        balanceDelta.set(
-          input.from_account_id,
-          (balanceDelta.get(input.from_account_id) ?? 0) - item.amount_rub
-        );
-        if (budgetCategoryId) {
-          categorySpentDelta.set(
-            budgetCategoryId,
-            (categorySpentDelta.get(budgetCategoryId) ?? 0) + item.amount_rub
-          );
-        }
-      } else {
-        balanceDelta.set(toId, (balanceDelta.get(toId) ?? 0) + item.amount_rub);
-      }
-    }
   }
 
   let created = 0;
@@ -1689,37 +1574,9 @@ export async function importPersonalTransactions(
     created += chunk.length;
   }
 
-  if (input.apply_balances) {
-    await Promise.all(
-      [...balanceDelta.entries()].map(([accountId, delta]) =>
-        delta !== 0 ? adjustAccountBalanceRub(accountId, userId, delta) : Promise.resolve()
-      )
-    );
-
-    const categoryIds = [...categorySpentDelta.keys()];
-    if (categoryIds.length) {
-      const { data: cats, error: spentErr } = await sb
-        .from("v2_personal_budget_categories")
-        .select("id, spent_rub")
-        .eq("user_id", userId)
-        .in("id", categoryIds);
-      if (spentErr) throw spentErr;
-      await Promise.all(
-        (cats ?? []).map((cat) => {
-          const delta = categorySpentDelta.get(String(cat.id)) ?? 0;
-          if (!delta) return Promise.resolve();
-          return sb
-            .from("v2_personal_budget_categories")
-            .update({
-              spent_rub: Number(cat.spent_rub) + delta,
-              updated_at: nowIso(),
-            })
-            .eq("id", cat.id)
-            .eq("user_id", userId);
-        })
-      );
-    }
-  }
+  await Promise.all(
+    [...monthPairs.values()].map(({ year, month }) => syncBudgetSpentForMonth(userId, year, month))
+  );
 
   return { created, skipped, batchId };
 }

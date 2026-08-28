@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
     const result = await importPersonalTransactions(auth.ctx, {
       from_account_id,
       to_account_id: body.to_account_id ?? null,
-      apply_balances: Boolean(body.apply_balances),
       items: items.map((it: Record<string, unknown>) => ({
         txn_type: it.txn_type === "income" ? "income" : "expense",
         amount_rub: Number(it.amount_rub),
