@@ -2,7 +2,8 @@
 
 import { PersonalAmt, PersonalMaskProvider } from "./personal-finance-mask";
 import { PersonalOperationModal } from "./personal-operation-modal";
-import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { fetchJson, IMPORT_FETCH_TIMEOUT_MS } from "@/lib/v2/client/fetch-json";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { apiUrl, appPath } from "@/lib/api-url";
 import {
   PERSONAL_MONTH_NAMES,
@@ -514,20 +515,6 @@ function StatementImportModal({
 
   if (!open) return null;
 
-  const loadCategoriesForItems = async (importItems: ImportPreviewItem[]) => {
-    const keys = [...new Set(importItems.map((i) => `${i.year}-${i.month}`))];
-    const entries = await Promise.all(
-      keys.map(async (key) => {
-        const [y, m] = key.split("-").map(Number);
-        const dash = await fetchJson<PersonalFinanceDashboard>(
-          `/api/v2/personal/finance/dashboard?year=${y}&month=${m}`
-        );
-        return [key, dash.budgetCategories] as const;
-      })
-    );
-    setCategoriesByMonth(Object.fromEntries(entries));
-  };
-
   const categoriesForItem = (item: ImportPreviewItem) =>
     categoriesByMonth[`${item.year}-${item.month}`] ??
     budgetCategories.filter((c) => c.year === item.year && c.month === item.month);
@@ -573,17 +560,17 @@ function StatementImportModal({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(apiUrl("/api/v2/personal/finance/transactions/import/parse"), {
-        method: "POST",
-        body: fd,
-        credentials: "include",
-      });
+      const res = await fetchWithTimeout(
+        apiUrl("/api/v2/personal/finance/transactions/import/parse"),
+        { method: "POST", body: fd, credentials: "include" },
+        IMPORT_FETCH_TIMEOUT_MS
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       const parsedItems = data.items as ImportPreviewItem[];
       setItems(parsedItems);
       setMeta({ bank: data.bank, warnings: data.warnings });
-      await loadCategoriesForItems(parsedItems);
+      setCategoriesByMonth((data.categoriesByMonth as Record<string, PersonalBudgetCategoryRow[]>) ?? {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка разбора");
       setItems([]);
@@ -616,7 +603,8 @@ function StatementImportModal({
             apply_balances: applyBalances,
             items: selected,
           }),
-        }
+        },
+        IMPORT_FETCH_TIMEOUT_MS
       );
       onDone();
       onClose();

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2PersonalFinance } from "@/lib/v2/auth/require-v2-personal";
-import { loadPersonalFinanceDashboard } from "@/lib/v2/personal/personal-finance-repo";
+import {
+  listPersonalBudgetCategoriesForMonth,
+} from "@/lib/v2/personal/personal-finance-repo";
+import type { PersonalBudgetCategoryRow } from "@/lib/v2/personal/types";
 import {
   decodeStatementBytes,
   guessBudgetCategoryName,
@@ -9,6 +12,8 @@ import {
   parseBankStatementText,
   type ParsedStatementOp,
 } from "@/lib/v2/personal/statement-import";
+
+export const maxDuration = 120;
 
 export type ImportPreviewItem = ParsedStatementOp & {
   budget_category_id: string | null;
@@ -86,14 +91,18 @@ export async function POST(request: NextRequest) {
     );
 
     const categoryMaps = new Map<string, { id: string; name: string }[]>();
-    for (const key of monthKeys) {
-      const [y, m] = key.split("-").map(Number);
-      const dash = await loadPersonalFinanceDashboard(auth.ctx, y, m);
-      categoryMaps.set(
-        key,
-        dash.budgetCategories.map((c) => ({ id: c.id, name: c.name }))
-      );
-    }
+    const categoriesByMonth: Record<string, PersonalBudgetCategoryRow[]> = {};
+    await Promise.all(
+      [...monthKeys].map(async (key) => {
+        const [y, m] = key.split("-").map(Number);
+        const cats = await listPersonalBudgetCategoriesForMonth(auth.ctx, y, m);
+        categoriesByMonth[key] = cats;
+        categoryMaps.set(
+          key,
+          cats.map((c) => ({ id: c.id, name: c.name }))
+        );
+      })
+    );
 
     const items: ImportPreviewItem[] = parsed.operations.map((op) => {
       const d = new Date(`${op.date}T12:00:00Z`);
@@ -127,6 +136,7 @@ export async function POST(request: NextRequest) {
       skipped: parsed.skipped,
       warnings: parsed.warnings,
       items,
+      categoriesByMonth,
       summary: {
         count: items.length,
         expenseTotal,

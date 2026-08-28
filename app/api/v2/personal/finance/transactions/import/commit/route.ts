@@ -5,6 +5,8 @@ import {
   PersonalFinanceValidationError,
 } from "@/lib/v2/personal/personal-finance-repo";
 
+export const maxDuration = 120;
+
 export async function POST(request: NextRequest) {
   const auth = await requireV2PersonalFinance();
   if (!auth.ok) return auth.response;

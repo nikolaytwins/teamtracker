@@ -1377,11 +1377,60 @@ export async function importPersonalTransactions(
   }
 
   const batchId = newV2Id();
-  let created = 0;
+  const now = nowIso();
+  const sb = getV2Supabase();
   let skipped = 0;
 
-  for (const item of input.items) {
+  const selectedItems = input.items.filter((item) => {
     if (item.selected === false) {
+      skipped++;
+      return false;
+    }
+    return true;
+  });
+
+  const monthPairs = new Map<string, { year: number; month: number }>();
+  for (const item of selectedItems) {
+    const d = new Date(`${item.date}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) continue;
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth() + 1;
+    monthPairs.set(`${year}-${month}`, { year, month });
+  }
+  await Promise.all(
+    [...monthPairs.values()].map(({ year, month }) => ensureBudgetMonth(userId, year, month))
+  );
+
+  const externalIds = [...new Set(selectedItems.map((item) => item.external_id).filter(Boolean))];
+  const existingExternalIds = new Set<string>();
+  for (let i = 0; i < externalIds.length; i += 400) {
+    const chunk = externalIds.slice(i, i + 400);
+    const { data, error } = await sb
+      .from("v2_personal_transactions")
+      .select("external_id")
+      .eq("user_id", userId)
+      .in("external_id", chunk);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      if (row.external_id) existingExternalIds.add(String(row.external_id));
+    }
+  }
+
+  const { data: categoryRows, error: catErr } = await sb
+    .from("v2_personal_budget_categories")
+    .select("id, year, month")
+    .eq("user_id", userId);
+  if (catErr) throw catErr;
+  const validCategoryKeys = new Set(
+    (categoryRows ?? []).map((c) => `${String(c.id)}:${Number(c.year)}:${Number(c.month)}`)
+  );
+
+  const insertRows: Record<string, unknown>[] = [];
+  const balanceDelta = new Map<string, number>();
+  const categorySpentDelta = new Map<string, number>();
+
+  for (const item of selectedItems) {
+    if (existingExternalIds.has(item.external_id)) {
       skipped++;
       continue;
     }
@@ -1393,36 +1442,101 @@ export async function importPersonalTransactions(
     const year = d.getUTCFullYear();
     const month = d.getUTCMonth() + 1;
 
-    const row = await createPersonalTransaction(ctx, {
+    let budgetCategoryId = item.txn_type === "expense" ? item.budget_category_id ?? null : null;
+    if (
+      budgetCategoryId &&
+      !validCategoryKeys.has(`${budgetCategoryId}:${year}:${month}`)
+    ) {
+      budgetCategoryId = null;
+    }
+
+    let txnDate = item.date.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(txnDate)) {
+      txnDate = `${txnDate}T12:00:00.000Z`;
+    } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(txnDate)) {
+      txnDate = `${txnDate}:00.000Z`;
+    }
+
+    insertRows.push({
+      id: newV2Id(),
+      user_id: userId,
+      txn_date: txnDate,
       txn_type: item.txn_type,
       amount_rub: item.amount_rub,
+      category: null,
       description: item.description,
       from_account_id: item.txn_type === "expense" ? input.from_account_id : null,
       to_account_id: item.txn_type === "income" ? toId : null,
-      budget_category_id: item.txn_type === "expense" ? item.budget_category_id ?? null : null,
+      budget_category_id: budgetCategoryId,
       year,
       month,
-      txn_date: item.date,
       external_id: item.external_id,
       import_batch_id: batchId,
-      skip_if_duplicate: true,
+      created_at: now,
     });
 
-    if (!row) {
-      skipped++;
-      continue;
-    }
-
-    // If user doesn't want balances touched (statement already reflected on account), reverse balance delta.
-    if (!input.apply_balances) {
+    if (input.apply_balances) {
       if (item.txn_type === "expense") {
-        await adjustAccountBalanceRub(input.from_account_id, userId, item.amount_rub);
+        balanceDelta.set(
+          input.from_account_id,
+          (balanceDelta.get(input.from_account_id) ?? 0) - item.amount_rub
+        );
+        if (budgetCategoryId) {
+          categorySpentDelta.set(
+            budgetCategoryId,
+            (categorySpentDelta.get(budgetCategoryId) ?? 0) + item.amount_rub
+          );
+        }
       } else {
-        await adjustAccountBalanceRub(toId, userId, -item.amount_rub);
+        balanceDelta.set(toId, (balanceDelta.get(toId) ?? 0) + item.amount_rub);
       }
     }
+  }
 
-    created++;
+  let created = 0;
+  for (let i = 0; i < insertRows.length; i += 200) {
+    const chunk = insertRows.slice(i, i + 200);
+    const { error } = await sb.from("v2_personal_transactions").insert(chunk);
+    if (error) {
+      if (String(error.message || "").includes("idx_v2_personal_txn_user_external")) {
+        skipped += chunk.length;
+        continue;
+      }
+      throw error;
+    }
+    created += chunk.length;
+  }
+
+  if (input.apply_balances) {
+    await Promise.all(
+      [...balanceDelta.entries()].map(([accountId, delta]) =>
+        delta !== 0 ? adjustAccountBalanceRub(accountId, userId, delta) : Promise.resolve()
+      )
+    );
+
+    const categoryIds = [...categorySpentDelta.keys()];
+    if (categoryIds.length) {
+      const { data: cats, error: spentErr } = await sb
+        .from("v2_personal_budget_categories")
+        .select("id, spent_rub")
+        .eq("user_id", userId)
+        .in("id", categoryIds);
+      if (spentErr) throw spentErr;
+      await Promise.all(
+        (cats ?? []).map((cat) => {
+          const delta = categorySpentDelta.get(String(cat.id)) ?? 0;
+          if (!delta) return Promise.resolve();
+          return sb
+            .from("v2_personal_budget_categories")
+            .update({
+              spent_rub: Number(cat.spent_rub) + delta,
+              updated_at: nowIso(),
+            })
+            .eq("id", cat.id)
+            .eq("user_id", userId);
+        })
+      );
+    }
   }
 
   return { created, skipped, batchId };
@@ -1514,6 +1628,47 @@ export async function updateBudgetCategorySpent(
     .eq("id", id)
     .eq("user_id", uid(ctx));
   if (error) throw error;
+}
+
+function mapBudgetCategoryRow(
+  r: Record<string, unknown>,
+  userId: string,
+  year: number,
+  month: number
+): PersonalBudgetCategoryRow {
+  return {
+    id: String(r.id),
+    user_id: userId,
+    year,
+    month,
+    name: String(r.name),
+    limit_rub: Number(r.limit_rub) || 0,
+    spent_rub: Number(r.spent_rub) || 0,
+    tint: String(r.tint),
+    sort_order: Number(r.sort_order) || 0,
+  };
+}
+
+export async function listPersonalBudgetCategoriesForMonth(
+  ctx: V2SessionContext,
+  year: number,
+  month: number
+): Promise<PersonalBudgetCategoryRow[]> {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new PersonalFinanceValidationError("Некорректный месяц");
+  }
+  const userId = uid(ctx);
+  await ensureBudgetMonth(userId, year, month);
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_budget_categories")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("year", year)
+    .eq("month", month)
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []).map((r) => mapBudgetCategoryRow(r as Record<string, unknown>, userId, year, month));
 }
 
 export async function createPersonalBudgetCategory(
