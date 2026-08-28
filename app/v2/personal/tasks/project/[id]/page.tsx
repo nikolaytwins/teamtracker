@@ -1,16 +1,6 @@
-import { PersonalTodoViewClient } from "@/components/v2/personal/todos/personal-todo-view-client";
+import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
-type Props = { params: Promise<{ id: string }> };
-
-export default async function PersonalTaskProjectPage({ params }: Props) {
-  const { id } = await params;
-  return (
-    <PersonalTodoViewClient
-      view="project"
-      projectId={id}
-      title="Проект"
-      subtitle="Задачи проекта"
-      focusQuickAddOnMount
-    />
-  );
+export default function PersonalTaskProjectPage() {
+  redirect(appPath("/v2/personal/ideas-tasks"));
 }

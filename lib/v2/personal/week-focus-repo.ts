@@ -16,6 +16,9 @@ export type WeekFocusGoalRow = {
   priority: WeekFocusPriority;
   completed_at: string | null;
   sort_order: number;
+  /** 0 — основной, 1 — дополнительный */
+  slot: number | null;
+  note: string;
 };
 
 const PRIORITY_RANK: Record<WeekFocusPriority, number> = { high: 0, medium: 1, low: 2 };
@@ -144,9 +147,10 @@ export async function loadWeekFocus(
 
   const { data: goals, error: goalsError } = await sb
     .from("v2_personal_week_focus_goals")
-    .select("id, title, priority, completed_at, sort_order")
+    .select("id, title, priority, completed_at, sort_order, slot, note")
     .eq("focus_id", focus.id)
     .eq("user_id", userId)
+    .order("slot", { ascending: true, nullsFirst: false })
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (goalsError) throw goalsError;
@@ -157,14 +161,19 @@ export async function loadWeekFocus(
     priority: normPriority(g.priority),
     completed_at: g.completed_at ? String(g.completed_at) : null,
     sort_order: Number(g.sort_order) || 0,
+    slot: g.slot == null ? null : Number(g.slot),
+    note: g.note ? String(g.note) : "",
   }));
   mapped.sort((a, b) => {
+    const slotA = a.slot ?? 99;
+    const slotB = b.slot ?? 99;
+    if (slotA !== slotB) return slotA - slotB;
     const done = Number(Boolean(a.completed_at)) - Number(Boolean(b.completed_at));
     if (done !== 0) return done;
-    const rank = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
-    if (rank !== 0) return rank;
     return a.sort_order - b.sort_order;
   });
+
+  const slotted = mapped.filter((g) => g.slot === 0 || g.slot === 1);
 
   return {
     id: String(focus.id),
@@ -172,7 +181,72 @@ export async function loadWeekFocus(
     week_end: weekEnd,
     label: formatWeekRangeShort(weekStart, weekEnd),
     result_title: String(focus.result_title),
-    goals: mapped,
+    goals: slotted,
+  };
+}
+
+export async function upsertWeekFocusSlot(
+  ctx: V2SessionContext,
+  weekStart: string,
+  slot: 0 | 1,
+  input: { title: string; note?: string; priority?: WeekFocusPriority }
+): Promise<WeekFocusGoalRow> {
+  const trimmed = input.title.trim();
+  if (!trimmed) throw new Error("title required");
+  const focus = await ensureFocusForWeek(ctx, weekStart);
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+  const now = nowIso();
+
+  const { data: existing } = await sb
+    .from("v2_personal_week_focus_goals")
+    .select("id")
+    .eq("focus_id", focus.id)
+    .eq("user_id", userId)
+    .eq("slot", slot)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await sb
+      .from("v2_personal_week_focus_goals")
+      .update({
+        title: trimmed,
+        note: input.note?.trim() ?? "",
+        priority: normPriority(input.priority ?? (slot === 0 ? "high" : "medium")),
+        updated_at: now,
+      })
+      .eq("id", existing.id)
+      .eq("user_id", userId);
+    if (error) throw error;
+    const loaded = await loadWeekFocus(ctx, weekStart);
+    const goal = loaded.goals.find((g) => g.slot === slot);
+    if (!goal) throw new Error("goal not found after update");
+    return goal;
+  }
+
+  const row = {
+    id: newV2Id(),
+    focus_id: focus.id,
+    user_id: userId,
+    title: trimmed,
+    note: input.note?.trim() ?? "",
+    priority: normPriority(input.priority ?? (slot === 0 ? "high" : "medium")),
+    completed_at: null,
+    sort_order: slot,
+    slot,
+    created_at: now,
+    updated_at: now,
+  };
+  const { error } = await sb.from("v2_personal_week_focus_goals").insert(row);
+  if (error) throw error;
+  return {
+    id: row.id,
+    title: row.title,
+    priority: row.priority,
+    completed_at: null,
+    sort_order: row.sort_order,
+    slot,
+    note: row.note,
   };
 }
 
@@ -197,52 +271,29 @@ export async function addWeekFocusGoal(
   ctx: V2SessionContext,
   weekStart: string,
   title: string,
-  priority?: WeekFocusPriority
+  priority?: WeekFocusPriority,
+  slot?: 0 | 1
 ): Promise<WeekFocusGoalRow> {
-  const trimmed = title.trim();
-  if (!trimmed) throw new Error("title required");
-  const focus = await ensureFocusForWeek(ctx, weekStart);
-  const sb = getV2Supabase();
-  const { data: maxRow } = await sb
-    .from("v2_personal_week_focus_goals")
-    .select("sort_order")
-    .eq("focus_id", focus.id)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const now = nowIso();
-  const row = {
-    id: newV2Id(),
-    focus_id: focus.id,
-    user_id: uid(ctx),
-    title: trimmed,
-    priority: normPriority(priority),
-    completed_at: null,
-    sort_order: (Number(maxRow?.sort_order) || 0) + 1,
-    created_at: now,
-    updated_at: now,
-  };
-  const { error } = await sb.from("v2_personal_week_focus_goals").insert(row);
-  if (error) throw error;
-  return {
-    id: row.id,
-    title: row.title,
-    priority: row.priority,
-    completed_at: null,
-    sort_order: row.sort_order,
-  };
+  if (slot === 0 || slot === 1) {
+    return upsertWeekFocusSlot(ctx, weekStart, slot, { title, priority });
+  }
+  const loaded = await loadWeekFocus(ctx, weekStart);
+  const used = new Set(loaded.goals.map((g) => g.slot).filter((s): s is number => s != null));
+  const nextSlot: 0 | 1 = !used.has(0) ? 0 : !used.has(1) ? 1 : (null as never);
+  if (nextSlot === (null as never)) throw new Error("week focus slots full");
+  return upsertWeekFocusSlot(ctx, weekStart, nextSlot, { title, priority });
 }
 
 export async function updateWeekFocusGoal(
   ctx: V2SessionContext,
   goalId: string,
-  patch: { title?: string; completed?: boolean; priority?: WeekFocusPriority }
+  patch: { title?: string; completed?: boolean; priority?: WeekFocusPriority; note?: string }
 ): Promise<WeekFocusGoalRow | null> {
   const sb = getV2Supabase();
   const userId = uid(ctx);
   const { data: existing, error: findError } = await sb
     .from("v2_personal_week_focus_goals")
-    .select("id, title, priority, completed_at, sort_order")
+    .select("id, title, priority, completed_at, sort_order, slot, note")
     .eq("id", goalId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -260,6 +311,9 @@ export async function updateWeekFocusGoal(
   }
   if (patch.priority !== undefined) {
     safe.priority = normPriority(patch.priority);
+  }
+  if (patch.note !== undefined) {
+    safe.note = patch.note.trim();
   }
 
   const { error } = await sb
@@ -282,6 +336,8 @@ export async function updateWeekFocusGoal(
           ? String(safe.completed_at)
           : null,
     sort_order: Number(existing.sort_order) || 0,
+    slot: existing.slot == null ? null : Number(existing.slot),
+    note: typeof safe.note === "string" ? safe.note : existing.note ? String(existing.note) : "",
   };
 }
 

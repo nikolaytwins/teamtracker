@@ -19,6 +19,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       title: typeof body.title === "string" ? body.title : undefined,
       completed: typeof body.completed === "boolean" ? body.completed : undefined,
       priority: isWeekFocusPriority(body.priority) ? body.priority : undefined,
+      note: typeof body.note === "string" ? body.note : undefined,
     });
     if (!goal) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ goal });

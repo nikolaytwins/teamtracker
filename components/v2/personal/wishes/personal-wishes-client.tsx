@@ -2,7 +2,7 @@
 
 import { apiUrl } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import type { PersonalWish } from "@/lib/v2/personal/personal-wishes-repo";
+import type { PersonalWish, PersonalWishImage } from "@/lib/v2/personal/personal-wishes-repo";
 import {
   MAX_WISH_IMAGES,
   WISH_CATS,
@@ -17,6 +17,12 @@ import {
 } from "@/lib/v2/personal/wish-cats";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { WishPhotosInCard, WishesMasonryGrid } from "@/components/v2/personal/wishes/wish-masonry-ui";
+import {
+  WISH_MEDIA_ACCEPT,
+  isWishMediaFile,
+  isWishVideoMedia,
+  wishMediaTypeFromFile,
+} from "@/lib/v2/personal/wish-media";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -93,12 +99,12 @@ function WishDescriptionProse({ text, className }: { text: string; className?: s
 
 function filesFromDropOrInput(list: FileList | File[] | null): File[] {
   if (!list) return [];
-  return Array.from(list).filter((f) => f.type.startsWith("image/") && f.size > 0);
+  return Array.from(list).filter(isWishMediaFile);
 }
 
 function uploadErrorMessage(e: unknown, fallback: string): string {
   if (e instanceof TypeError) {
-    return "Не удалось загрузить фото. Обновите страницу и попробуйте ещё раз.";
+    return "Не удалось загрузить файл. Обновите страницу и попробуйте ещё раз.";
   }
   if (e instanceof Error && e.message.trim()) return e.message;
   return fallback;
@@ -113,7 +119,7 @@ async function postWishImagesViaProxy(wishId: string, files: File[]): Promise<vo
     body: fd,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error || "Не удалось загрузить фото");
+  if (!res.ok) throw new Error((data as { error?: string }).error || "Не удалось загрузить файл");
 }
 
 async function postWishImages(wishId: string, files: File[]): Promise<void> {
@@ -151,7 +157,11 @@ async function postWishImages(wishId: string, files: File[]): Promise<void> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      registered: uploads.map((u) => ({ url: u.publicUrl, name: u.name })),
+      registered: uploads.map((u, i) => ({
+        url: u.publicUrl,
+        name: u.name,
+        media_type: wishMediaTypeFromFile(batch[i]!),
+      })),
     }),
   });
 }
@@ -405,7 +415,7 @@ function ModeSwitch({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void 
 }
 
 function PhotoSlot({
-  url,
+  media,
   placeholder,
   onPick,
   onClear,
@@ -413,7 +423,7 @@ function PhotoSlot({
   fit = "cover",
   onImageClick,
 }: {
-  url?: string | null;
+  media?: PersonalWishImage | null;
   placeholder: string;
   onPick?: () => void;
   onClear?: () => void;
@@ -422,6 +432,8 @@ function PhotoSlot({
   onImageClick?: () => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
+  const url = media?.url ?? null;
+  const isVideo = media ? isWishVideoMedia(media) : false;
   return (
     <div
       className={`relative h-full min-h-0 min-w-0 w-full overflow-hidden bg-[var(--v2-ink-100)] transition ${
@@ -447,15 +459,24 @@ function PhotoSlot({
       }}
     >
       {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={url}
-          alt=""
-          onClick={onImageClick}
-          className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${
-            onImageClick ? "cursor-zoom-in" : ""
-          }`}
-        />
+        isVideo ? (
+          <video
+            src={url}
+            controls
+            playsInline
+            className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} bg-black`}
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={url}
+            alt=""
+            onClick={onImageClick}
+            className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${
+              onImageClick ? "cursor-zoom-in" : ""
+            }`}
+          />
+        )
       ) : (
         <button
           type="button"
@@ -474,7 +495,7 @@ function PhotoSlot({
           type="button"
           onClick={onClear}
           className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)] shadow-sm transition hover:text-[var(--v2-ink-900)]"
-          title="Убрать фото"
+          title="Убрать файл"
         >
           <IcClose className="h-3.5 w-3.5" />
         </button>
@@ -762,12 +783,12 @@ function Fullscreen({
         <div className="relative min-w-0 flex-1 bg-[var(--v2-ink-100)]">
           {current ? (
             <PhotoSlot
-              url={current.url}
+              media={current}
               fit="contain"
               placeholder={
                 canAddMore
-                  ? "Перетащите фото или нажмите, чтобы добавить"
-                  : "Достигнут лимит фото"
+                  ? "Перетащите фото или видео, или нажмите"
+                  : "Достигнут лимит файлов"
               }
               onPick={canAddMore ? () => fileRef.current?.click() : undefined}
               onClear={() => onRemoveImage(current.id)}
@@ -791,16 +812,16 @@ function Fullscreen({
               className="flex h-full w-full flex-col items-center justify-center gap-2 px-8 text-center transition hover:bg-[var(--v2-ink-200)]/40"
             >
               <V2Icons.upload className="h-7 w-7 text-[var(--v2-ink-400)]" />
-              <span className="v2-tighter text-[22px] font-light text-[var(--v2-ink-700)]">Без фото</span>
+              <span className="v2-tighter text-[22px] font-light text-[var(--v2-ink-700)]">Без медиа</span>
               <span className="v2-tight max-w-[28ch] text-[13.5px] leading-relaxed text-[var(--v2-ink-500)]">
-                Можно оставить так или добавить изображение — карточка сама встанет в ленту.
+                Можно оставить так или добавить фото или видео — карточка сама встанет в ленту.
               </span>
             </button>
           )}
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept={WISH_MEDIA_ACCEPT}
             multiple
             className="hidden"
             onChange={(e) => {
@@ -819,8 +840,12 @@ function Fullscreen({
                     n === k ? "ring-white" : "ring-white/40 opacity-70 hover:opacity-100"
                   }`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt="" className="h-full w-full object-cover" />
+                  {isWishVideoMedia(img) ? (
+                    <video src={img.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={img.url} alt="" className="h-full w-full object-cover" />
+                  )}
                 </button>
               ))}
             </div>
@@ -955,10 +980,10 @@ function Fullscreen({
                     >
                       <V2Icons.upload className="h-6 w-6 text-[var(--v2-ink-400)]" />
                       <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">
-                        Перетащите фото сюда или нажмите
+                        Перетащите фото или видео сюда или нажмите
                       </span>
                       <span className="v2-tight text-[11px] text-[var(--v2-ink-400)]">
-                        до {MAX_WISH_IMAGES} изображений
+                        до {MAX_WISH_IMAGES} файлов
                       </span>
                     </button>
                   ) : (
@@ -968,8 +993,12 @@ function Fullscreen({
                           key={img.id}
                           className="relative aspect-square overflow-hidden rounded-xl bg-[var(--v2-ink-100)]"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={img.url} alt="" className="h-full w-full object-cover" />
+                          {isWishVideoMedia(img) ? (
+                            <video src={img.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={img.url} alt="" className="h-full w-full object-cover" />
+                          )}
                           <button
                             type="button"
                             onClick={() => onRemoveImage(img.id)}
@@ -1302,10 +1331,10 @@ function AddModal({
               >
                 <V2Icons.upload className="h-6 w-6 text-[var(--v2-ink-400)]" />
                 <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">
-                  Фото по желанию — перетащите или нажмите
+                  Фото или видео по желанию — перетащите или нажмите
                 </span>
                 <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">
-                  можно сохранить и без фото · до {MAX_WISH_IMAGES} изображений
+                  можно сохранить и без медиа · до {MAX_WISH_IMAGES} файлов
                 </span>
               </button>
             ) : (
@@ -1313,8 +1342,12 @@ function AddModal({
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {previews.map((url, i) => (
                     <div key={url} className="relative aspect-square overflow-hidden rounded-xl bg-[var(--v2-ink-200)]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      {files[i] && wishMediaTypeFromFile(files[i]!) === "video" ? (
+                        <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+                      )}
                       <button
                         type="button"
                         onClick={() => removeAt(i)}
@@ -1344,7 +1377,7 @@ function AddModal({
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept={WISH_MEDIA_ACCEPT}
             multiple
             className="hidden"
             onChange={(e) => {
@@ -1732,6 +1765,7 @@ export function PersonalWishesClient() {
           wish_id: wish.id,
           url,
           name: payload.files[i]?.name || "photo.jpg",
+          media_type: payload.files[i] ? wishMediaTypeFromFile(payload.files[i]!) : "image",
           sort_order: i,
           created_at: wish.created_at,
         })),
@@ -1748,7 +1782,7 @@ export function PersonalWishesClient() {
         } catch (e) {
           await reload();
           setError(
-            `${uploadErrorMessage(e, "Не удалось загрузить фото")} Желание сохранено — фото можно добавить, открыв карточку.`
+            `${uploadErrorMessage(e, "Не удалось загрузить файл")} Желание сохранено — медиа можно добавить, открыв карточку.`
           );
         } finally {
           blobUrls.forEach((url) => URL.revokeObjectURL(url));
@@ -1770,7 +1804,7 @@ export function PersonalWishesClient() {
     const current = items.find((w) => w.id === open);
     const room = MAX_WISH_IMAGES - (current?.images.length ?? 0);
     if (room <= 0) {
-      setError(`Можно добавить не больше ${MAX_WISH_IMAGES} фото`);
+      setError(`Можно добавить не больше ${MAX_WISH_IMAGES} файлов`);
       return;
     }
     setUploading(true);
@@ -1779,7 +1813,7 @@ export function PersonalWishesClient() {
       await postWishImages(open, list.slice(0, room));
       await reload();
     } catch (e) {
-      setError(uploadErrorMessage(e, "Не удалось загрузить фото"));
+      setError(uploadErrorMessage(e, "Не удалось загрузить файл"));
     } finally {
       setUploading(false);
     }
@@ -1793,7 +1827,7 @@ export function PersonalWishesClient() {
       });
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось удалить фото");
+      setError(e instanceof Error ? e.message : "Не удалось удалить файл");
     }
   };
 

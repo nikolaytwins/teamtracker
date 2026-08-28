@@ -5,6 +5,7 @@ import {
   isWeekFocusPriority,
   loadWeekFocus,
   updateWeekFocusTitle,
+  upsertWeekFocusSlot,
 } from "@/lib/v2/personal/week-focus-repo";
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -45,12 +46,23 @@ export async function POST(request: NextRequest) {
 
     const title = typeof body.title === "string" ? body.title.trim() : "";
     if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
-    const goal = await addWeekFocusGoal(
-      auth.ctx,
-      weekStart,
-      title,
-      isWeekFocusPriority(body.priority) ? body.priority : undefined
-    );
+    const slotRaw = body.slot;
+    const slot = slotRaw === 0 || slotRaw === 1 ? (slotRaw as 0 | 1) : undefined;
+    const note = typeof body.note === "string" ? body.note : undefined;
+    const goal =
+      slot !== undefined
+        ? await upsertWeekFocusSlot(auth.ctx, weekStart, slot, {
+            title,
+            note,
+            priority: isWeekFocusPriority(body.priority) ? body.priority : undefined,
+          })
+        : await addWeekFocusGoal(
+            auth.ctx,
+            weekStart,
+            title,
+            isWeekFocusPriority(body.priority) ? body.priority : undefined,
+            slot
+          );
     return NextResponse.json({ goal });
   } catch (error) {
     console.error("week focus post:", error);

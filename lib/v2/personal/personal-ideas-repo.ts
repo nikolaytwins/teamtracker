@@ -16,6 +16,8 @@ export type PersonalIdeaTag = {
   idea_count: number;
 };
 
+export type IdeaPriority = "high" | "normal" | "low";
+
 export type PersonalIdeaImage = {
   id: string;
   idea_id: string;
@@ -31,6 +33,8 @@ export type PersonalIdea = {
   body: string;
   accent: string;
   pinned: boolean;
+  idea_priority: IdeaPriority;
+  archived_at: string | null;
   tags: PersonalIdeaTag[];
   images: PersonalIdeaImage[];
   created_at: string;
@@ -49,6 +53,11 @@ const CARD_ACCENTS = ["#E7EDFD", "#F0E9FE", "#DBF0EE", "#FCEFD9", "#FCE4E4", "#D
 
 function uid(ctx: V2SessionContext) {
   return ctx.userId;
+}
+
+function normalizeIdeaPriority(raw: unknown): IdeaPriority {
+  if (raw === "high" || raw === "low") return raw;
+  return "normal";
 }
 
 function mapTag(r: Record<string, unknown>, idea_count = 0): PersonalIdeaTag {
@@ -231,6 +240,8 @@ export async function loadPersonalIdeasBoard(ctx: V2SessionContext): Promise<Per
       body: String(r.body || ""),
       accent: String(r.accent || CARD_ACCENTS[0]),
       pinned: Boolean(r.pinned),
+      idea_priority: normalizeIdeaPriority(r.idea_priority),
+      archived_at: r.archived_at ? String(r.archived_at) : null,
       tags: tagsByIdea.get(id) ?? [],
       images: imagesByIdea.get(id) ?? [],
       created_at: String(r.created_at),
@@ -248,6 +259,7 @@ export async function createPersonalIdea(
     body?: string;
     accent?: string;
     pinned?: boolean;
+    idea_priority?: IdeaPriority;
     tagNames?: string[];
   }
 ): Promise<PersonalIdea> {
@@ -268,6 +280,7 @@ export async function createPersonalIdea(
     body,
     accent: input.accent?.trim() || pickColor(CARD_ACCENTS, count ?? 0),
     pinned: Boolean(input.pinned),
+    idea_priority: normalizeIdeaPriority(input.idea_priority),
     created_at: now,
     updated_at: now,
   };
@@ -292,6 +305,8 @@ export async function updatePersonalIdea(
     body?: string;
     accent?: string;
     pinned?: boolean;
+    idea_priority?: IdeaPriority;
+    archived?: boolean;
     tagNames?: string[];
   }
 ): Promise<PersonalIdea> {
@@ -306,6 +321,10 @@ export async function updatePersonalIdea(
   if (input.body !== undefined) patch.body = input.body;
   if (input.accent !== undefined) patch.accent = input.accent.trim() || CARD_ACCENTS[0];
   if (input.pinned !== undefined) patch.pinned = Boolean(input.pinned);
+  if (input.idea_priority !== undefined) patch.idea_priority = normalizeIdeaPriority(input.idea_priority);
+  if (input.archived !== undefined) {
+    patch.archived_at = input.archived ? nowIso() : null;
+  }
 
   const { error } = await sb.from("v2_personal_ideas").update(patch).eq("id", id).eq("user_id", userId);
   if (error) throw error;

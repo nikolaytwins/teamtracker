@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Personal } from "@/lib/v2/auth/require-v2-personal";
 import { uploadAttachmentFiles } from "@/lib/v2/files/attachment-upload";
+import { inferWishMediaType } from "@/lib/v2/personal/wish-media";
 import {
   addPersonalWishImages,
   deletePersonalWishImage,
@@ -20,19 +21,21 @@ function blobsFromFormData(formData: FormData): Blob[] {
   return out;
 }
 
-function registeredFromJson(body: unknown): { url: string; name: string }[] {
+function registeredFromJson(body: unknown): { url: string; name: string; media_type?: "image" | "video" }[] {
   if (!body || typeof body !== "object") return [];
   const rec = body as Record<string, unknown>;
   const items = Array.isArray(rec.registered) ? rec.registered : rec.url ? [rec] : [];
-  const out: { url: string; name: string }[] = [];
+  const out: { url: string; name: string; media_type?: "image" | "video" }[] = [];
   for (const item of items) {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
     const url = typeof row.url === "string" ? row.url.trim() : "";
     if (!url) continue;
+    const name = typeof row.name === "string" && row.name.trim() ? row.name.trim() : "photo.jpg";
     out.push({
       url,
-      name: typeof row.name === "string" && row.name.trim() ? row.name.trim() : "photo.jpg",
+      name,
+      media_type: inferWishMediaType(name, row.media_type),
     });
   }
   return out;
@@ -44,23 +47,27 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   try {
     const { id } = await params;
     const contentType = request.headers.get("content-type") || "";
-    let uploaded: { url: string; name: string }[] = [];
+    let uploaded: { url: string; name: string; media_type?: "image" | "video" }[] = [];
     if (contentType.includes("application/json")) {
       const body = await request.json();
       const registered = registeredFromJson(body);
       if (!registered.length) {
-        return NextResponse.json({ error: "Выберите одно или несколько изображений" }, { status: 400 });
+        return NextResponse.json({ error: "Выберите одно или несколько файлов" }, { status: 400 });
       }
       uploaded = registered;
     } else {
       const result = await uploadAttachmentFiles("wishes", id, blobsFromFormData(await request.formData()), {
-        imagesOnly: true,
+        allowVideo: true,
       });
       if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-      uploaded = result.uploaded.map((u) => ({ url: u.url, name: u.name }));
+      uploaded = result.uploaded.map((u) => ({
+        url: u.url,
+        name: u.name,
+        media_type: inferWishMediaType(u.name, u.contentType.startsWith("video/") ? "video" : "image"),
+      }));
     }
     if (!uploaded.length) {
-      return NextResponse.json({ error: "Выберите одно или несколько изображений" }, { status: 400 });
+      return NextResponse.json({ error: "Выберите одно или несколько файлов" }, { status: 400 });
     }
 
     const images = await addPersonalWishImages(auth.ctx, id, uploaded);

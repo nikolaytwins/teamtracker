@@ -324,7 +324,7 @@ export function V2DashboardClient() {
                 Личные задачи
               </h2>
               <Link
-                href={appPath("/v2/personal/tasks/today")}
+                href={appPath("/v2/personal/ideas-tasks")}
                 className="text-[12px] font-semibold text-[var(--v2-brand-600)]"
               >
                 Сегодня →
@@ -486,7 +486,7 @@ export function V2DashboardClient() {
 
         <section className="flex flex-wrap gap-2 pb-6">
           {[
-            { href: "/v2/personal/tasks/inbox", label: "Задачи", icon: "tasks" as const },
+            { href: "/v2/personal/ideas-tasks", label: "Задачи", icon: "tasks" as const },
             { href: "/v2/personal/calendar", label: "Календарь", icon: "cal" as const },
             { href: "/v2/personal/ideas", label: "Идеи", icon: "spark" as const },
             { href: "/v2/personal/strategy", label: "Стратегия", icon: "flag" as const },

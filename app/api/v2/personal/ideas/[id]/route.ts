@@ -19,6 +19,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       body: body.body,
       accent: body.accent,
       pinned: body.pinned,
+      idea_priority: body.idea_priority,
+      archived: typeof body.archived === "boolean" ? body.archived : undefined,
       tagNames: Array.isArray(body.tagNames)
         ? body.tagNames.map(String)
         : Array.isArray(body.tags)

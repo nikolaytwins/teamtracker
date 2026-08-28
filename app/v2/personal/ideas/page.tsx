@@ -1,5 +1,6 @@
-import { PersonalIdeasClient } from "@/components/v2/personal/ideas/personal-ideas-client";
+import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
 export default function PersonalIdeasPage() {
-  return <PersonalIdeasClient />;
+  redirect(appPath("/v2/personal/ideas-tasks?tab=ideas"));
 }

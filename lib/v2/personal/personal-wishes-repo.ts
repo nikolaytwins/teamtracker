@@ -10,6 +10,7 @@ import {
   type WishCustomCategory,
   type WishScale,
 } from "@/lib/v2/personal/wish-cats";
+import { inferWishMediaType, type WishMediaType } from "@/lib/v2/personal/wish-media";
 
 export class PersonalWishesValidationError extends Error {
   constructor(message: string) {
@@ -23,6 +24,7 @@ export type PersonalWishImage = {
   wish_id: string;
   url: string;
   name: string;
+  media_type: WishMediaType;
   sort_order: number;
   created_at: string;
 };
@@ -53,6 +55,7 @@ function mapImage(r: Record<string, unknown>): PersonalWishImage {
     wish_id: String(r.wish_id),
     url: String(r.url),
     name: String(r.name || ""),
+    media_type: inferWishMediaType(String(r.name || r.url || ""), r.media_type),
     sort_order: Number(r.sort_order) || 0,
     created_at: String(r.created_at),
   };
@@ -267,7 +270,7 @@ async function syncWishGrid(userId: string, wishId: string): Promise<void> {
 export async function addPersonalWishImages(
   ctx: V2SessionContext,
   wishId: string,
-  files: { url: string; name: string }[]
+  files: { url: string; name: string; media_type?: WishMediaType }[]
 ): Promise<PersonalWishImage[]> {
   const userId = uid(ctx);
   if (!(await ownWish(userId, wishId))) {
@@ -284,11 +287,13 @@ export async function addPersonalWishImages(
 
   const existing = count ?? 0;
   if (existing >= MAX_WISH_IMAGES) {
-    throw new PersonalWishesValidationError(`Можно добавить не больше ${MAX_WISH_IMAGES} фото`);
+    throw new PersonalWishesValidationError(`Можно добавить не больше ${MAX_WISH_IMAGES} фото и видео`);
   }
   const room = MAX_WISH_IMAGES - existing;
   const toAdd = files.slice(0, room);
-  if (!toAdd.length) throw new PersonalWishesValidationError(`Можно добавить не больше ${MAX_WISH_IMAGES} фото`);
+  if (!toAdd.length) {
+    throw new PersonalWishesValidationError(`Можно добавить не больше ${MAX_WISH_IMAGES} фото и видео`);
+  }
 
   const { data: last } = await sb
     .from("v2_personal_wish_images")
@@ -303,6 +308,7 @@ export async function addPersonalWishImages(
     wish_id: wishId,
     url: f.url,
     name: f.name,
+    media_type: inferWishMediaType(f.name, f.media_type),
     sort_order: sort++,
     created_at: now,
   }));

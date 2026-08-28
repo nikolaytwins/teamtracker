@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
         };
       })
       .filter((f: { name: string }) => f.name);
-    const signed = await createSignedAttachmentUploads("wishes", id, files, { imagesOnly: true });
+    const signed = await createSignedAttachmentUploads("wishes", id, files, { allowVideo: true });
     if (!signed.ok) return NextResponse.json({ error: signed.error }, { status: 400 });
     return NextResponse.json({ uploads: signed.uploads });
   } catch (e) {

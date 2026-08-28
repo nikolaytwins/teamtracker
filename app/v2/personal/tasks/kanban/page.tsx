@@ -1,11 +1,6 @@
-import { PersonalTodoViewClient } from "@/components/v2/personal/todos/personal-todo-view-client";
+import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
 export default function PersonalTasksKanbanPage() {
-  return (
-    <PersonalTodoViewClient
-      view="kanban"
-      title="Канбан"
-      subtitle="Перетащите задачу в колонку — Сегодня, Завтра, Неделя или Позже"
-    />
-  );
+  redirect(appPath("/v2/personal/ideas-tasks"));
 }

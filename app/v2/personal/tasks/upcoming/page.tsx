@@ -1,11 +1,6 @@
-import { PersonalTodoViewClient } from "@/components/v2/personal/todos/personal-todo-view-client";
+import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
 export default function PersonalTasksUpcomingPage() {
-  return (
-    <PersonalTodoViewClient
-      view="upcoming"
-      title="Предстоящее"
-      subtitle="Следующие 7 дней"
-    />
-  );
+  redirect(appPath("/v2/personal/ideas-tasks"));
 }

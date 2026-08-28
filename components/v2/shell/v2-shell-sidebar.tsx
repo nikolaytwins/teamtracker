@@ -325,6 +325,11 @@ export function V2ShellSidebar({
                 active = pathname?.startsWith(appPath("/v2/personal/tasks")) ?? false;
               } else if (item.href.startsWith("/v2/personal/finance")) {
                 active = pathname?.startsWith(appPath("/v2/personal/finance")) ?? false;
+              } else if (item.href.startsWith("/v2/personal/ideas-tasks")) {
+                active =
+                  pathname?.startsWith(appPath("/v2/personal/ideas-tasks")) ??
+                  pathname?.startsWith(appPath("/v2/personal/tasks")) ??
+                  false;
               } else if (item.href.startsWith("/v2/personal/ideas")) {
                 active = pathname?.startsWith(appPath("/v2/personal/ideas")) ?? false;
               } else if (item.href.startsWith("/v2/personal/wishes")) {

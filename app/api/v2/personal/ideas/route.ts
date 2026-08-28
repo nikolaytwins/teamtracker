@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       body: body.body,
       accent: body.accent,
       pinned: body.pinned,
+      idea_priority: body.idea_priority,
       tagNames: Array.isArray(body.tagNames)
         ? body.tagNames.map(String)
         : Array.isArray(body.tags)

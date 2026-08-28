@@ -29,10 +29,29 @@ export type AttachmentUploadInput = {
   buffer: Buffer;
 };
 
+export type AttachmentUploadOpts = {
+  imagesOnly?: boolean;
+  /** Только image/* и video/* (желания) */
+  allowVideo?: boolean;
+};
+
 function storagePath(prefix: AttachmentPrefix, entityId: string, filename: string): string {
   const safeEntity = entityId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
   const safeName = sanitizeUploadFilename(filename);
   return `${prefix}/${safeEntity}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+}
+
+function isAllowedAttachmentType(contentType: string, opts?: AttachmentUploadOpts): boolean {
+  const ct = contentType.toLowerCase();
+  if (ct.startsWith("image/")) return true;
+  if (opts?.allowVideo) return ct.startsWith("video/");
+  if (opts?.imagesOnly ?? false) return false;
+  return true;
+}
+
+function attachmentTypeError(name: string, opts?: AttachmentUploadOpts): string {
+  if (opts?.allowVideo) return `«${name}» — нужен файл изображения или видео`;
+  return `«${name}» — нужен файл изображения`;
 }
 
 export type SignedAttachmentUpload = {
@@ -47,7 +66,7 @@ export async function createSignedAttachmentUploads(
   prefix: AttachmentPrefix,
   entityId: string,
   files: { name: string; contentType: string }[],
-  opts?: { imagesOnly?: boolean }
+  opts?: AttachmentUploadOpts
 ): Promise<{ ok: true; uploads: SignedAttachmentUpload[] } | { ok: false; error: string }> {
   if (!files.length) return { ok: false, error: "Выберите хотя бы один файл" };
   if (!isAttachmentUploadConfigured()) {
@@ -61,13 +80,14 @@ export async function createSignedAttachmentUploads(
   }
 
   const bucket = getAttachmentStorageBucket();
-  const imagesOnly = opts?.imagesOnly ?? (prefix === "ideas" || prefix === "wishes");
+  const imagesOnly = opts?.allowVideo ? false : (opts?.imagesOnly ?? (prefix === "ideas" || prefix === "wishes"));
+  const resolvedOpts: AttachmentUploadOpts = { ...opts, imagesOnly };
   const uploads: SignedAttachmentUpload[] = [];
 
   for (const file of files) {
     const contentType = file.contentType?.trim() || "application/octet-stream";
-    if (imagesOnly && !contentType.startsWith("image/")) {
-      return { ok: false, error: `«${file.name}» — нужен файл изображения` };
+    if (!isAllowedAttachmentType(contentType, resolvedOpts)) {
+      return { ok: false, error: attachmentTypeError(file.name, resolvedOpts) };
     }
     const path = storagePath(prefix, entityId, file.name || "photo.jpg");
     const { data, error } = await sb.storage.from(bucket).createSignedUploadUrl(path);
@@ -94,7 +114,7 @@ export async function uploadAttachmentBuffers(
   prefix: AttachmentPrefix,
   entityId: string,
   files: AttachmentUploadInput[],
-  opts?: { imagesOnly?: boolean }
+  opts?: AttachmentUploadOpts
 ): Promise<{ ok: true; uploaded: UploadedAttachment[] } | { ok: false; error: string }> {
   if (!files.length) return { ok: false, error: "Выберите хотя бы один файл" };
   if (!isAttachmentUploadConfigured()) {
@@ -110,7 +130,8 @@ export async function uploadAttachmentBuffers(
 
   const bucket = getAttachmentStorageBucket();
   const uploaded: UploadedAttachment[] = [];
-  const imagesOnly = opts?.imagesOnly ?? (prefix === "ideas" || prefix === "wishes");
+  const imagesOnly = opts?.allowVideo ? false : (opts?.imagesOnly ?? (prefix === "ideas" || prefix === "wishes"));
+  const resolvedOpts: AttachmentUploadOpts = { ...opts, imagesOnly };
 
   for (const file of files) {
     if (file.buffer.length <= 0) continue;
@@ -118,8 +139,8 @@ export async function uploadAttachmentBuffers(
       return { ok: false, error: `«${file.name}» больше 50 МБ` };
     }
     const contentType = file.contentType?.trim() || "application/octet-stream";
-    if (imagesOnly && !contentType.startsWith("image/")) {
-      return { ok: false, error: `«${file.name}» — нужен файл изображения` };
+    if (!isAllowedAttachmentType(contentType, resolvedOpts)) {
+      return { ok: false, error: attachmentTypeError(file.name, resolvedOpts) };
     }
 
     const name = sanitizeUploadFilename(file.name);
@@ -162,7 +183,7 @@ export async function uploadAttachmentFiles(
   prefix: AttachmentPrefix,
   entityId: string,
   files: Blob[],
-  opts?: { imagesOnly?: boolean }
+  opts?: AttachmentUploadOpts
 ): Promise<{ ok: true; uploaded: UploadedAttachment[] } | { ok: false; error: string }> {
   const inputs: AttachmentUploadInput[] = [];
   for (const file of files) {

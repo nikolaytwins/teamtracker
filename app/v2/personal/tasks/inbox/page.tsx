@@ -1,12 +1,6 @@
-import { PersonalTodoViewClient } from "@/components/v2/personal/todos/personal-todo-view-client";
+import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
 export default function PersonalTasksInboxPage() {
-  return (
-    <PersonalTodoViewClient
-      view="inbox"
-      title="Входящие"
-      subtitle="Всё, что ещё не разложено по дням и проектам"
-      focusQuickAddOnMount
-    />
-  );
+  redirect(appPath("/v2/personal/ideas-tasks"));
 }

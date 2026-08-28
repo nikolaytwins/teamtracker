@@ -1,6 +1,7 @@
 "use client";
 
-import type { PersonalWish } from "@/lib/v2/personal/personal-wishes-repo";
+import type { PersonalWish, PersonalWishImage } from "@/lib/v2/personal/personal-wishes-repo";
+import { isWishVideoMedia } from "@/lib/v2/personal/wish-media";
 import { buildWishPhotoLayout } from "@/lib/v2/personal/wish-photo-layout";
 import {
   distributeWishesMasonryColumns,
@@ -10,18 +11,19 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 const MASONRY_GAP = 12;
 
-function WishPhotoNatural({
-  url,
+function WishMediaNatural({
+  media,
   aspect,
   onAspect,
   onOpen,
 }: {
-  url: string;
+  media: PersonalWishImage;
   aspect?: number | null;
   onAspect?: (aspect: number) => void;
   onOpen?: () => void;
 }) {
-  const [localAspect, setLocalAspect] = useState(aspect ?? 4 / 3);
+  const isVideo = isWishVideoMedia(media);
+  const [localAspect, setLocalAspect] = useState(aspect ?? (isVideo ? 16 / 9 : 4 / 3));
   const ratio = aspect ?? localAspect;
 
   const applyAspect = useCallback(
@@ -39,19 +41,38 @@ function WishPhotoNatural({
   }, [aspect]);
 
   const inner = (
-    <div className="w-full overflow-hidden rounded-xl bg-[var(--v2-ink-100)]">
+    <div className="relative w-full overflow-hidden rounded-xl bg-[var(--v2-ink-100)]">
       <div className="w-full" style={{ aspectRatio: ratio }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={url}
-          alt=""
-          className="h-full w-full object-contain"
-          onLoad={(e) => {
-            const img = e.currentTarget;
-            applyAspect(img.naturalWidth, img.naturalHeight);
-          }}
-        />
+        {isVideo ? (
+          <video
+            src={media.url}
+            className="h-full w-full object-contain"
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              applyAspect(el.videoWidth, el.videoHeight);
+            }}
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={media.url}
+            alt=""
+            className="h-full w-full object-contain"
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              applyAspect(img.naturalWidth, img.naturalHeight);
+            }}
+          />
+        )}
       </div>
+      {isVideo ? (
+        <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+          video
+        </span>
+      ) : null}
     </div>
   );
 
@@ -80,8 +101,8 @@ function WishPhotoRow({
   if (images.length === 1) {
     const src = sourceIndices[0]!;
     return (
-      <WishPhotoNatural
-        url={images[0]!.url}
+      <WishMediaNatural
+        media={images[0]!}
         aspect={aspects[src]}
         onAspect={(a) => onAspectAt(src, a)}
         onOpen={onPhotoPress ? () => onPhotoPress(src) : undefined}
@@ -94,8 +115,8 @@ function WishPhotoRow({
         const src = sourceIndices[i]!;
         return (
           <div key={img.id} className="min-w-0 flex-1">
-            <WishPhotoNatural
-              url={img.url}
+            <WishMediaNatural
+              media={img}
               aspect={aspects[src]}
               onAspect={(a) => onAspectAt(src, a)}
               onOpen={onPhotoPress ? () => onPhotoPress(src) : undefined}
@@ -115,6 +136,24 @@ function useWishPhotoAspects(images: PersonalWish["images"]) {
     let cancelled = false;
 
     images.forEach((img, i) => {
+      if (isWishVideoMedia(img)) {
+        const probe = document.createElement("video");
+        probe.preload = "metadata";
+        probe.onloadedmetadata = () => {
+          if (cancelled) return;
+          const w = probe.videoWidth;
+          const h = probe.videoHeight;
+          if (w <= 0 || h <= 0) return;
+          setAspects((prev) => {
+            if (prev[i] != null) return prev;
+            const next = [...prev];
+            next[i] = w / h;
+            return next;
+          });
+        };
+        probe.src = img.url;
+        return;
+      }
       const probe = new window.Image();
       probe.onload = () => {
         if (cancelled) return;
