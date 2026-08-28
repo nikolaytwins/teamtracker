@@ -3,9 +3,13 @@
 import { PersonalAmt, PersonalMaskProvider } from "./personal-finance-mask";
 import {
   PersonalCapitalChart,
-  PersonalIncomeChart,
   PersonalSpark,
 } from "./personal-finance-charts";
+import {
+  IncomeHistoryProfitChart,
+  incomeHistoryChartExpandHref,
+  useIncomeHistoryChartPoints,
+} from "./personal-income-history-charts";
 import {
   PersonalAccountBalanceInline,
   PersonalCapitalAmountInline,
@@ -923,17 +927,22 @@ function PfAccountsAndCapital({
 
 function PfChartsSection({
   history,
+  incomeHistory,
   masked,
   year,
   month,
 }: {
   history: PersonalMonthSnapshotRow[];
+  incomeHistory: PersonalIncomeHistoryRow[];
   masked: boolean;
   year: number;
   month: number;
 }) {
   const capitalDelta = computeCapitalDeltaPct(history);
-  if (history.length < 2) {
+  const profitPoints = useIncomeHistoryChartPoints(incomeHistory);
+  const profitDataCount = profitPoints.filter((p) => p.profit_rub != null).length;
+
+  if (history.length < 2 && profitDataCount < 2) {
     return (
       <PfCard className="p-8 text-center text-sm text-[var(--v2-ink-500)]">
         Недостаточно данных для графиков — история появится после первого месяца
@@ -950,13 +959,36 @@ function PfChartsSection({
           right={capitalDelta != null ? <PfDelta value={capitalDelta} size="md" /> : null}
         />
         <PfCard className="p-4 pt-5">
-          <PersonalCapitalChart data={history} masked={masked} currentYear={year} currentMonth={month} />
+          {history.length >= 2 ? (
+            <PersonalCapitalChart data={history} masked={masked} currentYear={year} currentMonth={month} />
+          ) : (
+            <p className="py-6 text-center text-sm text-[var(--v2-ink-500)]">Недостаточно данных</p>
+          )}
         </PfCard>
       </div>
       <div>
-        <PfSectionTitle accent="#F59E0B" title="Доход по месяцам" />
+        <PfSectionTitle
+          accent="#10B981"
+          title="Прибыль по месяцам"
+          right={
+            profitDataCount >= 2 ? (
+              <Link
+                href={incomeHistoryChartExpandHref("profit-total", "profit")}
+                className="text-[12px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)]"
+              >
+                Развернуть
+              </Link>
+            ) : null
+          }
+        />
         <PfCard className="p-4 pt-5">
-          <PersonalIncomeChart data={history} masked={masked} currentYear={year} currentMonth={month} />
+          {profitDataCount >= 2 ? (
+            <IncomeHistoryProfitChart points={profitPoints} masked={masked} />
+          ) : (
+            <p className="py-6 text-center text-sm text-[var(--v2-ink-500)]">
+              Нет данных о прибыли — заполните историю дохода
+            </p>
+          )}
         </PfCard>
       </div>
     </div>
@@ -1806,7 +1838,13 @@ export function PersonalFinanceClient() {
                 AccountBalance={PersonalAccountBalanceInline}
                 CapitalAmount={PersonalCapitalAmountInline}
               />
-              <PfChartsSection history={history} masked={masked} year={year} month={month} />
+              <PfChartsSection
+                history={history}
+                incomeHistory={incomeHistory}
+                masked={masked}
+                year={year}
+                month={month}
+              />
               <PfHistoryTable incomeHistory={incomeHistory} year={year} month={month} />
               <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
                 <PfBudgetCard

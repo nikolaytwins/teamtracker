@@ -1,24 +1,32 @@
 "use client";
 
+import "./transactions-design.css";
 import { PersonalAmt, PersonalMaskProvider } from "./personal-finance-mask";
 import { PersonalOperationModal } from "./personal-operation-modal";
 import { PersonalTransactionAmountInline } from "./personal-money-inline";
 import { PersonalTransactionCategoryInline } from "./personal-transaction-category-inline";
+import {
+  CategoryBreakdown,
+  dayShortLabel,
+  monthLabel,
+  TransactionsHero,
+  TransactionsTrendChart,
+  txnTimeLabel,
+  type TxCatRow,
+} from "./personal-transactions-v3-ui";
 import { fetchJson, IMPORT_FETCH_TIMEOUT_MS } from "@/lib/v2/client/fetch-json";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { apiUrl, appPath } from "@/lib/api-url";
-import {
-  PERSONAL_MONTH_NAMES,
-} from "@/lib/v2/personal/formatters";
+import { apiUrl } from "@/lib/api-url";
+import { formatPersonalRub } from "@/lib/v2/personal/formatters";
 import type {
   PersonalAccountRow,
   PersonalBudgetCategoryRow,
   PersonalFinanceDashboard,
+  PersonalMonthSnapshotRow,
   PersonalTransactionRow,
   PersonalTxnType,
 } from "@/lib/v2/personal/types";
 import { V2Icons } from "@/components/v2/ui/icons";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ImportPreviewItem = {
@@ -35,24 +43,61 @@ type ImportPreviewItem = {
   month: number;
 };
 
-function PfCard({ className = "", children }: { className?: string; children: React.ReactNode }) {
-  return <div className={`rounded-2xl bg-white shadow-[var(--v2-shadow-soft)] ${className}`}>{children}</div>;
-}
-
-function formatDayLabel(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
-}
-
 function dayKey(iso: string) {
   return iso.slice(0, 10);
 }
 
+function incomeLabel(t: PersonalTransactionRow) {
+  return t.description?.trim() || "Поступление";
+}
+
 function typeMeta(t: PersonalTxnType) {
-  if (t === "income") return { label: "Доход", tint: "#10B981", soft: "#ECFDF5" };
-  if (t === "transfer") return { label: "Перевод", tint: "#6366F1", soft: "#EEF2FF" };
-  return { label: "Расход", tint: "#EF4444", soft: "#FEF2F2" };
+  if (t === "income") return { label: "Доход", tint: "#10B981" };
+  if (t === "transfer") return { label: "Перевод", tint: "#6366F1" };
+  return { label: "Расход", tint: "#EF4444" };
+}
+
+function buildExpenseRows(transactions: PersonalTransactionRow[], budgetCategories: PersonalBudgetCategoryRow[]): TxCatRow[] {
+  const byId = new Map<string, number>();
+  for (const t of transactions.filter((x) => x.txn_type === "expense")) {
+    const id = t.budget_category_id ?? "__none__";
+    byId.set(id, (byId.get(id) ?? 0) + t.amount_rub);
+  }
+  const total = [...byId.values()].reduce((s, v) => s + v, 0) || 1;
+  const catMeta = new Map(budgetCategories.map((c) => [c.id, c]));
+  return [...byId.entries()]
+    .map(([id, amount]) => {
+      const cat = catMeta.get(id);
+      return {
+        id,
+        name: id === "__none__" ? "Без категории" : (cat?.name ?? "Категория"),
+        tint: cat?.tint ?? "#94A3B8",
+        amount,
+        pct: Math.round((amount / total) * 100),
+        avg: amount,
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function buildIncomeRows(transactions: PersonalTransactionRow[]): TxCatRow[] {
+  const byLabel = new Map<string, number>();
+  for (const t of transactions.filter((x) => x.txn_type === "income")) {
+    const label = incomeLabel(t);
+    byLabel.set(label, (byLabel.get(label) ?? 0) + t.amount_rub);
+  }
+  const total = [...byLabel.values()].reduce((s, v) => s + v, 0) || 1;
+  const palette = ["#2A56EB", "#0E7490", "#7C3AED", "#6366F1", "#C2410C", "#10B981"];
+  return [...byLabel.entries()]
+    .map(([label, amount], idx) => ({
+      id: `income:${label}`,
+      name: label,
+      tint: palette[idx % palette.length]!,
+      amount,
+      pct: Math.round((amount / total) * 100),
+      avg: amount,
+    }))
+    .sort((a, b) => b.amount - a.amount);
 }
 
 export function PersonalTransactionsClient({
@@ -71,13 +116,18 @@ export function PersonalTransactionsClient({
   const [transactions, setTransactions] = useState<PersonalTransactionRow[]>([]);
   const [accounts, setAccounts] = useState<PersonalAccountRow[]>([]);
   const [budgetCategories, setBudgetCategories] = useState<PersonalBudgetCategoryRow[]>([]);
-  const [budgetLimit, setBudgetLimit] = useState(0);
+  const [monthHistory, setMonthHistory] = useState<PersonalMonthSnapshotRow[]>([]);
   const [filterType, setFilterType] = useState<PersonalTxnType | "all">("all");
-  const [filterCat, setFilterCat] = useState<string>("all");
+  const [filterCat, setFilterCat] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"date" | "sum" | "cat">("date");
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
   const [operationOpen, setOperationOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [qaAmount, setQaAmount] = useState("");
+  const [qaCategoryId, setQaCategoryId] = useState("");
+  const [qaDate, setQaDate] = useState("");
+  const [qaSaving, setQaSaving] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setQDebounced(q), 250);
@@ -89,8 +139,6 @@ export function PersonalTransactionsClient({
     setError(null);
     try {
       const params = new URLSearchParams({ year: String(y), month: String(m) });
-      if (filterType !== "all") params.set("txn_type", filterType);
-      if (filterCat !== "all") params.set("budget_category_id", filterCat);
       if (qDebounced.trim()) params.set("q", qDebounced.trim());
 
       const [dash, list] = await Promise.all([
@@ -101,7 +149,7 @@ export function PersonalTransactionsClient({
       ]);
       setAccounts(dash.accounts);
       setBudgetCategories(dash.budgetCategories);
-      setBudgetLimit(dash.budget.limit_rub);
+      setMonthHistory(dash.history);
       setTransactions(list.transactions);
       setYear(dash.year);
       setMonth(dash.month);
@@ -110,7 +158,7 @@ export function PersonalTransactionsClient({
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterCat, qDebounced]);
+  }, [qDebounced]);
 
   useEffect(() => {
     void load(year, month);
@@ -133,16 +181,83 @@ export function PersonalTransactionsClient({
     .filter((t) => t.txn_type === "income")
     .reduce((s, t) => s + t.amount_rub, 0);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, PersonalTransactionRow[]>();
+  const expenseRows = useMemo(
+    () => buildExpenseRows(transactions, budgetCategories),
+    [transactions, budgetCategories]
+  );
+  const incomeRows = useMemo(() => buildIncomeRows(transactions), [transactions]);
+
+  const displayed = useMemo(() => {
+    let rows = [...transactions];
+    if (filterType !== "all") rows = rows.filter((t) => t.txn_type === filterType);
+    if (filterCat) {
+      if (filterCat.startsWith("income:")) {
+        const label = filterCat.slice(7);
+        rows = rows.filter((t) => t.txn_type === "income" && incomeLabel(t) === label);
+      } else if (filterCat === "__none__") {
+        rows = rows.filter((t) => t.txn_type === "expense" && !t.budget_category_id);
+      } else {
+        rows = rows.filter((t) => t.budget_category_id === filterCat);
+      }
+    }
+    const needle = qDebounced.trim().toLowerCase();
+    if (needle) {
+      rows = rows.filter(
+        (t) =>
+          (t.description ?? "").toLowerCase().includes(needle) ||
+          (t.budget_category_name ?? "").toLowerCase().includes(needle)
+      );
+    }
+    if (sortOrder === "sum") rows.sort((a, b) => b.amount_rub - a.amount_rub);
+    else if (sortOrder === "cat") {
+      rows.sort(
+        (a, b) =>
+          (a.budget_category_name ?? incomeLabel(a)).localeCompare(b.budget_category_name ?? incomeLabel(b)) ||
+          b.txn_date.localeCompare(a.txn_date)
+      );
+    } else {
+      rows.sort((a, b) => b.txn_date.localeCompare(a.txn_date));
+    }
+    return rows;
+  }, [transactions, filterType, filterCat, qDebounced, sortOrder]);
+
+  const chipRows = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; tint: string; count: number }>();
     for (const t of transactions) {
+      if (filterType === "expense" && t.txn_type !== "expense") continue;
+      if (filterType === "income" && t.txn_type !== "income") continue;
+      if (filterType === "transfer" && t.txn_type !== "transfer") continue;
+      let id: string;
+      let name: string;
+      let tint: string;
+      if (t.txn_type === "income") {
+        id = `income:${incomeLabel(t)}`;
+        name = incomeLabel(t);
+        tint = "#2A56EB";
+      } else if (t.txn_type === "expense") {
+        id = t.budget_category_id ?? "__none__";
+        name = t.budget_category_name ?? "Без категории";
+        tint = t.budget_category_tint ?? "#94A3B8";
+      } else continue;
+      const prev = map.get(id);
+      map.set(id, { id, name, tint, count: (prev?.count ?? 0) + 1 });
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count);
+  }, [transactions, filterType]);
+
+  const grouped = useMemo(() => {
+    if (sortOrder !== "date") return [["all", displayed] as const];
+    const map = new Map<string, PersonalTransactionRow[]>();
+    for (const t of displayed) {
       const k = dayKey(t.txn_date);
       const arr = map.get(k) ?? [];
       arr.push(t);
       map.set(k, arr);
     }
     return [...map.entries()];
-  }, [transactions]);
+  }, [displayed, sortOrder]);
+
+  const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
 
   const shift = (delta: number) => {
     let m = month + delta;
@@ -155,242 +270,322 @@ export function PersonalTransactionsClient({
       m -= 12;
       y += 1;
     }
+    setFilterCat(null);
     setYear(y);
     setMonth(m);
   };
 
+  useEffect(() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setQaDate(`${year}-${pad(month)}-${pad(Math.min(today.getDate(), 28))}`);
+    setQaCategoryId(budgetCategories[0]?.id ?? "");
+  }, [year, month, budgetCategories, today]);
+
+  const quickAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = parseFloat(qaAmount);
+    if (!Number.isFinite(n) || n <= 0) {
+      setError("Укажите сумму");
+      return;
+    }
+    setQaSaving(true);
+    setError(null);
+    try {
+      let y = year;
+      let m = month;
+      if (qaDate && /^\d{4}-\d{2}-\d{2}$/.test(qaDate)) {
+        y = Number(qaDate.slice(0, 4));
+        m = Number(qaDate.slice(5, 7));
+      }
+      await fetchJson("/api/v2/personal/finance/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          txn_type: "expense",
+          amount_rub: n,
+          description: null,
+          from_account_id: null,
+          to_account_id: null,
+          budget_category_id: qaCategoryId || null,
+          year: y,
+          month: m,
+          txn_date: qaDate || null,
+        }),
+      });
+      setQaAmount("");
+      await load(year, month);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось добавить");
+    } finally {
+      setQaSaving(false);
+    }
+  };
+
+  const exportCsv = () => {
+    const head = ["Дата", "Тип", "Описание", "Категория", "Сумма"];
+    const rows = displayed.map((t) => [
+      t.txn_date.slice(0, 10),
+      t.txn_type === "income" ? "Приход" : t.txn_type === "expense" ? "Расход" : "Перевод",
+      t.description ?? "",
+      t.budget_category_name ?? incomeLabel(t),
+      t.txn_type === "expense" ? -t.amount_rub : t.amount_rub,
+    ]);
+    const csv =
+      "\ufeff" +
+      [head, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `transactions-${year}-${String(month).padStart(2, "0")}.csv`;
+    a.click();
+  };
+
+  const heroActions = (
+    <>
+      <button
+        type="button"
+        onClick={() => setMasked((v) => !v)}
+        className="iconbtn tip"
+        data-tip={masked ? "Показать суммы" : "Скрыть суммы"}
+        title={masked ? "Показать суммы" : "Скрыть суммы"}
+      >
+        {masked ? "◌" : "◉"}
+      </button>
+      <button type="button" className="btn btn--gh" onClick={() => setImportOpen(true)}>
+        Импорт
+      </button>
+      <button type="button" className="btn btn--pri" onClick={() => setOperationOpen(true)}>
+        Операция
+      </button>
+    </>
+  );
+
   return (
     <PersonalMaskProvider masked={masked}>
-      <div className="flex min-h-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--v2-ink-100)]/70 bg-white/90 px-6 backdrop-blur-md">
-          <nav className="flex items-center gap-1.5 text-[13px] text-[var(--v2-ink-500)]">
-            <Link href={appPath("/v2/personal/finance")} className="transition hover:text-[var(--v2-ink-800)]">
-              Финансы
-            </Link>
-            <V2Icons.chevR className="h-3.5 w-3.5 text-[var(--v2-ink-300)]" />
-            <span className="font-medium text-[var(--v2-ink-900)]">Транзакции</span>
-          </nav>
-          <div className="ml-auto flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setMasked((v) => !v)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)]"
-              title={masked ? "Показать суммы" : "Скрыть суммы"}
-            >
-              {masked ? <TxnEyeIcons.eyeOff /> : <TxnEyeIcons.eye />}
-            </button>
-            <button
-              type="button"
-              onClick={() => setImportOpen(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[12.5px] font-medium text-[var(--v2-ink-700)] transition hover:bg-[var(--v2-ink-50)]"
-            >
-              <V2Icons.upload className="h-4 w-4" />
-              Импорт выписки
-            </button>
-            <button
-              type="button"
-              onClick={() => setOperationOpen(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
-            >
-              <V2Icons.plus className="h-4 w-4" />
-              Операция
-            </button>
-          </div>
-        </header>
-
-        <div className="mx-auto w-full max-w-[980px] flex-1 px-6 py-8">
+      <div className="transactions-v3 min-h-0 flex-1 overflow-y-auto">
+        <div className="page">
           {error ? (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
-              {error}
-            </div>
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</div>
           ) : null}
 
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h1 className="v2-tighter text-[28px] font-semibold tracking-tight text-[var(--v2-ink-900)]">
-                Траты на жизнь
-              </h1>
-              <p className="mt-1 text-[13.5px] text-[var(--v2-ink-500)]">
-                Операции месяца, категории бюджета и массовый импорт PDF/CSV
-              </p>
-            </div>
-            <div className="flex items-center gap-2 rounded-xl bg-[var(--v2-ink-100)]/60 p-1">
-              <button
-                type="button"
-                onClick={() => shift(-1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-600)] hover:bg-white"
-              >
-                <V2Icons.chevL className="h-4 w-4" />
-              </button>
-              <span className="v2-tight min-w-[140px] text-center text-[13.5px] font-semibold text-[var(--v2-ink-900)]">
-                {PERSONAL_MONTH_NAMES[month - 1]} {year}
-              </span>
-              <button
-                type="button"
-                onClick={() => shift(1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-600)] hover:bg-white"
-              >
-                <V2Icons.chevR className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+          <TransactionsHero
+            year={year}
+            month={month}
+            incomeTotal={incomeTotal}
+            expenseTotal={expenseTotal}
+            isCurrentMonth={isCurrentMonth}
+            onPrev={() => shift(-1)}
+            onNext={() => shift(1)}
+            actions={heroActions}
+          />
 
-          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <PfCard className="p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
-                Расходы
-              </div>
-              <div className="v2-tighter mt-1.5 text-[24px] font-semibold text-red-500">
-                <PersonalAmt v={expenseTotal} />
-              </div>
-              <div className="mt-1 text-[12px] text-[var(--v2-ink-500)]">
-                лимит <PersonalAmt v={budgetLimit} short className="font-medium text-[var(--v2-ink-700)]" />
-              </div>
-            </PfCard>
-            <PfCard className="p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
-                Поступления
-              </div>
-              <div className="v2-tighter mt-1.5 text-[24px] font-semibold text-emerald-600">
-                <PersonalAmt v={incomeTotal} />
-              </div>
-              <div className="mt-1 text-[12px] text-[var(--v2-ink-500)]">{transactions.length} операций</div>
-            </PfCard>
-            <PfCard className="p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
-                Категории
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {budgetCategories.slice(0, 6).map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setFilterCat(filterCat === c.id ? "all" : c.id)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-medium transition ${
-                      filterCat === c.id
-                        ? "bg-[var(--v2-ink-900)] text-white"
-                        : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-700)] hover:bg-[var(--v2-ink-100)]"
-                    }`}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: c.tint }} />
-                    {c.name}
-                  </button>
-                ))}
-              </div>
-            </PfCard>
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div className="flex gap-1 rounded-xl bg-[var(--v2-ink-100)]/70 p-1">
-              {(
-                [
-                  ["all", "Все"],
-                  ["expense", "Расход"],
-                  ["income", "Доход"],
-                  ["transfer", "Перевод"],
-                ] as const
-              ).map(([k, label]) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setFilterType(k)}
-                  className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition ${
-                    filterType === k
-                      ? "bg-white text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)]"
-                      : "text-[var(--v2-ink-500)]"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Поиск по описанию…"
-              className="h-9 min-w-[200px] flex-1 rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[13px] outline-none focus:border-[var(--v2-brand-300)] focus:ring-2 focus:ring-[var(--v2-brand-100)]"
+          <div className="charts">
+            <CategoryBreakdown
+              title="Куда ушли деньги"
+              subtitle={
+                expenseTotal
+                  ? `${formatPersonalRub(expenseTotal)} за ${monthLabel(year, month).toLowerCase()}`
+                  : monthLabel(year, month).toLowerCase()
+              }
+              rows={expenseRows}
+              activeId={filterCat && !filterCat.startsWith("income:") ? filterCat : null}
+              onSelect={(id) => {
+                setFilterCat(id);
+                if (id) setFilterType("expense");
+              }}
+            />
+            <CategoryBreakdown
+              title="Откуда пришли деньги"
+              subtitle={
+                incomeTotal
+                  ? `${formatPersonalRub(incomeTotal)} за ${monthLabel(year, month).toLowerCase()}`
+                  : monthLabel(year, month).toLowerCase()
+              }
+              rows={incomeRows}
+              activeId={filterCat?.startsWith("income:") ? filterCat : null}
+              positive
+              onSelect={(id) => {
+                setFilterCat(id);
+                if (id) setFilterType("income");
+              }}
+              footer={
+                incomeRows.length > 0 ? (
+                  <div className="avg-row">
+                    <div className="avg">
+                      <b className="tnum">
+                        {formatPersonalRub(Math.round(incomeTotal / Math.max(incomeRows.length, 1)))}
+                      </b>
+                      <span>средняя оплата</span>
+                    </div>
+                    <div className="avg">
+                      <b className="tnum">{transactions.filter((t) => t.txn_type === "income").length}</b>
+                      <span>оплат за месяц</span>
+                    </div>
+                  </div>
+                ) : null
+              }
             />
           </div>
 
-          {loading ? (
-            <PfCard className="p-10 text-center text-sm text-[var(--v2-ink-500)]">Загрузка…</PfCard>
-          ) : grouped.length === 0 ? (
-            <PfCard className="p-10 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]">
-                <V2Icons.inbox className="h-6 w-6" />
+          <TransactionsTrendChart
+            data={monthHistory}
+            currentYear={year}
+            currentMonth={month}
+            onPickMonth={(y, m) => {
+              setFilterCat(null);
+              setYear(y);
+              setMonth(m);
+            }}
+          />
+
+          <section className="card pad">
+            <div className="bar-row">
+              <div className="seg">
+                {(
+                  [
+                    ["all", "Все"],
+                    ["income", "Приход"],
+                    ["expense", "Расход"],
+                    ["transfer", "Перевод"],
+                  ] as const
+                ).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className={filterType === k ? "on" : ""}
+                    onClick={() => {
+                      setFilterType(k);
+                      setFilterCat(null);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-              <p className="mt-4 text-[15px] font-medium text-[var(--v2-ink-800)]">Пока нет операций</p>
-              <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
-                Добавьте вручную или загрузите PDF-выписку Т-Банка
-              </p>
-              <div className="mt-5 flex justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setImportOpen(true)}
-                  className="h-9 rounded-xl border border-[var(--v2-ink-200)] px-4 text-[13px] font-medium text-[var(--v2-ink-700)]"
-                >
+              <span className="sec-sub">
+                {displayed.length
+                  ? `${displayed.length} из ${transactions.length} операций месяца`
+                  : ""}
+              </span>
+              <div className="ml-auto flex gap-2" style={{ marginLeft: "auto" }}>
+                <button type="button" className="btn btn--gh" onClick={() => setImportOpen(true)}>
                   Импорт выписки
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setOperationOpen(true)}
-                  className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white"
-                >
-                  Новая операция
+                <button type="button" className="btn btn--gh" onClick={exportCsv}>
+                  Экспорт CSV
                 </button>
               </div>
-            </PfCard>
-          ) : (
-            <div className="space-y-5">
-              {grouped.map(([day, rows]) => {
-                const dayExpense = rows
-                  .filter((r) => r.txn_type === "expense")
-                  .reduce((s, r) => s + r.amount_rub, 0);
-                return (
+            </div>
+
+            <div className="bar-row">
+              <button
+                type="button"
+                className={`chip${filterCat ? "" : " on"}`}
+                onClick={() => setFilterCat(null)}
+              >
+                Все категории
+              </button>
+              {chipRows.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`chip${filterCat === c.id ? " on" : ""}`}
+                  onClick={() => setFilterCat(filterCat === c.id ? null : c.id)}
+                >
+                  <span className="dot" style={{ background: c.tint }} />
+                  {c.name}
+                  <i>{c.count}</i>
+                </button>
+              ))}
+            </div>
+
+            <div className="bar-row" style={{ marginBottom: 14 }}>
+              <input
+                type="text"
+                className="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Поиск по названию, категории"
+              />
+              <select
+                className="sortsel"
+                style={{ marginLeft: "auto" }}
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as "date" | "sum" | "cat")}
+              >
+                <option value="date">Сначала новые</option>
+                <option value="sum">По сумме</option>
+                <option value="cat">По категориям</option>
+              </select>
+            </div>
+
+            <div className="addbox">
+              <form className="qa" onSubmit={(e) => void quickAdd(e)}>
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={qaAmount}
+                  onChange={(e) => setQaAmount(e.target.value)}
+                  placeholder="Сумма ₽"
+                  aria-label="Сумма"
+                />
+                <select
+                  value={qaCategoryId}
+                  onChange={(e) => setQaCategoryId(e.target.value)}
+                  aria-label="Категория"
+                >
+                  <option value="">Без категории</option>
+                  {budgetCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <input type="date" value={qaDate} onChange={(e) => setQaDate(e.target.value)} aria-label="Дата" />
+                <button type="submit" disabled={qaSaving}>
+                  {qaSaving ? "…" : "Добавить"}
+                </button>
+              </form>
+              <p className="hint">Быстрый расход — или кнопка «Операция» для дохода и подробностей.</p>
+            </div>
+
+            {loading ? (
+              <div className="empty">Загрузка…</div>
+            ) : displayed.length === 0 ? (
+              <div className="empty">Ничего не нашлось. Сбросьте фильтры или добавьте операцию.</div>
+            ) : (
+              <div className="tlist">
+                {grouped.map(([day, rows]) => (
                   <div key={day}>
-                    <div className="mb-2 flex items-center justify-between px-1">
-                      <span className="v2-tight text-[12.5px] font-semibold uppercase tracking-[0.06em] text-[var(--v2-ink-500)]">
-                        {formatDayLabel(rows[0].txn_date)}
-                      </span>
-                      {dayExpense > 0 ? (
-                        <span className="v2-tnum text-[12px] text-[var(--v2-ink-500)]">
-                          −<PersonalAmt v={dayExpense} short />
+                    {sortOrder === "date" && day !== "all" ? (
+                      <div className="daysep">
+                        <b>{dayShortLabel(rows[0]!.txn_date)}</b>
+                        <hr />
+                        <span className="tnum">
+                          {formatPersonalRub(
+                            rows.reduce(
+                              (s, t) => s + (t.txn_type === "expense" ? -t.amount_rub : t.amount_rub),
+                              0
+                            )
+                          )}{" "}
+                          за день
                         </span>
-                      ) : null}
-                    </div>
-                    <PfCard className="divide-y divide-[var(--v2-ink-100)]/80 overflow-hidden">
-                      {rows.map((t) => {
-                        const meta = typeMeta(t.txn_type);
-                        const amountClass =
-                          t.txn_type === "income"
-                            ? "text-emerald-600"
-                            : t.txn_type === "expense"
-                              ? "text-[var(--v2-ink-900)]"
-                              : "text-[var(--v2-ink-700)]";
-                        return (
-                          <div
-                            key={t.id}
-                            className="group flex items-center gap-3 px-4 py-3.5 transition hover:bg-[var(--v2-ink-50)]/60"
-                          >
-                            <span
-                              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                              style={{ background: meta.soft, color: meta.tint }}
-                            >
-                              {t.txn_type === "income" ? (
-                                <V2Icons.plus className="h-4 w-4" />
-                              ) : t.txn_type === "transfer" ? (
-                                <V2Icons.chevR className="h-4 w-4" />
-                              ) : (
-                                <V2Icons.ruble className="h-4 w-4" />
-                              )}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <div className="v2-tight truncate text-[14px] font-medium text-[var(--v2-ink-900)]">
-                                {t.description || meta.label}
-                              </div>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[var(--v2-ink-500)]">
-                                {t.txn_type === "expense" ? (
-                                  <PersonalTransactionCategoryInline
+                      </div>
+                    ) : null}
+                    {rows.map((t) => {
+                      const meta = typeMeta(t.txn_type);
+                      const amountClass =
+                        t.txn_type === "income" ? "pos" : t.txn_type === "expense" ? "" : "";
+                      return (
+                        <div key={t.id} className="tx">
+                          <span className="tx-ic" style={{ color: meta.tint }}>
+                            {t.txn_type === "income" ? "↓" : "↑"}
+                          </span>
+                          <div className="tx-mid">
+                            <div className="tx-t">{t.description || meta.label}</div>
+                            <div className="tx-meta">
+                              {t.txn_type === "expense" ? (
+                                <PersonalTransactionCategoryInline
                                     transactionId={t.id}
                                     categoryId={t.budget_category_id}
                                     categoryName={t.budget_category_name ?? null}
@@ -413,57 +608,62 @@ export function PersonalTransactionsClient({
                                     }}
                                     onError={(msg) => setError(msg)}
                                   />
-                                ) : t.budget_category_name ? (
-                                  <span className="inline-flex items-center gap-1">
-                                    <span
-                                      className="h-1.5 w-1.5 rounded-full"
-                                      style={{ background: t.budget_category_tint ?? "#94A3B8" }}
-                                    />
-                                    {t.budget_category_name}
-                                  </span>
-                                ) : (
-                                  <span>{meta.label}</span>
-                                )}
-                                {t.from_account_name || t.to_account_name ? (
-                                  <span>
-                                    ·{" "}
-                                    {t.txn_type === "transfer"
-                                      ? `${t.from_account_name ?? "?"} → ${t.to_account_name ?? "?"}`
-                                      : t.txn_type === "income"
-                                        ? t.to_account_name
-                                        : t.from_account_name}
-                                  </span>
-                                ) : null}
-                                {t.import_batch_id ? <span>· импорт</span> : null}
-                              </div>
+                              ) : (
+                                <span className="tag tag--cat">
+                                  <span className="dot" style={{ background: meta.tint }} />
+                                  {meta.label}
+                                </span>
+                              )}
+                              {t.import_batch_id ? <span className="tag tag--sub">импорт</span> : null}
+                              {t.from_account_name || t.to_account_name ? (
+                                <span className="tag tag--sub">
+                                  {t.txn_type === "transfer"
+                                    ? `${t.from_account_name ?? "?"} → ${t.to_account_name ?? "?"}`
+                                    : t.txn_type === "income"
+                                      ? t.to_account_name
+                                      : t.from_account_name}
+                                </span>
+                              ) : null}
                             </div>
-                            <PersonalTransactionAmountInline
-                              transactionId={t.id}
-                              value={t.amount_rub}
-                              txnType={t.txn_type}
-                              className={amountClass}
-                              onSaved={(txn) => {
-                                setTransactions((prev) => prev.map((row) => (row.id === txn.id ? txn : row)));
-                              }}
-                              onError={(msg) => setError(msg)}
-                            />
+                          </div>
+                          <div className="tx-r">
+                            <div className={`tx-sum tnum ${amountClass}`}>
+                              <PersonalTransactionAmountInline
+                                transactionId={t.id}
+                                value={t.amount_rub}
+                                txnType={t.txn_type}
+                                className={amountClass === "pos" ? "text-emerald-600" : ""}
+                                onSaved={(txn) => {
+                                  setTransactions((prev) =>
+                                    prev.map((row) => (row.id === txn.id ? txn : row))
+                                  );
+                                }}
+                                onError={(msg) => setError(msg)}
+                              />
+                            </div>
+                            <div className="tx-date tnum">
+                              {dayShortLabel(t.txn_date).split(" ")[0]} · {txnTimeLabel(t.txn_date)}
+                            </div>
+                          </div>
+                          <div className="tx-act">
                             <button
                               type="button"
-                              onClick={() => void deleteTxn(t.id)}
-                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                              className="iconbtn tip"
+                              data-tip="Удалить"
                               title="Удалить"
+                              onClick={() => void deleteTxn(t.id)}
                             >
-                              <V2Icons.trash className="h-4 w-4" />
+                              ×
                             </button>
                           </div>
-                        );
-                      })}
-                    </PfCard>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
         <PersonalOperationModal
@@ -486,20 +686,6 @@ export function PersonalTransactionsClient({
     </PersonalMaskProvider>
   );
 }
-
-const TxnEyeIcons = {
-  eye: () => (
-    <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]" stroke="currentColor" strokeWidth="1.8">
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  ),
-  eyeOff: () => (
-    <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 3l18 18M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-1.2M9.9 5.2A10.5 10.5 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4.1M6.1 6.1A17.4 17.4 0 0 0 2 12s3.5 7 10 7a10.4 10.4 0 0 0 4.2-.9" />
-    </svg>
-  ),
-};
 
 function StatementImportModal({
   open,

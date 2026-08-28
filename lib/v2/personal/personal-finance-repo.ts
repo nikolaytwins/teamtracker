@@ -10,6 +10,7 @@ import { DEFAULT_BUDGET_CATEGORIES } from "@/lib/v2/personal/formatters";
 import {
   ensureFxRatesFresh,
   getFxRateMap,
+  listFxRates,
   isPersonalAccountCurrency,
   isPersonalFxCurrency,
   rubFromNative,
@@ -85,8 +86,13 @@ function mapAccount(
   };
 }
 
-async function loadFxRateLookup(): Promise<Map<PersonalFxCurrency, { rate: number; asOf: string }>> {
-  const rates = await ensureFxRatesFresh();
+async function loadFxRateLookup(opts?: { refresh?: boolean }): Promise<
+  Map<PersonalFxCurrency, { rate: number; asOf: string }>
+> {
+  const rates = opts?.refresh ? (await ensureFxRatesFresh()) : await listFxRates().catch(() => []);
+  if (!opts?.refresh && rates.length === 0) {
+    return loadFxRateLookup({ refresh: true });
+  }
   return new Map(
     rates.map((r) => [r.currency_code, { rate: r.rate_to_rub, asOf: r.as_of_date }])
   );
@@ -257,6 +263,29 @@ async function listForecastExtras(
 }
 
 /** Синхронизирует spent_rub категорий и общий budgetSpent из expense-транзакций месяца. */
+function computeBudgetSpentFromTransactions(
+  txns: { amount_rub: unknown; budget_category_id: unknown }[],
+  budgetCategories: PersonalBudgetCategoryRow[]
+): { categories: PersonalBudgetCategoryRow[]; totalSpent: number } {
+  const spentByCategory = new Map<string, number>();
+  let totalSpent = 0;
+  for (const t of txns) {
+    const amount = Number(t.amount_rub) || 0;
+    totalSpent += amount;
+    const catId = t.budget_category_id ? String(t.budget_category_id) : null;
+    if (catId) {
+      spentByCategory.set(catId, (spentByCategory.get(catId) ?? 0) + amount);
+    }
+  }
+
+  const categories = budgetCategories.map((c) => ({
+    ...c,
+    spent_rub: spentByCategory.get(c.id) ?? 0,
+  }));
+
+  return { categories, totalSpent };
+}
+
 async function syncBudgetSpentFromTransactions(
   userId: string,
   year: number,
@@ -273,23 +302,9 @@ async function syncBudgetSpentFromTransactions(
     .eq("txn_type", "expense");
   if (error) throw error;
 
-  const spentByCategory = new Map<string, number>();
-  let totalSpent = 0;
-  for (const t of txns ?? []) {
-    const amount = Number(t.amount_rub) || 0;
-    totalSpent += amount;
-    const catId = t.budget_category_id ? String(t.budget_category_id) : null;
-    if (catId) {
-      spentByCategory.set(catId, (spentByCategory.get(catId) ?? 0) + amount);
-    }
-  }
+  const { categories, totalSpent } = computeBudgetSpentFromTransactions(txns ?? [], budgetCategories);
 
   const now = nowIso();
-  const categories = budgetCategories.map((c) => ({
-    ...c,
-    spent_rub: spentByCategory.get(c.id) ?? 0,
-  }));
-
   await Promise.all(
     categories.map((c) =>
       sb
@@ -458,12 +473,19 @@ export async function loadPersonalFinanceDashboard(
         .from("v2_personal_month_snapshots")
         .select("*")
         .eq("user_id", userId)
-        .order("year")
+        .eq("year", year)
         .order("month"),
+      sb
+        .from("v2_personal_transactions")
+        .select("amount_rub, budget_category_id")
+        .eq("user_id", userId)
+        .eq("year", year)
+        .eq("month", month)
+        .eq("txn_type", "expense"),
       listForecastExtras(userId, year, month),
     ]),
     agencyPromise,
-    listPersonalIncomeHistory(ctx),
+    listPersonalIncomeHistory(ctx, { sync: false }),
   ]);
 
   const fxRates: FxRateRow[] = [...rateLookup.entries()].map(([currency_code, v]) => ({
@@ -482,6 +504,7 @@ export async function loadPersonalFinanceDashboard(
     advancesRes,
     categoriesRes,
     historyRes,
+    expenseTxnsRes,
     forecastExtras,
   ] = batch;
 
@@ -491,6 +514,7 @@ export async function loadPersonalFinanceDashboard(
   if (advancesRes.error) throw advancesRes.error;
   if (categoriesRes.error) throw categoriesRes.error;
   if (historyRes.error) throw historyRes.error;
+  if (expenseTxnsRes.error) throw expenseTxnsRes.error;
 
   const accounts = (accountsRes.data ?? []).map((r) =>
     mapAccount(r as Record<string, unknown>, rateLookup)
@@ -538,7 +562,7 @@ export async function loadPersonalFinanceDashboard(
   const paidContributions = taxAdvances
     .filter((a) => !a.planned)
     .reduce((s, a) => s + a.amount_rub, 0);
-  const syncedBudget = await syncBudgetSpentFromTransactions(userId, year, month, budgetCategories);
+  const syncedBudget = computeBudgetSpentFromTransactions(expenseTxnsRes.data ?? [], budgetCategories);
   budgetCategories = syncedBudget.categories;
   const summary = buildSummary(
     accounts,

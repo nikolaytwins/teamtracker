@@ -74,10 +74,13 @@ function mapAgencyGeneralExpense(
   };
 }
 
-async function loadDetailsTotals(projectIds: string[]): Promise<Map<string, number>> {
+async function loadDetailsTotals(
+  projectIds: string[],
+  rawProjects?: Awaited<ReturnType<ReturnType<typeof repo>["listProjectsWithTotalExpenses"]>>
+): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (!projectIds.length) return out;
-  const projects = await repo().listProjectsWithTotalExpenses();
+  const projects = rawProjects ?? (await repo().listProjectsWithTotalExpenses());
   const rates = new Map<string, number>();
   for (const p of projects) {
     rates.set(String(p.id), Number(p.hourlyRateRub) || 0);
@@ -123,7 +126,7 @@ export async function listFinanceProjects(ctx: V2SessionContext): Promise<V2Fina
 async function loadEnrichedFinanceProjects(ctx: V2SessionContext): Promise<V2FinanceProjectView[]> {
   const rawProjects = await repo().listProjectsWithTotalExpenses();
   const ids = rawProjects.map((r) => String(r.id));
-  const detailTotals = await loadDetailsTotals(ids);
+  const detailTotals = await loadDetailsTotals(ids, rawProjects);
   const expenseTotals = new Map<string, number>();
   for (const r of rawProjects) {
     expenseTotals.set(String(r.id), Number(r.totalExpenses) || 0);

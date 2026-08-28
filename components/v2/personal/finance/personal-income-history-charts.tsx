@@ -332,9 +332,11 @@ export function IncomeHistoryCapitalDeltaChart({
 export function IncomeHistoryProfitChart({
   points,
   expanded = false,
+  masked = false,
 }: {
   points: IncomeHistoryChartPoint[];
   expanded?: boolean;
+  masked?: boolean;
 }) {
   const data = points.filter((p) => p.profit_rub != null);
   const layout = getChartLayout(data.length, expanded);
@@ -412,8 +414,12 @@ export function IncomeHistoryProfitChart({
             x={hp.x}
             y={hp.y - 16}
             title={monthLabel(hd)}
-            value={formatPersonalRubShort(hd.profit_rub!)}
-            sub={hd.profit_delta != null ? `Δ ${formatPersonalRubSigned(hd.profit_delta)}` : undefined}
+            value={masked ? "••• ₽" : formatPersonalRubShort(hd.profit_rub!)}
+            sub={
+              !masked && hd.profit_delta != null
+                ? `Δ ${formatPersonalRubSigned(hd.profit_delta)}`
+                : undefined
+            }
           />
         </g>
       ) : null}
