@@ -1516,6 +1516,83 @@ export async function updateBudgetCategorySpent(
   if (error) throw error;
 }
 
+export async function createPersonalBudgetCategory(
+  ctx: V2SessionContext,
+  input: { year: number; month: number; name: string; limit_rub?: number }
+): Promise<PersonalBudgetCategoryRow> {
+  const year = Number(input.year);
+  const month = Number(input.month);
+  const name = input.name.trim();
+  if (!name) throw new PersonalFinanceValidationError("Укажите название категории");
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new PersonalFinanceValidationError("Некорректный месяц");
+  }
+  const limit_rub =
+    input.limit_rub !== undefined && Number.isFinite(Number(input.limit_rub))
+      ? Math.max(0, Math.round(Number(input.limit_rub)))
+      : 0;
+
+  const userId = uid(ctx);
+  await ensureBudgetMonth(userId, year, month);
+  const sb = getV2Supabase();
+  const { data: existing, error: listErr } = await sb
+    .from("v2_personal_budget_categories")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("year", year)
+    .eq("month", month)
+    .order("sort_order");
+  if (listErr) throw listErr;
+
+  const normalized = name.toLowerCase();
+  const duplicate = (existing ?? []).find((c) => String(c.name).trim().toLowerCase() === normalized);
+  if (duplicate) {
+    return {
+      id: String(duplicate.id),
+      user_id: userId,
+      year,
+      month,
+      name: String(duplicate.name),
+      limit_rub: Number(duplicate.limit_rub) || 0,
+      spent_rub: Number(duplicate.spent_rub) || 0,
+      tint: String(duplicate.tint),
+      sort_order: Number(duplicate.sort_order) || 0,
+    };
+  }
+
+  const sort_order =
+    (existing ?? []).reduce((max, c) => Math.max(max, Number(c.sort_order) || 0), -1) + 1;
+  const tint =
+    DEFAULT_BUDGET_CATEGORIES[sort_order % DEFAULT_BUDGET_CATEGORIES.length]?.tint ?? "#A1A1AA";
+  const now = nowIso();
+  const row = {
+    id: newV2Id(),
+    user_id: userId,
+    year,
+    month,
+    name,
+    limit_rub,
+    spent_rub: 0,
+    tint,
+    sort_order,
+    created_at: now,
+    updated_at: now,
+  };
+  const { error } = await sb.from("v2_personal_budget_categories").insert(row);
+  if (error) throw error;
+  return {
+    id: row.id,
+    user_id: userId,
+    year,
+    month,
+    name,
+    limit_rub,
+    spent_rub: 0,
+    tint,
+    sort_order,
+  };
+}
+
 export async function updatePersonalExpectedExpenses(
   ctx: V2SessionContext,
   year: number,

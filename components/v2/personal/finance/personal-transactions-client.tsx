@@ -495,6 +495,10 @@ function StatementImportModal({
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<{ bank?: string; warnings?: string[] } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [categoriesByMonth, setCategoriesByMonth] = useState<Record<string, PersonalBudgetCategoryRow[]>>({});
+  const [creatingForIdx, setCreatingForIdx] = useState<number | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -502,10 +506,66 @@ function StatementImportModal({
     setError(null);
     setMeta(null);
     setApplyBalances(false);
+    setCategoriesByMonth({});
+    setCreatingForIdx(null);
+    setNewCategoryName("");
     setAccountId(accounts.find((a) => a.account_type === "card")?.id ?? accounts[0]?.id ?? "");
   }, [open, accounts]);
 
   if (!open) return null;
+
+  const loadCategoriesForItems = async (importItems: ImportPreviewItem[]) => {
+    const keys = [...new Set(importItems.map((i) => `${i.year}-${i.month}`))];
+    const entries = await Promise.all(
+      keys.map(async (key) => {
+        const [y, m] = key.split("-").map(Number);
+        const dash = await fetchJson<PersonalFinanceDashboard>(
+          `/api/v2/personal/finance/dashboard?year=${y}&month=${m}`
+        );
+        return [key, dash.budgetCategories] as const;
+      })
+    );
+    setCategoriesByMonth(Object.fromEntries(entries));
+  };
+
+  const categoriesForItem = (item: ImportPreviewItem) =>
+    categoriesByMonth[`${item.year}-${item.month}`] ??
+    budgetCategories.filter((c) => c.year === item.year && c.month === item.month);
+
+  const submitNewCategory = async (idx: number) => {
+    const item = items[idx];
+    if (!item) return;
+    const name = newCategoryName.trim();
+    if (!name) return;
+    setCreatingCategory(true);
+    setError(null);
+    try {
+      const { category } = await fetchJson<{ category: PersonalBudgetCategoryRow }>(
+        "/api/v2/personal/finance/budget/categories",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ year: item.year, month: item.month, name }),
+        }
+      );
+      const key = `${item.year}-${item.month}`;
+      setCategoriesByMonth((prev) => ({
+        ...prev,
+        [key]: [...(prev[key] ?? []).filter((c) => c.id !== category.id), category],
+      }));
+      setItems((prev) =>
+        prev.map((p, i) =>
+          i === idx ? { ...p, budget_category_id: category.id, budget_category_name: category.name } : p
+        )
+      );
+      setCreatingForIdx(null);
+      setNewCategoryName("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось создать категорию");
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
 
   const parseFile = async (file: File) => {
     setParsing(true);
@@ -520,8 +580,10 @@ function StatementImportModal({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setItems(data.items as ImportPreviewItem[]);
+      const parsedItems = data.items as ImportPreviewItem[];
+      setItems(parsedItems);
       setMeta({ bank: data.bank, warnings: data.warnings });
+      await loadCategoriesForItems(parsedItems);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка разбора");
       setItems([]);
@@ -577,7 +639,7 @@ function StatementImportModal({
         <div className="border-b border-[var(--v2-ink-100)] px-6 py-4">
           <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Импорт выписки</h2>
           <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
-            PDF Т-Банка («Движение средств за период») или CSV из раздела «Операции». Дубликаты пропускаются автоматически.
+            PDF Т-Банка («Движение средств за период») или CSV из раздела «Операции». Дубликаты пропускаются автоматически. Новые категории — кнопкой + у операции.
           </p>
         </div>
 
@@ -714,28 +776,87 @@ function StatementImportModal({
                         </td>
                         <td className="px-2 py-2">
                           {item.txn_type === "expense" ? (
-                            <select
-                              value={item.budget_category_id ?? ""}
-                              onChange={(e) => {
-                                const id = e.target.value || null;
-                                const name = budgetCategories.find((c) => c.id === id)?.name ?? null;
-                                setItems((prev) =>
-                                  prev.map((p, i) =>
-                                    i === idx
-                                      ? { ...p, budget_category_id: id, budget_category_name: name }
-                                      : p
-                                  )
-                                );
-                              }}
-                              className="h-8 max-w-[130px] rounded-lg border border-[var(--v2-ink-200)] px-1.5 text-[12px]"
-                            >
-                              <option value="">—</option>
-                              {budgetCategories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
+                            creatingForIdx === idx ? (
+                              <div className="flex min-w-[148px] flex-col gap-1">
+                                <input
+                                  autoFocus
+                                  value={newCategoryName}
+                                  onChange={(e) => setNewCategoryName(e.target.value)}
+                                  placeholder="Название категории"
+                                  disabled={creatingCategory}
+                                  className="h-8 w-full rounded-lg border border-[var(--v2-brand-300)] px-2 text-[12px] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void submitNewCategory(idx);
+                                    }
+                                    if (e.key === "Escape") {
+                                      setCreatingForIdx(null);
+                                      setNewCategoryName("");
+                                    }
+                                  }}
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={creatingCategory || !newCategoryName.trim()}
+                                    onClick={() => void submitNewCategory(idx)}
+                                    className="h-7 flex-1 rounded-md bg-[var(--v2-brand-600)] px-2 text-[11px] font-medium text-white disabled:opacity-45"
+                                  >
+                                    {creatingCategory ? "…" : "Создать"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={creatingCategory}
+                                    onClick={() => {
+                                      setCreatingForIdx(null);
+                                      setNewCategoryName("");
+                                    }}
+                                    className="h-7 rounded-md px-2 text-[11px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <select
+                                  value={item.budget_category_id ?? ""}
+                                  onChange={(e) => {
+                                    const id = e.target.value || null;
+                                    const name =
+                                      categoriesForItem(item).find((c) => c.id === id)?.name ?? null;
+                                    setItems((prev) =>
+                                      prev.map((p, i) =>
+                                        i === idx
+                                          ? { ...p, budget_category_id: id, budget_category_name: name }
+                                          : p
+                                      )
+                                    );
+                                  }}
+                                  className="h-8 min-w-0 max-w-[118px] flex-1 rounded-lg border border-[var(--v2-ink-200)] px-1.5 text-[12px]"
+                                >
+                                  <option value="">—</option>
+                                  {categoriesForItem(item).map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  title="Новая категория"
+                                  aria-label="Создать категорию"
+                                  onClick={() => {
+                                    setCreatingForIdx(idx);
+                                    setNewCategoryName(item.budget_category_name ?? "");
+                                  }}
+                                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--v2-ink-200)] text-[var(--v2-brand-700)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)]"
+                                >
+                                  <V2Icons.plus className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            )
                           ) : (
                             <span className="text-emerald-600">доход</span>
                           )}
