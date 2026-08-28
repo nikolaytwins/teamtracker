@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ru"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тим Трекер — Транзакции</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<style>/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("daa49f05-637d-40bf-8098-9bc66dca89a9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("4196eef7-87ec-44a0-8444-e6705c4b782e") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("de65aa8e-0dac-4390-b8db-f02ef62278b7") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("8304709f-3fcc-48c0-aa35-61f5335a4c65") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("d988004e-1070-4b84-a1cb-6e12396aadaa") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("c0e4b2ec-d10b-43e6-9fe9-01d16ef2ba7a") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("f9502ad1-b4b5-40fe-8940-0415e53816cf") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("daa49f05-637d-40bf-8098-9bc66dca89a9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("4196eef7-87ec-44a0-8444-e6705c4b782e") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("de65aa8e-0dac-4390-b8db-f02ef62278b7") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("8304709f-3fcc-48c0-aa35-61f5335a4c65") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("d988004e-1070-4b84-a1cb-6e12396aadaa") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("c0e4b2ec-d10b-43e6-9fe9-01d16ef2ba7a") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("f9502ad1-b4b5-40fe-8940-0415e53816cf") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("daa49f05-637d-40bf-8098-9bc66dca89a9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("4196eef7-87ec-44a0-8444-e6705c4b782e") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("de65aa8e-0dac-4390-b8db-f02ef62278b7") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("8304709f-3fcc-48c0-aa35-61f5335a4c65") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("d988004e-1070-4b84-a1cb-6e12396aadaa") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("c0e4b2ec-d10b-43e6-9fe9-01d16ef2ba7a") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("f9502ad1-b4b5-40fe-8940-0415e53816cf") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("daa49f05-637d-40bf-8098-9bc66dca89a9") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("4196eef7-87ec-44a0-8444-e6705c4b782e") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("de65aa8e-0dac-4390-b8db-f02ef62278b7") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("8304709f-3fcc-48c0-aa35-61f5335a4c65") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("d988004e-1070-4b84-a1cb-6e12396aadaa") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("c0e4b2ec-d10b-43e6-9fe9-01d16ef2ba7a") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("f9502ad1-b4b5-40fe-8940-0415e53816cf") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>
+:root{--ink-900:#0a0a0b;--ink-800:#18181b;--ink-700:#27272a;--ink-600:#52525b;--ink-500:#71717a;--ink-400:#a1a1aa;--ink-300:#d4d4d8;--ink-200:#e4e4e7;--ink-100:#f4f4f5;--ink-50:#fafafa;--brand-50:#eff4ff;--brand-300:#93b4fd;--brand-500:#3b6ff7;--brand-600:#2a56eb;--brand-700:#2244d8;--blue:#2d5eef;--green:#0e9f6e;--green-bg:#e8f7f0;--red:#b42318;--red-bg:#fee4e2;--amber-bg:#fef3c7;--amber:#92400e;--shadow-card:0 1px 2px rgba(16,24,40,.04),0 10px 30px -14px rgba(16,24,40,.10);--shadow-soft:0 1px 2px rgba(16,24,40,.03),0 16px 44px -18px rgba(30,52,120,.14);--shadow-glow:0 0 0 4px rgba(59,111,247,.1),0 6px 22px -8px rgba(59,111,247,.45)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:linear-gradient(180deg,#f6f8fc 0%,#eef2f9 100%);color:var(--ink-900);-webkit-font-smoothing:antialiased;font-size:15px}
+a{color:var(--brand-700);text-decoration:none}a:hover{color:var(--brand-600)}
+button{font:inherit;color:inherit}
+.tnum{font-variant-numeric:tabular-nums}
+.shell{display:flex;min-height:100vh}
+.sidebar{width:252px;flex-shrink:0;background:#fff;box-shadow:var(--shadow-soft);padding:20px 14px;display:flex;flex-direction:column;gap:4px}
+.sidebar-logo{display:flex;align-items:center;gap:11px;padding:8px 10px;margin-bottom:12px}
+.sidebar-logo-mark{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--brand-500),var(--brand-600));box-shadow:var(--shadow-glow)}
+.sidebar-logo-text{font-size:15px;font-weight:600}
+.sidebar-item{padding:11px 12px;border-radius:12px;font-size:14.5px;color:var(--ink-600);display:block}
+.sidebar-item--active{background:var(--brand-50);color:var(--brand-700);font-weight:600}
+.main{flex:1;min-width:0}
+.page{padding:28px 36px 120px;display:flex;flex-direction:column;gap:22px;max-width:1720px}
+.card{background:#fff;border-radius:20px;box-shadow:var(--shadow-card)}
+.pad{padding:26px 28px}
+.kick{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-400)}
+.sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.sec-title{font-size:20px;font-weight:600;letter-spacing:-.026em}
+.sec-sub{font-size:14px;color:var(--ink-500)}
+.tip{position:relative}
+.tip:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);background:var(--ink-900);color:#fff;font-size:12.5px;font-weight:500;letter-spacing:0;padding:6px 10px;border-radius:9px;white-space:nowrap;z-index:20;pointer-events:none;box-shadow:0 8px 20px -8px rgba(0,0,0,.45)}
+/* ---------- ХЕРО ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,540px);overflow:hidden}
+.hero-l{padding:28px 32px;display:flex;flex-direction:column;justify-content:center;gap:13px;min-height:340px;position:relative;z-index:2}
+.hero-h1{font-size:38px;font-weight:600;letter-spacing:-.036em;line-height:1.1}
+.hero-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hero-sub{font-size:15.5px;color:var(--ink-500);max-width:560px;line-height:1.5}
+.hero-img{position:relative;overflow:hidden;pointer-events:none;min-height:340px}
+.hero-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:72% 12%;-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.7) 8%,#000 17%);mask-image:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.7) 8%,#000 17%)}
+.hero-img::after{content:"";position:absolute;inset:0 auto 0 0;width:20%;background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.45) 60%,rgba(255,255,255,0) 100%)}
+.wk-nav{display:flex;align-items:center;gap:8px}
+.wk-btn{width:36px;height:36px;border-radius:11px;border:1.5px solid var(--ink-200);background:#fff;font-size:16px;color:var(--ink-600);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.wk-btn:hover{border-color:var(--brand-500);color:var(--brand-600)}
+.wk-btn[disabled]{opacity:.4;cursor:default}
+.wk-label{font-size:15px;font-weight:600;letter-spacing:-.02em;min-width:150px;text-align:center}
+.wk-badge{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;padding:4px 8px;border-radius:7px;background:var(--brand-50);color:var(--brand-700)}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:4px}
+.kpi{border-radius:18px;padding:15px 17px;display:flex;flex-direction:column;gap:6px}
+.kpi--main{background:var(--blue);color:#fff;box-shadow:0 16px 40px -20px rgba(45,94,239,.85)}
+.kpi--soft{background:rgba(255,255,255,.8);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 1px 2px rgba(16,24,40,.04),0 14px 34px -20px rgba(16,24,40,.2)}
+.kpi-k{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em}
+.kpi--main .kpi-k{color:rgba(255,255,255,.62)}
+.kpi--soft .kpi-k{color:var(--ink-400)}
+.kpi-v{font-size:23px;font-weight:600;letter-spacing:-.035em;line-height:1.1;white-space:nowrap}
+.kpi-n{font-size:13.5px;line-height:1.4;margin-top:auto}
+.kpi--main .kpi-n{color:rgba(255,255,255,.72)}
+.kpi--soft .kpi-n{color:var(--ink-500)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+/* ---------- ГРАФИКИ ---------- */
+.charts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.avg-row{display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--ink-100)}
+.avg{flex:1;display:flex;flex-direction:column;gap:3px}
+.avg b{font-size:17px;font-weight:600;letter-spacing:-.03em}
+.avg span{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.11em;color:var(--ink-400)}
+.trend{position:relative;height:270px}
+.trend svg{display:block;width:100%;height:100%;overflow:visible}
+.tr-g{stroke:var(--ink-100);stroke-width:1}
+.tr-yl{font-size:11px;fill:var(--ink-400);font-weight:500}
+.tr-xl{font-size:13px;fill:var(--ink-500);font-weight:500}
+.tr-xl.now{fill:var(--ink-900);font-weight:700}
+.tr-hit{fill:transparent;cursor:pointer}
+.tr-hit:hover{fill:rgba(45,94,239,.05)}
+.tr-dot{cursor:pointer}
+.tr-tip{position:absolute;transform:translate(-50%,-100%);background:var(--ink-900);color:#fff;border-radius:11px;padding:9px 12px;font-size:13px;line-height:1.45;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;box-shadow:0 10px 26px -10px rgba(0,0,0,.5)}
+.tr-tip.on{opacity:1}
+.tr-tip b{font-weight:600}
+.cbs{display:flex;flex-direction:column;gap:4px}
+.cb{border:none;background:none;text-align:left;width:100%;padding:10px 12px;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;gap:7px}
+.cb:hover{background:var(--ink-50)}
+.cb.on{background:var(--brand-50)}
+.cb-h{display:flex;align-items:baseline;gap:10px}
+.cb-n{font-size:15px;font-weight:600;letter-spacing:-.018em;color:var(--ink-800)}
+.cb-p{font-size:12.5px;color:var(--ink-400);font-weight:500}
+.cb-s{margin-left:auto;font-size:15.5px;font-weight:600;letter-spacing:-.024em;white-space:nowrap}
+.cb-t{height:9px;border-radius:999px;background:var(--ink-100);overflow:hidden}
+.cb-f{height:100%;border-radius:999px;transition:width .35s cubic-bezier(.2,.7,.2,1)}
+.cb-a{font-size:12.5px;color:var(--ink-400);font-weight:500}
+.bars{display:flex;align-items:flex-end;gap:14px;height:230px;padding:0 2px}
+.bcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;height:100%;justify-content:flex-end}
+.bpair{display:flex;align-items:flex-end;gap:7px;height:100%;width:100%;justify-content:center}
+.bar{width:26px;border-radius:9px 9px 4px 4px;position:relative;min-height:4px}
+.bar--in{background:linear-gradient(180deg,var(--brand-500),var(--brand-600))}
+.bar--out{background:var(--ink-200)}
+.bar:hover::after{content:attr(data-v);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);background:var(--ink-900);color:#fff;font-size:12px;font-weight:500;padding:5px 9px;border-radius:8px;white-space:nowrap;z-index:5}
+.bcol-l{font-size:13px;color:var(--ink-500);font-weight:500}
+.bcol.now .bcol-l{color:var(--ink-900);font-weight:600}
+.blegend{display:flex;gap:16px;margin-top:16px;padding-top:14px;border-top:1px solid var(--ink-100);flex-wrap:wrap}
+.blg{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-500)}
+.blg span{width:10px;height:10px;border-radius:3px}
+.mini{margin-left:auto;font-size:13.5px;color:var(--ink-500)}
+/* ---------- ФИЛЬТРЫ ---------- */
+.bar-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.chip{border:1.5px solid var(--ink-200);background:#fff;border-radius:12px;padding:9px 14px;font-size:14px;font-weight:500;color:var(--ink-600);cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.chip:hover{border-color:var(--brand-300)}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.chip i{font-style:normal;font-size:12px;font-weight:600;opacity:.6}
+.chip .dot{width:8px;height:8px;border-radius:999px}
+.search{height:44px;border-radius:13px;border:1.5px solid var(--ink-200);background:#fff;padding:0 16px;font:inherit;font-size:14.5px;width:250px}
+.search:focus{outline:none;border-color:var(--brand-500)}
+.sortsel{height:44px;border-radius:13px;border:1.5px solid var(--ink-200);background:#fff;font:inherit;font-size:14px;color:var(--ink-600);padding:0 12px}
+.seg{display:inline-flex;background:var(--ink-100);border-radius:13px;padding:3px}
+.seg button{border:none;background:none;font-size:14px;font-weight:600;color:var(--ink-500);padding:8px 16px;border-radius:10px;cursor:pointer}
+.seg button.on{background:#fff;color:var(--ink-900);box-shadow:0 1px 3px rgba(16,24,40,.1)}
+.addbox{background:var(--ink-50);border-radius:18px;padding:18px 20px;margin-bottom:18px}
+.qa{display:flex;gap:10px;flex-wrap:wrap}
+.qa input[type=text]{flex:1;min-width:220px;height:52px;border-radius:15px;border:1.5px solid var(--ink-200);background:#fff;padding:0 18px;font:inherit;font-size:16px}
+.qa input[type=text]:focus,.qa input[type=number]:focus{outline:none;border-color:var(--brand-500);box-shadow:var(--shadow-glow)}
+.qa select,.qa input[type=date],.qa input[type=number]{height:52px;border-radius:15px;border:1.5px solid var(--ink-200);background:#fff;font:inherit;font-size:14.5px;color:var(--ink-600);padding:0 14px}
+.qa input[type=number]{width:180px}
+.qa select{flex:1;min-width:200px}
+.qa button{height:52px;padding:0 24px;border-radius:15px;border:none;background:var(--brand-600);color:#fff;font-size:15.5px;font-weight:600;cursor:pointer}
+.qa button:hover{background:var(--brand-700)}
+.hint{font-size:13px;color:var(--ink-400);margin-top:10px}
+/* ---------- СПИСОК ---------- */
+.tlist{display:flex;flex-direction:column;gap:8px}
+.tx{display:flex;align-items:center;gap:16px;background:var(--ink-50);border-radius:16px;padding:14px 18px;min-height:74px;cursor:pointer;transition:background .15s}
+.tx:hover{background:var(--ink-100)}
+.tx-ic{width:40px;height:40px;border-radius:13px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:17px;font-weight:600;background:#fff;box-shadow:var(--shadow-card)}
+.tx-mid{flex:1;min-width:0}
+.tx-t{font-size:16.5px;font-weight:600;letter-spacing:-.018em;line-height:1.3;color:var(--ink-800)}
+.tx-meta{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.tag{font-size:12px;font-weight:600;border-radius:8px;padding:3px 9px;white-space:nowrap}
+.tag--cat{background:#fff;box-shadow:inset 0 0 0 1px var(--ink-200);color:var(--ink-600);display:inline-flex;align-items:center;gap:6px}
+.tag--cat .dot{width:7px;height:7px;border-radius:999px}
+.tag--sub{background:var(--ink-100);color:var(--ink-500);font-weight:500;max-width:320px;overflow:hidden;text-overflow:ellipsis}
+.tag--paid{background:var(--green-bg);color:#036b4d}
+.tag--pending{background:var(--amber-bg);color:var(--amber)}
+.tag--refund{background:var(--brand-50);color:var(--brand-700)}
+.tag--failed{background:var(--red-bg);color:var(--red)}
+.tx-sum{font-size:17.5px;font-weight:600;letter-spacing:-.026em;white-space:nowrap;text-align:right}
+.tx-date{font-size:12.5px;color:var(--ink-400);margin-top:5px;text-align:right;font-weight:500}
+.tx-r{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0}
+.tx-act{display:flex;gap:6px;flex-shrink:0}
+.iconbtn{width:38px;height:38px;border-radius:12px;border:none;background:#fff;box-shadow:var(--shadow-card);cursor:pointer;font-size:15px;color:var(--ink-500);display:inline-flex;align-items:center;justify-content:center}
+.iconbtn:hover{color:var(--brand-600)}
+.empty{border:1.5px dashed var(--ink-200);border-radius:18px;padding:44px 28px;text-align:center;font-size:16px;color:var(--ink-400)}
+.daysep{display:flex;align-items:center;gap:12px;padding:14px 4px 6px}
+.daysep b{font-size:13px;font-weight:600;color:var(--ink-500)}
+.daysep hr{flex:1;border:none;height:1px;background:linear-gradient(90deg,rgba(16,24,40,.1),rgba(16,24,40,0))}
+.daysep span{font-size:13px;color:var(--ink-400);font-weight:500}
+.linkbtn{border:none;background:none;cursor:pointer;font-size:14px;font-weight:500;color:var(--brand-700);padding:0}
+.btn{height:44px;padding:0 18px;border-radius:13px;border:none;font-size:14.5px;font-weight:600;cursor:pointer}
+.btn--pri{background:var(--brand-600);color:#fff}
+.btn--pri:hover{background:var(--brand-700)}
+.btn--gh{background:#fff;color:var(--ink-700);box-shadow:var(--shadow-card)}
+.btn--gh:hover{color:var(--brand-700)}
+/* ---------- ПАНЕЛЬ ---------- */
+.scrim{position:fixed;inset:0;background:rgba(10,10,11,.32);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:94vw;background:#fff;box-shadow:-24px 0 60px -24px rgba(16,24,40,.3);z-index:50;transform:translateX(102%);transition:transform .26s cubic-bezier(.2,.7,.2,1);display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.dr-h{padding:24px 28px 18px;border-bottom:1px solid var(--ink-100);display:flex;align-items:center;gap:12px}
+.dr-h .sec-title{flex:1}
+.dr-b{padding:24px 28px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:18px}
+.dr-f{padding:18px 28px;border-top:1px solid var(--ink-100);display:flex;gap:10px;flex-wrap:wrap}
+.fld{display:flex;flex-direction:column;gap:8px}
+.fld label{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-400)}
+.fld input,.fld select,.fld textarea{border:1.5px solid var(--ink-200);border-radius:14px;background:#fff;font:inherit;padding:13px 15px;font-size:15.5px;color:var(--ink-900)}
+.fld textarea{min-height:90px;resize:vertical;line-height:1.5}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--brand-500)}
+.fld2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dr-act{border:1.5px solid var(--ink-200);background:#fff;border-radius:14px;padding:13px 15px;font-size:14.5px;font-weight:500;text-align:left;cursor:pointer;color:var(--ink-700)}
+.dr-act:hover{border-color:var(--brand-500);color:var(--brand-700)}
+.dr-act--dan:hover{border-color:#f97066;color:#b42318}
+.dr-acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dr-note{font-size:13.5px;color:var(--ink-400);line-height:1.5}
+.toast{position:fixed;left:50%;bottom:32px;transform:translate(-50%,180%);background:var(--ink-900);color:#fff;border-radius:16px;padding:15px 20px;display:flex;align-items:center;gap:16px;font-size:15px;font-weight:500;box-shadow:0 20px 50px -18px rgba(0,0,0,.6);z-index:60;transition:transform .24s cubic-bezier(.2,.7,.2,1)}
+.toast.on{transform:translate(-50%,0)}
+.toast button{border:none;background:rgba(255,255,255,.16);color:#fff;border-radius:10px;padding:7px 12px;font-size:14px;font-weight:600;cursor:pointer}
+@media(max-width:1280px){.charts{grid-template-columns:1fr}}
+@media(max-width:1200px){.hero{grid-template-columns:1fr}.hero-img{display:none}.kpis{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="shell">
+<aside class="sidebar" aria-label="Навигация">
+<div class="sidebar-logo"><span class="sidebar-logo-mark"></span><span class="sidebar-logo-text">Team Tracker</span></div>
+<a class="sidebar-item" href="Главная (редизайн) v3.html">Главная</a>
+<a class="sidebar-item" href="Задачи и идеи.html">Задачи и идеи</a>
+<div class="sidebar-item">Календарь</div>
+<div class="sidebar-item">Стратегия</div>
+<div class="sidebar-item sidebar-item--active">Транзакции</div>
+</aside>
+<main class="main">
+<div class="page">
+
+<section class="card hero">
+<div class="hero-l">
+<div class="hero-top"><span class="kick">Финансы</span><span class="wk-badge" id="m-badge">этот месяц</span></div>
+<h1 class="hero-h1" id="m-h1">Август 2026</h1>
+<div class="wk-nav"><button type="button" class="wk-btn tip" id="m-prev" data-tip="Прошлый месяц">‹</button><span class="wk-label tnum" id="m-label"></span><button type="button" class="wk-btn tip" id="m-next" data-tip="Следующий месяц">›</button></div>
+<div class="kpis" id="kpis"></div>
+</div>
+<div class="hero-img"><img src="ef0bc860-4c0d-4236-9ab2-b0a694da3972" alt=""></div>
+</section>
+
+<div class="charts">
+<section class="card pad">
+<div class="sec-head"><h2 class="sec-title">Куда ушли деньги</h2><span class="sec-sub" id="don-sub"></span></div>
+<div class="cbs" id="cbs"></div>
+</section>
+<section class="card pad">
+<div class="sec-head"><h2 class="sec-title">Откуда пришли деньги</h2><span class="sec-sub" id="in-sub"></span></div>
+<div class="cbs" id="cbs-in"></div>
+<div class="avg-row" id="in-avg"></div>
+</section>
+</div>
+<section class="card pad">
+<div class="sec-head"><h2 class="sec-title">Приход и расход по месяцам</h2><span class="sec-sub mini" id="bars-sub"></span></div>
+<div class="trend" id="trend"></div>
+<div class="blegend">
+<span class="blg"><span style="background:var(--brand-500)"></span>Приход</span>
+<span class="blg"><span style="background:#E5604D"></span>Расход</span>
+<span class="blg" id="bars-note"></span>
+</div>
+</section>
+
+<section class="card pad">
+<div class="bar-row">
+<div class="seg" id="type-seg">
+<button type="button" class="on" data-type="all">Все</button>
+<button type="button" data-type="in">Приход</button>
+<button type="button" data-type="out">Расход</button>
+</div>
+<span class="sec-sub" id="list-count"></span>
+<div style="margin-left:auto;display:flex;gap:10px"><button type="button" class="btn btn--gh" id="imp">Импорт выписки</button><button type="button" class="btn btn--gh" id="csv">Экспорт CSV</button></div>
+<input type="file" id="impfile" accept=".csv,text/csv" hidden="">
+</div>
+<div class="bar-row" id="cats"></div>
+<div class="bar-row" style="margin-bottom:14px">
+<input type="text" class="search" id="q" placeholder="Поиск по названию, категории, ID">
+<select class="sortsel" id="sort" style="margin-left:auto"><option value="date">Сначала новые</option><option value="sum">По сумме</option><option value="cat">По категориям</option></select>
+</div>
+<div class="addbox">
+<form class="qa" id="add">
+<input type="number" id="a-sum" placeholder="Сумма ₽" aria-label="Сумма" min="0" step="100">
+<select id="a-cat" aria-label="Категория"></select>
+<input type="date" id="a-date" aria-label="Дата">
+<button type="submit">Добавить</button>
+</form>
+<p class="hint">Данные хранятся в браузере. Любое действие можно отменить в уведомлении.</p>
+</div>
+<div class="tlist" id="list"></div>
+</section>
+
+</div>
+</main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="toast" id="toast" role="status"><span id="toast-t"></span><button type="button" id="toast-u">Отменить</button></div>
+
+<script>
+const CATS={course:{n:"Курсы",c:"#2A56EB",t:"in"},individual:{n:"Индивидуальный трек",c:"#7C3AED",t:"in"},addon:{n:"Доп. модуль",c:"#0891B2",t:"in"},ads:{n:"Реклама",c:"#E5604D",t:"out"},team:{n:"Команда",c:"#2A56EB",t:"out"},services:{n:"Сервисы",c:"#7C3AED",t:"out"},tax:{n:"Налоги",c:"#EAB308",t:"out"},equip:{n:"Оборудование",c:"#0891B2",t:"out"},edu:{n:"Обучение",c:"#71717A",t:"out"}};
+const STATUS={paid:["Оплачено","paid"],pending:["Ожидает","pending"],refund:["Возврат","refund"],failed:["Ошибка","failed"]};
+const MONTHS=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+const MONTHS_N=["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+const SEED=[
+["2026-08-27","11:20","out","Яндекс Директ","Кампания «Дизайн с нуля», август","ads",68000,"Расчётный счёт","paid","op_ya_0827"],
+["2026-08-26","14:32","in","Алина Морозова","alina.m@mail.ru · Поток 1, полная оплата","course",89000,"Сбер · карта","paid","txn_8f2a91c4"],
+["2026-08-26","09:40","out","VK Реклама","Прогрев на вебинар","ads",41000,"Корп. карта","paid","op_vk_0826"],
+["2026-08-25","19:08","in","Игорь Власов","igor.vlasov@gmail.com · рассрочка 2/6","course",14833,"T-Pay","paid","txn_71bd0e22"],
+["2026-08-25","12:10","out","Куратор Алексей","Проверка домашних заданий, август","team",60000,"Расчётный счёт","paid","op_team_0825"],
+["2026-08-25","11:44","in","Евгения Киселёва","Персональная программа, счёт выставлен","individual",120000,"Счёт на оплату","pending","txn_a04491de"],
+["2026-08-24","09:15","in","Мария Соколова","maria.sokolova@yandex.ru · промокод IMPULSE15","course",75650,"ЮKassa","paid","txn_3c88b712"],
+["2026-08-24","18:30","out","Монтажёр видео","12 уроков второго модуля","team",35000,"Расчётный счёт","paid","op_team_0824"],
+["2026-08-23","16:51","in","Дмитрий Орлов","d.orlov@icloud.com · возврат по заявлению","course",-89000,"Сбер · карта","refund","txn_ref_0192fa"],
+["2026-08-22","13:02","in","Полина Романова","polina.r@mail.ru · рассрочка 1/6, платёж не прошёл","course",14833,"T-Pay","failed","txn_fail_88ac01"],
+["2026-08-22","08:05","out","Notion и Figma","Подписки команды","services",7800,"Корп. карта","paid","op_srv_0822"],
+["2026-08-21","10:27","in","Артём Зайцев","artem.z@gmail.com · полная оплата","course",89000,"ЮKassa","paid","txn_55e0c318"],
+["2026-08-20","15:00","out","Хостинг и домен","Лендинг и личный кабинет","services",4200,"Корп. карта","paid","op_srv_0820"],
+["2026-08-19","12:45","in","Ольга Гаврилова","olga.g@mail.ru · рассрочка 3/6","course",14833,"T-Pay","paid","txn_9a12bb03"],
+["2026-08-18","10:00","out","Налог УСН 6%","Аванс за второй квартал","tax",77000,"Расчётный счёт","paid","op_tax_0818"],
+["2026-08-15","17:22","in","Кирилл Демин","k.demin@gmail.com · полная оплата","course",89000,"Сбер · карта","paid","txn_44c1e097"],
+["2026-08-14","14:10","out","Микрофон Rode","Запись уроков третьего модуля","equip",24000,"Корп. карта","paid","op_eq_0814"],
+["2026-08-12","11:05","in","Никита Фомин","n.fomin@yandex.ru · доп. модуль «Портфолио»","addon",19000,"ЮKassa","paid","txn_6612ad55"],
+["2026-08-10","09:30","out","Курс по продюсированию","Обучение для меня","edu",45000,"Корп. карта","paid","op_edu_0810"],
+["2026-08-08","16:40","in","Светлана Ким","s.kim@gmail.com · персональная программа","individual",120000,"Счёт на оплату","paid","txn_77b0da31"],
+["2026-08-07","10:15","out","Telegram Ads","Тест закупа в каналах","ads",30000,"Корп. карта","paid","op_tg_0807"],
+["2026-08-05","13:18","in","Регина Сафина","r.safina@mail.ru · рассрочка 4/6","course",14833,"T-Pay","paid","txn_0dd41c2b"],
+["2026-08-04","12:00","out","Дизайнер лендинга","Страница второго потока","team",25000,"Расчётный счёт","paid","op_team_0804"],
+["2026-08-02","23:59","out","Эквайринг ЮKassa","Комиссия за июль","services",12400,"Расчётный счёт","paid","op_srv_0802"],
+["2026-07-28","15:20","in","Егор Панов","e.panov@gmail.com · полная оплата","course",89000,"ЮKassa","paid","txn_31aa7c60"],
+["2026-07-27","11:00","out","Яндекс Директ","Кампания «Дизайн с нуля», июль","ads",52000,"Расчётный счёт","paid","op_ya_0727"],
+["2026-07-21","12:10","out","Куратор Алексей","Проверка домашних заданий, июль","team",60000,"Расчётный счёт","paid","op_team_0721"],
+["2026-07-20","10:35","in","Дарья Лапина","d.lapina@mail.ru · рассрочка 2/6","course",14833,"T-Pay","paid","txn_58f0be14"],
+["2026-07-18","10:00","out","Налог УСН 6%","Аванс за второй квартал","tax",54000,"Расчётный счёт","paid","op_tax_0718"],
+["2026-07-14","18:05","in","Инна Белова","i.belova@yandex.ru · доп. модуль «Портфолио»","addon",19000,"ЮKassa","paid","txn_2b77ff41"],
+["2026-07-09","09:00","out","Подписки сервисов","Notion, Figma, рассылка","services",7800,"Корп. карта","paid","op_srv_0709"],
+["2026-07-06","14:44","in","Тимур Хайруллин","t.khay@gmail.com · полная оплата","course",89000,"Сбер · карта","paid","txn_c001ba87"],
+["2026-06-25","16:00","in","Милана Гусева","m.guseva@mail.ru · полная оплата","course",89000,"ЮKassa","paid","txn_ee20a413"],
+["2026-06-24","11:30","out","Яндекс Директ","Первый тест на холодную","ads",38000,"Расчётный счёт","paid","op_ya_0624"],
+["2026-06-20","12:00","out","Куратор Алексей","Старт работы с потоком","team",45000,"Расчётный счёт","paid","op_team_0620"],
+["2026-06-18","10:12","in","Роман Чернов","r.chernov@gmail.com · рассрочка 1/6","course",14833,"T-Pay","paid","txn_9f31c0ad"],
+["2026-06-17","10:00","out","Налог УСН 6%","Аванс за первый квартал","tax",43000,"Расчётный счёт","paid","op_tax_0617"],
+["2026-06-12","19:20","out","Мастермайнд по запускам","Обучение для меня","edu",28000,"Корп. карта","paid","op_edu_0612"],
+["2026-06-09","13:05","in","Алиса Ветрова","a.vetrova@icloud.com · персональная программа","individual",120000,"Счёт на оплату","paid","txn_a7710e5c"],
+["2026-06-05","09:00","out","Подписки сервисов","Notion, Figma, рассылка","services",7200,"Корп. карта","paid","op_srv_0605"]
+];
+const KEY="tt-tx-v1";
+let items=load(),state={month:"2026-08",type:"all",cat:null,q:"",sort:"date"},undo=null,tmr=null;
+function load(){try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);if(Array.isArray(p)&&p.length)return p}}catch(e){}
+return SEED.map((r,i)=>({id:"s"+i,date:r[0],time:r[1],type:r[2],title:r[3],sub:r[4],cat:r[5],sum:r[6],method:r[7],status:r[8],txn:r[9]}))}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){}}
+const $=s=>document.querySelector(s);
+const money=n=>(n<0?"− ":"")+Math.abs(Math.round(n)).toLocaleString("ru-RU").replace(/,/g," ")+" ₽";
+const short=n=>{const a=Math.abs(n);return a>=1e6?(a/1e6).toFixed(a>=1e7?0:1).replace(".",",")+" млн ₽":a>=1e3?Math.round(a/1e3)+" тыс ₽":a+" ₽"};
+const monthOf=d=>d.slice(0,7);
+const months=()=>[...new Set(items.map(i=>monthOf(i.date)))].sort();
+const mName=m=>MONTHS_N[+m.slice(5,7)-1]+" "+m.slice(0,4);
+const dName=d=>{const p=d.split("-");return +p[2]+" "+MONTHS[+p[1]-1]};
+const inMonth=i=>monthOf(i.date)===state.month;
+const signed=i=>i.type==="in"?i.sum:-Math.abs(i.sum);
+const counts=i=>i.status!=="failed";
+function totals(m){const l=items.filter(i=>monthOf(i.date)===m&&counts(i));
+const inc=l.filter(i=>i.type==="in").reduce((s,i)=>s+i.sum,0),out=l.filter(i=>i.type==="out").reduce((s,i)=>s+Math.abs(i.sum),0);
+return{inc,out,prof:inc-out}}
+/* ---------- ХЕРО ---------- */
+function renderHero(){const ms=months(),idx=ms.indexOf(state.month),t=totals(state.month),prev=idx>0?totals(ms[idx-1]):null;
+$("#m-h1").textContent=mName(state.month);$("#m-label").textContent=mName(state.month);
+$("#m-badge").textContent=state.month==="2026-08"?"этот месяц":"архив";
+$("#m-prev").disabled=idx<=0;$("#m-next").disabled=idx>=ms.length-1;
+$("#kpis").innerHTML=`<div class="kpi kpi--soft"><div class="kpi-k">Приход</div><div class="kpi-v tnum pos">${money(t.inc)}</div></div>
+<div class="kpi kpi--soft"><div class="kpi-k">Расход</div><div class="kpi-v tnum">${money(t.out)}</div></div>
+<div class="kpi kpi--main"><div class="kpi-k">Разница</div><div class="kpi-v tnum">${money(t.prof)}</div></div>`}
+/* ---------- КАТЕГОРИИ РАСХОДОВ ---------- */
+function renderCatBars(){const l=items.filter(i=>inMonth(i)&&i.type==="out"&&counts(i));
+const by={};l.forEach(i=>{by[i.cat]=(by[i.cat]||0)+Math.abs(i.sum)});
+const ms=months(),tot={};items.filter(i=>i.type==="out"&&counts(i)).forEach(i=>{tot[i.cat]=(tot[i.cat]||0)+Math.abs(i.sum)});
+const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]),total=rows.reduce((s,r)=>s+r[1],0),max=rows.length?rows[0][1]:1;
+$("#don-sub").textContent=total?money(total)+" за "+mName(state.month).toLowerCase():mName(state.month).toLowerCase();
+$("#cbs").innerHTML=rows.length?rows.map(([k,v])=>{const a=Math.round((tot[k]||0)/ms.length),d=v-a;
+return `<button type="button" class="cb${state.cat===k?" on":""}" data-cat="${k}"><div class="cb-h"><span class="cb-n">${CATS[k].n}</span><span class="cb-p tnum">${Math.round(v/total*100)}%</span><span class="cb-s tnum">${money(v)}</span></div><div class="cb-t"><div class="cb-f" style="width:${Math.max(v/max*100,2)}%;background:${CATS[k].c}"></div></div><div class="cb-a tnum">в среднем ${money(a)} в месяц${a&&d?" · "+(d>0?"+ ":"− ")+money(Math.abs(d)):""}</div></button>`}).join(""):`<p class="dr-note">В этом месяце расходов нет.</p>`;
+$("#cbs").querySelectorAll(".cb").forEach(b=>b.onclick=()=>{state.cat=state.cat===b.dataset.cat?null:b.dataset.cat;if(state.cat)state.type="out";renderAll()})}
+/* ---------- КАТЕГОРИИ ПРИХОДА ---------- */
+function renderInBars(){const l=items.filter(i=>inMonth(i)&&i.type==="in"&&counts(i)&&i.sum>0);
+const by={};l.forEach(i=>{by[i.cat]=(by[i.cat]||0)+i.sum});
+const ms=months(),tot={};items.filter(i=>i.type==="in"&&counts(i)&&i.sum>0).forEach(i=>{tot[i.cat]=(tot[i.cat]||0)+i.sum});
+const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]),total=rows.reduce((s,r)=>s+r[1],0),max=rows.length?rows[0][1]:1;
+$("#in-sub").textContent=total?money(total)+" за "+mName(state.month).toLowerCase():mName(state.month).toLowerCase();
+$("#cbs-in").innerHTML=rows.length?rows.map(([k,v])=>{const a=Math.round((tot[k]||0)/ms.length),d=v-a;
+return `<button type="button" class="cb${state.cat===k?" on":""}" data-cat="${k}"><div class="cb-h"><span class="cb-n">${CATS[k].n}</span><span class="cb-p tnum">${Math.round(v/total*100)}%</span><span class="cb-s tnum pos">${money(v)}</span></div><div class="cb-t"><div class="cb-f" style="width:${Math.max(v/max*100,2)}%;background:${CATS[k].c}"></div></div><div class="cb-a tnum">в среднем ${money(a)} в месяц${a&&d?" · "+(d>0?"+ ":"− ")+money(Math.abs(d)):""}</div></button>`}).join(""):`<p class="dr-note">В этом месяце поступлений нет.</p>`;
+const pay=l.length,avgp=pay?Math.round(total/pay):0,ref=items.filter(i=>inMonth(i)&&i.status==="refund").reduce((s,i)=>s+Math.abs(i.sum),0);
+$("#in-avg").innerHTML=`<div class="avg"><b class="tnum">${money(avgp)}</b><span>средняя оплата</span></div><div class="avg"><b class="tnum">${pay}</b><span>оплат за месяц</span></div><div class="avg"><b class="tnum">${ref?"− "+money(ref):"—"}</b><span>возвраты</span></div>`;
+$("#cbs-in").querySelectorAll(".cb").forEach(b=>b.onclick=()=>{state.cat=state.cat===b.dataset.cat?null:b.dataset.cat;if(state.cat)state.type="in";renderAll()})}
+/* ---------- ГРАФИК ПО МЕСЯЦАМ ---------- */
+function renderBars(){const ms=months(),show=ms.slice(-6),data=show.map(m=>({m,...totals(m)}));
+const W=1000,H=250,PL=54,PR=16,PT=14,PB=34,iw=W-PL-PR,ih=H-PT-PB;
+const max=Math.max(...data.map(d=>Math.max(d.inc,d.out)),1),step=Math.pow(10,Math.floor(Math.log10(max)))/2,top=Math.ceil(max/step)*step;
+const x=i=>PL+(data.length===1?iw/2:i*iw/(data.length-1)),y=v=>PT+ih-v/top*ih;
+const path=k=>data.map((d,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(d[k]).toFixed(1)).join(" ");
+const area=k=>path(k)+` L${x(data.length-1).toFixed(1)} ${PT+ih} L${x(0).toFixed(1)} ${PT+ih} Z`;
+let grid="";for(let v=0;v<=top+1;v+=step){grid+=`<line class="tr-g" x1="${PL}" x2="${W-PR}" y1="${y(v)}" y2="${y(v)}"/><text class="tr-yl" x="${PL-10}" y="${y(v)+4}" text-anchor="end">${v?short(v):0}</text>`}
+const dots=k=>data.map((d,i)=>`<circle class="tr-dot" cx="${x(i)}" cy="${y(d[k])}" r="${d.m===state.month?6:4.5}" fill="#fff" stroke="${k==="inc"?"#2d5eef":"#E5604D"}" stroke-width="3"/>`).join("");
+const hits=data.map((d,i)=>{const w=iw/data.length;return `<rect class="tr-hit" data-i="${i}" x="${PL+i*w-(i?0:0)}" y="${PT}" width="${w}" height="${ih}" rx="10"/>`}).join("");
+$("#trend").innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
+<defs><linearGradient id="gin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d5eef" stop-opacity=".22"/><stop offset="1" stop-color="#2d5eef" stop-opacity="0"/></linearGradient></defs>
+${grid}<path d="${area("inc")}" fill="url(#gin)"/>
+<path d="${path("inc")}" fill="none" stroke="#2d5eef" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="${path("out")}" fill="none" stroke="#E5604D" stroke-width="3" stroke-dasharray="7 6" stroke-linejoin="round" stroke-linecap="round"/>
+${dots("out")}${dots("inc")}
+${data.map((d,i)=>`<text class="tr-xl${d.m===state.month?" now":""}" x="${x(i)}" y="${H-10}" text-anchor="middle">${MONTHS_N[+d.m.slice(5,7)-1].slice(0,3)}</text>`).join("")}
+${hits}</svg><div class="tr-tip" id="tr-tip"></div>`;
+const tip=$("#tr-tip"),box=$("#trend");
+box.querySelectorAll(".tr-hit").forEach(r=>{const i=+r.dataset.i,d=data[i];
+r.onmouseenter=()=>{const w=box.clientWidth,h=box.clientHeight;tip.innerHTML=`<b>${mName(d.m)}</b><br>Приход ${money(d.inc)}<br>Расход ${money(d.out)}<br>Разница ${money(d.prof)}`;
+tip.style.left=x(i)/W*w+"px";tip.style.top=Math.max(y(Math.max(d.inc,d.out))/H*h-14,52)+"px";tip.classList.add("on")};
+r.onmouseleave=()=>tip.classList.remove("on");
+r.onclick=()=>{state.month=d.m;renderAll()}});
+const avg=Math.round(data.reduce((s,d)=>s+d.prof,0)/data.length);
+$("#bars-sub").textContent="нажмите на месяц";
+$("#bars-note").textContent="Средняя разница: "+money(avg)}
+/* ---------- ФИЛЬТРЫ + СПИСОК ---------- */
+function catList(){const l=items.filter(inMonth).filter(i=>state.type==="all"||i.type===state.type);
+const by={};l.forEach(i=>{by[i.cat]=(by[i.cat]||0)+1});return Object.entries(by).sort((a,b)=>b[1]-a[1])}
+function renderCats(){const rows=catList();
+$("#cats").innerHTML=`<button type="button" class="chip${state.cat?"":" on"}" data-cat="">Все категории</button>`+rows.map(([k,c])=>`<button type="button" class="chip${state.cat===k?" on":""}" data-cat="${k}"><span class="dot" style="background:${CATS[k].c}"></span>${CATS[k].n}<i>${c}</i></button>`).join("");
+$("#cats").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{state.cat=b.dataset.cat||null;renderAll()})}
+function filtered(){let l=items.filter(inMonth);
+if(state.type!=="all")l=l.filter(i=>i.type===state.type);
+if(state.cat)l=l.filter(i=>i.cat===state.cat);
+const q=state.q.trim().toLowerCase();
+if(q)l=l.filter(i=>(i.title+" "+i.sub+" "+CATS[i.cat].n+" "+i.txn+" "+i.method).toLowerCase().includes(q));
+if(state.sort==="sum")l.sort((a,b)=>Math.abs(b.sum)-Math.abs(a.sum));
+else if(state.sort==="cat")l.sort((a,b)=>CATS[a.cat].n.localeCompare(CATS[b.cat].n)||b.date.localeCompare(a.date));
+else l.sort((a,b)=>b.date.localeCompare(a.date)||(b.time||"").localeCompare(a.time||""));
+return l}
+function txRow(i){const st=STATUS[i.status],sum=signed(i);
+return `<div class="tx" data-id="${i.id}"><span class="tx-ic" style="color:${CATS[i.cat].c}">${i.type==="in"?"↓":"↑"}</span>
+<div class="tx-mid"><div class="tx-t">${esc(i.title)}</div><div class="tx-meta"><span class="tag tag--cat"><span class="dot" style="background:${CATS[i.cat].c}"></span>${CATS[i.cat].n}</span>${i.status!=="paid"?`<span class="tag tag--${st[1]}">${st[0]}</span>`:""}<span class="tag tag--sub">${esc(i.sub||i.method)}</span></div></div>
+<div class="tx-r"><div class="tx-sum tnum ${i.type==="in"&&i.status!=="refund"?"pos":i.status==="refund"?"neg":""}">${i.type==="in"&&sum>0?"+ ":""}${money(sum)}</div><div class="tx-date tnum">${dName(i.date)} · ${i.time||""}</div></div>
+<div class="tx-act"><button type="button" class="iconbtn tip" data-act="edit" data-tip="Изменить">✎</button></div></div>`}
+function renderList(){const l=filtered();
+$("#list-count").textContent=l.length?l.length+" из "+items.filter(inMonth).length+" операций месяца":"";
+if(!l.length){$("#list").innerHTML=`<div class="empty">Ничего не нашлось. Сбросьте фильтры или измените поиск.</div>`;return}
+let html="",day=null;
+l.forEach(i=>{if(state.sort==="date"&&i.date!==day){day=i.date;const d=l.filter(x=>x.date===day),s=d.reduce((a,x)=>a+signed(x)*(counts(x)?1:0),0);
+html+=`<div class="daysep"><b>${dName(day)}</b><hr /><span class="tnum">${s>=0?"+ ":""}${money(s)} за день</span></div>`}
+html+=txRow(i)});
+$("#list").innerHTML=html;
+$("#list").querySelectorAll(".tx").forEach(r=>{const it=items.find(x=>x.id===r.dataset.id);
+r.onclick=e=>{if(e.target.closest("[data-act]"))return;openDrawer(it)};
+const b=r.querySelector('[data-act="edit"]');b.onclick=e=>{e.stopPropagation();openDrawer(it)}})}
+function renderPend(){}
+function renderAll(){renderHero();renderCatBars();renderInBars();renderBars();renderCats();renderList();
+$("#type-seg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.type===state.type));
+fillCatSelect()}
+const esc=s=>(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+/* ---------- ПАНЕЛЬ ---------- */
+function openDrawer(i){const opts=t=>Object.entries(CATS).filter(([k,v])=>v.t===t).map(([k,v])=>`<option value="${k}"${k===i.cat?" selected":""}>${v.n}</option>`).join("");
+$("#drawer").innerHTML=`<div class="dr-h"><h2 class="sec-title">Операция</h2><button type="button" class="iconbtn" id="dr-x">✕</button></div>
+<div class="dr-b">
+<div class="fld"><label>Название</label><input type="text" id="d-title" value="${esc(i.title)}" /></div>
+<div class="fld2"><div class="fld"><label>Тип</label><select id="d-type"><option value="in"${i.type==="in"?" selected":""}>Приход</option><option value="out"${i.type==="out"?" selected":""}>Расход</option></select></div>
+<div class="fld"><label>Категория</label><select id="d-cat">${opts(i.type)}</select></div></div>
+<div class="fld2"><div class="fld"><label>Сумма, ₽</label><input type="number" id="d-sum" value="${Math.abs(i.sum)}" /></div>
+<div class="fld"><label>Дата</label><input type="date" id="d-date" value="${i.date}" /></div></div>
+<div class="fld2"><div class="fld"><label>Статус</label><select id="d-status">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===i.status?" selected":""}>${v[0]}</option>`).join("")}</select></div>
+<div class="fld"><label>Способ</label><input type="text" id="d-method" value="${esc(i.method)}" /></div></div>
+<div class="fld"><label>Комментарий</label><textarea id="d-sub">${esc(i.sub)}</textarea></div>
+<div class="dr-acts"><button type="button" class="dr-act" id="d-dup">Повторить операцию</button><button type="button" class="dr-act dr-act--dan" id="d-del">Удалить</button></div>
+<p class="dr-note">ID: ${esc(i.txn)} · ${i.method}. При удалении покажем уведомление с возможностью вернуть.</p>
+</div>
+<div class="dr-f"><button type="button" class="btn btn--pri" id="d-save">Сохранить</button><button type="button" class="btn btn--gh" id="d-cancel">Отмена</button></div>`;
+$("#drawer").classList.add("on");$("#scrim").classList.add("on");$("#drawer").setAttribute("aria-hidden","false");
+const close=()=>{$("#drawer").classList.remove("on");$("#scrim").classList.remove("on");$("#drawer").setAttribute("aria-hidden","true")};
+$("#dr-x").onclick=close;$("#d-cancel").onclick=close;$("#scrim").onclick=close;
+$("#d-type").onchange=()=>{const t=$("#d-type").value;$("#d-cat").innerHTML=Object.entries(CATS).filter(([k,v])=>v.t===t).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join("")};
+$("#d-save").onclick=()=>{const before=JSON.parse(JSON.stringify(items));
+i.title=$("#d-title").value.trim()||i.title;i.type=$("#d-type").value;i.cat=$("#d-cat").value;
+i.sum=Math.abs(+$("#d-sum").value||0)*(i.status==="refund"?-1:1);i.date=$("#d-date").value||i.date;
+i.status=$("#d-status").value;i.method=$("#d-method").value;i.sub=$("#d-sub").value;
+if(monthOf(i.date)!==state.month)state.month=monthOf(i.date);
+close();commit("Операция обновлена",before)};
+$("#d-del").onclick=()=>{const before=JSON.parse(JSON.stringify(items));items=items.filter(x=>x.id!==i.id);close();commit("Операция удалена",before)};
+$("#d-dup").onclick=()=>{const before=JSON.parse(JSON.stringify(items));const c={...i,id:"n"+Date.now(),txn:i.txn+"_copy",date:new Date().toISOString().slice(0,10),time:"12:00",status:"pending"};items.push(c);close();commit("Операция скопирована, статус «Ожидает»",before)}}
+/* ---------- ТОСТ ---------- */
+function commit(msg,before){save();renderAll();toast(msg,before)}
+function toast(msg,before){undo=before||null;$("#toast-t").textContent=msg;$("#toast-u").hidden=!before;$("#toast").classList.add("on");
+clearTimeout(tmr);tmr=setTimeout(()=>$("#toast").classList.remove("on"),6000)}
+$("#toast-u").onclick=()=>{if(undo){items=undo;undo=null;save();renderAll()}$("#toast").classList.remove("on")};
+/* ---------- ДОБАВЛЕНИЕ ---------- */
+function fillCatSelect(){if($("#a-cat").options.length)return;
+const grp=t=>`<optgroup label="${t==="out"?"Расход":"Приход"}">`+Object.entries(CATS).filter(([k,v])=>v.t===t).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join("")+`</optgroup>`;
+$("#a-cat").innerHTML=grp("out")+grp("in")}
+$("#add").onsubmit=e=>{e.preventDefault();const sum=Math.abs(+$("#a-sum").value||0),cat=$("#a-cat").value;
+if(!sum){toast("Укажите сумму");return}
+const before=JSON.parse(JSON.stringify(items)),date=$("#a-date").value||"2026-08-28",type=CATS[cat].t;
+items.push({id:"n"+Date.now(),date,time:new Date().toTimeString().slice(0,5),type,title:CATS[cat].n,sub:"Добавлено вручную",cat,sum,method:type==="in"?"Счёт на оплату":"Корп. карта",status:"paid",txn:"man_"+Math.random().toString(16).slice(2,10)});
+$("#a-sum").value="";
+if(monthOf(date)!==state.month)state.month=monthOf(date);
+commit((type==="in"?"Приход":"Расход")+" добавлен: "+money(sum),before)};
+/* ---------- ОСТАЛЬНОЕ ---------- */
+$("#m-prev").onclick=()=>{const ms=months(),i=ms.indexOf(state.month);if(i>0){state.month=ms[i-1];renderAll()}};
+$("#m-next").onclick=()=>{const ms=months(),i=ms.indexOf(state.month);if(i<ms.length-1){state.month=ms[i+1];renderAll()}};
+$("#type-seg").querySelectorAll("button").forEach(b=>b.onclick=()=>{state.type=b.dataset.type;if(state.cat&&CATS[state.cat].t!==state.type&&state.type!=="all")state.cat=null;renderAll()});
+$("#q").oninput=e=>{state.q=e.target.value;renderList()};
+$("#sort").onchange=e=>{state.sort=e.target.value;renderList()};
+$("#csv").onclick=()=>{const l=filtered(),head=["Дата","Время","Тип","Название","Категория","Сумма","Способ","Статус","ID"];
+const rows=l.map(i=>[i.date,i.time,i.type==="in"?"Приход":"Расход",i.title,CATS[i.cat].n,signed(i),i.method,STATUS[i.status][0],i.txn]);
+const csv="\ufeff"+[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(";")).join("\n");
+const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="transactions-"+state.month+".csv";a.click();
+toast("Выгружено "+l.length+" операций")};
+$("#imp").onclick=()=>$("#impfile").click();
+$("#impfile").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+rd.onload=()=>{const lines=String(rd.result).replace(/^\ufeff/,"").split(/\r?\n/).filter(s=>s.trim());
+const before=JSON.parse(JSON.stringify(items));let n=0;
+lines.forEach((ln,idx)=>{const c=ln.split(/[;,\t]/).map(s=>s.trim().replace(/^"|"$/g,""));
+const date=(c[0]||"").match(/^\d{4}-\d{2}-\d{2}$/)?c[0]:null;if(!date)return;
+const sum=Math.abs(parseFloat(String(c[3]||c[2]||"").replace(/\s/g,"").replace(",",".")))||0;if(!sum)return;
+const title=c[1]||"Из выписки";
+const cname=(c[2]||"").toLowerCase(),key=Object.keys(CATS).find(k=>CATS[k].n.toLowerCase()===cname)||(/\+/.test(String(c[3]))?"course":"services");
+items.push({id:"i"+Date.now()+idx,date,time:"12:00",type:CATS[key].t,title,sub:"Импорт выписки «"+f.name+"»",cat:key,sum,method:"Выписка",status:"paid",txn:"imp_"+Math.random().toString(16).slice(2,10)});n++});
+e.target.value="";
+if(!n){toast("В файле не нашлось строк: нужны столбцы дата; название; категория; сумма");return}
+commit("Импортировано "+n+" операций из выписки",before)};
+rd.readAsText(f,"utf-8")};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){$("#drawer").classList.remove("on");$("#scrim").classList.remove("on")}});
+$("#a-date").value="2026-08-28";
+renderAll();
+</script>
+
+
+</body></html>
