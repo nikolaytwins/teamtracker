@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/api-url";
 import {
+  addSeasonTask,
   buildSeasonMonths,
   deleteSeasonTask,
   moveSeasonTaskToMonth,
@@ -95,6 +96,10 @@ export function HomeSeasonBand() {
 
   const onDelete = (taskId: string) => {
     refreshStorage(deleteSeasonTask(taskId));
+  };
+
+  const onAdd = (monthId: string, input: { text: string; href?: string }) => {
+    refreshStorage(addSeasonTask(monthId, input));
   };
 
   const onDropToMonth = (monthId: string) => {
@@ -195,6 +200,7 @@ export function HomeSeasonBand() {
         }}
         onToggle={onToggle}
         onDelete={onDelete}
+        onAdd={onAdd}
         onDropToMonth={onDropToMonth}
       />
     </section>
@@ -208,6 +214,7 @@ function MonthPanel({
   onDragEnd,
   onToggle,
   onDelete,
+  onAdd,
   onDropToMonth,
 }: {
   month: MonthView;
@@ -216,9 +223,30 @@ function MonthPanel({
   onDragEnd: () => void;
   onToggle: (id: string, done: boolean) => void;
   onDelete: (id: string) => void;
+  onAdd: (monthId: string, input: { text: string; href?: string }) => void;
   onDropToMonth: (monthId: string) => void;
 }) {
   const done = month.tasks.filter((t) => t.done).length;
+  const [adding, setAdding] = useState(false);
+  const [draftText, setDraftText] = useState("");
+  const [draftHref, setDraftHref] = useState("");
+
+  function resetAddForm() {
+    setAdding(false);
+    setDraftText("");
+    setDraftHref("");
+  }
+
+  useEffect(() => {
+    resetAddForm();
+  }, [month.id]);
+
+  function submitAdd() {
+    const text = draftText.trim();
+    if (!text) return;
+    onAdd(month.id, { text, href: draftHref.trim() || undefined });
+    resetAddForm();
+  }
 
   return (
     <div
@@ -242,6 +270,16 @@ function MonthPanel({
         <span className="v2-tnum v2-tight ml-auto text-[14px] font-semibold text-[var(--v2-ink-500)]">
           {done} из {month.tasks.length} сделано
         </span>
+        {!adding ? (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="v2-tight inline-flex items-center gap-1.5 rounded-xl border border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] px-3.5 py-2 text-[13.5px] font-semibold text-[var(--v2-brand-700)] transition hover:border-[var(--v2-brand-400)] hover:bg-[var(--v2-brand-100)]"
+          >
+            <V2Icons.plus className="h-3.5 w-3.5" />
+            Добавить карточку
+          </button>
+        ) : null}
       </div>
 
       {month.lead ? (
@@ -284,6 +322,58 @@ function MonthPanel({
             </button>
           </div>
         ))}
+        {adding ? (
+          <div className="flex min-h-[92px] flex-col gap-3 rounded-2xl border-2 border-dashed border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)] px-[22px] py-5">
+            <input
+              type="text"
+              value={draftText}
+              onChange={(e) => setDraftText(e.target.value)}
+              placeholder="Текст карточки"
+              autoFocus
+              className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[15px] text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submitAdd();
+                }
+                if (e.key === "Escape") resetAddForm();
+              }}
+            />
+            <input
+              type="url"
+              value={draftHref}
+              onChange={(e) => setDraftHref(e.target.value)}
+              placeholder="Ссылка на документ (необязательно)"
+              className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[14px] text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={submitAdd}
+                disabled={!draftText.trim()}
+                className="v2-tight rounded-xl bg-[var(--v2-brand-600)] px-4 py-2 text-[13.5px] font-semibold text-white transition hover:bg-[var(--v2-brand-700)] disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Сохранить
+              </button>
+              <button
+                type="button"
+                onClick={resetAddForm}
+                className="v2-tight rounded-xl px-4 py-2 text-[13.5px] font-semibold text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)]"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex min-h-[92px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-[22px] py-5 text-[var(--v2-ink-500)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)]"
+          >
+            <V2Icons.plus className="h-5 w-5" />
+            <span className="v2-tight text-[14.5px] font-semibold">Добавить карточку</span>
+          </button>
+        )}
       </div>
 
       {month.warn ? (
