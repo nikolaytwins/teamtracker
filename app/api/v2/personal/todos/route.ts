@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       due_date: body.due_date ?? null,
       due_time: body.due_time ?? null,
       scheduled_date: body.scheduled_date ?? null,
+      inbox_section: body.inbox_section === "later" ? "later" : "inbox",
     });
     return NextResponse.json({ todo });
   } catch (e) {

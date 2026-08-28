@@ -58,6 +58,7 @@ function mapTodo(r: Record<string, unknown>, project?: PersonalTodoProjectRow | 
     scheduled_date: r.scheduled_date ? String(r.scheduled_date).slice(0, 10) : null,
     completed_at: r.completed_at ? String(r.completed_at) : null,
     sort_order: Number(r.sort_order) || 0,
+    inbox_section: r.inbox_section === "later" ? "later" : "inbox",
     project_name: project?.name ?? null,
     project_color: project?.color ?? null,
     subtask_count: r.subtask_count != null ? Number(r.subtask_count) : undefined,
@@ -400,6 +401,7 @@ export async function createPersonalTodo(
     due_date?: string | null;
     due_time?: string | null;
     scheduled_date?: string | null;
+    inbox_section?: "inbox" | "later";
   }
 ): Promise<PersonalTodoRow> {
   const sb = getV2Supabase();
@@ -452,6 +454,7 @@ export async function createPersonalTodo(
           : null,
     completed_at: null,
     sort_order: personalTodoSortOrder(),
+    inbox_section: input.inbox_section === "later" ? "later" : "inbox",
     deleted_at: null,
     created_at: now,
     updated_at: now,
@@ -496,6 +499,9 @@ export async function updatePersonalTodo(
   }
   if (patch.sort_order !== undefined) safe.sort_order = patch.sort_order;
   if (patch.completed_at !== undefined) safe.completed_at = patch.completed_at;
+  if (patch.inbox_section !== undefined) {
+    safe.inbox_section = patch.inbox_section === "later" ? "later" : "inbox";
+  }
 
   const { error } = await sb.from("v2_personal_todos").update(safe).eq("id", id).eq("user_id", userId);
   if (error) throw error;

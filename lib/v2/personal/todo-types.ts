@@ -4,6 +4,8 @@ export type PersonalTodoView = "inbox" | "today" | "upcoming" | "week" | "kanban
 
 export type PersonalKanbanColumn = "unassigned" | "today" | "tomorrow" | "this_week" | "later";
 
+export type PersonalTodoInboxSection = "inbox" | "later";
+
 export type PersonalTodoProjectRow = {
   id: string;
   user_id: string;
@@ -28,6 +30,7 @@ export type PersonalTodoRow = {
   scheduled_date: string | null;
   completed_at: string | null;
   sort_order: number;
+  inbox_section: PersonalTodoInboxSection;
   project_name?: string | null;
   project_color?: string | null;
   subtask_count?: number;

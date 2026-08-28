@@ -11,7 +11,7 @@ import {
 import { usePersonalTodo } from "@/components/v2/personal/todos/personal-todo-context";
 import type { useWeekFocus } from "@/components/v2/personal/week-focus/use-week-focus";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import type { PersonalTodoListPayload, PersonalTodoRow } from "@/lib/v2/personal/todo-types";
+import type { PersonalTodoInboxSection, PersonalTodoListPayload, PersonalTodoRow } from "@/lib/v2/personal/todo-types";
 import type { V2TaskPriority } from "@/lib/v2/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -30,6 +30,177 @@ function priorityForQuickAdd(value: string): V2TaskPriority | null {
 function prioToSelect(priority: PersonalTodoRow["priority"]) {
   const n = taskPrioNum(priority);
   return String(n);
+}
+
+function filterAndSortTasks(
+  list: PersonalTodoRow[],
+  opts: {
+    filter: TaskFilter;
+    search: string;
+    sort: TaskSort;
+    inboxProjectId: string | null;
+  }
+) {
+  let filtered = list.filter((todo) => {
+    if (opts.filter === "all") return true;
+    if (opts.filter === "p1") return todo.priority === "urgent" || todo.priority === "high";
+    if (opts.filter === "p2") return todo.priority === "medium";
+    if (opts.filter === "p3") return todo.priority === "low";
+    if (opts.filter === "") return !todo.project_name || todo.project_id === opts.inboxProjectId;
+    return todo.project_name === opts.filter;
+  });
+  const q = opts.search.trim().toLowerCase();
+  if (q) filtered = filtered.filter((t) => t.title.toLowerCase().includes(q));
+
+  filtered.sort((a, b) => {
+    if (opts.sort === "dl") {
+      const da = a.due_date ?? a.scheduled_date ?? "9999";
+      const db = b.due_date ?? b.scheduled_date ?? "9999";
+      if (da !== db) return da.localeCompare(db);
+    } else if (opts.sort === "new") {
+      return b.sort_order - a.sort_order;
+    } else {
+      const ra = a.priority ? PRIO_RANK[a.priority] ?? 9 : 9;
+      const rb = b.priority ? PRIO_RANK[b.priority] ?? 9 : 9;
+      if (ra !== rb) return ra - rb;
+    }
+    return a.title.localeCompare(b.title, "ru");
+  });
+  return filtered;
+}
+
+type TaskListProps = {
+  todos: PersonalTodoRow[];
+  loading: boolean;
+  emptyText: string;
+  focusTitleSet: Set<string>;
+  inboxProjectId: string | null;
+  section: PersonalTodoInboxSection;
+  onOpen: (todo: PersonalTodoRow) => void;
+  onFinish: (todo: PersonalTodoRow) => void;
+  onAssignFocus: (todo: PersonalTodoRow) => void;
+  onToIdea: (todo: PersonalTodoRow) => void;
+  onMoveSection: (todo: PersonalTodoRow, section: PersonalTodoInboxSection) => void;
+};
+
+function TaskList({
+  todos,
+  loading,
+  emptyText,
+  focusTitleSet,
+  inboxProjectId,
+  section,
+  onOpen,
+  onFinish,
+  onAssignFocus,
+  onToIdea,
+  onMoveSection,
+}: TaskListProps) {
+  function projectLabel(todo: PersonalTodoRow) {
+    return todo.project_name && todo.project_id !== inboxProjectId ? todo.project_name : "без проекта";
+  }
+
+  return (
+    <div className="tlist">
+      {loading ? (
+        <div className="empty">Загрузка…</div>
+      ) : todos.length ? (
+        todos.map((todo) => {
+          const pn = taskPrioNum(todo.priority);
+          const dl = dlInfoForTodo(todo);
+          const isFocus = focusTitleSet.has(todo.title.trim());
+          const proj = projectLabel(todo);
+          return (
+            <div key={todo.id} className="t" onClick={() => onOpen(todo)}>
+              <button
+                type="button"
+                className="t-ok tip"
+                data-tip="Выполнено"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void onFinish(todo);
+                }}
+              >
+                ✓
+              </button>
+              <div className="t-mid">
+                <div className="t-t">{todo.title}</div>
+                <div className="t-meta">
+                  {pn ? <span className={`tag tag--p${pn}`}>{TASK_PRIO_LABEL[pn]}</span> : null}
+                  {isFocus ? <span className="tag tag--fx">фокус недели</span> : null}
+                  <span className={`tag ${proj !== "без проекта" ? "tag--proj" : "tag--none"}`}>{proj}</span>
+                  {dl ? <span className={`tag tag--${dl.cls}`}>{dl.text}</span> : null}
+                  {todo.description ? <span className="tag tag--note">есть уточнение</span> : null}
+                </div>
+              </div>
+              <div className="t-act">
+                {section === "inbox" ? (
+                  <button
+                    type="button"
+                    className="iconbtn tip"
+                    data-tip="На потом"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void onMoveSection(todo, "later");
+                    }}
+                  >
+                    ↓
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="iconbtn tip"
+                    data-tip="Во входящие"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void onMoveSection(todo, "inbox");
+                    }}
+                  >
+                    ↑
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="iconbtn tip"
+                  data-tip="Сделать фокусом недели"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void onAssignFocus(todo);
+                  }}
+                >
+                  ★
+                </button>
+                <button
+                  type="button"
+                  className="iconbtn tip"
+                  data-tip="Превратить в идею"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void onToIdea(todo);
+                  }}
+                >
+                  ◇
+                </button>
+                <button
+                  type="button"
+                  className="iconbtn tip"
+                  data-tip="Открыть и уточнить"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpen(todo);
+                  }}
+                >
+                  ⋯
+                </button>
+              </div>
+            </div>
+          );
+        })
+      ) : (
+        <div className="empty">{emptyText}</div>
+      )}
+    </div>
+  );
 }
 
 export function TasksInboxPanel({
@@ -87,38 +258,16 @@ export function TasksInboxPanel({
 
   const focusTitleSet = weekFocus.focusTitles;
 
-  function projectLabel(todo: PersonalTodoRow) {
-    return todo.project_name && todo.project_id !== inboxProjectId ? todo.project_name : "без проекта";
-  }
+  const inboxTasks = useMemo(() => active.filter((t) => t.inbox_section !== "later"), [active]);
+  const laterTasks = useMemo(() => active.filter((t) => t.inbox_section === "later"), [active]);
 
-  const filtered = useMemo(() => {
-    let list = active.filter((todo) => {
-      if (filter === "all") return true;
-      if (filter === "p1") return todo.priority === "urgent" || todo.priority === "high";
-      if (filter === "p2") return todo.priority === "medium";
-      if (filter === "p3") return todo.priority === "low";
-      if (filter === "") return !todo.project_name || todo.project_id === inboxProjectId;
-      return todo.project_name === filter;
-    });
-    const q = search.trim().toLowerCase();
-    if (q) list = list.filter((t) => t.title.toLowerCase().includes(q));
+  const filterOpts = useMemo(
+    () => ({ filter, search, sort, inboxProjectId }),
+    [filter, search, sort, inboxProjectId]
+  );
 
-    list.sort((a, b) => {
-      if (sort === "dl") {
-        const da = a.due_date ?? a.scheduled_date ?? "9999";
-        const db = b.due_date ?? b.scheduled_date ?? "9999";
-        if (da !== db) return da.localeCompare(db);
-      } else if (sort === "new") {
-        return b.sort_order - a.sort_order;
-      } else {
-        const ra = a.priority ? PRIO_RANK[a.priority] ?? 9 : 9;
-        const rb = b.priority ? PRIO_RANK[b.priority] ?? 9 : 9;
-        if (ra !== rb) return ra - rb;
-      }
-      return a.title.localeCompare(b.title, "ru");
-    });
-    return list;
-  }, [active, search, filter, sort, inboxProjectId]);
+  const filteredInbox = useMemo(() => filterAndSortTasks(inboxTasks, filterOpts), [inboxTasks, filterOpts]);
+  const filteredLater = useMemo(() => filterAndSortTasks(laterTasks, filterOpts), [laterTasks, filterOpts]);
 
   const filterChips = useMemo(() => {
     const chips: [TaskFilter, string, number][] = [
@@ -161,6 +310,7 @@ export function TasksInboxPanel({
           project_id: projectId || inboxProjectId,
           priority: priorityForQuickAdd(prio),
           due_date: deadline || null,
+          inbox_section: "inbox",
         }),
       });
       setTitle("");
@@ -228,6 +378,21 @@ export function TasksInboxPanel({
     }
   }
 
+  async function moveSection(todo: PersonalTodoRow, section: PersonalTodoInboxSection) {
+    if (todo.inbox_section === section) return;
+    try {
+      await fetchJson(`/api/v2/personal/todos/${todo.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inbox_section: section }),
+      });
+      await reload();
+      flash(section === "later" ? "Задача отложена на потом" : "Задача вернулась во входящие");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось переместить");
+    }
+  }
+
   function openTask(todo: PersonalTodoRow) {
     setSelected(todo);
     setEditTitle(todo.title);
@@ -272,9 +437,27 @@ export function TasksInboxPanel({
     }
   }
 
+  const taskListProps = {
+    loading,
+    focusTitleSet,
+    inboxProjectId,
+    onOpen: openTask,
+    onFinish: finishTask,
+    onAssignFocus: assignFocus,
+    onToIdea: toIdea,
+    onMoveSection: moveSection,
+  };
+
   return (
     <>
-      <section className="card pad" data-section="task-list">
+      <section className="card pad" data-section="task-list-inbox">
+        <div className="sec-head">
+          <h2 className="sec-title">Входящие (ближайшие)</h2>
+          <span className="sec-sub">
+            {inboxTasks.length} {inboxTasks.length === 1 ? "задача" : inboxTasks.length < 5 ? "задачи" : "задач"}
+          </span>
+        </div>
+
         <div className="bar">
           {filterChips.map(([key, label, count]) => (
             <button
@@ -338,81 +521,51 @@ export function TasksInboxPanel({
 
         {error ? <p style={{ fontSize: 13, color: "#b42318", marginBottom: 12 }}>{error}</p> : null}
 
-        <div className="tlist">
-          {loading ? (
-            <div className="empty">Загрузка…</div>
-          ) : filtered.length ? (
-            filtered.map((todo) => {
-              const pn = taskPrioNum(todo.priority);
-              const dl = dlInfoForTodo(todo);
-              const isFocus = focusTitleSet.has(todo.title.trim());
-              const proj = projectLabel(todo);
-              return (
-                <div key={todo.id} className="t" onClick={() => openTask(todo)}>
-                  <button
-                    type="button"
-                    className="t-ok tip"
-                    data-tip="Выполнено"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void finishTask(todo);
-                    }}
-                  >
-                    ✓
-                  </button>
-                  <div className="t-mid">
-                    <div className="t-t">{todo.title}</div>
-                    <div className="t-meta">
-                      {pn ? <span className={`tag tag--p${pn}`}>{TASK_PRIO_LABEL[pn]}</span> : null}
-                      {isFocus ? <span className="tag tag--fx">фокус недели</span> : null}
-                      <span className={`tag ${proj !== "без проекта" ? "tag--proj" : "tag--none"}`}>{proj}</span>
-                      {dl ? <span className={`tag tag--${dl.cls}`}>{dl.text}</span> : null}
-                      {todo.description ? <span className="tag tag--note">есть уточнение</span> : null}
-                    </div>
-                  </div>
-                  <div className="t-act">
-                    <button
-                      type="button"
-                      className="iconbtn tip"
-                      data-tip="Сделать фокусом недели"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void assignFocus(todo);
-                      }}
-                    >
-                      ★
-                    </button>
-                    <button
-                      type="button"
-                      className="iconbtn tip"
-                      data-tip="Превратить в идею"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void toIdea(todo);
-                      }}
-                    >
-                      ◇
-                    </button>
-                    <button
-                      type="button"
-                      className="iconbtn tip"
-                      data-tip="Открыть и уточнить"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openTask(todo);
-                      }}
-                    >
-                      ⋯
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="empty">Здесь пусто. Выгрузи из головы то, что накопилось.</div>
-          )}
+        <TaskList
+          {...taskListProps}
+          section="inbox"
+          todos={filteredInbox}
+          emptyText="Здесь пусто. Выгрузи из головы то, что накопилось."
+        />
+      </section>
+
+      <section className="card pad" data-section="task-list-later">
+        <div className="sec-head">
+          <h2 className="sec-title">Потом</h2>
+          <span className="sec-sub">
+            {laterTasks.length} {laterTasks.length === 1 ? "задача" : laterTasks.length < 5 ? "задачи" : "задач"}
+          </span>
         </div>
 
+        <div className="bar" style={{ marginBottom: 18 }}>
+          <input
+            type="text"
+            className="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск по задачам"
+          />
+          <select
+            className="sortsel"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as TaskSort)}
+            style={{ marginLeft: "auto" }}
+          >
+            <option value="prio">По важности</option>
+            <option value="dl">По дедлайну</option>
+            <option value="new">Сначала новые</option>
+          </select>
+        </div>
+
+        <TaskList
+          {...taskListProps}
+          section="later"
+          todos={filteredLater}
+          emptyText="Сюда можно отложить то, что не горит — стрелкой ↓ из входящих."
+        />
+      </section>
+
+      <section className="card pad" data-section="task-done">
         <div className="taken">
           <div className="bar" style={{ margin: 0 }}>
             <span className="kick">Выполнено</span>
@@ -495,6 +648,23 @@ export function TasksInboxPanel({
         <div className="fld">
           <label>Действия</label>
           <div className="dr-acts">
+            {selected?.inbox_section === "later" ? (
+              <button
+                type="button"
+                className="dr-act"
+                onClick={() => selected && void moveSection(selected, "inbox").then(() => setSelected(null))}
+              >
+                ↑ Вернуть во входящие
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="dr-act"
+                onClick={() => selected && void moveSection(selected, "later").then(() => setSelected(null))}
+              >
+                ↓ Отложить на потом
+              </button>
+            )}
             <button
               type="button"
               className="dr-act"

@@ -120,6 +120,7 @@ export async function cloneProjectTaskToPersonal(
         scheduled_date: data.scheduled_date ? String(data.scheduled_date) : null,
         completed_at: data.completed_at ? String(data.completed_at) : null,
         sort_order: Number(data.sort_order) || 0,
+        inbox_section: data.inbox_section === "later" ? "later" : "inbox",
       } satisfies PersonalTodoRow;
       return { task, personalTodo, link: existing, created: false };
     }
