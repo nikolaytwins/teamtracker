@@ -3,6 +3,7 @@
 import { PersonalAmt, PersonalMaskProvider } from "./personal-finance-mask";
 import { PersonalOperationModal } from "./personal-operation-modal";
 import { PersonalTransactionAmountInline } from "./personal-money-inline";
+import { PersonalTransactionCategoryInline } from "./personal-transaction-category-inline";
 import { fetchJson, IMPORT_FETCH_TIMEOUT_MS } from "@/lib/v2/client/fetch-json";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { apiUrl, appPath } from "@/lib/api-url";
@@ -388,7 +389,31 @@ export function PersonalTransactionsClient({
                                 {t.description || meta.label}
                               </div>
                               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[var(--v2-ink-500)]">
-                                {t.budget_category_name ? (
+                                {t.txn_type === "expense" ? (
+                                  <PersonalTransactionCategoryInline
+                                    transactionId={t.id}
+                                    categoryId={t.budget_category_id}
+                                    categoryName={t.budget_category_name ?? null}
+                                    categoryTint={t.budget_category_tint ?? null}
+                                    year={t.year}
+                                    month={t.month}
+                                    categories={budgetCategories.filter(
+                                      (c) => c.year === t.year && c.month === t.month
+                                    )}
+                                    onSaved={(txn) => {
+                                      setTransactions((prev) =>
+                                        prev.map((row) => (row.id === txn.id ? txn : row))
+                                      );
+                                    }}
+                                    onCategoryCreated={(category) => {
+                                      setBudgetCategories((prev) => [
+                                        ...prev.filter((c) => c.id !== category.id),
+                                        category,
+                                      ]);
+                                    }}
+                                    onError={(msg) => setError(msg)}
+                                  />
+                                ) : t.budget_category_name ? (
                                   <span className="inline-flex items-center gap-1">
                                     <span
                                       className="h-1.5 w-1.5 rounded-full"

@@ -1434,6 +1434,104 @@ export async function updatePersonalTransactionAmount(
   return mapTransaction(updated as Record<string, unknown>, accountsById, categoriesById);
 }
 
+export async function updatePersonalTransactionCategory(
+  ctx: V2SessionContext,
+  id: string,
+  budget_category_id: string | null
+): Promise<PersonalTransactionRow | null> {
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+
+  const { data, error } = await sb
+    .from("v2_personal_transactions")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new PersonalFinanceValidationError("Операция не найдена");
+
+  const txnType = String(data.txn_type) as PersonalTxnType;
+  if (txnType !== "expense") {
+    throw new PersonalFinanceValidationError("Категория доступна только для расходов");
+  }
+
+  const year = Number(data.year);
+  const month = Number(data.month);
+  const oldCategoryId = data.budget_category_id ? String(data.budget_category_id) : null;
+  const newCategoryId = budget_category_id?.trim() ? budget_category_id.trim() : null;
+
+  if (oldCategoryId === newCategoryId) {
+    return mapTransaction(data as Record<string, unknown>, new Map(), new Map());
+  }
+
+  if (newCategoryId && !(await ownBudgetCategoryId(userId, newCategoryId, year, month))) {
+    throw new PersonalFinanceValidationError("Категория бюджета не найдена");
+  }
+
+  const amount = Number(data.amount_rub) || 0;
+  const now = nowIso();
+
+  if (oldCategoryId) {
+    const { data: cat } = await sb
+      .from("v2_personal_budget_categories")
+      .select("spent_rub")
+      .eq("id", oldCategoryId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (cat) {
+      await sb
+        .from("v2_personal_budget_categories")
+        .update({ spent_rub: Math.max(0, Number(cat.spent_rub) - amount), updated_at: now })
+        .eq("id", oldCategoryId)
+        .eq("user_id", userId);
+    }
+  }
+
+  if (newCategoryId) {
+    const { data: cat } = await sb
+      .from("v2_personal_budget_categories")
+      .select("spent_rub")
+      .eq("id", newCategoryId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (cat) {
+      await sb
+        .from("v2_personal_budget_categories")
+        .update({ spent_rub: Number(cat.spent_rub) + amount, updated_at: now })
+        .eq("id", newCategoryId)
+        .eq("user_id", userId);
+    }
+  }
+
+  const { data: updated, error: updErr } = await sb
+    .from("v2_personal_transactions")
+    .update({ budget_category_id: newCategoryId })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (updErr) throw updErr;
+  if (!updated) throw new PersonalFinanceValidationError("Операция не найдена");
+
+  const [{ data: accounts }, { data: categories }] = await Promise.all([
+    sb.from("v2_personal_accounts").select("id, name").eq("user_id", userId),
+    sb
+      .from("v2_personal_budget_categories")
+      .select("id, name, tint")
+      .eq("user_id", userId)
+      .eq("year", year)
+      .eq("month", month),
+  ]);
+
+  const accountsById = new Map((accounts ?? []).map((a) => [String(a.id), String(a.name)]));
+  const categoriesById = new Map(
+    (categories ?? []).map((c) => [String(c.id), { name: String(c.name), tint: String(c.tint) }])
+  );
+
+  return mapTransaction(updated as Record<string, unknown>, accountsById, categoriesById);
+}
+
 export async function importPersonalTransactions(
   ctx: V2SessionContext,
   input: {

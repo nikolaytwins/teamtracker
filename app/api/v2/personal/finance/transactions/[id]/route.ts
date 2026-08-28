@@ -4,6 +4,7 @@ import {
   deletePersonalTransaction,
   PersonalFinanceValidationError,
   updatePersonalTransactionAmount,
+  updatePersonalTransactionCategory,
 } from "@/lib/v2/personal/personal-finance-repo";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -14,6 +15,17 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   try {
     const { id } = await params;
     const body = await request.json();
+
+    if ("budget_category_id" in body) {
+      const budget_category_id =
+        body.budget_category_id == null || body.budget_category_id === ""
+          ? null
+          : String(body.budget_category_id);
+      const transaction = await updatePersonalTransactionCategory(auth.ctx, id, budget_category_id);
+      if (!transaction) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ transaction });
+    }
+
     const amount_rub = Number(body.amount_rub);
     const transaction = await updatePersonalTransactionAmount(auth.ctx, id, amount_rub);
     if (!transaction) return NextResponse.json({ error: "Not found" }, { status: 404 });
