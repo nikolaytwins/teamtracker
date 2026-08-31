@@ -81,8 +81,9 @@
 | 060 | `060_v2_personal_todo_inbox_section.sql` | Личные задачи: секция inbox / later (входящие / потом) |
 | 061 | `061_move_inbox_tasks_to_later.sql` | Разово: все активные задачи из inbox → later |
 | 062 | `062_personal_finance_card_sort_order.sql` | Уникальный sort_order счетов и капитала |
+| 063 | `063_personal_accounts_clothing_gifts_funds.sql` | Счета: Фонд одежды, Фонд подарков |
 
-**Следующий свободный номер:** `063`
+**Следующий свободный номер:** `064`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 
