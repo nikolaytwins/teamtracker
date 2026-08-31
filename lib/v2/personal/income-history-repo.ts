@@ -13,6 +13,78 @@ function uid(ctx: V2SessionContext) {
   return ctx.userId;
 }
 
+function calendarMonthNow(): { year: number; month: number } {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+}
+
+function compareYearMonth(
+  a: { year: number; month: number },
+  b: { year: number; month: number }
+): number {
+  if (a.year !== b.year) return a.year - b.year;
+  return a.month - b.month;
+}
+
+function nextCalendarMonth(year: number, month: number): { year: number; month: number } {
+  if (month >= 12) return { year: year + 1, month: 1 };
+  return { year, month: month + 1 };
+}
+
+/** Добавляет строки с последнего месяца в БД до текущего календарного включительно. */
+async function ensureOpenMonthsThroughCurrent(userId: string) {
+  const sb = getV2Supabase();
+  const current = calendarMonthNow();
+
+  const { data: latestRow, error: latestErr } = await sb
+    .from("v2_personal_income_history")
+    .select("year, month, accounts_total_rub")
+    .eq("user_id", userId)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestErr) throw latestErr;
+  if (!latestRow) return;
+
+  let cursor = { year: Number(latestRow.year), month: Number(latestRow.month) };
+  if (compareYearMonth(cursor, current) >= 0) return;
+
+  let liveAccountsTotal = Number(latestRow.accounts_total_rub) || 0;
+  const { data: accounts } = await sb.from("v2_personal_accounts").select("balance_rub").eq("user_id", userId);
+  if (accounts?.length) {
+    liveAccountsTotal = accounts.reduce((s, a) => s + (Number(a.balance_rub) || 0), 0);
+  }
+
+  let carryAccounts = Number(latestRow.accounts_total_rub) || 0;
+  const ts = nowIso();
+
+  while (compareYearMonth(cursor, current) < 0) {
+    cursor = nextCalendarMonth(cursor.year, cursor.month);
+    const isCurrent = cursor.year === current.year && cursor.month === current.month;
+    const accounts_total_rub = isCurrent ? liveAccountsTotal : carryAccounts;
+
+    const { error } = await sb.from("v2_personal_income_history").insert({
+      user_id: userId,
+      year: cursor.year,
+      month: cursor.month,
+      accounts_total_rub,
+      earned_rub: null,
+      profit_rub: null,
+      spent_rub: null,
+      created_at: ts,
+      updated_at: ts,
+    });
+    if (error) {
+      // Параллельный запрос уже создал этот месяц
+      if (error.code === "23505") continue;
+      throw error;
+    }
+
+    carryAccounts = accounts_total_rub;
+  }
+}
+
 function mapRow(r: Record<string, unknown>): PersonalIncomeHistoryRow {
   return {
     user_id: String(r.user_id),
@@ -187,6 +259,7 @@ export async function listPersonalIncomeHistory(
     await syncHistoricalSeed(userId);
     await sync2026JanAprSeed(userId);
   }
+  await ensureOpenMonthsThroughCurrent(userId);
 
   const sb = getV2Supabase();
   const { data, error } = await sb

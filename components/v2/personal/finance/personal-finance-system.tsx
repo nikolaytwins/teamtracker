@@ -2,6 +2,7 @@
 
 import { PersonalAmt } from "./personal-finance-mask";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { sortFinanceCards } from "@/lib/v2/personal/finance-card-order";
 import { formatPersonalRubShort } from "@/lib/v2/personal/formatters";
 import type {
   PersonalAccountRow,
@@ -769,6 +770,8 @@ export function PfAccountsAsFunds({
   }>;
 }) {
   const manageLink = appPath("/v2/personal/finance/accounts");
+  const sortedAccounts = useMemo(() => sortFinanceCards(accounts), [accounts]);
+  const sortedCapital = useMemo(() => sortFinanceCards(capital), [capital]);
 
   return (
     <div className="space-y-7">
@@ -798,11 +801,11 @@ export function PfAccountsAsFunds({
           </div>
         }
       >
-        {accounts.length === 0 ? (
+        {sortedAccounts.length === 0 ? (
           <Card className="p-8 text-center text-sm text-[var(--v2-ink-500)]">Счетов пока нет</Card>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {accounts.map((a) => (
+            {sortedAccounts.map((a) => (
                 <Card key={a.id} className="px-6 py-6">
                   <div className="flex items-center gap-2.5">
                     <span
@@ -873,11 +876,11 @@ export function PfAccountsAsFunds({
           </div>
         }
       >
-        {capital.length === 0 ? (
+        {sortedCapital.length === 0 ? (
           <Card className="p-8 text-center text-sm text-[var(--v2-ink-500)]">Капитал не добавлен</Card>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {capital.map((c) => (
+            {sortedCapital.map((c) => (
               <Card key={c.id} className="px-6 py-6">
                 <div className="flex items-center gap-2.5">
                   <span

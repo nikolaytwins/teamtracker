@@ -6,6 +6,7 @@ import {
   listUnpaidFinanceRemainders,
 } from "@/lib/v2/finance/finance-repo";
 import { listPersonalIncomeHistory } from "@/lib/v2/personal/income-history-repo";
+import { sortFinanceCards } from "@/lib/v2/personal/finance-card-order";
 import { DEFAULT_BUDGET_CATEGORIES } from "@/lib/v2/personal/formatters";
 import {
   ensureFxRatesFresh,
@@ -51,6 +52,24 @@ export class PersonalFinanceValidationError extends Error {
 
 function uid(ctx: V2SessionContext) {
   return ctx.userId;
+}
+
+const FINANCE_CARD_ORDER = { ascending: true } as const;
+
+async function nextFinanceSortOrder(
+  table: "v2_personal_accounts" | "v2_personal_capital_items",
+  userId: string
+): Promise<number> {
+  const sb = getV2Supabase();
+  const { data } = await sb
+    .from(table)
+    .select("sort_order")
+    .eq("user_id", userId)
+    .order("sort_order", FINANCE_CARD_ORDER)
+    .order("id", FINANCE_CARD_ORDER)
+    .limit(1)
+    .maybeSingle();
+  return (Number(data?.sort_order) || 0) + 1;
 }
 
 function mapAccount(
@@ -452,8 +471,8 @@ export async function loadPersonalFinanceDashboard(
       ] as const;
     }),
     Promise.all([
-      sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order"),
-      sb.from("v2_personal_capital_items").select("*").eq("user_id", userId).order("sort_order"),
+      sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order", FINANCE_CARD_ORDER).order("created_at", FINANCE_CARD_ORDER).order("id", FINANCE_CARD_ORDER),
+      sb.from("v2_personal_capital_items").select("*").eq("user_id", userId).order("sort_order", FINANCE_CARD_ORDER).order("created_at", FINANCE_CARD_ORDER).order("id", FINANCE_CARD_ORDER),
       sb
         .from("v2_personal_incomes")
         .select("*")
@@ -516,10 +535,10 @@ export async function loadPersonalFinanceDashboard(
   if (historyRes.error) throw historyRes.error;
   if (expenseTxnsRes.error) throw expenseTxnsRes.error;
 
-  const accounts = (accountsRes.data ?? []).map((r) =>
-    mapAccount(r as Record<string, unknown>, rateLookup)
+  const accounts = sortFinanceCards(
+    (accountsRes.data ?? []).map((r) => mapAccount(r as Record<string, unknown>, rateLookup))
   );
-  const capital = (capitalRes.data ?? []).map((r) => mapCapital(r as Record<string, unknown>));
+  const capital = sortFinanceCards((capitalRes.data ?? []).map((r) => mapCapital(r as Record<string, unknown>)));
   const incomes = (incomesRes.data ?? []).map((r) => mapIncome(r as Record<string, unknown>));
   const taxAdvances = (advancesRes.data ?? []).map(
     (r) =>
@@ -872,9 +891,11 @@ export async function createPersonalAccount(
   const nativeInput =
     input.balance_native != null ? Number(input.balance_native) : Number(input.balance_rub ?? 0);
   const balances = await resolveRubBalance(currency, nativeInput, input.balance_rub);
+  const userId = uid(ctx);
+  const sort_order = input.sort_order ?? (await nextFinanceSortOrder("v2_personal_accounts", userId));
   const row = {
     id,
-    user_id: uid(ctx),
+    user_id: userId,
     name: input.name?.trim() || "Счёт",
     account_type: input.account_type ?? "card",
     icon_key: input.icon_key ?? "wallet",
@@ -886,7 +907,7 @@ export async function createPersonalAccount(
     disposable: input.disposable ?? true,
     in_cushion: input.in_cushion ?? false,
     goal_amount_rub: input.goal_amount_rub ?? null,
-    sort_order: input.sort_order ?? 0,
+    sort_order,
     created_at: now,
     updated_at: now,
   };
@@ -984,16 +1005,18 @@ export async function createPersonalCapital(
   const sb = getV2Supabase();
   const id = newV2Id();
   const now = nowIso();
+  const userId = uid(ctx);
+  const sort_order = input.sort_order ?? (await nextFinanceSortOrder("v2_personal_capital_items", userId));
   const row = {
     id,
-    user_id: uid(ctx),
+    user_id: userId,
     name: input.name?.trim() || "Актив",
     icon_key: input.icon_key ?? "coin",
     amount_rub: input.amount_rub ?? 0,
     meta: input.meta ?? null,
     unit_label: input.unit_label ?? null,
     tint: input.tint ?? null,
-    sort_order: input.sort_order ?? 0,
+    sort_order,
     created_at: now,
     updated_at: now,
   };
@@ -1883,12 +1906,12 @@ export async function loadPersonalCashForecast(
   const budget = await ensureBudgetMonth(userId, year, month);
   const sb = getV2Supabase();
   const [accountsRes, one_time_expenses, unpaid] = await Promise.all([
-    sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order"),
+    sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order", FINANCE_CARD_ORDER).order("created_at", FINANCE_CARD_ORDER).order("id", FINANCE_CARD_ORDER),
     listForecastExtras(userId, year, month),
     listUnpaidFinanceRemainders(ctx),
   ]);
   if (accountsRes.error) throw accountsRes.error;
-  const accounts = (accountsRes.data ?? []).map((r) => mapAccount(r as Record<string, unknown>));
+  const accounts = sortFinanceCards((accountsRes.data ?? []).map((r) => mapAccount(r as Record<string, unknown>)));
   const disposable = accounts.filter((a) => a.disposable).reduce((s, a) => s + a.balance_rub, 0);
   const planned_incomes: PersonalCashForecastPlannedIncome[] = unpaid.map((p) => ({
     project_id: p.project_id,

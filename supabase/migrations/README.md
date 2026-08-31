@@ -79,8 +79,10 @@
 | 058 | `058_v2_tasks_ideas_redesign.sql` | Фокус недели: слоты primary/secondary; идеи: приоритет и архив |
 | 059 | `059_v2_personal_wish_video.sql` | Желания: тип медиа image/video у вложений |
 | 060 | `060_v2_personal_todo_inbox_section.sql` | Личные задачи: секция inbox / later (входящие / потом) |
+| 061 | `061_move_inbox_tasks_to_later.sql` | Разово: все активные задачи из inbox → later |
+| 062 | `062_personal_finance_card_sort_order.sql` | Уникальный sort_order счетов и капитала |
 
-**Следующий свободный номер:** `061`
+**Следующий свободный номер:** `063`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

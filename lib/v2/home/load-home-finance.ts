@@ -4,6 +4,7 @@ import {
   listFinanceProjectsForMonth,
 } from "@/lib/v2/finance/finance-repo";
 import type { V2FinanceMonthSummary } from "@/lib/v2/finance/types";
+import { sortFinanceCards } from "@/lib/v2/personal/finance-card-order";
 import { ensureFinanceGoals } from "@/lib/v2/personal/personal-finance-repo";
 import { listPersonalIncomeHistory } from "@/lib/v2/personal/income-history-repo";
 import type {
@@ -133,7 +134,7 @@ export async function loadHomePersonalFinance(ctx: V2SessionContext): Promise<Ho
   const month = now.getMonth() + 1;
 
   const [accountsRes, capitalRes, goals, incomeHistoryRaw, agencyStrip] = await Promise.all([
-    sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order"),
+    sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order", { ascending: true }).order("created_at", { ascending: true }).order("id", { ascending: true }),
     sb.from("v2_personal_capital_items").select("amount_rub").eq("user_id", userId),
     ensureFinanceGoals(userId).catch(() => [] as PersonalFinanceGoalRow[]),
     listPersonalIncomeHistory(ctx, { sync: false }),
@@ -143,7 +144,7 @@ export async function loadHomePersonalFinance(ctx: V2SessionContext): Promise<Ho
   if (accountsRes.error) throw accountsRes.error;
   if (capitalRes.error) throw capitalRes.error;
 
-  const accounts = (accountsRes.data ?? []).map((r) => mapHomeAccount(r as Record<string, unknown>));
+  const accounts = sortFinanceCards((accountsRes.data ?? []).map((r) => mapHomeAccount(r as Record<string, unknown>)));
   const accountsTotal = accounts.reduce((s, a) => s + a.balance_rub, 0);
   const capitalSum = (capitalRes.data ?? []).reduce((s, r) => s + (Number(r.amount_rub) || 0), 0);
   const netWorth = accountsTotal + capitalSum;
