@@ -5,10 +5,15 @@ import {
 } from "@/lib/v2/finance/finance-repo";
 import type { V2FinanceMonthSummary } from "@/lib/v2/finance/types";
 import { sortFinanceCards } from "@/lib/v2/personal/finance-card-order";
-import { ensureFinanceGoals } from "@/lib/v2/personal/personal-finance-repo";
+import {
+  ensureFinanceFunds,
+  ensureFinanceGoals,
+  filterOperatingAccounts,
+} from "@/lib/v2/personal/personal-finance-repo";
 import { listPersonalIncomeHistory } from "@/lib/v2/personal/income-history-repo";
 import type {
   PersonalAccountRow,
+  PersonalFinanceFundRow,
   PersonalFinanceGoalRow,
   PersonalIncomeHistoryRow,
 } from "@/lib/v2/personal/types";
@@ -27,6 +32,7 @@ export type HomePersonalFinancePayload = {
   month: number;
   incomeHistory: PersonalIncomeHistoryRow[];
   accounts: PersonalAccountRow[];
+  funds: PersonalFinanceFundRow[];
   goals: PersonalFinanceGoalRow[];
   summary: {
     netWorth: number;
@@ -133,10 +139,11 @@ export async function loadHomePersonalFinance(ctx: V2SessionContext): Promise<Ho
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
 
-  const [accountsRes, capitalRes, goals, incomeHistoryRaw, agencyStrip] = await Promise.all([
+  const [accountsRes, capitalRes, goals, fundsRaw, incomeHistoryRaw, agencyStrip] = await Promise.all([
     sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order", { ascending: true }).order("created_at", { ascending: true }).order("id", { ascending: true }),
     sb.from("v2_personal_capital_items").select("amount_rub").eq("user_id", userId),
     ensureFinanceGoals(userId).catch(() => [] as PersonalFinanceGoalRow[]),
+    ensureFinanceFunds(userId).catch(() => [] as PersonalFinanceFundRow[]),
     listPersonalIncomeHistory(ctx, { sync: false }),
     ctx.role === "admin" ? loadHomeFinanceStrip(ctx) : Promise.resolve(null),
   ]);
@@ -144,7 +151,15 @@ export async function loadHomePersonalFinance(ctx: V2SessionContext): Promise<Ho
   if (accountsRes.error) throw accountsRes.error;
   if (capitalRes.error) throw capitalRes.error;
 
-  const accounts = sortFinanceCards((accountsRes.data ?? []).map((r) => mapHomeAccount(r as Record<string, unknown>)));
+  const allAccounts = sortFinanceCards((accountsRes.data ?? []).map((r) => mapHomeAccount(r as Record<string, unknown>)));
+  const accounts = filterOperatingAccounts(allAccounts);
+  const accountNames = new Map(allAccounts.map((a) => [a.id, a.name]));
+  const funds = sortFinanceCards(
+    fundsRaw.map((f) => ({
+      ...f,
+      source_account_name: f.source_account_id ? accountNames.get(f.source_account_id) ?? null : null,
+    }))
+  );
   const accountsTotal = accounts.reduce((s, a) => s + a.balance_rub, 0);
   const capitalSum = (capitalRes.data ?? []).reduce((s, r) => s + (Number(r.amount_rub) || 0), 0);
   const netWorth = accountsTotal + capitalSum;
@@ -188,6 +203,7 @@ export async function loadHomePersonalFinance(ctx: V2SessionContext): Promise<Ho
     month,
     incomeHistory,
     accounts,
+    funds,
     goals,
     summary: {
       netWorth,

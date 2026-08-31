@@ -38,6 +38,21 @@ export type PersonalCapitalRow = {
   sort_order: number;
 };
 
+/** Виртуальная «корзина» на счёте — не добавляется к капиталу повторно */
+export type PersonalFinanceFundRow = {
+  id: string;
+  user_id: string;
+  fund_key: string | null;
+  name: string;
+  amount_rub: number;
+  source_account_id: string | null;
+  source_account_name: string | null;
+  monthly_hint: string | null;
+  icon_key: string;
+  accent: string;
+  sort_order: number;
+};
+
 export type PersonalIncomeRow = {
   id: string;
   user_id: string;
@@ -181,6 +196,7 @@ export type PersonalFinanceDashboard = {
   month: number;
   accounts: PersonalAccountRow[];
   capital: PersonalCapitalRow[];
+  funds: PersonalFinanceFundRow[];
   incomes: PersonalIncomeRow[];
   tax: PersonalTaxProfileRow;
   taxAdvances: PersonalTaxAdvanceRow[];

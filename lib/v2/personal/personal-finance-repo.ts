@@ -38,6 +38,7 @@ import type {
   PersonalTxnType,
   PersonalFinanceSystemRow,
   PersonalFinanceGoalRow,
+  PersonalFinanceFundRow,
 } from "@/lib/v2/personal/types";
 
 export const DEFAULT_EXPECTED_EXPENSES_RUB = 180_000;
@@ -129,6 +130,22 @@ function mapCapital(r: Record<string, unknown>): PersonalCapitalRow {
     tint: r.tint ? String(r.tint) : null,
     sort_order: Number(r.sort_order) || 0,
   };
+}
+
+const FUND_ACCOUNT_NAMES = new Set([
+  "Подушка безопасности",
+  "Фонд одежды",
+  "Фонд подарков",
+]);
+
+/** Счета в блоке «Счета» — без типов cushion/goal и без перенесённых фондов */
+export function filterOperatingAccounts(accounts: PersonalAccountRow[]): PersonalAccountRow[] {
+  return accounts.filter(
+    (a) =>
+      a.account_type !== "cushion" &&
+      a.account_type !== "goal" &&
+      !FUND_ACCOUNT_NAMES.has(a.name)
+  );
 }
 
 function mapIncome(r: Record<string, unknown>): PersonalIncomeRow {
@@ -458,8 +475,9 @@ export async function loadPersonalFinanceDashboard(
     loadFxRateLookup(),
     ensureTaxProfile(userId),
     ensureBudgetMonth(userId, year, month),
-    Promise.all([ensureFinanceSystem(userId), ensureFinanceGoals(userId)]).catch((e) => {
-      console.warn("personal finance system tables unavailable — apply migration 052", e);
+    Promise.all([ensureFinanceSystem(userId), ensureFinanceGoals(userId), ensureFinanceFunds(userId)]).catch(
+      (e) => {
+      console.warn("personal finance system tables unavailable — apply migration 052/064", e);
       return [
         {
           user_id: userId,
@@ -468,6 +486,7 @@ export async function loadPersonalFinanceDashboard(
           moscow_job_stable: true,
         } satisfies PersonalFinanceSystemRow,
         [] as PersonalFinanceGoalRow[],
+        [] as PersonalFinanceFundRow[],
       ] as const;
     }),
     Promise.all([
@@ -515,7 +534,7 @@ export async function loadPersonalFinanceDashboard(
     updated_at: nowIso(),
   }));
 
-  const [system, goals] = systemGoals;
+  const [system, goals, fundsFromEnsure] = systemGoals;
   const [
     accountsRes,
     capitalRes,
@@ -535,10 +554,18 @@ export async function loadPersonalFinanceDashboard(
   if (historyRes.error) throw historyRes.error;
   if (expenseTxnsRes.error) throw expenseTxnsRes.error;
 
-  const accounts = sortFinanceCards(
+  const allAccounts = sortFinanceCards(
     (accountsRes.data ?? []).map((r) => mapAccount(r as Record<string, unknown>, rateLookup))
   );
+  const accountNames = new Map(allAccounts.map((a) => [a.id, a.name]));
+  const accounts = filterOperatingAccounts(allAccounts);
   const capital = sortFinanceCards((capitalRes.data ?? []).map((r) => mapCapital(r as Record<string, unknown>)));
+  const funds = sortFinanceCards(
+    fundsFromEnsure.map((f) => ({
+      ...f,
+      source_account_name: f.source_account_id ? accountNames.get(f.source_account_id) ?? null : null,
+    }))
+  );
   const incomes = (incomesRes.data ?? []).map((r) => mapIncome(r as Record<string, unknown>));
   const taxAdvances = (advancesRes.data ?? []).map(
     (r) =>
@@ -723,6 +750,7 @@ export async function loadPersonalFinanceDashboard(
     month,
     accounts,
     capital,
+    funds,
     incomes,
     tax,
     taxAdvances,
@@ -2074,6 +2102,211 @@ function mapFinanceGoal(r: Record<string, unknown>): PersonalFinanceGoalRow {
     target_rub: Number(r.target_rub) || 0,
     sort_order: Number(r.sort_order) || 0,
   };
+}
+
+const DEFAULT_FINANCE_FUNDS: Array<{
+  fund_key: string;
+  name: string;
+  monthly_hint: string | null;
+  icon_key: string;
+  accent: string;
+  sort_order: number;
+}> = [
+  {
+    fund_key: "life",
+    name: "Траты на жизнь",
+    monthly_hint: "150 000 ₽ каждый месяц",
+    icon_key: "wallet",
+    accent: "#10B981",
+    sort_order: 0,
+  },
+  {
+    fund_key: "salary",
+    name: "Фонд зарплат",
+    monthly_hint: "50 000 ₽ каждый месяц",
+    icon_key: "bank",
+    accent: "#3B6FF7",
+    sort_order: 1,
+  },
+  {
+    fund_key: "cushion",
+    name: "Подушка безопасности",
+    monthly_hint: null,
+    icon_key: "shield",
+    accent: "#6366F1",
+    sort_order: 2,
+  },
+  {
+    fund_key: "clothing",
+    name: "Фонд одежды",
+    monthly_hint: null,
+    icon_key: "target",
+    accent: "#9A8CFF",
+    sort_order: 3,
+  },
+  {
+    fund_key: "gifts",
+    name: "Фонд подарков",
+    monthly_hint: null,
+    icon_key: "target",
+    accent: "#FF335F",
+    sort_order: 4,
+  },
+  {
+    fund_key: "lera",
+    name: "Фонд сюрпризов Лере",
+    monthly_hint: null,
+    icon_key: "coin",
+    accent: "#F472B6",
+    sort_order: 5,
+  },
+  {
+    fund_key: "moscow",
+    name: "Фонд Москва",
+    monthly_hint: null,
+    icon_key: "flag",
+    accent: "#0EA5E9",
+    sort_order: 6,
+  },
+  {
+    fund_key: "china",
+    name: "Фонд Китай",
+    monthly_hint: null,
+    icon_key: "coin",
+    accent: "#EF4444",
+    sort_order: 7,
+  },
+];
+
+function mapFinanceFundRow(r: Record<string, unknown>): PersonalFinanceFundRow {
+  return {
+    id: String(r.id),
+    user_id: String(r.user_id),
+    fund_key: r.fund_key ? String(r.fund_key) : null,
+    name: String(r.name),
+    amount_rub: Number(r.amount_rub) || 0,
+    source_account_id: r.source_account_id ? String(r.source_account_id) : null,
+    source_account_name: null,
+    monthly_hint: r.monthly_hint ? String(r.monthly_hint) : null,
+    icon_key: String(r.icon_key || "coin"),
+    accent: String(r.accent || "#F59E0B"),
+    sort_order: Number(r.sort_order) || 0,
+  };
+}
+
+export async function ensureFinanceFunds(userId: string): Promise<PersonalFinanceFundRow[]> {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_finance_funds")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order", FINANCE_CARD_ORDER)
+    .order("id", FINANCE_CARD_ORDER);
+  if (error) throw error;
+
+  const existingKeys = new Set((data ?? []).map((r) => String(r.fund_key ?? "")).filter(Boolean));
+  const missing = DEFAULT_FINANCE_FUNDS.filter((f) => !existingKeys.has(f.fund_key));
+  if (missing.length) {
+    const ts = nowIso();
+    const inserts = missing.map((f) => ({
+      id: newV2Id(),
+      user_id: userId,
+      fund_key: f.fund_key,
+      name: f.name,
+      amount_rub: 0,
+      source_account_id: null,
+      monthly_hint: f.monthly_hint,
+      icon_key: f.icon_key,
+      accent: f.accent,
+      sort_order: f.sort_order,
+      created_at: ts,
+      updated_at: ts,
+    }));
+    const { error: insErr } = await sb.from("v2_personal_finance_funds").insert(inserts);
+    if (insErr && !String(insErr.message).includes("duplicate")) throw insErr;
+  }
+
+  const { data: again, error: againErr } = await sb
+    .from("v2_personal_finance_funds")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order", FINANCE_CARD_ORDER)
+    .order("id", FINANCE_CARD_ORDER);
+  if (againErr) throw againErr;
+  return (again ?? []).map((r) => mapFinanceFundRow(r as Record<string, unknown>));
+}
+
+export async function updatePersonalFinanceFund(
+  ctx: V2SessionContext,
+  id: string,
+  patch: Partial<{
+    amount_rub: number;
+    source_account_id: string | null;
+    name: string;
+    monthly_hint: string | null;
+  }>
+): Promise<PersonalFinanceFundRow | null> {
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+  const safe: Record<string, unknown> = { updated_at: nowIso() };
+
+  if (patch.amount_rub !== undefined) {
+    const n = Number(patch.amount_rub);
+    if (!Number.isFinite(n) || n < 0) throw new PersonalFinanceValidationError("Некорректная сумма фонда");
+    safe.amount_rub = Math.round(n);
+  }
+  if (patch.source_account_id !== undefined) {
+    if (patch.source_account_id === null || patch.source_account_id === "") {
+      safe.source_account_id = null;
+    } else {
+      const { data: acc } = await sb
+        .from("v2_personal_accounts")
+        .select("id")
+        .eq("id", patch.source_account_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!acc) throw new PersonalFinanceValidationError("Счёт-источник не найден");
+      safe.source_account_id = patch.source_account_id;
+    }
+  }
+  if (patch.name !== undefined) safe.name = String(patch.name).trim() || "Фонд";
+  if (patch.monthly_hint !== undefined) {
+    safe.monthly_hint = patch.monthly_hint?.trim() || null;
+  }
+
+  if (Object.keys(safe).length === 1) {
+    const { data } = await sb
+      .from("v2_personal_finance_funds")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .maybeSingle();
+    return data ? mapFinanceFundRow(data as Record<string, unknown>) : null;
+  }
+
+  const { error } = await sb
+    .from("v2_personal_finance_funds")
+    .update(safe)
+    .eq("id", id)
+    .eq("user_id", userId);
+  if (error) throw error;
+
+  const { data } = await sb
+    .from("v2_personal_finance_funds")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data) return null;
+
+  let source_account_name: string | null = null;
+  const sourceId = data.source_account_id ? String(data.source_account_id) : null;
+  if (sourceId) {
+    const { data: acc } = await sb.from("v2_personal_accounts").select("name").eq("id", sourceId).maybeSingle();
+    source_account_name = acc?.name ? String(acc.name) : null;
+  }
+
+  return { ...mapFinanceFundRow(data as Record<string, unknown>), source_account_name };
 }
 
 export async function ensureFinanceSystem(userId: string): Promise<PersonalFinanceSystemRow> {

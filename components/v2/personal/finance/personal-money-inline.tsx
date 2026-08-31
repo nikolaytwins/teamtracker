@@ -261,3 +261,38 @@ export function PersonalCapitalAmountInline({
     />
   );
 }
+
+export function PersonalFundAmountInline({
+  fundId,
+  value,
+  onSaved,
+  onError,
+  className = "",
+}: {
+  fundId: string;
+  value: number;
+  onSaved?: (amount: number) => void;
+  onError?: (msg: string) => void;
+  className?: string;
+}) {
+  return (
+    <PersonalMoneyInline
+      value={value}
+      className={className}
+      title="Нажмите, чтобы изменить сумму фонда"
+      onSave={async (next) => {
+        const { item } = await fetchJson<{ item: { amount_rub: number } }>(
+          `/api/v2/personal/finance/funds/${fundId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount_rub: next }),
+          }
+        );
+        return item.amount_rub;
+      }}
+      onSaved={onSaved}
+      onError={onError}
+    />
+  );
+}

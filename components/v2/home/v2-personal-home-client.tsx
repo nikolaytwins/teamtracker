@@ -85,7 +85,7 @@ function GoalsAndNotNow() {
 
   const goals = useMemo(() => {
     if (!dashboard) return [];
-    const pool = cushionPool(dashboard.accounts);
+    const pool = cushionPool(dashboard.funds?.length ? dashboard.funds : dashboard.accounts);
     return allocateGoals(dashboard.goals, pool);
   }, [dashboard]);
 

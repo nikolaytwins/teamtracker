@@ -13,11 +13,13 @@ import {
 import {
   PersonalAccountBalanceInline,
   PersonalCapitalAmountInline,
+  PersonalFundAmountInline,
 } from "./personal-money-inline";
 import { PersonalOperationModal } from "./personal-operation-modal";
 import {
   allocateGoals,
   cushionPool,
+  fundsTotal,
   PfAccountsAsFunds,
   PfGoalQueue,
   PfMonthSplit,
@@ -370,19 +372,21 @@ function PfPageHead({
 function PfHeroCards({
   summary,
   accounts,
+  funds,
   history,
   year,
   month,
 }: {
   summary: PersonalFinanceDashboard["summary"];
   accounts: PersonalAccountRow[];
+  funds: PersonalFinanceDashboard["funds"];
   history: PersonalMonthSnapshotRow[];
   year: number;
   month: number;
 }) {
   const capSeries = history.map((h) => h.capital_total_rub);
-  const cushionTotal = cushionPool(accounts);
-  const goal = accounts.find((a) => a.account_type === "goal");
+  const cushionTotal = cushionPool(funds);
+  const fundsSum = fundsTotal(funds);
   const incomeExpected = summary.projectExpectedRevenue || summary.incomeExpected;
   const incomeReceived = summary.projectActualRevenue || summary.incomeReceived;
   const incomePending = Math.max(incomeExpected - incomeReceived, 0);
@@ -461,11 +465,11 @@ function PfHeroCards({
                 </span>
               </span>
             ) : null}
-            {goal ? (
+            {fundsSum > 0 ? (
               <span>
-                Цели{" "}
+                Фонды{" "}
                 <span className="font-medium text-[var(--v2-ink-700)]">
-                  <PersonalAmt v={goal.balance_rub} short />
+                  <PersonalAmt v={fundsSum} short />
                 </span>
               </span>
             ) : null}
@@ -1757,10 +1761,11 @@ export function PersonalFinanceClient() {
 
   if (!data) return null;
 
-  const { summary, accounts, capital, tax, taxAdvances, budget, budgetCategories, history, incomeHistory, system, goals } =
+  const { summary, accounts, funds, capital, tax, taxAdvances, budget, budgetCategories, history, incomeHistory, system, goals } =
     data;
   const accountsTotal = summary.disposable + summary.reserves;
-  const cushionTotal = cushionPool(accounts);
+  const cushionTotal = cushionPool(funds ?? []);
+  const fundsTotalRub = fundsTotal(funds ?? []);
   const allocated = allocateGoals(goals ?? [], cushionTotal);
   const nearest = allocated.find((g) => g.active);
   const monthIncome = summary.monthProfit;
@@ -1805,7 +1810,7 @@ export function PersonalFinanceClient() {
             />
 
             <div className="space-y-7">
-              <PfHeroCards summary={summary} accounts={accounts} history={history} year={year} month={month} />
+              <PfHeroCards summary={summary} accounts={accounts} funds={funds ?? []} history={history} year={year} month={month} />
               <PfNearestGoal nearest={nearest} cushionTotal={cushionTotal} />
               {system ? (
                 <PfMonthSplit
@@ -1829,13 +1834,15 @@ export function PersonalFinanceClient() {
               />
               <PfAccountsAsFunds
                 accounts={accounts}
+                funds={funds ?? []}
                 capital={capital}
                 accountsTotal={accountsTotal}
-                cushionTotal={cushionTotal}
+                fundsTotalRub={fundsTotalRub}
                 capitalSum={summary.capitalSum}
                 onSaved={() => void reload()}
                 onError={setError}
                 AccountBalance={PersonalAccountBalanceInline}
+                FundAmount={PersonalFundAmountInline}
                 CapitalAmount={PersonalCapitalAmountInline}
               />
               <PfChartsSection

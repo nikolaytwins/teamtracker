@@ -7,6 +7,7 @@ import { formatPersonalRubShort } from "@/lib/v2/personal/formatters";
 import type {
   PersonalAccountRow,
   PersonalCapitalRow,
+  PersonalFinanceFundRow,
   PersonalFinanceGoalRow,
   PersonalFinanceSystemRow,
 } from "@/lib/v2/personal/types";
@@ -23,8 +24,23 @@ export type AllocatedGoal = PersonalFinanceGoalRow & {
   active: boolean;
 };
 
-export function cushionPool(accounts: PersonalAccountRow[]): number {
-  return accounts.filter((a) => a.in_cushion).reduce((s, a) => s + a.balance_rub, 0);
+export function cushionPool(
+  fundsOrAccounts: PersonalFinanceFundRow[] | PersonalAccountRow[]
+): number {
+  if (!fundsOrAccounts.length) return 0;
+  const first = fundsOrAccounts[0]!;
+  if ("amount_rub" in first && "fund_key" in first) {
+    const funds = fundsOrAccounts as PersonalFinanceFundRow[];
+    const cushion = funds.find((f) => f.fund_key === "cushion");
+    return cushion?.amount_rub ?? funds.reduce((s, f) => s + f.amount_rub, 0);
+  }
+  return (fundsOrAccounts as PersonalAccountRow[])
+    .filter((a) => a.in_cushion)
+    .reduce((s, a) => s + a.balance_rub, 0);
+}
+
+export function fundsTotal(funds: PersonalFinanceFundRow[]): number {
+  return funds.reduce((s, f) => s + f.amount_rub, 0);
 }
 
 export function allocateGoals(goals: PersonalFinanceGoalRow[], pool: number): AllocatedGoal[] {
@@ -726,29 +742,32 @@ function AccIcon({ iconKey, className }: { iconKey: string; className?: string }
   return <Icon className={className} />;
 }
 
-async function patchAccountCushion(accountId: string, in_cushion: boolean) {
-  await fetchJson(`/api/v2/personal/finance/accounts/${accountId}`, {
+async function patchFundSource(fundId: string, source_account_id: string | null) {
+  await fetchJson(`/api/v2/personal/finance/funds/${fundId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ in_cushion }),
+    body: JSON.stringify({ source_account_id: source_account_id || null }),
   });
 }
 
 export function PfAccountsAsFunds({
   accounts,
+  funds,
   capital,
   accountsTotal,
-  cushionTotal,
+  fundsTotalRub,
   capitalSum,
   onSaved,
   onError,
   AccountBalance,
+  FundAmount,
   CapitalAmount,
 }: {
   accounts: PersonalAccountRow[];
+  funds: PersonalFinanceFundRow[];
   capital: PersonalCapitalRow[];
   accountsTotal: number;
-  cushionTotal: number;
+  fundsTotalRub: number;
   capitalSum: number;
   onSaved: () => void;
   onError: (msg: string) => void;
@@ -757,6 +776,13 @@ export function PfAccountsAsFunds({
     value: number;
     currencyCode: PersonalAccountRow["currency_code"];
     rubValue?: number;
+    onSaved: () => void;
+    onError: (msg: string) => void;
+    className?: string;
+  }>;
+  FundAmount: React.ComponentType<{
+    fundId: string;
+    value: number;
     onSaved: () => void;
     onError: (msg: string) => void;
     className?: string;
@@ -771,7 +797,12 @@ export function PfAccountsAsFunds({
 }) {
   const manageLink = appPath("/v2/personal/finance/accounts");
   const sortedAccounts = useMemo(() => sortFinanceCards(accounts), [accounts]);
+  const sortedFunds = useMemo(() => sortFinanceCards(funds), [funds]);
   const sortedCapital = useMemo(() => sortFinanceCards(capital), [capital]);
+  const sourceOptions = useMemo(
+    () => sortedAccounts.filter((a) => a.currency_code === "RUB"),
+    [sortedAccounts]
+  );
 
   return (
     <div className="space-y-7">
@@ -785,11 +816,6 @@ export function PfAccountsAsFunds({
               Всего{" "}
               <span className="font-semibold text-[var(--v2-ink-800)]">
                 <PersonalAmt v={accountsTotal} short />
-              </span>
-              {" · "}
-              в подушке{" "}
-              <span className="font-semibold text-[var(--v2-ink-800)]">
-                <PersonalAmt v={cushionTotal} short />
               </span>
             </span>
             <Link
@@ -829,21 +855,7 @@ export function PfAccountsAsFunds({
                       className="text-[32px] leading-none text-left"
                     />
                   </div>
-                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--v2-ink-100)] pt-4">
-                    <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[var(--v2-ink-600)]">
-                      <input
-                        type="checkbox"
-                        checked={a.in_cushion}
-                        onChange={(e) => {
-                          void patchAccountCushion(a.id, e.target.checked)
-                            .then(onSaved)
-                            .catch((err) =>
-                              onError(err instanceof Error ? err.message : "Не удалось обновить счёт")
-                            );
-                        }}
-                      />
-                      В подушку
-                    </label>
+                  <div className="mt-4 flex items-center justify-end gap-3 border-t border-[var(--v2-ink-100)] pt-4">
                     {a.note || a.currency_code !== "RUB" || !a.disposable ? (
                       <span className="v2-tight truncate text-[13px] text-[var(--v2-ink-400)]">
                         {a.note || (a.disposable ? a.currency_code : "резерв")}
@@ -852,6 +864,77 @@ export function PfAccountsAsFunds({
                   </div>
                 </Card>
               ))}
+          </div>
+        )}
+      </Sect>
+
+      <Sect
+        accent="#F59E0B"
+        title="Фонды"
+        hint="не входят в сумму капитала · деньги лежат на счетах"
+        right={
+          <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">
+            В фондах{" "}
+            <span className="font-semibold text-[var(--v2-ink-800)]">
+              <PersonalAmt v={fundsTotalRub} short />
+            </span>
+          </span>
+        }
+      >
+        {sortedFunds.length === 0 ? (
+          <Card className="p-8 text-center text-sm text-[var(--v2-ink-500)]">Фонды не настроены</Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {sortedFunds.map((f) => (
+              <Card key={f.id} className="px-6 py-6">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-white"
+                    style={{ background: f.accent || "#F59E0B" }}
+                  >
+                    <AccIcon iconKey={f.icon_key} className="h-4 w-4" />
+                  </span>
+                  <span className="v2-tight min-w-0 truncate text-[16px] font-semibold text-[var(--v2-ink-900)]">
+                    {f.name}
+                  </span>
+                </div>
+                {f.monthly_hint ? (
+                  <p className="v2-tight mt-2 text-[12.5px] leading-snug text-[var(--v2-ink-500)]">{f.monthly_hint}</p>
+                ) : null}
+                <div className="v2-tighter mt-4 text-[32px] font-semibold leading-none">
+                  <FundAmount
+                    fundId={f.id}
+                    value={f.amount_rub}
+                    onSaved={onSaved}
+                    onError={onError}
+                    className="text-[32px] leading-none text-left"
+                  />
+                </div>
+                <div className="mt-4 border-t border-[var(--v2-ink-100)] pt-4">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[var(--v2-ink-400)]">
+                    Источник
+                  </label>
+                  <select
+                    value={f.source_account_id ?? ""}
+                    onChange={(e) => {
+                      void patchFundSource(f.id, e.target.value || null)
+                        .then(onSaved)
+                        .catch((err) =>
+                          onError(err instanceof Error ? err.message : "Не удалось обновить источник")
+                        );
+                    }}
+                    className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[13.5px] text-[var(--v2-ink-800)]"
+                  >
+                    <option value="">не указан</option>
+                    {sourceOptions.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </Card>
+            ))}
           </div>
         )}
       </Sect>

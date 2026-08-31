@@ -178,7 +178,7 @@ export function HomeDynamicsChart() {
 
     const last = vals[vals.length - 1] ?? 0;
     const prev = vals[vals.length - 2] ?? last;
-    const pool = cushionPool(dashboard.accounts);
+    const pool = cushionPool(dashboard.funds?.length ? dashboard.funds : dashboard.accounts);
     const allocated = allocateGoals(dashboard.goals, pool);
     const cushionGoal =
       allocated.find((g) => g.goal_key === "cushion_goal") ??
