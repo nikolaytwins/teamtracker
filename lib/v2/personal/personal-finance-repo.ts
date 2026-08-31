@@ -2176,6 +2176,14 @@ const DEFAULT_FINANCE_FUNDS: Array<{
     accent: "#EF4444",
     sort_order: 7,
   },
+  {
+    fund_key: "rent_deposit",
+    name: "Фонд залог за квартиру",
+    monthly_hint: null,
+    icon_key: "key",
+    accent: "#78716C",
+    sort_order: 8,
+  },
 ];
 
 function mapFinanceFundRow(r: Record<string, unknown>): PersonalFinanceFundRow {
