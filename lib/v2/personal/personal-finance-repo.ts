@@ -2139,15 +2139,15 @@ const DEFAULT_FINANCE_FUNDS: Array<{
   {
     fund_key: "clothing",
     name: "Фонд одежды",
-    monthly_hint: null,
+    monthly_hint: "5 000 ₽ каждый месяц",
     icon_key: "target",
     accent: "#9A8CFF",
     sort_order: 3,
   },
   {
     fund_key: "gifts",
-    name: "Фонд подарков",
-    monthly_hint: null,
+    name: "Подарки и праздники",
+    monthly_hint: "10 000 ₽ каждый месяц",
     icon_key: "target",
     accent: "#FF335F",
     sort_order: 4,

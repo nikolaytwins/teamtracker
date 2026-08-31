@@ -19,4 +19,9 @@ if [[ -d "$ROOT/content/strategy/articles" ]]; then
   rm -rf "$ST/content/strategy/articles"
   cp -a "$ROOT/content/strategy/articles" "$ST/content/strategy/articles"
 fi
-echo "OK: synced .next/static, public и content/strategy → .next/standalone"
+if [[ -d "$ROOT/content/personal" ]]; then
+  mkdir -p "$ST/content"
+  rm -rf "$ST/content/personal"
+  cp -a "$ROOT/content/personal" "$ST/content/personal"
+fi
+echo "OK: synced .next/static, public, content/strategy и content/personal → .next/standalone"

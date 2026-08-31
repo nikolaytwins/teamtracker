@@ -83,8 +83,9 @@
 | 062 | `062_personal_finance_card_sort_order.sql` | Уникальный sort_order счетов и капитала |
 | 063 | `063_personal_accounts_clothing_gifts_funds.sql` | Счета: Фонд одежды, Фонд подарков |
 | 064 | `064_v2_personal_finance_funds.sql` | Фонды: отдельная сущность с источником на счёте |
+| 065 | `065_personal_finance_fund_hints.sql` | Фонды: подсказки одежды/подарков и переименование |
 
-**Следующий свободный номер:** `065`
+**Следующий свободный номер:** `066`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

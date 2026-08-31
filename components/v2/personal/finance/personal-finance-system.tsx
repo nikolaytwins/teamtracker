@@ -873,12 +873,20 @@ export function PfAccountsAsFunds({
         title="Фонды"
         hint="не входят в сумму капитала · деньги лежат на счетах"
         right={
-          <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">
-            В фондах{" "}
-            <span className="font-semibold text-[var(--v2-ink-800)]">
-              <PersonalAmt v={fundsTotalRub} short />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link
+              href={appPath("/v2/personal/finance/rules")}
+              className="v2-tight text-[12px] text-[var(--v2-ink-400)] transition hover:text-[var(--v2-ink-600)]"
+            >
+              правила распределения
+            </Link>
+            <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">
+              В фондах{" "}
+              <span className="font-semibold text-[var(--v2-ink-800)]">
+                <PersonalAmt v={fundsTotalRub} short />
+              </span>
             </span>
-          </span>
+          </div>
         }
       >
         {sortedFunds.length === 0 ? (
