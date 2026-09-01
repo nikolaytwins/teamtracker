@@ -5,12 +5,14 @@ import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { sortFinanceCards } from "@/lib/v2/personal/finance-card-order";
 import { formatPersonalRubShort } from "@/lib/v2/personal/formatters";
 import type {
+  PersonalAccountCurrency,
   PersonalAccountRow,
   PersonalCapitalRow,
   PersonalFinanceFundRow,
   PersonalFinanceGoalRow,
   PersonalFinanceSystemRow,
 } from "@/lib/v2/personal/types";
+import { FX_CURRENCY_META } from "@/lib/v2/personal/fx-rates";
 import { V2Icons } from "@/components/v2/ui/icons";
 import { appPath } from "@/lib/api-url";
 import Link from "next/link";
@@ -737,6 +739,53 @@ const ACCOUNT_ICON: Record<string, keyof typeof V2Icons> = {
   other: "folder",
 };
 
+const ACCOUNT_CURRENCY_GROUPS: { code: PersonalAccountCurrency | "OTHER"; label: string }[] = [
+  { code: "RUB", label: "Рубли" },
+  { code: "USD", label: "Доллары" },
+  { code: "AED", label: "Дирхамы" },
+  { code: "GEL", label: "Лари" },
+];
+
+const FUND_SOURCE_CURRENCY: Partial<Record<string, PersonalAccountCurrency>> = {
+  life: "USD",
+  apartment: "USD",
+  lera: "USD",
+  salary: "RUB",
+  clothing: "RUB",
+  gifts: "RUB",
+  ai: "RUB",
+};
+
+function accountCurrencyLabel(code: PersonalAccountCurrency): string {
+  if (code === "RUB") return "₽";
+  return FX_CURRENCY_META[code as keyof typeof FX_CURRENCY_META]?.short ?? code;
+}
+
+function sourceOptionsForFund(fund: PersonalFinanceFundRow, accounts: PersonalAccountRow[]) {
+  const pref = FUND_SOURCE_CURRENCY[fund.fund_key ?? ""];
+  return [...accounts].sort((a, b) => {
+    if (!pref) return a.sort_order - b.sort_order;
+    if (a.currency_code === pref && b.currency_code !== pref) return -1;
+    if (b.currency_code === pref && a.currency_code !== pref) return 1;
+    return a.sort_order - b.sort_order;
+  });
+}
+
+function groupAccountsByCurrency(accounts: PersonalAccountRow[]) {
+  const groups: { label: string; items: PersonalAccountRow[] }[] = [];
+  const used = new Set<string>();
+  for (const g of ACCOUNT_CURRENCY_GROUPS) {
+    const items = accounts.filter((a) => a.currency_code === g.code);
+    if (items.length) {
+      groups.push({ label: g.label, items });
+      items.forEach((a) => used.add(a.id));
+    }
+  }
+  const other = accounts.filter((a) => !used.has(a.id));
+  if (other.length) groups.push({ label: "Другое", items: other });
+  return groups;
+}
+
 function AccIcon({ iconKey, className }: { iconKey: string; className?: string }) {
   const Icon = V2Icons[ACCOUNT_ICON[iconKey] ?? "folder"];
   return <Icon className={className} />;
@@ -799,10 +848,7 @@ export function PfAccountsAsFunds({
   const sortedAccounts = useMemo(() => sortFinanceCards(accounts), [accounts]);
   const sortedFunds = useMemo(() => sortFinanceCards(funds), [funds]);
   const sortedCapital = useMemo(() => sortFinanceCards(capital), [capital]);
-  const sourceOptions = useMemo(
-    () => sortedAccounts.filter((a) => a.currency_code === "RUB"),
-    [sortedAccounts]
-  );
+  const accountGroups = useMemo(() => groupAccountsByCurrency(sortedAccounts), [sortedAccounts]);
 
   return (
     <div className="space-y-7">
@@ -830,8 +876,16 @@ export function PfAccountsAsFunds({
         {sortedAccounts.length === 0 ? (
           <Card className="p-8 text-center text-sm text-[var(--v2-ink-500)]">Счетов пока нет</Card>
         ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {sortedAccounts.map((a) => (
+          <div className="space-y-5">
+            {accountGroups.map((group) => (
+              <div key={group.label}>
+                {accountGroups.length > 1 ? (
+                  <p className="v2-tight mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--v2-ink-400)]">
+                    {group.label}
+                  </p>
+                ) : null}
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {group.items.map((a) => (
                 <Card key={a.id} className="px-6 py-6">
                   <div className="flex items-center gap-2.5">
                     <span
@@ -863,7 +917,10 @@ export function PfAccountsAsFunds({
                     ) : null}
                   </div>
                 </Card>
-              ))}
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </Sect>
@@ -934,9 +991,9 @@ export function PfAccountsAsFunds({
                     className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[13.5px] text-[var(--v2-ink-800)]"
                   >
                     <option value="">не указан</option>
-                    {sourceOptions.map((a) => (
+                    {sourceOptionsForFund(f, sortedAccounts).map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name}
+                        {a.name} · {accountCurrencyLabel(a.currency_code)}
                       </option>
                     ))}
                   </select>

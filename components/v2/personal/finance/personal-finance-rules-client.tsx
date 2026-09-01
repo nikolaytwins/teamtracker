@@ -27,7 +27,7 @@ export function PersonalFinanceRulesClient({ title, body }: { title: string; bod
             {title}
           </h1>
           <p className="v2-tight mt-2 text-[13.5px] text-[var(--v2-ink-500)]">
-            Как распределять выручку и пополнять фонды
+            Распределение в конце месяца: ₽, USD, AED и GEL
           </p>
 
           <div className="mt-8">

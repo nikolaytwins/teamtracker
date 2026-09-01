@@ -84,6 +84,12 @@ export function buildSeasonMonths(
       id: task.id,
       text: edit?.text ?? task.text,
       href: edit ? edit.href?.trim() || undefined : task.href,
+      priority: task.priority,
+      note: task.note,
+      items: task.items,
+      sections: task.sections,
+      exclude: task.exclude,
+      doneWhen: task.doneWhen,
       done: Boolean(storage.taskDone[taskId]),
     });
     byMonth.set(monthId, list);

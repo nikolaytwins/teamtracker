@@ -1,5 +1,7 @@
 "use client";
 
+/** Прежний плоский дизайн карточек сезона. Откат: в v2-personal-home-client импортировать HomeSeasonBandLegacy. */
+
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/api-url";
@@ -18,25 +20,12 @@ import {
   HOME_MONTHS,
   resolveCurrentSeasonMonthId,
   type HomeMonth,
-  type HomeSeasonPriority,
   type HomeSeasonTask,
 } from "@/lib/v2/personal/seeds/home-seed";
 import { HomeTaskCheckbox } from "@/components/v2/home/personal/home-task-checkbox";
 import { V2Icons } from "@/components/v2/ui/icons";
 
 const HERO_BLUE = "#2d5eef";
-
-const PRIORITY_GROUPS: {
-  id: HomeSeasonPriority;
-  label: string;
-  emoji: string;
-  tint: string;
-  bg: string;
-}[] = [
-  { id: "high", label: "Высокий приоритет", emoji: "🔴", tint: "#B91C1C", bg: "#FEF2F2" },
-  { id: "medium", label: "Средний приоритет", emoji: "🟡", tint: "#A16207", bg: "#FFFBEB" },
-  { id: "low", label: "Необязательно, но желательно", emoji: "⚪", tint: "#52525B", bg: "#F4F4F5" },
-];
 
 function ExternalLinkIcon({ className }: { className?: string }) {
   return (
@@ -52,241 +41,39 @@ function ExternalLinkIcon({ className }: { className?: string }) {
   );
 }
 
-type TaskView = HomeSeasonTask & { done: boolean };
-
-type MonthView = Omit<HomeMonth, "tasks"> & { tasks: TaskView[] };
-
-function priorityRank(p?: HomeSeasonPriority): number {
-  if (p === "high") return 0;
-  if (p === "medium") return 1;
-  if (p === "low") return 2;
-  return 3;
-}
-
-function groupTasksByPriority(tasks: TaskView[]) {
-  const sorted = [...tasks].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
-  const groups: { key: string; label: string; emoji?: string; tint?: string; bg?: string; tasks: TaskView[] }[] = [];
-  for (const g of PRIORITY_GROUPS) {
-    const items = sorted.filter((t) => t.priority === g.id);
-    if (items.length) groups.push({ key: g.id, label: g.label, emoji: g.emoji, tint: g.tint, bg: g.bg, tasks: items });
-  }
-  const other = sorted.filter((t) => !t.priority);
-  if (other.length) groups.push({ key: "other", label: "Прочее", tasks: other });
-  return groups;
-}
-
-function TaskBullets({ items, tone }: { items: string[]; tone: "default" | "on-blue" }) {
+function TaskLabel({ task, done }: { task: HomeSeasonTask; done: boolean }) {
   return (
-    <ul
-      className={`v2-tight space-y-1.5 pl-4 text-[13.5px] leading-snug ${
-        tone === "on-blue" ? "text-white/85 marker:text-white/50" : "text-[var(--v2-ink-600)] marker:text-[var(--v2-ink-300)]"
-      } list-disc`}
-    >
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
+    <span className="flex min-w-0 flex-1 flex-col gap-2.5">
+      <span
+        className={`v2-tight text-[17.5px] font-semibold leading-snug tracking-[-0.018em] ${
+          done ? "text-white" : "text-[var(--v2-ink-800)]"
+        }`}
+      >
+        {task.text}
+      </span>
+      {task.href ? (
+        <a
+          href={task.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Открыть в Google Docs"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          className={`inline-flex w-fit items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[13px] font-semibold shadow-sm transition ${
+            done
+              ? "border border-white/35 bg-white/15 text-white hover:bg-white/25"
+              : "border border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)] hover:border-[var(--v2-brand-400)] hover:bg-[var(--v2-brand-100)]"
+          }`}
+        >
+          <ExternalLinkIcon className="h-3.5 w-3.5 shrink-0" />
+          Открыть документ
+        </a>
+      ) : null}
+    </span>
   );
 }
 
-function SeasonTaskCard({
-  task,
-  expanded,
-  onToggleExpand,
-  onToggleDone,
-  onEdit,
-  onDelete,
-  onDragStart,
-  onDragEnd,
-  dragDisabled,
-}: {
-  task: TaskView;
-  expanded: boolean;
-  onToggleExpand: () => void;
-  onToggleDone: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  dragDisabled: boolean;
-}) {
-  const hasDetails =
-    Boolean(task.note) ||
-    Boolean(task.items?.length) ||
-    Boolean(task.sections?.length) ||
-    Boolean(task.exclude?.length) ||
-    Boolean(task.doneWhen);
-  const priorityMeta = PRIORITY_GROUPS.find((g) => g.id === task.priority);
-
-  return (
-    <div className="group relative">
-      <div
-        className={`overflow-hidden rounded-2xl transition ${
-          task.done
-            ? "text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
-            : "bg-[var(--v2-ink-50)] ring-1 ring-[var(--v2-ink-100)] hover:bg-white hover:shadow-[var(--v2-shadow-card)]"
-        }`}
-        style={task.done ? { background: HERO_BLUE } : undefined}
-      >
-        <div className="flex items-start gap-3 px-4 py-3.5 pr-16">
-          <button
-            type="button"
-            draggable={!dragDisabled}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            onClick={onToggleDone}
-            className="mt-0.5 shrink-0 cursor-grab active:cursor-grabbing"
-            aria-label={task.done ? "Отметить не сделанным" : "Отметить сделанным"}
-          >
-            <HomeTaskCheckbox done={task.done} tone={task.done ? "on-blue" : "default"} />
-          </button>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {priorityMeta && !task.done ? (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide"
-                  style={{ color: priorityMeta.tint, background: priorityMeta.bg }}
-                >
-                  <span aria-hidden>{priorityMeta.emoji}</span>
-                  {priorityMeta.id === "high" ? "высокий" : priorityMeta.id === "medium" ? "средний" : "желательно"}
-                </span>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={hasDetails ? onToggleExpand : onToggleDone}
-              className={`v2-tight mt-1 w-full text-left text-[16px] font-semibold leading-snug tracking-[-0.018em] ${
-                task.done ? "text-white" : "text-[var(--v2-ink-900)]"
-              }`}
-            >
-              {task.text}
-            </button>
-          </div>
-          {hasDetails ? (
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              aria-expanded={expanded}
-              aria-label={expanded ? "Свернуть" : "Подробнее"}
-              className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
-                task.done
-                  ? "text-white/70 hover:bg-white/15 hover:text-white"
-                  : "text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)]"
-              }`}
-            >
-              <V2Icons.chev
-                className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
-              />
-            </button>
-          ) : null}
-        </div>
-
-        {expanded && hasDetails ? (
-          <div
-            className={`space-y-3 border-t px-4 py-3.5 ${
-              task.done ? "border-white/15" : "border-[var(--v2-ink-100)] bg-white/60"
-            }`}
-          >
-            {task.note ? (
-              <p
-                className={`v2-tight text-[13px] leading-relaxed ${
-                  task.done ? "text-white/80" : "text-[var(--v2-ink-500)]"
-                }`}
-              >
-                {task.note}
-              </p>
-            ) : null}
-            {task.items?.length ? <TaskBullets items={task.items} tone={task.done ? "on-blue" : "default"} /> : null}
-            {task.sections?.map((section) => (
-              <div key={section.title ?? section.items[0]}>
-                {section.title ? (
-                  <p
-                    className={`v2-tight mb-1.5 text-[11px] font-semibold uppercase tracking-wide ${
-                      task.done ? "text-white/60" : "text-[var(--v2-ink-400)]"
-                    }`}
-                  >
-                    {section.title}
-                  </p>
-                ) : null}
-                <TaskBullets items={section.items} tone={task.done ? "on-blue" : "default"} />
-              </div>
-            ))}
-            {task.exclude?.length ? (
-              <div
-                className={`rounded-xl px-3 py-2.5 ${
-                  task.done ? "bg-white/10" : "bg-[var(--v2-ink-50)] ring-1 ring-[var(--v2-ink-100)]"
-                }`}
-              >
-                <p
-                  className={`v2-tight mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide ${
-                    task.done ? "text-white/55" : "text-[var(--v2-ink-400)]"
-                  }`}
-                >
-                  Не входит
-                </p>
-                <TaskBullets items={task.exclude} tone={task.done ? "on-blue" : "default"} />
-              </div>
-            ) : null}
-            {task.doneWhen ? (
-              <p
-                className={`v2-tight rounded-xl px-3 py-2.5 text-[13px] leading-snug ${
-                  task.done
-                    ? "bg-white/10 text-white/90"
-                    : "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-100"
-                }`}
-              >
-                <span className="font-semibold">Готово, когда: </span>
-                {task.doneWhen}
-              </p>
-            ) : null}
-            {task.href ? (
-              <a
-                href={task.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className={`inline-flex w-fit items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[12.5px] font-semibold transition ${
-                  task.done
-                    ? "border border-white/35 bg-white/15 text-white hover:bg-white/25"
-                    : "border border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)] hover:border-[var(--v2-brand-400)]"
-                }`}
-              >
-                <ExternalLinkIcon className="h-3.5 w-3.5 shrink-0" />
-                Открыть документ
-              </a>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        title="Редактировать"
-        aria-label="Редактировать карточку"
-        onClick={onEdit}
-        className={`absolute right-10 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
-          task.done
-            ? "text-white/70 hover:bg-white/15 hover:text-white"
-            : "text-[var(--v2-ink-400)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)]"
-        }`}
-      >
-        <V2Icons.edit className="h-3.5 w-3.5" />
-      </button>
-      <button
-        type="button"
-        title="Удалить"
-        aria-label="Удалить задачу"
-        onClick={onDelete}
-        className={`absolute right-2 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
-          task.done
-            ? "text-white/70 hover:bg-white/15 hover:text-white"
-            : "text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
-        }`}
-      >
-        <V2Icons.trash className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-}
+type MonthView = Omit<HomeMonth, "tasks"> & { tasks: Array<HomeSeasonTask & { done: boolean }> };
 
 function SeasonCardForm({
   draftText,
@@ -355,7 +142,7 @@ function SeasonCardForm({
   );
 }
 
-export function HomeSeasonBand() {
+export function HomeSeasonBandLegacy() {
   const currentId = useMemo(() => resolveCurrentSeasonMonthId(new Date()), []);
   const [storage, setStorage] = useState<SeasonStorageState>(() => readSeasonStorage());
   const [activeId, setActiveId] = useState(currentId);
@@ -404,7 +191,7 @@ export function HomeSeasonBand() {
           Расписание сезона
         </h2>
         <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">
-          Клик — сделано. Стрелка — детали. Перетащите карточку на другой месяц.
+          Четыре периода до Review 30 ноября. Клик — отметить сделанное. Перетащите задачу на другой месяц.
         </span>
         <Link
           href={appPath(HOME_LINKS.strategy)}
@@ -519,15 +306,8 @@ function MonthPanel({
   const done = month.tasks.filter((t) => t.done).length;
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
   const [draftHref, setDraftHref] = useState("");
-
-  const usePriorityGroups = month.id === "sep" && month.tasks.some((t) => t.priority);
-  const taskGroups = useMemo(
-    () => (usePriorityGroups ? groupTasksByPriority(month.tasks) : [{ key: "all", label: "", tasks: month.tasks }]),
-    [month.tasks, usePriorityGroups]
-  );
 
   function resetDraft() {
     setAdding(false);
@@ -538,7 +318,6 @@ function MonthPanel({
 
   useEffect(() => {
     resetDraft();
-    setExpandedId(null);
   }, [month.id]);
 
   function startAdd() {
@@ -569,8 +348,6 @@ function MonthPanel({
     onEdit(editingId, { text, href: draftHref.trim() || undefined });
     resetDraft();
   }
-
-  const dragDisabled = Boolean(adding || editingId);
 
   return (
     <div
@@ -612,54 +389,67 @@ function MonthPanel({
         </p>
       ) : null}
 
-      <div className="space-y-6">
-        {taskGroups.map((group) => (
-          <div key={group.key}>
-            {group.label ? (
-              <div className="mb-3 flex items-center gap-2 px-0.5">
-                {group.emoji ? <span className="text-[14px]">{group.emoji}</span> : null}
-                <h4
-                  className="v2-tight text-[13px] font-semibold uppercase tracking-[0.08em]"
-                  style={group.tint ? { color: group.tint } : { color: "var(--v2-ink-500)" }}
-                >
-                  {group.label}
-                </h4>
-                <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{group.tasks.length}</span>
-              </div>
-            ) : null}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {group.tasks.map((task) =>
-                editingId === task.id ? (
-                  <SeasonCardForm
-                    key={task.id}
-                    draftText={draftText}
-                    draftHref={draftHref}
-                    onTextChange={setDraftText}
-                    onHrefChange={setDraftHref}
-                    onSubmit={submitEdit}
-                    onCancel={resetDraft}
-                    submitLabel="Сохранить изменения"
-                    autoFocus
-                  />
-                ) : (
-                  <SeasonTaskCard
-                    key={task.id}
-                    task={task}
-                    expanded={expandedId === task.id}
-                    onToggleExpand={() => setExpandedId((id) => (id === task.id ? null : task.id))}
-                    onToggleDone={() => onToggle(task.id, !task.done)}
-                    onEdit={() => startEdit(task)}
-                    onDelete={() => onDelete(task.id)}
-                    onDragStart={() => onDragStart(task.id)}
-                    onDragEnd={onDragEnd}
-                    dragDisabled={dragDisabled}
-                  />
-                )
-              )}
+      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
+        {month.tasks.map((task) =>
+          editingId === task.id ? (
+            <SeasonCardForm
+              key={task.id}
+              draftText={draftText}
+              draftHref={draftHref}
+              onTextChange={setDraftText}
+              onHrefChange={setDraftHref}
+              onSubmit={submitEdit}
+              onCancel={resetDraft}
+              submitLabel="Сохранить изменения"
+              autoFocus
+            />
+          ) : (
+            <div key={task.id} className="group relative">
+              <button
+                type="button"
+                draggable={!adding && !editingId}
+                onDragStart={() => onDragStart(task.id)}
+                onDragEnd={onDragEnd}
+                onClick={() => onToggle(task.id, !task.done)}
+                className={`flex min-h-[92px] w-full cursor-grab items-start gap-4 rounded-2xl px-[22px] py-5 pr-[4.5rem] text-left transition active:cursor-grabbing ${
+                  task.done
+                    ? "text-white shadow-[0_10px_26px_-14px_rgba(45,94,239,0.7)]"
+                    : "bg-[var(--v2-ink-50)] hover:bg-[var(--v2-ink-100)]"
+                }`}
+                style={task.done ? { background: HERO_BLUE } : undefined}
+              >
+                <HomeTaskCheckbox done={task.done} tone={task.done ? "on-blue" : "default"} />
+                <TaskLabel task={task} done={task.done} />
+              </button>
+              <button
+                type="button"
+                title="Редактировать"
+                aria-label="Редактировать карточку"
+                onClick={() => startEdit(task)}
+                className={`absolute right-10 top-2 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
+                  task.done
+                    ? "text-white/70 hover:bg-white/15 hover:text-white"
+                    : "text-[var(--v2-ink-400)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)]"
+                }`}
+              >
+                <V2Icons.edit className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Удалить"
+                aria-label="Удалить задачу"
+                onClick={() => onDelete(task.id)}
+                className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
+                  task.done
+                    ? "text-white/70 hover:bg-white/15 hover:text-white"
+                    : "text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
+                }`}
+              >
+                <V2Icons.trash className="h-3.5 w-3.5" />
+              </button>
             </div>
-          </div>
-        ))}
-
+          )
+        )}
         {adding ? (
           <SeasonCardForm
             draftText={draftText}
@@ -674,7 +464,7 @@ function MonthPanel({
           <button
             type="button"
             onClick={startAdd}
-            className="flex min-h-[72px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-[22px] py-4 text-[var(--v2-ink-500)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)] md:max-w-sm"
+            className="flex min-h-[92px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-[22px] py-5 text-[var(--v2-ink-500)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)]"
           >
             <V2Icons.plus className="h-5 w-5" />
             <span className="v2-tight text-[14.5px] font-semibold">Добавить карточку</span>

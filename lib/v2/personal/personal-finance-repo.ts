@@ -475,7 +475,12 @@ export async function loadPersonalFinanceDashboard(
     loadFxRateLookup(),
     ensureTaxProfile(userId),
     ensureBudgetMonth(userId, year, month),
-    Promise.all([ensureFinanceSystem(userId), ensureFinanceGoals(userId), ensureFinanceFunds(userId)]).catch(
+    Promise.all([
+      ensureFinanceSystem(userId),
+      ensureFinanceGoals(userId),
+      ensureFinanceFunds(userId),
+      ensureCapitalItems(userId),
+    ]).catch(
       (e) => {
       console.warn("personal finance system tables unavailable — apply migration 052/064", e);
       return [
@@ -487,11 +492,11 @@ export async function loadPersonalFinanceDashboard(
         } satisfies PersonalFinanceSystemRow,
         [] as PersonalFinanceGoalRow[],
         [] as PersonalFinanceFundRow[],
+        [] as PersonalCapitalRow[],
       ] as const;
     }),
     Promise.all([
       sb.from("v2_personal_accounts").select("*").eq("user_id", userId).order("sort_order", FINANCE_CARD_ORDER).order("created_at", FINANCE_CARD_ORDER).order("id", FINANCE_CARD_ORDER),
-      sb.from("v2_personal_capital_items").select("*").eq("user_id", userId).order("sort_order", FINANCE_CARD_ORDER).order("created_at", FINANCE_CARD_ORDER).order("id", FINANCE_CARD_ORDER),
       sb
         .from("v2_personal_incomes")
         .select("*")
@@ -534,10 +539,9 @@ export async function loadPersonalFinanceDashboard(
     updated_at: nowIso(),
   }));
 
-  const [system, goals, fundsFromEnsure] = systemGoals;
+  const [system, goals, fundsFromEnsure, capitalFromEnsure] = systemGoals;
   const [
     accountsRes,
-    capitalRes,
     incomesRes,
     advancesRes,
     categoriesRes,
@@ -547,7 +551,6 @@ export async function loadPersonalFinanceDashboard(
   ] = batch;
 
   if (accountsRes.error) throw accountsRes.error;
-  if (capitalRes.error) throw capitalRes.error;
   if (incomesRes.error) throw incomesRes.error;
   if (advancesRes.error) throw advancesRes.error;
   if (categoriesRes.error) throw categoriesRes.error;
@@ -559,7 +562,7 @@ export async function loadPersonalFinanceDashboard(
   );
   const accountNames = new Map(allAccounts.map((a) => [a.id, a.name]));
   const accounts = filterOperatingAccounts(allAccounts);
-  const capital = sortFinanceCards((capitalRes.data ?? []).map((r) => mapCapital(r as Record<string, unknown>)));
+  const capital = sortFinanceCards(capitalFromEnsure);
   const funds = sortFinanceCards(
     fundsFromEnsure.map((f) => ({
       ...f,
@@ -2115,7 +2118,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
   {
     fund_key: "life",
     name: "Траты на жизнь",
-    monthly_hint: "150 000 ₽ каждый месяц",
+    monthly_hint: "100 000 ₽ каждый месяц · счёт в USD",
     icon_key: "wallet",
     accent: "#10B981",
     sort_order: 0,
@@ -2123,7 +2126,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
   {
     fund_key: "salary",
     name: "Фонд зарплат",
-    monthly_hint: "50 000 ₽ каждый месяц",
+    monthly_hint: "зарплаты следующего месяца · счёт в ₽",
     icon_key: "bank",
     accent: "#3B6FF7",
     sort_order: 1,
@@ -2131,7 +2134,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
   {
     fund_key: "cushion",
     name: "Подушка безопасности",
-    monthly_hint: null,
+    monthly_hint: "остаток · делить между ₽ и USD",
     icon_key: "shield",
     accent: "#6366F1",
     sort_order: 2,
@@ -2139,7 +2142,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
   {
     fund_key: "clothing",
     name: "Фонд одежды",
-    monthly_hint: "5 000 ₽ каждый месяц",
+    monthly_hint: "5 000 ₽ каждый месяц · счёт в ₽",
     icon_key: "target",
     accent: "#9A8CFF",
     sort_order: 3,
@@ -2147,18 +2150,26 @@ const DEFAULT_FINANCE_FUNDS: Array<{
   {
     fund_key: "gifts",
     name: "Подарки и праздники",
-    monthly_hint: "10 000 ₽ каждый месяц",
+    monthly_hint: "10 000 ₽ каждый месяц · счёт в ₽",
     icon_key: "target",
     accent: "#FF335F",
     sort_order: 4,
   },
   {
+    fund_key: "apartment",
+    name: "Квартира",
+    monthly_hint: "аренда · счёт в USD",
+    icon_key: "key",
+    accent: "#0EA5E9",
+    sort_order: 5,
+  },
+  {
     fund_key: "lera",
     name: "Фонд сюрпризов Лере",
-    monthly_hint: null,
+    monthly_hint: "5 000 ₽ каждый месяц · счёт в USD",
     icon_key: "coin",
     accent: "#F472B6",
-    sort_order: 5,
+    sort_order: 6,
   },
   {
     fund_key: "moscow",
@@ -2166,7 +2177,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
     monthly_hint: null,
     icon_key: "flag",
     accent: "#0EA5E9",
-    sort_order: 6,
+    sort_order: 7,
   },
   {
     fund_key: "china",
@@ -2174,15 +2185,31 @@ const DEFAULT_FINANCE_FUNDS: Array<{
     monthly_hint: null,
     icon_key: "coin",
     accent: "#EF4444",
-    sort_order: 7,
+    sort_order: 8,
   },
   {
-    fund_key: "rent_deposit",
-    name: "Фонд залог за квартиру",
-    monthly_hint: null,
+    fund_key: "ai",
+    name: "ИИ",
+    monthly_hint: "20 000 ₽ каждый месяц · остаток можно на жизнь",
+    icon_key: "coin",
+    accent: "#9A8CFF",
+    sort_order: 9,
+  },
+];
+
+const DEFAULT_CAPITAL_ITEMS: Array<{
+  name: string;
+  icon_key: string;
+  meta: string;
+  tint: string;
+  sort_order: number;
+}> = [
+  {
+    name: "Залог за квартиру",
     icon_key: "key",
-    accent: "#78716C",
-    sort_order: 8,
+    meta: "у арендодателя, неликвиден",
+    tint: "#78716C",
+    sort_order: 0,
   },
 ];
 
@@ -2242,6 +2269,50 @@ export async function ensureFinanceFunds(userId: string): Promise<PersonalFinanc
     .order("id", FINANCE_CARD_ORDER);
   if (againErr) throw againErr;
   return (again ?? []).map((r) => mapFinanceFundRow(r as Record<string, unknown>));
+}
+
+export async function ensureCapitalItems(userId: string): Promise<PersonalCapitalRow[]> {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_capital_items")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order", FINANCE_CARD_ORDER)
+    .order("created_at", FINANCE_CARD_ORDER)
+    .order("id", FINANCE_CARD_ORDER);
+  if (error) throw error;
+
+  const existingNames = new Set((data ?? []).map((r) => String(r.name)));
+  const missing = DEFAULT_CAPITAL_ITEMS.filter((c) => !existingNames.has(c.name));
+  if (missing.length) {
+    const ts = nowIso();
+    const maxSort = (data ?? []).reduce((m, r) => Math.max(m, Number(r.sort_order) || 0), -1);
+    const inserts = missing.map((c, i) => ({
+      id: newV2Id(),
+      user_id: userId,
+      name: c.name,
+      icon_key: c.icon_key,
+      amount_rub: 0,
+      meta: c.meta,
+      unit_label: null,
+      tint: c.tint,
+      sort_order: c.sort_order >= 0 ? c.sort_order : maxSort + 1 + i,
+      created_at: ts,
+      updated_at: ts,
+    }));
+    const { error: insErr } = await sb.from("v2_personal_capital_items").insert(inserts);
+    if (insErr && !String(insErr.message).includes("duplicate")) throw insErr;
+  }
+
+  const { data: again, error: againErr } = await sb
+    .from("v2_personal_capital_items")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order", FINANCE_CARD_ORDER)
+    .order("created_at", FINANCE_CARD_ORDER)
+    .order("id", FINANCE_CARD_ORDER);
+  if (againErr) throw againErr;
+  return (again ?? []).map((r) => mapCapital(r as Record<string, unknown>));
 }
 
 export async function updatePersonalFinanceFund(

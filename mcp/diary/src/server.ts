@@ -2,6 +2,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { formatEntry, getEntry, listEntries } from "./client.js";
 
+function monthPeriod(month: string): { from: string; to: string } | null {
+  const m = month.trim().match(/^(\d{4})-(\d{2})$/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  if (!y || mo < 1 || mo > 12) return null;
+  const lastDay = new Date(y, mo, 0).getDate();
+  return {
+    from: `${m[1]}-${m[2]}-01`,
+    to: `${m[1]}-${m[2]}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
 export function createDiaryMcpServer() {
   const server = new McpServer({
     name: "team-tracker-diary",
@@ -10,7 +23,7 @@ export function createDiaryMcpServer() {
 
   server.tool(
     "search_entries",
-    "Поиск записей личного дневника Team Tracker по тексту, тегу или типу.",
+    "Поиск записей личного дневника Team Tracker по тексту, тегу или типу (не включает выводы — см. search_conclusions).",
     {
       q: z.string().optional().describe("Поиск по заголовку, тексту и тегам"),
       tag: z.string().optional().describe("Тег без #"),
@@ -64,8 +77,57 @@ export function createDiaryMcpServer() {
   );
 
   server.tool(
+    "search_conclusions",
+    "Месячные выводы дневника (type=conclusion): заголовок и markdown-текст.",
+    {
+      q: z.string().optional().describe("Поиск по заголовку и тексту"),
+      month: z.string().optional().describe("Месяц YYYY-MM, например 2026-08"),
+      from: z.string().optional().describe("Начало периода YYYY-MM-DD"),
+      to: z.string().optional().describe("Конец периода YYYY-MM-DD"),
+      limit: z.number().int().min(1).max(50).optional(),
+    },
+    async ({ q, month, from, to, limit }) => {
+      const period = month ? monthPeriod(month) : null;
+      const data = await listEntries({
+        q,
+        type: "conclusion",
+        from: period?.from ?? from,
+        to: period?.to ?? to,
+        limit: limit ?? 20,
+      });
+      const text =
+        data.observations.length === 0
+          ? "Выводов не найдено."
+          : `Найдено ${data.total} выводов, показано ${data.observations.length}:\n\n${data.observations
+              .map((o) => formatEntry(o, { full: true }))
+              .join("\n\n---\n\n")}`;
+      return { content: [{ type: "text", text }] };
+    }
+  );
+
+  server.tool(
+    "get_conclusion",
+    "Полный markdown одного месячного вывода по id.",
+    { id: z.string() },
+    async ({ id }) => {
+      const o = await getEntry(id);
+      if (o.type !== "conclusion") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Запись ${id} — не вывод (type=${o.type}). Используй get_entry.`,
+            },
+          ],
+        };
+      }
+      return { content: [{ type: "text", text: formatEntry(o, { full: true }) }] };
+    }
+  );
+
+  server.tool(
     "get_observations",
-    "Сводка дневника: записи, популярные теги и счётчики типов. Те же фильтры, что у поиска.",
+    "Сводка дневника: записи, популярные теги и счётчики типов. Для выводов месяца — search_conclusions.",
     {
       q: z.string().optional(),
       tag: z.string().optional(),

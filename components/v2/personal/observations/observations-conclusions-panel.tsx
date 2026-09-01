@@ -24,7 +24,7 @@ function conclusionBody(it: PersonalObservation): string {
 
 function ConclusionMarkdown({ text }: { text: string }) {
   return (
-    <div className="obs-conclusion-md mt-3 max-w-[68ch]">
+    <div className="obs-conclusion-md mt-3 max-w-[72ch] lg:max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -316,7 +316,7 @@ function ConclusionCard({
       ) : (
         <>
           {item.title.trim() ? (
-            <h3 className="v2-tight mt-3 text-[18px] font-semibold leading-snug text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+            <h3 className="v2-tight mt-3 text-[20px] font-semibold leading-snug tracking-[-0.02em] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
               {item.title.trim()}
             </h3>
           ) : null}

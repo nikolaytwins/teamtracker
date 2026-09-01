@@ -3,6 +3,8 @@
  * Статичный seed — 1:1 перенос макета. БД и API не задействованы.
  */
 
+import { SEP_2026_TASKS } from "./home-seed-sep-tasks";
+
 export type HomeSeason = {
   kicker: string;
   dates: string;
@@ -18,10 +20,23 @@ export type HomeMonthMarker = {
   text: string;
 };
 
+export type HomeSeasonPriority = "high" | "medium" | "low";
+
+export type HomeSeasonTaskSection = {
+  title?: string;
+  items: string[];
+};
+
 export type HomeSeasonTask = {
   id: string;
   text: string;
   href?: string;
+  priority?: HomeSeasonPriority;
+  note?: string;
+  items?: string[];
+  sections?: HomeSeasonTaskSection[];
+  exclude?: string[];
+  doneWhen?: string;
 };
 
 export type HomeMonth = {
@@ -37,11 +52,6 @@ export type HomeMonth = {
   focus?: string[];
   tasks: HomeSeasonTask[];
 };
-
-const DOC_AGENCY_RULES =
-  "https://docs.google.com/document/d/1eGGnwy5yCqVFAMdmrvAcmv9iL85WxLol_zD3St8rBWk/edit?usp=sharing";
-const DOC_LERA_REGLEMENT =
-  "https://docs.google.com/document/d/18kGrtjAbPvvViHcE3pJnH-GkDDHKUH5NuHmALaFGVGw/edit?usp=sharing";
 
 /** Какой период сезона «сейчас» по календарной дате. */
 export function resolveCurrentSeasonMonthId(d = new Date()): string {
@@ -209,36 +219,9 @@ export const HOME_MONTHS: HomeMonth[] = [
     tag: "Земля",
     state: "дальше",
     headline: "Создать опору + выйти в реальность",
-    lead: "Переезд и первый выход на рынок найма. Среда важнее скорости.",
+    lead: "Переезд, validation и выход на рынок. Карточки с приоритетами — раскрой для деталей.",
     warn: "следить за расходами! не раздувать! даже на команду!",
-    tasks: [
-      {
-        id: "sep-webinar-time",
-        text: "Начать считать вебинарные проекты и трату времени на них",
-        href: DOC_AGENCY_RULES,
-      },
-      {
-        id: "sep-urgent-rules",
-        text: "Сформулировать правила срочных проектов",
-        href: DOC_AGENCY_RULES,
-      },
-      {
-        id: "sep-finance-thresholds",
-        text: "Сформулировать финансовые пороги",
-        href: DOC_AGENCY_RULES,
-      },
-      {
-        id: "sep-lera-reglament",
-        text: "Прописать регламент перед разговором с Лерой",
-        href: DOC_LERA_REGLEMENT,
-      },
-      { id: "sep-portfolio", text: "Оформить портфолио агентства" },
-      { id: "sep-model-fix", text: "Разобрать косяки прошлой модели и исправить" },
-      { id: "sep-cv", text: "Сделать 2 CV — одно на поддержку, одно на ИИ-внедрение" },
-      { id: "sep-reactivate", text: "Реактивировать базу" },
-      { id: "sep-housing", text: "Разобраться с жильём" },
-      { id: "sep-youtube-script", text: "Написать сценарий ютуб" },
-    ],
+    tasks: SEP_2026_TASKS,
   },
   {
     id: "oct",

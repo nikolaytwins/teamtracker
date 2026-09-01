@@ -73,10 +73,13 @@ export async function getEntry(id: string): Promise<DiaryObservation> {
 
 export function formatEntry(o: DiaryObservation, { full = false } = {}): string {
   const tags = o.tags.length ? o.tags.map((t) => `#${t}`).join(" ") : "—";
-  const body = full ? o.body : o.body.length > 420 ? `${o.body.slice(0, 420)}…` : o.body;
+  const isConclusion = o.type === "conclusion";
+  const previewLimit = isConclusion ? 900 : 420;
+  const body = full ? o.body : o.body.length > previewLimit ? `${o.body.slice(0, previewLimit)}…` : o.body;
   const why = o.why ? `\nПочему: ${o.why}` : "";
+  const kind = isConclusion ? "вывод" : o.type;
   return [
-    `${o.observed_at.slice(0, 10)} · ${o.type} · ${o.title}`,
+    `${o.observed_at.slice(0, 10)} · ${kind} · ${o.title}`,
     `id: ${o.id}`,
     `теги: ${tags}`,
     body,
