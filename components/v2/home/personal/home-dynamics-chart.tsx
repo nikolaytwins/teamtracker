@@ -7,27 +7,53 @@ import { homeFmt } from "@/lib/v2/personal/seeds/home-seed";
 import type { PersonalIncomeHistoryRow } from "@/lib/v2/personal/types";
 
 type SeriesKey = "profit" | "capital";
-type ChartView = "fit" | "scroll";
+type ChartView = "all" | "fit" | "scroll";
 type CurrencyMode = "rub" | "usd";
 
 const MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 const OVERVIEW_GAP = 56;
 const DETAIL_GAP = 84;
+const MIN_ALL_GAP = 6;
 const CHART_H = 300;
 const Y_AXIS_W = 82;
 const PR = 28;
 const PT = 22;
 const PB = 40;
 
-function pointGapForMode(mode: ChartView): number {
-  return mode === "fit" ? OVERVIEW_GAP : DETAIL_GAP;
+function labelStep(gap: number, total: number): number {
+  if (gap >= 48) return 1;
+  if (gap >= 32) return 2;
+  if (gap >= 22) return 3;
+  if (gap >= 16) return 4;
+  if (gap >= 12) return 6;
+  return Math.max(1, Math.ceil(total / 10));
 }
 
 function shouldShowMonthLabel(i: number, total: number, gap: number): boolean {
   if (i === 0 || i === total - 1) return true;
-  if (gap >= OVERVIEW_GAP) return true;
-  const step = gap >= 64 ? 2 : 3;
+  const step = labelStep(gap, total);
   return i % step === 0;
+}
+
+function resolveChartLayout(
+  mode: ChartView,
+  pointCount: number,
+  viewportW: number
+): { pointGap: number; plotW: number; innerW: number; scrollable: boolean } {
+  if (pointCount < 2) {
+    return { pointGap: OVERVIEW_GAP, plotW: viewportW, innerW: Math.max(1, viewportW - PR), scrollable: false };
+  }
+
+  if (mode === "all") {
+    const innerW = Math.max(MIN_ALL_GAP, viewportW - PR);
+    const pointGap = innerW / (pointCount - 1);
+    return { pointGap, plotW: viewportW, innerW, scrollable: false };
+  }
+
+  const pointGap = mode === "fit" ? OVERVIEW_GAP : DETAIL_GAP;
+  const inner = (pointCount - 1) * pointGap;
+  const plotW = Math.max(viewportW, inner + PR);
+  return { pointGap, plotW, innerW: inner, scrollable: plotW > viewportW + 1 };
 }
 
 function monthRateKey(year: number, month: number): string {
@@ -188,7 +214,7 @@ export function HomeDynamicsChart() {
   const { dashboard } = useHomePersonalFinance();
   const [seriesKey, setSeriesKey] = useState<SeriesKey>("profit");
   const [currency, setCurrency] = useState<CurrencyMode>("rub");
-  const [chartView, setChartView] = useState<ChartView>("fit");
+  const [chartView, setChartView] = useState<ChartView>("all");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [plotViewportW, setPlotViewportW] = useState(900);
@@ -216,22 +242,19 @@ export function HomeDynamicsChart() {
     return buildFullSeries(dashboard.incomeHistory, seriesKey, currency, usdRates);
   }, [dashboard, seriesKey, currency, usdRates]);
 
-  const pointGap = pointGapForMode(chartView);
-
-  const plotW = useMemo(() => {
-    const n = series.values.length;
-    if (n < 2) return plotViewportW;
-    const inner = (n - 1) * pointGap;
-    return Math.max(plotViewportW, inner + PR);
-  }, [series.values.length, plotViewportW, pointGap]);
+  const layout = useMemo(
+    () => resolveChartLayout(chartView, series.values.length, plotViewportW),
+    [chartView, series.values.length, plotViewportW]
+  );
+  const { pointGap, plotW, innerW, scrollable } = layout;
 
   const chart = useMemo(() => {
     const { values, labels } = series;
     if (values.length < 2) return null;
 
-    const innerW = (values.length - 1) * pointGap;
     const max = axisMax(values, currency);
-    const xAt = (i: number) => i * pointGap;
+    const xAt = (i: number) =>
+      chartView === "all" ? (i * innerW) / (values.length - 1) : i * pointGap;
     const yAt = (v: number) => PT + (1 - v / max) * (CHART_H - PT - PB);
 
     const pts = values.map((v, i) => [xAt(i), yAt(v)] as const);
@@ -262,9 +285,10 @@ export function HomeDynamicsChart() {
       labels,
       pointGap,
     };
-  }, [series, plotW, pointGap, currency]);
+  }, [series, plotW, innerW, pointGap, chartView, currency]);
 
   useEffect(() => {
+    if (chartView === "all") return;
     const el = scrollRef.current;
     if (!el || series.values.length < 2) return;
     if (el.scrollWidth <= el.clientWidth + 1) return;
@@ -353,8 +377,13 @@ export function HomeDynamicsChart() {
     series.labels.length > 1
       ? `${series.labels[0]} — ${series.labels[series.labels.length - 1]}`
       : series.labels[0] ?? "";
-  const scrollable = plotW > plotViewportW + 1;
   const activePt = chart.pts[activeIdx];
+  const viewHint =
+    chartView === "all"
+      ? " · весь период на экране"
+      : scrollable
+        ? " · прокрутите влево к началу"
+        : null;
   const rateHint =
     currency === "usd" && activeRate
       ? ` · курс ЦБ ср. ${activeRate.toFixed(2).replace(".", ",")} ₽/$`
@@ -371,7 +400,7 @@ export function HomeDynamicsChart() {
           </span>
           <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-400)]">
             {rangeLabel}
-            {scrollable ? " · прокрутите влево к началу" : null}
+            {viewHint}
             {rateHint}
           </p>
           <div className="v2-tnum mt-2.5 text-[44px] font-semibold leading-none tracking-[-0.04em] text-[var(--v2-ink-900)]">
@@ -409,18 +438,24 @@ export function HomeDynamicsChart() {
             ))}
           </div>
           <div className="inline-flex rounded-[14px] bg-[var(--v2-ink-100)] p-[3px]">
-            {(["fit", "scroll"] as const).map((mode) => (
+            {(
+              [
+                ["all", "Весь"],
+                ["fit", "Обзор"],
+                ["scroll", "Детально"],
+              ] as const
+            ).map(([mode, label]) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setChartView(mode)}
-                className={`rounded-[11px] px-4 py-2 text-[13.5px] font-semibold transition ${
+                className={`rounded-[11px] px-3.5 py-2 text-[13px] font-semibold transition ${
                   chartView === mode
                     ? "bg-white text-[var(--v2-ink-900)] shadow-sm"
                     : "text-[var(--v2-ink-500)]"
                 }`}
               >
-                {mode === "fit" ? "Обзор" : "Детально"}
+                {label}
               </button>
             ))}
           </div>
@@ -479,7 +514,7 @@ export function HomeDynamicsChart() {
 
         <div
           ref={scrollRef}
-          className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]"
+          className={`min-w-0 flex-1 pb-1 ${scrollable ? "overflow-x-auto overscroll-x-contain [scrollbar-width:thin]" : "overflow-x-hidden"}`}
         >
           <div className="relative" style={{ width: chart.W }}>
             <svg
@@ -512,17 +547,17 @@ export function HomeDynamicsChart() {
               <path d={chart.path} fill="none" stroke="#2d5eef" strokeWidth="3" strokeLinecap="round" />
 
               {series.labels.map((label, i) =>
-                shouldShowMonthLabel(i, series.labels.length, chart.pointGap) ? (
+                shouldShowMonthLabel(i, series.labels.length, pointGap) ? (
                   <text
                     key={series.keys[i] ?? label}
                     x={chart.pts[i]![0]}
                     y={CHART_H - 12}
                     textAnchor="middle"
-                    fontSize="11.5"
+                    fontSize={pointGap < 18 ? "10" : "11.5"}
                     fill="#a1a1aa"
                     fontFamily="inherit"
                   >
-                    {label}
+                    {pointGap < 14 ? label.replace(" ", "") : label}
                   </text>
                 ) : null
               )}
