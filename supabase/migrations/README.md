@@ -90,8 +90,10 @@
 | 069 | `069_personal_finance_lera_usd_hint.sql` | Фонд Леры: 5 000 ₽/мес на ₽-счёт |
 | 070 | `070_agency_dispatch_foundation.sql` | Sofia Plan: dispatch_work_status, правила, поля планирования на agency_project |
 | 071 | `071_personal_income_history_2018_2023.sql` | История дохода: помесячные суммы 2018–2023 для графика |
+| 072 | `072_v2_fx_monthly_rates.sql` | Помесячные средние курсы ЦБ (таблица) |
+| 073 | `073_fx_monthly_usd_seed.sql` | Seed средних курсов USD 2018–2026 |
 
-**Следующий свободный номер:** `072`
+**Следующий свободный номер:** `074`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

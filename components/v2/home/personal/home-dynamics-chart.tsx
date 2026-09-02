@@ -8,11 +8,10 @@ import type { PersonalIncomeHistoryRow } from "@/lib/v2/personal/types";
 
 type SeriesKey = "profit" | "capital";
 type ChartView = "fit" | "scroll";
+type CurrencyMode = "rub" | "usd";
 
 const MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
-/** Компактный шаг в «Обзоре» — всегда со скроллом при длинной истории. */
 const OVERVIEW_GAP = 56;
-/** Развёрнутый шаг в «Детально». */
 const DETAIL_GAP = 84;
 const CHART_H = 300;
 const Y_AXIS_W = 82;
@@ -31,21 +30,64 @@ function shouldShowMonthLabel(i: number, total: number, gap: number): boolean {
   return i % step === 0;
 }
 
-function fmtRub(n: number) {
+function monthRateKey(year: number, month: number): string {
+  return `${year}-${month}`;
+}
+
+function rubValueForRow(row: PersonalIncomeHistoryRow, key: SeriesKey): number {
+  return key === "profit" ? row.profit_rub ?? 0 : row.accounts_total_rub ?? 0;
+}
+
+function convertRubToDisplay(
+  rub: number,
+  year: number,
+  month: number,
+  currency: CurrencyMode,
+  usdRates: Record<string, number>
+): number {
+  if (currency === "rub") return rub;
+  const rate = usdRates[monthRateKey(year, month)];
+  if (!rate || rate <= 0) return 0;
+  return rub / rate;
+}
+
+function fmtMoney(n: number, currency: CurrencyMode): string {
+  if (currency === "usd") {
+    const abs = Math.abs(n);
+    if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(2).replace(".", ",")}M`;
+    if (abs >= 1000) return `$${Math.round(n).toLocaleString("en-US")}`;
+    return `$${Math.round(n).toLocaleString("en-US")}`;
+  }
   return `${homeFmt(n)} ₽`;
+}
+
+function formatAxisTick(v: number, currency: CurrencyMode): string {
+  if (currency === "usd") {
+    if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
+    if (v >= 1000) return `$${Math.round(v / 1000).toLocaleString("en-US")}k`;
+    return `$${Math.round(v)}`;
+  }
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
+  if (v >= 1000) return `${Math.round(v / 1000).toLocaleString("ru-RU")}к`;
+  return String(Math.round(v));
 }
 
 function buildFullSeries(
   rows: PersonalIncomeHistoryRow[],
-  key: SeriesKey
-): { labels: string[]; values: number[]; keys: string[] } {
+  key: SeriesKey,
+  currency: CurrencyMode,
+  usdRates: Record<string, number>
+): { labels: string[]; values: number[]; keys: string[]; rates: (number | null)[] } {
   const sorted = [...rows].sort((a, b) => a.year - b.year || a.month - b.month);
   const labels = sorted.map(
     (r) => `${MONTH_SHORT[r.month - 1] ?? String(r.month)} '${String(r.year).slice(-2)}`
   );
-  const values = sorted.map((r) => (key === "profit" ? r.profit_rub ?? 0 : r.accounts_total_rub ?? 0));
-  const keys = sorted.map((r) => `${r.year}-${r.month}`);
-  return { labels, values, keys };
+  const values = sorted.map((r) =>
+    convertRubToDisplay(rubValueForRow(r, key), r.year, r.month, currency, usdRates)
+  );
+  const keys = sorted.map((r) => monthRateKey(r.year, r.month));
+  const rates = sorted.map((r) => usdRates[monthRateKey(r.year, r.month)] ?? null);
+  return { labels, values, keys, rates };
 }
 
 function pctChange(cur: number, prev: number): string {
@@ -63,9 +105,15 @@ function sortedHistory(rows: PersonalIncomeHistoryRow[]): PersonalIncomeHistoryR
   return [...rows].sort((a, b) => a.year - b.year || a.month - b.month);
 }
 
-function avgProfitLast6(rows: PersonalIncomeHistoryRow[]): number | null {
+function avgProfitLast6(
+  rows: PersonalIncomeHistoryRow[],
+  currency: CurrencyMode,
+  usdRates: Record<string, number>
+): number | null {
   const last6 = sortedHistory(rows).slice(-6);
-  const profits = last6.map((r) => r.profit_rub).filter((v): v is number => v != null);
+  const profits = last6
+    .map((r) => convertRubToDisplay(r.profit_rub ?? 0, r.year, r.month, currency, usdRates))
+    .filter((v) => v > 0 || currency === "rub");
   if (!profits.length) return null;
   return Math.round(profits.reduce((s, v) => s + v, 0) / profits.length);
 }
@@ -102,33 +150,55 @@ function avgMarginFromSlice(slice: PersonalIncomeHistoryRow[]): number | null {
   return margins.reduce((s, v) => s + v, 0) / margins.length;
 }
 
-function profitDeltaLast6(rows: PersonalIncomeHistoryRow[]): string {
+function profitDeltaLast6(
+  rows: PersonalIncomeHistoryRow[],
+  currency: CurrencyMode,
+  usdRates: Record<string, number>
+): string {
   const sorted = sortedHistory(rows);
-  const cur = avgProfitFromSlice(sorted.slice(-6));
-  const prev = avgProfitFromSlice(sorted.slice(-12, -6));
+  const cur = avgProfitFromSlice(sorted.slice(-6), currency, usdRates);
+  const prev = avgProfitFromSlice(sorted.slice(-12, -6), currency, usdRates);
   if (cur == null || prev == null) return "—";
   return pctChange(cur, prev);
 }
 
-function avgProfitFromSlice(slice: PersonalIncomeHistoryRow[]): number | null {
-  const profits = slice.map((r) => r.profit_rub).filter((v): v is number => v != null);
+function avgProfitFromSlice(
+  slice: PersonalIncomeHistoryRow[],
+  currency: CurrencyMode,
+  usdRates: Record<string, number>
+): number | null {
+  const profits = slice
+    .map((r) => convertRubToDisplay(r.profit_rub ?? 0, r.year, r.month, currency, usdRates))
+    .filter((v) => v > 0 || currency === "rub");
   if (!profits.length) return null;
   return profits.reduce((s, v) => s + v, 0) / profits.length;
 }
 
-function formatAxisTick(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
-  if (v >= 1000) return `${Math.round(v / 1000).toLocaleString("ru-RU")}к`;
-  return String(Math.round(v));
+function axisMax(values: number[], currency: CurrencyMode): number {
+  const peak = Math.max(...values, 1);
+  if (currency === "usd") {
+    if (peak >= 10_000) return Math.ceil((peak * 1.12) / 1000) * 1000;
+    if (peak >= 1000) return Math.ceil((peak * 1.12) / 100) * 100;
+    return Math.ceil(peak * 1.12 / 10) * 10 || 1;
+  }
+  return Math.ceil((peak * 1.12) / 50000) * 50000 || 1;
 }
 
 export function HomeDynamicsChart() {
   const { dashboard } = useHomePersonalFinance();
   const [seriesKey, setSeriesKey] = useState<SeriesKey>("profit");
+  const [currency, setCurrency] = useState<CurrencyMode>("rub");
   const [chartView, setChartView] = useState<ChartView>("fit");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [plotViewportW, setPlotViewportW] = useState(900);
+
+  const usdRates = dashboard?.usdMonthlyRates ?? {};
+  const hasUsdRates = Object.keys(usdRates).length > 0;
+
+  useEffect(() => {
+    if (currency === "usd" && !hasUsdRates) setCurrency("rub");
+  }, [currency, hasUsdRates]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -141,10 +211,10 @@ export function HomeDynamicsChart() {
 
   const series = useMemo(() => {
     if (!dashboard?.incomeHistory?.length) {
-      return { labels: [] as string[], values: [] as number[], keys: [] as string[] };
+      return { labels: [] as string[], values: [] as number[], keys: [] as string[], rates: [] as (number | null)[] };
     }
-    return buildFullSeries(dashboard.incomeHistory, seriesKey);
-  }, [dashboard, seriesKey]);
+    return buildFullSeries(dashboard.incomeHistory, seriesKey, currency, usdRates);
+  }, [dashboard, seriesKey, currency, usdRates]);
 
   const pointGap = pointGapForMode(chartView);
 
@@ -160,7 +230,7 @@ export function HomeDynamicsChart() {
     if (values.length < 2) return null;
 
     const innerW = (values.length - 1) * pointGap;
-    const max = Math.ceil((Math.max(...values) * 1.12) / 50000) * 50000 || 1;
+    const max = axisMax(values, currency);
     const xAt = (i: number) => i * pointGap;
     const yAt = (v: number) => PT + (1 - v / max) * (CHART_H - PT - PB);
 
@@ -175,7 +245,7 @@ export function HomeDynamicsChart() {
 
     const grid = [0, max / 4, max / 2, (max * 3) / 4, max].map((t) => ({
       y: yAt(t),
-      label: formatAxisTick(t),
+      label: formatAxisTick(t, currency),
     }));
     const y0 = yAt(0);
     const fillPath = `${path} L${pts[pts.length - 1]![0]},${y0} L${pts[0]![0]},${y0} Z`;
@@ -190,18 +260,16 @@ export function HomeDynamicsChart() {
       grid,
       max,
       labels,
-      xAt,
-      yAt,
       pointGap,
     };
-  }, [series, plotW, pointGap]);
+  }, [series, plotW, pointGap, currency]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || series.values.length < 2) return;
     if (el.scrollWidth <= el.clientWidth + 1) return;
     el.scrollLeft = el.scrollWidth - el.clientWidth;
-  }, [series.values.length, seriesKey, chartView, plotW]);
+  }, [series.values.length, seriesKey, chartView, plotW, currency]);
 
   const pickIndexFromClientX = (clientX: number) => {
     if (!chart || !scrollRef.current) return 0;
@@ -225,21 +293,26 @@ export function HomeDynamicsChart() {
   const curVal = series.values[activeIdx] ?? 0;
   const prevVal = series.values[activeIdx - 1] ?? 0;
   const monthDeltaPositive = pctChangePositive(curVal, prevVal);
+  const activeRate = series.rates[activeIdx];
 
   const stats = useMemo(() => {
     const vals = series.values;
     const history = dashboard?.incomeHistory ?? [];
     if (!vals.length || !dashboard) return [];
 
+    const fmt = (n: number) => fmtMoney(n, currency);
+
     if (seriesKey === "profit") {
-      const avg6 = avgProfitLast6(history) ?? dashboard.summary.avgProfit6m;
+      const avg6 =
+        avgProfitLast6(history, currency, usdRates) ??
+        (currency === "rub" ? dashboard.summary.avgProfit6m : null);
       const margin6 = avgMarginLast6(history);
       const best = Math.max(...vals);
       const bestIdx = vals.indexOf(best);
       return [
-        ["Средняя прибыль · 6 мес.", avg6 != null ? fmtRub(avg6) : "—", profitDeltaLast6(history)],
+        ["Средняя прибыль · 6 мес.", avg6 != null ? fmt(avg6) : "—", profitDeltaLast6(history, currency, usdRates)],
         ["Маржа · 6 мес.", margin6 != null ? `${margin6}%` : "—", marginDeltaLast6(history)],
-        ["Лучший месяц", fmtRub(best), series.labels[bestIdx] ?? ""],
+        ["Лучший месяц", fmt(best), series.labels[bestIdx] ?? ""],
       ];
     }
 
@@ -250,20 +323,28 @@ export function HomeDynamicsChart() {
     const cushionGoal =
       allocated.find((g) => g.goal_key === "cushion_goal") ??
       allocated.find((g) => g.target_rub === 1_000_000);
-    const cushionTarget = cushionGoal?.target_rub ?? 1_000_000;
-    const leftToCushion = cushionGoal?.left ?? Math.max(0, cushionTarget - pool);
-    const filledPct = cushionTarget > 0 ? Math.round(((cushionTarget - leftToCushion) / cushionTarget) * 100) : 0;
+    const cushionTargetRub = cushionGoal?.target_rub ?? 1_000_000;
+    const leftToCushionRub = cushionGoal?.left ?? Math.max(0, cushionTargetRub - pool);
+    const latestRow = history[0];
+    const latestRate = latestRow ? usdRates[monthRateKey(latestRow.year, latestRow.month)] : undefined;
+    const leftToCushion =
+      currency === "usd" && latestRate
+        ? leftToCushionRub / latestRate
+        : leftToCushionRub;
+    const cushionTarget =
+      currency === "usd" && latestRate ? cushionTargetRub / latestRate : cushionTargetRub;
+    const filledPct = cushionTargetRub > 0 ? Math.round(((cushionTargetRub - leftToCushionRub) / cushionTargetRub) * 100) : 0;
 
     return [
-      ["Капитал сейчас", fmtRub(last), pctChange(last, prev)],
-      ["Прирост за месяц", fmtRub(last - prev), pctChange(last - prev, prev)],
+      ["Капитал сейчас", fmt(last), pctChange(last, prev)],
+      ["Прирост за месяц", fmt(last - prev), pctChange(last - prev, prev)],
       [
         "До цели подушки",
-        fmtRub(leftToCushion),
-        `${filledPct}% · цель ${homeFmt(cushionTarget)} ₽`,
+        fmt(leftToCushion),
+        `${filledPct}% · цель ${fmt(cushionTarget)}`,
       ],
     ];
-  }, [series, seriesKey, dashboard]);
+  }, [series, seriesKey, dashboard, currency, usdRates]);
 
   if (!dashboard || !chart || !series.values.length) return null;
 
@@ -274,6 +355,12 @@ export function HomeDynamicsChart() {
       : series.labels[0] ?? "";
   const scrollable = plotW > plotViewportW + 1;
   const activePt = chart.pts[activeIdx];
+  const rateHint =
+    currency === "usd" && activeRate
+      ? ` · курс ЦБ ср. ${activeRate.toFixed(2).replace(".", ",")} ₽/$`
+      : currency === "usd"
+        ? " · курс ЦБ недоступен для месяца"
+        : null;
 
   return (
     <section className="v2-card px-7 py-6">
@@ -285,9 +372,10 @@ export function HomeDynamicsChart() {
           <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-400)]">
             {rangeLabel}
             {scrollable ? " · прокрутите влево к началу" : null}
+            {rateHint}
           </p>
           <div className="v2-tnum mt-2.5 text-[44px] font-semibold leading-none tracking-[-0.04em] text-[var(--v2-ink-900)]">
-            {fmtRub(curVal)}
+            {fmtMoney(curVal, currency)}
           </div>
           <div className="mt-2.5 flex items-center gap-2.5">
             <span
@@ -303,6 +391,23 @@ export function HomeDynamicsChart() {
           </div>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <div className="inline-flex rounded-[14px] bg-[var(--v2-ink-100)] p-[3px]">
+            {(["rub", "usd"] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                disabled={c === "usd" && !hasUsdRates}
+                onClick={() => setCurrency(c)}
+                className={`rounded-[11px] px-4 py-2 text-[13.5px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                  currency === c
+                    ? "bg-white text-[var(--v2-ink-900)] shadow-sm"
+                    : "text-[var(--v2-ink-500)]"
+                }`}
+              >
+                {c === "rub" ? "₽" : "$"}
+              </button>
+            ))}
+          </div>
           <div className="inline-flex rounded-[14px] bg-[var(--v2-ink-100)] p-[3px]">
             {(["fit", "scroll"] as const).map((mode) => (
               <button
@@ -367,7 +472,7 @@ export function HomeDynamicsChart() {
               fill="#c4c4cc"
               fontFamily="inherit"
             >
-              ₽
+              {currency === "usd" ? "$" : "₽"}
             </text>
           </svg>
         </div>
@@ -449,9 +554,12 @@ export function HomeDynamicsChart() {
                 className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[130%] rounded-xl bg-[var(--v2-ink-900)] px-3 py-2 text-[15px] font-semibold text-white shadow-lg"
                 style={{ left: activePt[0], top: activePt[1] }}
               >
-                {fmtRub(series.values[activeIdx] ?? 0)}
+                {fmtMoney(series.values[activeIdx] ?? 0, currency)}
                 <small className="mt-0.5 block text-[12px] font-medium opacity-60">
                   {series.labels[activeIdx]}
+                  {currency === "usd" && activeRate
+                    ? ` · ${activeRate.toFixed(2).replace(".", ",")} ₽/$`
+                    : null}
                 </small>
               </div>
             ) : null}

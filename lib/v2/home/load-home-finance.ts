@@ -11,6 +11,11 @@ import {
   filterOperatingAccounts,
 } from "@/lib/v2/personal/personal-finance-repo";
 import { listPersonalIncomeHistory } from "@/lib/v2/personal/income-history-repo";
+import {
+  ensureUsdMonthlyRatesForRange,
+  fxMonthlyRatesToMap,
+  incomeHistoryMonthSpan,
+} from "@/lib/v2/personal/fx-monthly-rates";
 import type {
   PersonalAccountRow,
   PersonalFinanceFundRow,
@@ -43,6 +48,8 @@ export type HomePersonalFinancePayload = {
     agencyTotalExpenses: number;
     avgProfit6m: number;
   };
+  /** Средний курс ЦБ USD за месяц: ключ "year-month" → ₽ за $1 */
+  usdMonthlyRates: Record<string, number>;
 };
 
 export async function loadHomeFinanceStrip(ctx: V2SessionContext): Promise<HomeFinanceStripPayload | null> {
@@ -198,6 +205,22 @@ export async function loadHomePersonalFinance(ctx: V2SessionContext): Promise<Ho
     monthProfit
   );
 
+  let usdMonthlyRates: Record<string, number> = {};
+  const span = incomeHistoryMonthSpan(incomeHistory);
+  if (span) {
+    try {
+      const rates = await ensureUsdMonthlyRatesForRange(
+        span.fromYear,
+        span.fromMonth,
+        span.toYear,
+        span.toMonth
+      );
+      usdMonthlyRates = Object.fromEntries(fxMonthlyRatesToMap(rates));
+    } catch (e) {
+      console.error("loadHomePersonalFinance usd rates:", e);
+    }
+  }
+
   return {
     year,
     month,
@@ -205,6 +228,7 @@ export async function loadHomePersonalFinance(ctx: V2SessionContext): Promise<Ho
     accounts,
     funds,
     goals,
+    usdMonthlyRates,
     summary: {
       netWorth,
       projectExpectedRevenue,
