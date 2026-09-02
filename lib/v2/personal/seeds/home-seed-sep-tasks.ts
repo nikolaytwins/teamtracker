@@ -1,7 +1,21 @@
 import type { HomeSeasonTask } from "./home-seed";
 
-const DOC_AGENCY_RULES =
-  "https://docs.google.com/document/d/1eGGnwy5yCqVFAMdmrvAcmv9iL85WxLol_zD3St8rBWk/edit?usp=sharing";
+const DOC_AGENCY_BASE =
+  "https://docs.google.com/document/d/1eGGnwy5yCqVFAMdmrvAcmv9iL85WxLol_zD3St8rBWk/edit";
+const DOC_AGENCY_LINKS = [
+  {
+    label: "Вебинарные проекты",
+    href: `${DOC_AGENCY_BASE}?tab=t.0#heading=h.8gxo1x7kuomg`,
+  },
+  {
+    label: "Правила срочности",
+    href: `${DOC_AGENCY_BASE}?usp=sharing`,
+  },
+  {
+    label: "Финансовые пороги",
+    href: `${DOC_AGENCY_BASE}?usp=sharing`,
+  },
+] as const;
 const DOC_LERA_REGLEMENT =
   "https://docs.google.com/document/d/18kGrtjAbPvvViHcE3pJnH-GkDDHKUH5NuHmALaFGVGw/edit?usp=sharing";
 
@@ -11,7 +25,7 @@ export const SEP_2026_TASKS: HomeSeasonTask[] = [
     id: "sep-agency-rules",
     text: "Зафиксировать правила срочных и вебинарных проектов",
     priority: "high",
-    href: DOC_AGENCY_RULES,
+    links: [...DOC_AGENCY_LINKS],
     items: [
       "Разобрать 3–5 прошлых вебинарных проектов",
       "Оценить объём, прибыль, нагрузку и скрытую стоимость восстановления",

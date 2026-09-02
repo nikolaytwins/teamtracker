@@ -21,6 +21,21 @@ const TABS = [
     label: "Канбан",
     match: (p: string) => p.startsWith(appPath("/v2/agency/kanban")),
   },
+  {
+    href: "/v2/agency/plan",
+    label: "План",
+    match: (p: string) => p.startsWith(appPath("/v2/agency/plan")),
+  },
+  {
+    href: "/v2/agency/rules",
+    label: "Правила",
+    match: (p: string) => p.startsWith(appPath("/v2/agency/rules")),
+  },
+  {
+    href: "/v2/agency/sofia",
+    label: "София",
+    match: (p: string) => p.startsWith(appPath("/v2/agency/sofia")),
+  },
 ] as const;
 
 export default function AgencyLayout({ children }: { children: React.ReactNode }) {

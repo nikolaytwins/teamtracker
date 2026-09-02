@@ -7,14 +7,15 @@ import { homeFmt } from "@/lib/v2/personal/seeds/home-seed";
 import type { PersonalIncomeHistoryRow } from "@/lib/v2/personal/types";
 
 type SeriesKey = "profit" | "capital";
+type ChartView = "fit" | "scroll";
 
 const MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 const POINT_GAP = 84;
 const CHART_H = 300;
-const PL = 74;
+const Y_AXIS_W = 74;
 const PR = 28;
 const PT = 22;
-const PB = 16;
+const PB = 36;
 
 function fmtRub(n: number) {
   return `${homeFmt(n)} ₽`;
@@ -37,6 +38,11 @@ function pctChange(cur: number, prev: number): string {
   if (!prev) return "—";
   const d = ((cur - prev) / Math.abs(prev)) * 100;
   return `${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(1).replace(".", ",")}%`;
+}
+
+function pctChangePositive(cur: number, prev: number): boolean | null {
+  if (!prev) return null;
+  return cur - prev >= 0;
 }
 
 function sortedHistory(rows: PersonalIncomeHistoryRow[]): PersonalIncomeHistoryRow[] {
@@ -96,19 +102,26 @@ function avgProfitFromSlice(slice: PersonalIncomeHistoryRow[]): number | null {
   return profits.reduce((s, v) => s + v, 0) / profits.length;
 }
 
+function formatAxisTick(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
+  if (v >= 1000) return `${Math.round(v / 1000).toLocaleString("ru-RU")}к`;
+  return String(Math.round(v));
+}
+
 export function HomeDynamicsChart() {
   const { dashboard } = useHomePersonalFinance();
   const [seriesKey, setSeriesKey] = useState<SeriesKey>("profit");
+  const [chartView, setChartView] = useState<ChartView>("fit");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [viewportW, setViewportW] = useState(1000);
+  const [plotViewportW, setPlotViewportW] = useState(900);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setViewportW(el.clientWidth || 1000));
+    const ro = new ResizeObserver(() => setPlotViewportW(el.clientWidth || 900));
     ro.observe(el);
-    setViewportW(el.clientWidth || 1000);
+    setPlotViewportW(el.clientWidth || 900);
     return () => ro.disconnect();
   }, []);
 
@@ -119,20 +132,23 @@ export function HomeDynamicsChart() {
     return buildFullSeries(dashboard.incomeHistory, seriesKey);
   }, [dashboard, seriesKey]);
 
-  const chartW = useMemo(() => {
+  const plotW = useMemo(() => {
     const n = series.values.length;
-    if (n < 2) return viewportW;
-    return Math.max(viewportW, PL + PR + (n - 1) * POINT_GAP);
-  }, [series.values.length, viewportW]);
+    if (n < 2) return plotViewportW;
+    if (chartView === "fit") return plotViewportW;
+    return Math.max(plotViewportW, (n - 1) * POINT_GAP + PR);
+  }, [series.values.length, plotViewportW, chartView]);
 
   const chart = useMemo(() => {
-    const { values } = series;
+    const { values, labels } = series;
     if (values.length < 2) return null;
-    const W = chartW;
+
+    const innerW = Math.max(1, plotW - PR);
     const max = Math.ceil((Math.max(...values) * 1.12) / 50000) * 50000 || 1;
-    const x = (i: number) => PL + (i * (W - PL - PR)) / (values.length - 1);
-    const y = (v: number) => PT + (1 - v / max) * (CHART_H - PT - PB);
-    const pts = values.map((v, i) => [x(i), y(v)] as const);
+    const xAt = (i: number) => (i * innerW) / (values.length - 1);
+    const yAt = (v: number) => PT + (1 - v / max) * (CHART_H - PT - PB);
+
+    const pts = values.map((v, i) => [xAt(i), yAt(v)] as const);
     let path = `M${pts[0]![0]},${pts[0]![1]}`;
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i]!;
@@ -140,24 +156,58 @@ export function HomeDynamicsChart() {
       const cx = (a[0] + b[0]) / 2;
       path += ` C${cx},${a[1]} ${cx},${b[1]} ${b[0]},${b[1]}`;
     }
+
     const grid = [0, max / 4, max / 2, (max * 3) / 4, max].map((t) => ({
-      y: y(t),
-      label: `${Math.round(t / 1000).toLocaleString("ru-RU")}к`,
+      y: yAt(t),
+      label: formatAxisTick(t),
     }));
-    const y0 = y(0);
+    const y0 = yAt(0);
     const fillPath = `${path} L${pts[pts.length - 1]![0]},${y0} L${pts[0]![0]},${y0} Z`;
-    return { H: CHART_H, W, PL, PR, PT, PB, path, fillPath, pts, grid, max, pointStep: (W - PL - PR) / (values.length - 1) };
-  }, [series, chartW]);
+
+    return {
+      H: CHART_H,
+      W: plotW,
+      innerW,
+      path,
+      fillPath,
+      pts,
+      grid,
+      max,
+      labels,
+      xAt,
+      yAt,
+    };
+  }, [series, plotW]);
 
   useEffect(() => {
+    if (chartView !== "scroll") return;
     const el = scrollRef.current;
     if (!el || series.values.length < 2) return;
     el.scrollLeft = el.scrollWidth - el.clientWidth;
-  }, [series.values.length, seriesKey, chartW]);
+  }, [series.values.length, seriesKey, chartView, plotW]);
+
+  const pickIndexFromClientX = (clientX: number) => {
+    if (!chart || !scrollRef.current) return 0;
+    const container = scrollRef.current;
+    const rect = container.getBoundingClientRect();
+    const mx = container.scrollLeft + (clientX - rect.left);
+
+    let best = 0;
+    let bestDist = Infinity;
+    chart.pts.forEach((p, i) => {
+      const d = Math.abs(p[0] - mx);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    return best;
+  };
 
   const activeIdx = hoverIdx ?? (series.values.length ? series.values.length - 1 : 0);
   const curVal = series.values[activeIdx] ?? 0;
   const prevVal = series.values[activeIdx - 1] ?? 0;
+  const monthDeltaPositive = pctChangePositive(curVal, prevVal);
 
   const stats = useMemo(() => {
     const vals = series.values;
@@ -205,6 +255,8 @@ export function HomeDynamicsChart() {
     series.labels.length > 1
       ? `${series.labels[0]} — ${series.labels[series.labels.length - 1]}`
       : series.labels[0] ?? "";
+  const scrollable = chartView === "scroll" && plotW > plotViewportW + 1;
+  const activePt = chart.pts[activeIdx];
 
   return (
     <section className="v2-card px-7 py-6">
@@ -213,144 +265,177 @@ export function HomeDynamicsChart() {
           <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-[var(--v2-ink-400)]">
             {kick}
           </span>
-          <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-400)]">{rangeLabel} · прокрутите влево к началу</p>
+          <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-400)]">
+            {rangeLabel}
+            {scrollable ? " · прокрутите влево к началу" : " · все месяцы на одном экране"}
+          </p>
           <div className="v2-tnum mt-2.5 text-[44px] font-semibold leading-none tracking-[-0.04em] text-[var(--v2-ink-900)]">
             {fmtRub(curVal)}
           </div>
           <div className="mt-2.5 flex items-center gap-2.5">
-            <span className="v2-tight inline-flex items-center gap-1 rounded-[9px] bg-emerald-50 px-2.5 py-1 text-[15px] font-semibold text-emerald-700">
+            <span
+              className={`v2-tight inline-flex items-center gap-1 rounded-[9px] px-2.5 py-1 text-[15px] font-semibold ${
+                monthDeltaPositive === false
+                  ? "bg-rose-50 text-rose-700"
+                  : "bg-emerald-50 text-emerald-700"
+              }`}
+            >
               {pctChange(curVal, prevVal)}
             </span>
             <span className="v2-tight text-[13.5px] text-[var(--v2-ink-400)]">к предыдущему месяцу</span>
           </div>
         </div>
-        <div className="ml-auto inline-flex rounded-[14px] bg-[var(--v2-ink-100)] p-[3px]">
-          {(["profit", "capital"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setSeriesKey(k)}
-              className={`rounded-[11px] px-5 py-2 text-[14.5px] font-semibold transition ${
-                seriesKey === k
-                  ? "bg-white text-[var(--v2-ink-900)] shadow-sm"
-                  : "text-[var(--v2-ink-500)]"
-              }`}
-            >
-              {k === "profit" ? "Прибыль" : "Капитал"}
-            </button>
-          ))}
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <div className="inline-flex rounded-[14px] bg-[var(--v2-ink-100)] p-[3px]">
+            {(["fit", "scroll"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setChartView(mode)}
+                className={`rounded-[11px] px-4 py-2 text-[13.5px] font-semibold transition ${
+                  chartView === mode
+                    ? "bg-white text-[var(--v2-ink-900)] shadow-sm"
+                    : "text-[var(--v2-ink-500)]"
+                }`}
+              >
+                {mode === "fit" ? "Обзор" : "Детально"}
+              </button>
+            ))}
+          </div>
+          <div className="inline-flex rounded-[14px] bg-[var(--v2-ink-100)] p-[3px]">
+            {(["profit", "capital"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setSeriesKey(k)}
+                className={`rounded-[11px] px-5 py-2 text-[14.5px] font-semibold transition ${
+                  seriesKey === k
+                    ? "bg-white text-[var(--v2-ink-900)] shadow-sm"
+                    : "text-[var(--v2-ink-500)]"
+                }`}
+              >
+                {k === "profit" ? "Прибыль" : "Капитал"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        className="mt-[22px] overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]"
-      >
-        <div className="relative" style={{ width: chart.W, minWidth: "100%" }}>
+      <div className="mt-[22px] flex">
+        <div className="shrink-0" style={{ width: Y_AXIS_W }}>
           <svg
-            viewBox={`0 0 ${chart.W} ${chart.H}`}
+            viewBox={`0 0 ${Y_AXIS_W} ${CHART_H}`}
             className="block"
-            style={{ width: chart.W, height: chart.H }}
-            onMouseLeave={() => setHoverIdx(null)}
-            onMouseMove={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const mx = ((e.clientX - rect.left) / rect.width) * chart.W;
-              let best = 0;
-              let bd = Infinity;
-              chart.pts.forEach((p, i) => {
-                const dx = Math.abs(p[0] - mx);
-                if (dx < bd) {
-                  bd = dx;
-                  best = i;
-                }
-              });
-              setHoverIdx(best);
-            }}
+            style={{ width: Y_AXIS_W, height: CHART_H }}
+            aria-hidden
           >
-            <defs>
-              <linearGradient id="home-chart-g" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#2d5eef" stopOpacity="0.18" />
-                <stop offset="1" stopColor="#2d5eef" stopOpacity="0" />
-              </linearGradient>
-            </defs>
             {chart.grid.map((g) => (
-              <g key={g.label}>
+              <text
+                key={g.label}
+                x={Y_AXIS_W - 10}
+                y={g.y + 5}
+                textAnchor="end"
+                fontSize="12"
+                fill="#a1a1aa"
+                fontFamily="inherit"
+              >
+                {g.label}
+              </text>
+            ))}
+            <text
+              x={Y_AXIS_W - 10}
+              y={CHART_H - 8}
+              textAnchor="end"
+              fontSize="11"
+              fill="#c4c4cc"
+              fontFamily="inherit"
+            >
+              ₽
+            </text>
+          </svg>
+        </div>
+
+        <div
+          ref={scrollRef}
+          className={`min-w-0 flex-1 ${scrollable ? "overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]" : "overflow-hidden"}`}
+        >
+          <div className="relative" style={{ width: chart.W }}>
+            <svg
+              viewBox={`0 0 ${chart.W} ${CHART_H}`}
+              className="block"
+              style={{ width: chart.W, height: CHART_H }}
+              onMouseLeave={() => setHoverIdx(null)}
+              onMouseMove={(e) => setHoverIdx(pickIndexFromClientX(e.clientX))}
+            >
+              <defs>
+                <linearGradient id="home-chart-g" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#2d5eef" stopOpacity="0.18" />
+                  <stop offset="1" stopColor="#2d5eef" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+
+              {chart.grid.map((g) => (
                 <line
-                  x1={chart.PL}
-                  x2={chart.W - chart.PR}
+                  key={g.label}
+                  x1={0}
+                  x2={chart.innerW}
                   y1={g.y}
                   y2={g.y}
                   stroke="#eff0f4"
                   strokeWidth="1"
                 />
+              ))}
+
+              <path d={chart.fillPath} fill="url(#home-chart-g)" />
+              <path d={chart.path} fill="none" stroke="#2d5eef" strokeWidth="3" strokeLinecap="round" />
+
+              {series.labels.map((label, i) => (
                 <text
-                  x={chart.PL - 14}
-                  y={g.y + 5}
-                  textAnchor="end"
-                  fontSize="13"
+                  key={series.keys[i] ?? label}
+                  x={chart.pts[i]![0]}
+                  y={CHART_H - 10}
+                  textAnchor="middle"
+                  fontSize="12.5"
                   fill="#a1a1aa"
                   fontFamily="inherit"
                 >
-                  {g.label}
+                  {label}
                 </text>
-              </g>
-            ))}
-            <path d={chart.fillPath} fill="url(#home-chart-g)" />
-            <path d={chart.path} fill="none" stroke="#2d5eef" strokeWidth="3" strokeLinecap="round" />
-            {chart.pts[activeIdx] ? (
-              <>
-                <line
-                  x1={chart.pts[activeIdx]![0]}
-                  x2={chart.pts[activeIdx]![0]}
-                  y1={chart.PT}
-                  y2={chart.H - chart.PB}
-                  stroke="#c9d4f6"
-                  strokeDasharray="4 4"
-                />
-                <circle
-                  cx={chart.pts[activeIdx]![0]}
-                  cy={chart.pts[activeIdx]![1]}
-                  r="7"
-                  fill="#2d5eef"
-                  stroke="#fff"
-                  strokeWidth="3"
-                />
-              </>
-            ) : null}
-          </svg>
+              ))}
 
-          {chart.pts[activeIdx] ? (
-            <div
-              className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[130%] rounded-xl bg-[var(--v2-ink-900)] px-3 py-2 text-[15px] font-semibold text-white shadow-lg"
-              style={{
-                left: chart.pts[activeIdx]![0],
-                top: chart.pts[activeIdx]![1],
-              }}
-            >
-              {fmtRub(series.values[activeIdx] ?? 0)}
-              <small className="mt-0.5 block text-[12px] font-medium opacity-60">
-                {series.labels[activeIdx]}
-              </small>
-            </div>
-          ) : null}
+              {activePt ? (
+                <>
+                  <line
+                    x1={activePt[0]}
+                    x2={activePt[0]}
+                    y1={PT}
+                    y2={CHART_H - PB}
+                    stroke="#c9d4f6"
+                    strokeDasharray="4 4"
+                  />
+                  <circle
+                    cx={activePt[0]}
+                    cy={activePt[1]}
+                    r="7"
+                    fill="#2d5eef"
+                    stroke="#fff"
+                    strokeWidth="3"
+                  />
+                </>
+              ) : null}
+            </svg>
 
-          <div
-            className="mt-2 grid gap-2"
-            style={{
-              gridTemplateColumns: `repeat(${series.labels.length}, ${chart.pointStep}px)`,
-              marginLeft: PL - chart.pointStep / 2,
-              marginRight: PR - chart.pointStep / 2,
-              width: chart.W - PL - PR + chart.pointStep,
-            }}
-          >
-            {series.labels.map((l, i) => (
-              <span
-                key={series.keys[i] ?? l}
-                className="text-center text-[12.5px] text-[var(--v2-ink-400)] whitespace-nowrap"
+            {activePt ? (
+              <div
+                className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[130%] rounded-xl bg-[var(--v2-ink-900)] px-3 py-2 text-[15px] font-semibold text-white shadow-lg"
+                style={{ left: activePt[0], top: activePt[1] }}
               >
-                {l}
-              </span>
-            ))}
+                {fmtRub(series.values[activeIdx] ?? 0)}
+                <small className="mt-0.5 block text-[12px] font-medium opacity-60">
+                  {series.labels[activeIdx]}
+                </small>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

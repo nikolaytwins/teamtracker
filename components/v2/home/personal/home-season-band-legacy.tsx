@@ -169,11 +169,11 @@ export function HomeSeasonBandLegacy() {
   };
 
   const onAdd = (monthId: string, input: { text: string; href?: string }) => {
-    refreshStorage(addSeasonTask(monthId, input));
+    refreshStorage(addSeasonTask(monthId, input, HOME_MONTHS));
   };
 
   const onEdit = (taskId: string, input: { text: string; href?: string }) => {
-    refreshStorage(updateSeasonTask(taskId, input));
+    refreshStorage(updateSeasonTask(taskId, input, HOME_MONTHS));
   };
 
   const onDropToMonth = (monthId: string) => {
@@ -389,6 +389,14 @@ function MonthPanel({
         </p>
       ) : null}
 
+      {month.warn ? (
+        <div className="mb-5">
+          <p className="v2-tight whitespace-pre-wrap rounded-2xl bg-amber-50 px-5 py-[18px] text-[15px] font-medium leading-relaxed text-amber-900">
+            {month.warn}
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
         {month.tasks.map((task) =>
           editingId === task.id ? (
@@ -471,14 +479,6 @@ function MonthPanel({
           </button>
         ) : null}
       </div>
-
-      {month.warn ? (
-        <div className="mt-[18px]">
-          <p className="v2-tight whitespace-pre-wrap rounded-2xl bg-amber-50 px-5 py-[18px] text-[15px] font-medium leading-relaxed text-amber-900">
-            {month.warn}
-          </p>
-        </div>
-      ) : null}
     </div>
   );
 }

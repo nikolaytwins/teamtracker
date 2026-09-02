@@ -27,10 +27,16 @@ export type HomeSeasonTaskSection = {
   items: string[];
 };
 
+export type HomeSeasonTaskLink = {
+  label: string;
+  href: string;
+};
+
 export type HomeSeasonTask = {
   id: string;
   text: string;
   href?: string;
+  links?: HomeSeasonTaskLink[];
   priority?: HomeSeasonPriority;
   note?: string;
   items?: string[];

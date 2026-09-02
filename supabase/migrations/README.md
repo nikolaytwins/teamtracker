@@ -87,9 +87,10 @@
 | 066 | `066_personal_finance_rent_deposit_fund.sql` | Фонд залога за квартиру |
 | 067 | `067_personal_finance_rules_v2.sql` | Правила v2: фонды, капитал, AED/GEL → счета |
 | 068 | `068_august_2026_conclusion.sql` | Дневник: вывод августа 2026 (markdown) |
-| 069 | `069_personal_finance_lera_usd_hint.sql` | Фонд Леры: подсказка 5 000 $ |
+| 069 | `069_personal_finance_lera_usd_hint.sql` | Фонд Леры: 5 000 ₽/мес на ₽-счёт |
+| 070 | `070_agency_dispatch_foundation.sql` | Sofia Plan: dispatch_work_status, правила, поля планирования на agency_project |
 
-**Следующий свободный номер:** `070`
+**Следующий свободный номер:** `071`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

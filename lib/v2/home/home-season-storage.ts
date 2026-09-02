@@ -1,17 +1,66 @@
-import type { HomeMonth, HomeSeasonTask } from "@/lib/v2/personal/seeds/home-seed";
+import type { HomeMonth, HomeSeasonPriority, HomeSeasonTask } from "@/lib/v2/personal/seeds/home-seed";
 
 const STORAGE_KEY = "v2-home-season-v1";
+
+/** Карточки сентября v1 — сняты при редизайне; убираем из «Прочее» и localStorage. */
+const LEGACY_SEP_TASK_IDS = new Set([
+  "sep-webinar-time",
+  "sep-urgent-rules",
+  "sep-finance-thresholds",
+  "sep-lera-reglament",
+  "sep-portfolio",
+  "sep-model-fix",
+  "sep-cv",
+  "sep-reactivate",
+]);
+
+const LEGACY_SEP_TASK_TEXTS = new Set([
+  "Оформить портфолио агентства",
+  "Разобрать косяки прошлой модели и исправить",
+  "Сделать 2 CV — одно на поддержку, одно на ИИ-внедрение",
+  "Реактивировать базу",
+  "Начать считать вебинарные проекты и трату времени на них",
+  "Сформулировать правила срочных проектов",
+  "Сформулировать финансовые пороги",
+  "Прописать регламент перед разговором с Лерой",
+]);
+
+function migrateSeasonStorage(state: SeasonStorageState): SeasonStorageState {
+  const hidden = new Set(state.taskHidden);
+  for (const id of LEGACY_SEP_TASK_IDS) hidden.add(id);
+
+  const customTasks = (state.customTasks ?? []).filter(
+    (t) => !LEGACY_SEP_TASK_IDS.has(t.id) && !LEGACY_SEP_TASK_TEXTS.has(t.text.trim())
+  );
+
+  const taskOrder: Record<string, string[]> = {};
+  for (const [monthId, ids] of Object.entries(state.taskOrder)) {
+    taskOrder[monthId] = ids.filter((id) => !LEGACY_SEP_TASK_IDS.has(id));
+  }
+
+  const nextHidden = [...hidden];
+  const changed =
+    nextHidden.length !== state.taskHidden.length ||
+    customTasks.length !== (state.customTasks ?? []).length ||
+    JSON.stringify(taskOrder) !== JSON.stringify(state.taskOrder);
+
+  if (!changed) return state;
+
+  return { ...state, taskHidden: nextHidden, customTasks, taskOrder };
+}
 
 export type SeasonCustomTask = {
   id: string;
   monthId: string;
   text: string;
   href?: string;
+  priority?: HomeSeasonPriority;
 };
 
 export type SeasonTaskEdit = {
   text: string;
   href?: string;
+  priority?: HomeSeasonPriority;
 };
 
 export type SeasonStorageState = {
@@ -39,7 +88,7 @@ export function readSeasonStorage(): SeasonStorageState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as Partial<SeasonStorageState>;
-    return {
+    const state: SeasonStorageState = {
       taskMonth: parsed.taskMonth ?? {},
       taskOrder: parsed.taskOrder ?? {},
       taskDone: parsed.taskDone ?? {},
@@ -47,6 +96,9 @@ export function readSeasonStorage(): SeasonStorageState {
       customTasks: parsed.customTasks ?? [],
       taskEdits: parsed.taskEdits ?? {},
     };
+    const migrated = migrateSeasonStorage(state);
+    if (migrated !== state) writeSeasonStorage(migrated);
+    return migrated;
   } catch {
     return emptyState();
   }
@@ -77,6 +129,7 @@ export function buildSeasonMonths(
 
   for (const [taskId, task] of allTasks) {
     if (storage.taskHidden.includes(taskId)) continue;
+    if (LEGACY_SEP_TASK_IDS.has(taskId)) continue;
     const monthId = storage.taskMonth[taskId] ?? task.defaultMonthId;
     const edit = storage.taskEdits[taskId];
     const list = byMonth.get(monthId) ?? [];
@@ -84,7 +137,8 @@ export function buildSeasonMonths(
       id: task.id,
       text: edit?.text ?? task.text,
       href: edit ? edit.href?.trim() || undefined : task.href,
-      priority: task.priority,
+      links: task.links,
+      priority: "priority" in (edit ?? {}) ? edit!.priority : task.priority,
       note: task.note,
       items: task.items,
       sections: task.sections,
@@ -103,6 +157,7 @@ export function buildSeasonMonths(
       id: custom.id,
       text: custom.text,
       href: custom.href,
+      priority: custom.priority,
       done: Boolean(storage.taskDone[custom.id]),
     });
     byMonth.set(monthId, list);
@@ -187,9 +242,72 @@ export function reorderSeasonTaskInMonth(
   return storage;
 }
 
+function setTaskPriority(
+  storage: SeasonStorageState,
+  taskId: string,
+  priority: HomeSeasonPriority | undefined,
+  seed: HomeMonth[]
+): void {
+  if (taskId.startsWith("custom-")) {
+    storage.customTasks = (storage.customTasks ?? []).map((task) =>
+      task.id === taskId ? { ...task, priority } : task
+    );
+    return;
+  }
+
+  const seedTask = seed.flatMap((m) => m.tasks).find((t) => t.id === taskId);
+  if (!seedTask) return;
+  const existing = storage.taskEdits[taskId];
+  storage.taskEdits[taskId] = {
+    text: existing?.text ?? seedTask.text,
+    ...(existing?.href ? { href: existing.href } : seedTask.href ? { href: seedTask.href } : {}),
+    priority,
+  };
+}
+
+function reorderForPriority(
+  storage: SeasonStorageState,
+  monthId: string,
+  taskId: string,
+  priority: HomeSeasonPriority | undefined,
+  seed: HomeMonth[]
+): void {
+  const built = buildSeasonMonths(seed, storage);
+  const month = built.find((m) => m.id === monthId);
+  if (!month) return;
+
+  const rest = month.tasks.filter((t) => t.id !== taskId);
+  const high = rest.filter((t) => t.priority === "high").map((t) => t.id);
+  const medium = rest.filter((t) => t.priority === "medium").map((t) => t.id);
+  const low = rest.filter((t) => t.priority === "low").map((t) => t.id);
+  const other = rest.filter((t) => !t.priority).map((t) => t.id);
+
+  const order: string[] = [];
+  if (priority === "high") order.push(...high, taskId, ...medium, ...low, ...other);
+  else if (priority === "medium") order.push(...high, ...medium, taskId, ...low, ...other);
+  else if (priority === "low") order.push(...high, ...medium, ...low, taskId, ...other);
+  else order.push(...high, ...medium, ...low, ...other, taskId);
+
+  storage.taskOrder[monthId] = order;
+}
+
+export function moveSeasonTaskToPriority(
+  taskId: string,
+  monthId: string,
+  priority: HomeSeasonPriority | undefined,
+  seed: HomeMonth[]
+): SeasonStorageState {
+  const storage = readSeasonStorage();
+  setTaskPriority(storage, taskId, priority, seed);
+  reorderForPriority(storage, monthId, taskId, priority, seed);
+  writeSeasonStorage(storage);
+  return storage;
+}
+
 export function addSeasonTask(
   monthId: string,
-  input: { text: string; href?: string }
+  input: { text: string; href?: string; priority?: HomeSeasonPriority },
+  seed: HomeMonth[]
 ): SeasonStorageState {
   const text = input.text.trim();
   if (!text) return readSeasonStorage();
@@ -202,32 +320,50 @@ export function addSeasonTask(
     monthId,
     text,
     ...(href ? { href } : {}),
+    ...(input.priority ? { priority: input.priority } : {}),
   };
 
   storage.customTasks = [...(storage.customTasks ?? []), task];
-  const order = storage.taskOrder[monthId] ?? [];
-  storage.taskOrder[monthId] = [id, ...order.filter((existingId) => existingId !== id)];
+  reorderForPriority(storage, monthId, id, input.priority, seed);
   writeSeasonStorage(storage);
   return storage;
 }
 
 export function updateSeasonTask(
   taskId: string,
-  input: { text: string; href?: string }
+  input: { text: string; href?: string; priority?: HomeSeasonPriority },
+  seed: HomeMonth[] = []
 ): SeasonStorageState {
   const text = input.text.trim();
   if (!text) return readSeasonStorage();
 
   const storage = readSeasonStorage();
   const href = input.href?.trim();
+  const hasPriority = "priority" in input;
 
   if (taskId.startsWith("custom-")) {
     storage.customTasks = (storage.customTasks ?? []).map((task) => {
       if (task.id !== taskId) return task;
-      return href ? { ...task, text, href } : { id: task.id, monthId: task.monthId, text };
+      return {
+        ...task,
+        text,
+        ...(href ? { href } : {}),
+        ...(hasPriority ? { priority: input.priority } : {}),
+      };
     });
+    const monthId =
+      storage.taskMonth[taskId] ?? storage.customTasks.find((t) => t.id === taskId)?.monthId;
+    if (monthId && hasPriority) reorderForPriority(storage, monthId, taskId, input.priority, seed);
   } else {
-    storage.taskEdits[taskId] = href ? { text, href } : { text };
+    const existing = storage.taskEdits[taskId];
+    storage.taskEdits[taskId] = {
+      text,
+      ...(href ? { href } : existing?.href ? { href: existing.href } : {}),
+      ...(hasPriority ? { priority: input.priority } : existing?.priority !== undefined ? { priority: existing.priority } : {}),
+    };
+    const seedMonth = seed.find((m) => m.tasks.some((t) => t.id === taskId));
+    const monthId = storage.taskMonth[taskId] ?? seedMonth?.id;
+    if (monthId && hasPriority) reorderForPriority(storage, monthId, taskId, input.priority, seed);
   }
 
   writeSeasonStorage(storage);

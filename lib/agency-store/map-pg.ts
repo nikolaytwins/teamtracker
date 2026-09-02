@@ -20,6 +20,12 @@ export function mapProjectRow(r: Record<string, unknown>): Record<string, unknow
     workStatus: r.work_status ?? "not_started",
     kanbanSortOrder: Number(r.kanban_sort_order) || 0,
     hourlyRateRub: Number(r.hourly_rate_rub) || 0,
+    dispatchWorkStatus: r.dispatch_work_status ?? "planned",
+    workDeadline: r.work_deadline ?? null,
+    plannedHoursRemaining:
+      r.planned_hours_remaining == null ? null : Number(r.planned_hours_remaining),
+    paymentCertainThisMonth: r.payment_certain_this_month === true,
+    workModelType: r.work_model_type ?? "other",
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

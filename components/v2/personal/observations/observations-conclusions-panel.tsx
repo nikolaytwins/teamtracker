@@ -24,7 +24,7 @@ function conclusionBody(it: PersonalObservation): string {
 
 function ConclusionMarkdown({ text }: { text: string }) {
   return (
-    <div className="obs-conclusion-md mt-3 max-w-[72ch] lg:max-w-none">
+    <div className="obs-conclusion-md mt-3 max-w-[62ch]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -179,7 +179,7 @@ function ConclusionComposer({
   };
 
   return (
-    <section className="rounded-2xl border border-dashed border-[var(--v2-ink-200)] bg-white px-5 py-4 shadow-[var(--v2-shadow-card)]">
+    <section className="max-w-[62ch] rounded-2xl border border-dashed border-[var(--v2-ink-200)] bg-white px-5 py-4 shadow-[var(--v2-shadow-card)]">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -260,7 +260,7 @@ function ConclusionCard({
   const bodyMd = conclusionBody(item);
 
   return (
-    <article className="rounded-2xl bg-white px-6 py-5 shadow-[var(--v2-shadow-soft)]">
+    <article className="max-w-[68ch] rounded-2xl bg-white px-6 py-5 shadow-[var(--v2-shadow-soft)]">
       <div className="flex flex-wrap items-center gap-3">
         <span className="inline-flex h-[26px] items-center rounded-lg bg-[var(--v2-brand-50)] px-2.5 text-[11.5px] font-semibold text-[var(--v2-brand-700)]">
           Вывод
@@ -287,7 +287,7 @@ function ConclusionCard({
       </div>
 
       {editing ? (
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="mt-4 flex max-w-[62ch] flex-col gap-3">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -314,7 +314,7 @@ function ConclusionCard({
           </button>
         </div>
       ) : (
-        <>
+        <div className="max-w-[62ch]">
           {item.title.trim() ? (
             <h3 className="v2-tight mt-3 text-[20px] font-semibold leading-snug tracking-[-0.02em] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
               {item.title.trim()}
@@ -325,7 +325,7 @@ function ConclusionCard({
           ) : item.body.trim() ? (
             <ConclusionMarkdown text={item.body.trim()} />
           ) : null}
-        </>
+        </div>
       )}
     </article>
   );
@@ -366,7 +366,7 @@ export function ObservationsConclusionsPanel({
 
   return (
     <div className="flex flex-col gap-10">
-      <section className="rounded-2xl bg-[var(--v2-ink-900)] px-6 py-5 text-white shadow-[var(--v2-shadow-soft)]">
+      <section className="max-w-[62ch] rounded-2xl bg-[var(--v2-ink-900)] px-6 py-5 text-white shadow-[var(--v2-shadow-soft)]">
         <p className="v2-tight text-[15px] leading-relaxed text-white/90">
           Здесь не события, а <span className="font-semibold text-white">выводы месяца</span> — что стало яснее и что
           меняет стратегию. Новый месяц появляется сам, можно добавить несколько карточек.

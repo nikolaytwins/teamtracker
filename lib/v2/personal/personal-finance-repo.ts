@@ -2166,7 +2166,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
   {
     fund_key: "lera",
     name: "Фонд сюрпризов Лере",
-    monthly_hint: "5 000 $ каждый месяц · счёт в USD",
+    monthly_hint: "5 000 ₽ каждый месяц · счёт в ₽",
     icon_key: "coin",
     accent: "#F472B6",
     sort_order: 6,
