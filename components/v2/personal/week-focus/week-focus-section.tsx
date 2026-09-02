@@ -28,7 +28,7 @@ function FocusEditForm({
 
   return (
     <form
-      className="mt-2 flex flex-col gap-2"
+      className="mt-2 flex flex-col gap-2.5"
       onSubmit={(e) => {
         e.preventDefault();
         const t = title.trim();
@@ -36,19 +36,29 @@ function FocusEditForm({
         onSubmit(t, note.trim());
       }}
     >
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Фокус недели"
-        className="v2-tight h-11 rounded-xl border-[1.5px] border-[var(--v2-ink-200)] bg-white px-3.5 text-[15px] outline-none focus:border-[var(--v2-brand-500)]"
-        autoFocus
-      />
-      <input
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="Уточнение (необязательно)"
-        className="v2-tight h-10 rounded-xl border-[1.5px] border-[var(--v2-ink-200)] bg-white px-3.5 text-[14px] outline-none focus:border-[var(--v2-brand-500)]"
-      />
+      <div className="flex flex-col gap-1.5">
+        <label className="v2-tight text-[12px] font-semibold text-[var(--v2-ink-500)]">Фокус</label>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Что главное на этой неделе"
+          className="v2-tight h-11 rounded-xl border-[1.5px] border-[var(--v2-ink-200)] bg-white px-3.5 text-[15px] outline-none focus:border-[var(--v2-brand-500)]"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="v2-tight text-[12px] font-semibold text-[var(--v2-ink-500)]">Описание</label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Детали, дедлайн, ссылка на контекст…"
+          rows={3}
+          className="v2-tight min-h-[84px] w-full resize-y rounded-xl border-[1.5px] border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[14px] leading-relaxed outline-none focus:border-[var(--v2-brand-500)]"
+        />
+      </div>
       <div className="flex gap-2">
         <button
           type="submit"

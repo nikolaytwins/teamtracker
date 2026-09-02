@@ -356,10 +356,12 @@ function PriorityPicker({
 
 function SeasonCardForm({
   draftText,
+  draftNote,
   draftHref,
   draftPriority,
   showPriority,
   onTextChange,
+  onNoteChange,
   onHrefChange,
   onPriorityChange,
   onSubmit,
@@ -368,10 +370,12 @@ function SeasonCardForm({
   autoFocus = false,
 }: {
   draftText: string;
+  draftNote: string;
   draftHref: string;
   draftPriority?: HomeSeasonPriority;
   showPriority?: boolean;
   onTextChange: (value: string) => void;
+  onNoteChange: (value: string) => void;
   onHrefChange: (value: string) => void;
   onPriorityChange?: (value?: HomeSeasonPriority) => void;
   onSubmit: () => void;
@@ -385,14 +389,20 @@ function SeasonCardForm({
         type="text"
         value={draftText}
         onChange={(e) => onTextChange(e.target.value)}
-        placeholder="Текст карточки"
+        placeholder="Заголовок карточки"
         autoFocus={autoFocus}
         className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[15px] text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            onSubmit();
-          }
+          if (e.key === "Escape") onCancel();
+        }}
+      />
+      <textarea
+        value={draftNote}
+        onChange={(e) => onNoteChange(e.target.value)}
+        placeholder="Описание (необязательно)"
+        rows={3}
+        className="v2-tight w-full resize-y rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+        onKeyDown={(e) => {
           if (e.key === "Escape") onCancel();
         }}
       />
@@ -457,11 +467,11 @@ export function HomeSeasonBand() {
     refreshStorage(deleteSeasonTask(taskId));
   };
 
-  const onAdd = (monthId: string, input: { text: string; href?: string; priority?: HomeSeasonPriority }) => {
+  const onAdd = (monthId: string, input: { text: string; href?: string; note?: string; priority?: HomeSeasonPriority }) => {
     refreshStorage(addSeasonTask(monthId, input, HOME_MONTHS));
   };
 
-  const onEdit = (taskId: string, input: { text: string; href?: string; priority?: HomeSeasonPriority }) => {
+  const onEdit = (taskId: string, input: { text: string; href?: string; note?: string; priority?: HomeSeasonPriority }) => {
     refreshStorage(updateSeasonTask(taskId, input, HOME_MONTHS));
   };
 
@@ -603,10 +613,10 @@ function MonthPanel({
   onDropPriorityKeyChange: (key: TaskGroupKey | null) => void;
   onToggle: (id: string, done: boolean) => void;
   onDelete: (id: string) => void;
-  onAdd: (monthId: string, input: { text: string; href?: string; priority?: HomeSeasonPriority }) => void;
+  onAdd: (monthId: string, input: { text: string; href?: string; note?: string; priority?: HomeSeasonPriority }) => void;
   onEdit: (
     taskId: string,
-    input: { text: string; href?: string; priority?: HomeSeasonPriority }
+    input: { text: string; href?: string; note?: string; priority?: HomeSeasonPriority }
   ) => void;
   onDropToMonth: (monthId: string) => void;
   onDropToPriority: (monthId: string, taskId: string, priority: HomeSeasonPriority | undefined) => void;
@@ -616,6 +626,7 @@ function MonthPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
+  const [draftNote, setDraftNote] = useState("");
   const [draftHref, setDraftHref] = useState("");
   const [draftPriority, setDraftPriority] = useState<HomeSeasonPriority | undefined>(undefined);
 
@@ -638,6 +649,7 @@ function MonthPanel({
     setAdding(false);
     setEditingId(null);
     setDraftText("");
+    setDraftNote("");
     setDraftHref("");
     setDraftPriority(undefined);
   }
@@ -650,6 +662,7 @@ function MonthPanel({
   function startAdd() {
     setEditingId(null);
     setDraftText("");
+    setDraftNote("");
     setDraftHref("");
     setDraftPriority(undefined);
     setAdding(true);
@@ -659,6 +672,7 @@ function MonthPanel({
     setAdding(false);
     setEditingId(task.id);
     setDraftText(task.text);
+    setDraftNote(task.note ?? "");
     setDraftHref(task.href ?? "");
     setDraftPriority(task.priority);
   }
@@ -668,6 +682,7 @@ function MonthPanel({
     if (!text) return;
     onAdd(month.id, {
       text,
+      note: draftNote.trim() || undefined,
       href: draftHref.trim() || undefined,
       ...(usePriorityGroups ? { priority: draftPriority } : {}),
     });
@@ -680,6 +695,7 @@ function MonthPanel({
     if (!text) return;
     onEdit(editingId, {
       text,
+      note: draftNote.trim() || undefined,
       href: draftHref.trim() || undefined,
       ...(usePriorityGroups ? { priority: draftPriority } : {}),
     });
@@ -791,10 +807,12 @@ function MonthPanel({
                     <SeasonCardForm
                       key={task.id}
                       draftText={draftText}
+                      draftNote={draftNote}
                       draftHref={draftHref}
                       draftPriority={draftPriority}
                       showPriority={usePriorityGroups}
                       onTextChange={setDraftText}
+                      onNoteChange={setDraftNote}
                       onHrefChange={setDraftHref}
                       onPriorityChange={setDraftPriority}
                       onSubmit={submitEdit}
@@ -832,10 +850,12 @@ function MonthPanel({
         {adding ? (
           <SeasonCardForm
             draftText={draftText}
+            draftNote={draftNote}
             draftHref={draftHref}
             draftPriority={draftPriority}
             showPriority={usePriorityGroups}
             onTextChange={setDraftText}
+            onNoteChange={setDraftNote}
             onHrefChange={setDraftHref}
             onPriorityChange={setDraftPriority}
             onSubmit={submitAdd}

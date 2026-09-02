@@ -54,12 +54,14 @@ export type SeasonCustomTask = {
   monthId: string;
   text: string;
   href?: string;
+  note?: string;
   priority?: HomeSeasonPriority;
 };
 
 export type SeasonTaskEdit = {
   text: string;
   href?: string;
+  note?: string;
   priority?: HomeSeasonPriority;
 };
 
@@ -139,7 +141,7 @@ export function buildSeasonMonths(
       href: edit ? edit.href?.trim() || undefined : task.href,
       links: task.links,
       priority: "priority" in (edit ?? {}) ? edit!.priority : task.priority,
-      note: task.note,
+      note: edit && "note" in edit ? edit.note?.trim() || undefined : task.note,
       items: task.items,
       sections: task.sections,
       exclude: task.exclude,
@@ -157,6 +159,7 @@ export function buildSeasonMonths(
       id: custom.id,
       text: custom.text,
       href: custom.href,
+      note: custom.note,
       priority: custom.priority,
       done: Boolean(storage.taskDone[custom.id]),
     });
@@ -306,7 +309,7 @@ export function moveSeasonTaskToPriority(
 
 export function addSeasonTask(
   monthId: string,
-  input: { text: string; href?: string; priority?: HomeSeasonPriority },
+  input: { text: string; href?: string; note?: string; priority?: HomeSeasonPriority },
   seed: HomeMonth[]
 ): SeasonStorageState {
   const text = input.text.trim();
@@ -315,11 +318,13 @@ export function addSeasonTask(
   const storage = readSeasonStorage();
   const id = `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   const href = input.href?.trim();
+  const note = input.note?.trim();
   const task: SeasonCustomTask = {
     id,
     monthId,
     text,
     ...(href ? { href } : {}),
+    ...(note ? { note } : {}),
     ...(input.priority ? { priority: input.priority } : {}),
   };
 
@@ -331,7 +336,7 @@ export function addSeasonTask(
 
 export function updateSeasonTask(
   taskId: string,
-  input: { text: string; href?: string; priority?: HomeSeasonPriority },
+  input: { text: string; href?: string; note?: string; priority?: HomeSeasonPriority },
   seed: HomeMonth[] = []
 ): SeasonStorageState {
   const text = input.text.trim();
@@ -339,7 +344,9 @@ export function updateSeasonTask(
 
   const storage = readSeasonStorage();
   const href = input.href?.trim();
+  const note = input.note?.trim();
   const hasPriority = "priority" in input;
+  const hasNote = "note" in input;
 
   if (taskId.startsWith("custom-")) {
     storage.customTasks = (storage.customTasks ?? []).map((task) => {
@@ -348,6 +355,7 @@ export function updateSeasonTask(
         ...task,
         text,
         ...(href ? { href } : {}),
+        ...(hasNote ? { note: note || undefined } : {}),
         ...(hasPriority ? { priority: input.priority } : {}),
       };
     });
@@ -359,6 +367,7 @@ export function updateSeasonTask(
     storage.taskEdits[taskId] = {
       text,
       ...(href ? { href } : existing?.href ? { href: existing.href } : {}),
+      ...(hasNote ? { note: note || undefined } : existing?.note !== undefined ? { note: existing.note } : {}),
       ...(hasPriority ? { priority: input.priority } : existing?.priority !== undefined ? { priority: existing.priority } : {}),
     };
     const seedMonth = seed.find((m) => m.tasks.some((t) => t.id === taskId));
