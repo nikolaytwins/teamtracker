@@ -1,4 +1,4 @@
--- 072 — помесячные средние курсы ЦБ (для графиков в USD)
+-- 072 pomesyachnye srednie kursy CB (dlya grafikov v USD)
 
 CREATE TABLE IF NOT EXISTS v2_fx_monthly_rates (
   year INTEGER NOT NULL,
