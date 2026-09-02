@@ -1,5 +1,5 @@
--- 073 — seed средних курсов USD (ЦБ), 2018–текущий год
--- Сгенерировано scripts/generate-fx-monthly-seed.ts
+-- 073 seed srednikh kursov USD (CBR), 2018-2026
+-- Smotri 072_v2_fx_monthly_rates.sql (tablitsa dolzhna byt sozdana)
 
 INSERT INTO v2_fx_monthly_rates (year, month, currency_code, avg_rate_to_rub, sample_days, source, updated_at)
 VALUES

@@ -27,8 +27,8 @@ async function main() {
 
   const rows = [...allMonthly.values()].sort((a, b) => a.year - b.year || a.month - b.month);
 
-  console.log("-- 073 — seed средних курсов USD (ЦБ), 2018–текущий год");
-  console.log("-- Сгенерировано scripts/generate-fx-monthly-seed.ts");
+  console.log("-- 073 seed srednikh kursov USD (CBR), 2018-2026");
+  console.log("-- Smotri 072_v2_fx_monthly_rates.sql");
   console.log("");
   console.log("INSERT INTO v2_fx_monthly_rates (year, month, currency_code, avg_rate_to_rub, sample_days, source, updated_at)");
   console.log("VALUES");
