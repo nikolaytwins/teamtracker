@@ -10,12 +10,26 @@ type SeriesKey = "profit" | "capital";
 type ChartView = "fit" | "scroll";
 
 const MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
-const POINT_GAP = 84;
+/** Компактный шаг в «Обзоре» — всегда со скроллом при длинной истории. */
+const OVERVIEW_GAP = 56;
+/** Развёрнутый шаг в «Детально». */
+const DETAIL_GAP = 84;
 const CHART_H = 300;
-const Y_AXIS_W = 74;
+const Y_AXIS_W = 82;
 const PR = 28;
 const PT = 22;
-const PB = 36;
+const PB = 40;
+
+function pointGapForMode(mode: ChartView): number {
+  return mode === "fit" ? OVERVIEW_GAP : DETAIL_GAP;
+}
+
+function shouldShowMonthLabel(i: number, total: number, gap: number): boolean {
+  if (i === 0 || i === total - 1) return true;
+  if (gap >= OVERVIEW_GAP) return true;
+  const step = gap >= 64 ? 2 : 3;
+  return i % step === 0;
+}
 
 function fmtRub(n: number) {
   return `${homeFmt(n)} ₽`;
@@ -132,20 +146,22 @@ export function HomeDynamicsChart() {
     return buildFullSeries(dashboard.incomeHistory, seriesKey);
   }, [dashboard, seriesKey]);
 
+  const pointGap = pointGapForMode(chartView);
+
   const plotW = useMemo(() => {
     const n = series.values.length;
     if (n < 2) return plotViewportW;
-    if (chartView === "fit") return plotViewportW;
-    return Math.max(plotViewportW, (n - 1) * POINT_GAP + PR);
-  }, [series.values.length, plotViewportW, chartView]);
+    const inner = (n - 1) * pointGap;
+    return Math.max(plotViewportW, inner + PR);
+  }, [series.values.length, plotViewportW, pointGap]);
 
   const chart = useMemo(() => {
     const { values, labels } = series;
     if (values.length < 2) return null;
 
-    const innerW = Math.max(1, plotW - PR);
+    const innerW = (values.length - 1) * pointGap;
     const max = Math.ceil((Math.max(...values) * 1.12) / 50000) * 50000 || 1;
-    const xAt = (i: number) => (i * innerW) / (values.length - 1);
+    const xAt = (i: number) => i * pointGap;
     const yAt = (v: number) => PT + (1 - v / max) * (CHART_H - PT - PB);
 
     const pts = values.map((v, i) => [xAt(i), yAt(v)] as const);
@@ -176,13 +192,14 @@ export function HomeDynamicsChart() {
       labels,
       xAt,
       yAt,
+      pointGap,
     };
-  }, [series, plotW]);
+  }, [series, plotW, pointGap]);
 
   useEffect(() => {
-    if (chartView !== "scroll") return;
     const el = scrollRef.current;
     if (!el || series.values.length < 2) return;
+    if (el.scrollWidth <= el.clientWidth + 1) return;
     el.scrollLeft = el.scrollWidth - el.clientWidth;
   }, [series.values.length, seriesKey, chartView, plotW]);
 
@@ -255,7 +272,7 @@ export function HomeDynamicsChart() {
     series.labels.length > 1
       ? `${series.labels[0]} — ${series.labels[series.labels.length - 1]}`
       : series.labels[0] ?? "";
-  const scrollable = chartView === "scroll" && plotW > plotViewportW + 1;
+  const scrollable = plotW > plotViewportW + 1;
   const activePt = chart.pts[activeIdx];
 
   return (
@@ -267,7 +284,7 @@ export function HomeDynamicsChart() {
           </span>
           <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-400)]">
             {rangeLabel}
-            {scrollable ? " · прокрутите влево к началу" : " · все месяцы на одном экране"}
+            {scrollable ? " · прокрутите влево к началу" : null}
           </p>
           <div className="v2-tnum mt-2.5 text-[44px] font-semibold leading-none tracking-[-0.04em] text-[var(--v2-ink-900)]">
             {fmtRub(curVal)}
@@ -357,7 +374,7 @@ export function HomeDynamicsChart() {
 
         <div
           ref={scrollRef}
-          className={`min-w-0 flex-1 ${scrollable ? "overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]" : "overflow-hidden"}`}
+          className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]"
         >
           <div className="relative" style={{ width: chart.W }}>
             <svg
@@ -389,19 +406,21 @@ export function HomeDynamicsChart() {
               <path d={chart.fillPath} fill="url(#home-chart-g)" />
               <path d={chart.path} fill="none" stroke="#2d5eef" strokeWidth="3" strokeLinecap="round" />
 
-              {series.labels.map((label, i) => (
-                <text
-                  key={series.keys[i] ?? label}
-                  x={chart.pts[i]![0]}
-                  y={CHART_H - 10}
-                  textAnchor="middle"
-                  fontSize="12.5"
-                  fill="#a1a1aa"
-                  fontFamily="inherit"
-                >
-                  {label}
-                </text>
-              ))}
+              {series.labels.map((label, i) =>
+                shouldShowMonthLabel(i, series.labels.length, chart.pointGap) ? (
+                  <text
+                    key={series.keys[i] ?? label}
+                    x={chart.pts[i]![0]}
+                    y={CHART_H - 12}
+                    textAnchor="middle"
+                    fontSize="11.5"
+                    fill="#a1a1aa"
+                    fontFamily="inherit"
+                  >
+                    {label}
+                  </text>
+                ) : null
+              )}
 
               {activePt ? (
                 <>

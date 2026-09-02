@@ -89,8 +89,9 @@
 | 068 | `068_august_2026_conclusion.sql` | Дневник: вывод августа 2026 (markdown) |
 | 069 | `069_personal_finance_lera_usd_hint.sql` | Фонд Леры: 5 000 ₽/мес на ₽-счёт |
 | 070 | `070_agency_dispatch_foundation.sql` | Sofia Plan: dispatch_work_status, правила, поля планирования на agency_project |
+| 071 | `071_personal_income_history_2018_2023.sql` | История дохода: помесячные суммы 2018–2023 для графика |
 
-**Следующий свободный номер:** `071`
+**Следующий свободный номер:** `072`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 
