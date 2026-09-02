@@ -91,6 +91,19 @@ type TaskView = HomeSeasonTask & { done: boolean };
 
 type MonthView = Omit<HomeMonth, "tasks"> & { tasks: TaskView[] };
 
+type PriorityGroupKey = HomeSeasonPriority | "other";
+
+type TaskGroupKey = PriorityGroupKey | "all";
+
+type PriorityTaskGroup = {
+  key: TaskGroupKey;
+  label: string;
+  emoji?: string;
+  tint?: string;
+  bg?: string;
+  tasks: TaskView[];
+};
+
 function priorityRank(p?: HomeSeasonPriority): number {
   if (p === "high") return 0;
   if (p === "medium") return 1;
@@ -98,9 +111,9 @@ function priorityRank(p?: HomeSeasonPriority): number {
   return 3;
 }
 
-function groupTasksByPriority(tasks: TaskView[]) {
+function groupTasksByPriority(tasks: TaskView[]): PriorityTaskGroup[] {
   const sorted = [...tasks].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
-  const groups = PRIORITY_GROUPS.map((g) => ({
+  const groups: PriorityTaskGroup[] = PRIORITY_GROUPS.map((g) => ({
     key: g.id,
     label: g.label,
     emoji: g.emoji,
@@ -423,7 +436,7 @@ export function HomeSeasonBand() {
   const [activeId, setActiveId] = useState(currentId);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dropMonthId, setDropMonthId] = useState<string | null>(null);
-  const [dropPriorityKey, setDropPriorityKey] = useState<string | null>(null);
+  const [dropPriorityKey, setDropPriorityKey] = useState<TaskGroupKey | null>(null);
 
   const months: MonthView[] = useMemo(() => buildSeasonMonths(HOME_MONTHS, storage), [storage]);
   const active = months.find((m) => m.id === activeId) ?? months[0]!;
@@ -584,10 +597,10 @@ function MonthPanel({
 }: {
   month: MonthView;
   dragTaskId: string | null;
-  dropPriorityKey: string | null;
+  dropPriorityKey: TaskGroupKey | null;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
-  onDropPriorityKeyChange: (key: string | null) => void;
+  onDropPriorityKeyChange: (key: TaskGroupKey | null) => void;
   onToggle: (id: string, done: boolean) => void;
   onDelete: (id: string) => void;
   onAdd: (monthId: string, input: { text: string; href?: string; priority?: HomeSeasonPriority }) => void;
@@ -607,12 +620,12 @@ function MonthPanel({
   const [draftPriority, setDraftPriority] = useState<HomeSeasonPriority | undefined>(undefined);
 
   const usePriorityGroups = month.id === "sep" && month.tasks.some((t) => t.priority);
-  const taskGroups = useMemo(() => {
+  const taskGroups = useMemo((): PriorityTaskGroup[] => {
     if (!usePriorityGroups) return [{ key: "all", label: "", tasks: month.tasks }];
     const grouped = groupTasksByPriority(month.tasks);
     if (!dragTaskId) return grouped.filter((g) => g.tasks.length > 0);
     const byKey = new Map(grouped.map((g) => [g.key, g]));
-    const result = PRIORITY_GROUPS.map(
+    const result: PriorityTaskGroup[] = PRIORITY_GROUPS.map(
       (g) => byKey.get(g.id) ?? { key: g.id, label: g.label, emoji: g.emoji, tint: g.tint, bg: g.bg, tasks: [] }
     );
     if (!result.some((g) => g.key === "other")) {
@@ -726,9 +739,7 @@ function MonthPanel({
       <div className="space-y-6">
         {taskGroups.map((group) => {
           const dropPriority =
-            group.key === "high" || group.key === "medium" || group.key === "low"
-              ? (group.key as HomeSeasonPriority)
-              : undefined;
+            group.key === "high" || group.key === "medium" || group.key === "low" ? group.key : undefined;
           const isDropTarget = Boolean(dragTaskId && dropPriorityKey === group.key);
 
           return (
