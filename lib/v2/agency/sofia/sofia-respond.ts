@@ -1,8 +1,13 @@
 import { buildDispatchContext } from "@/lib/v2/agency/dispatch/dispatch-context";
+import type { DispatchContext } from "@/lib/v2/agency/dispatch/dispatch-types";
 import { dayModeMap } from "@/lib/v2/agency/plan/plan-calendar-logic";
 import { listPlanDayModes, listPlanItems } from "@/lib/v2/agency/plan/plan-repo";
 import { addDays, fmtLong, fmtWeekday, mondayOf, toYmd } from "@/lib/v2/agency/plan/plan-utils";
-import { buildSofiaContextPanel, estimateFreeHoursBefore } from "@/lib/v2/agency/sofia/sofia-context";
+import {
+  buildSofiaContextPanel,
+  estimateFreeHoursBefore,
+  loadSofiaRuntimeContext,
+} from "@/lib/v2/agency/sofia/sofia-context";
 import { parseProjectQuery } from "@/lib/v2/agency/sofia/sofia-parse-input";
 import type {
   SofiaChatTurn,
@@ -23,6 +28,20 @@ function fmtRate(n: number): string {
   return `${Math.round(n).toLocaleString("ru-RU")} ₽/ч`;
 }
 
+function isSmallTalk(message: string): boolean {
+  return /^(привет|здравствуй|добрый\s+(день|утро|вечер)|hi|hello|hey)[!.?\s]*$/i.test(message.trim());
+}
+
+export function sofiaFallbackBubble(): SofiaMessage {
+  return {
+    id: id(),
+    role: "sofia",
+    kind: "bubble",
+    text: "Приняла. Если это про новый проект — напишите цену, дедлайн и часы. Если нужно перестроить план или выбрать следующий блок — скажите прямо.",
+    chips: ["Можно брать новый проект?", "Что делать сейчас?", "Перестроить план"],
+  };
+}
+
 export type SofiaRespondResult = {
   messages: SofiaMessage[];
   replanPreview?: ReplanPreviewPayload;
@@ -32,29 +51,47 @@ export async function respondSofia(
   ctx: V2SessionContext,
   input: { message: string; history?: SofiaChatTurn[]; year: number; month: number }
 ): Promise<SofiaRespondResult> {
+  const runtime = await loadSofiaRuntimeContext(ctx, input.year, input.month);
+
   const llm = await respondSofiaViaOpenRouter({
     message: input.message,
     history: input.history ?? [],
     year: input.year,
     month: input.month,
-    context: await buildSofiaContextPanel(ctx, input.year, input.month),
-    dispatch: await buildDispatchContext(ctx, input.year, input.month),
+    context: runtime.context,
+    dispatch: runtime.dispatch,
   });
   if (llm?.length) return { messages: llm };
 
-  return respondSofiaRules(ctx, input.message, input.year, input.month);
+  return respondSofiaRules(ctx, input.message, input.year, input.month, runtime);
 }
 
 async function respondSofiaRules(
   ctx: V2SessionContext,
   message: string,
   year: number,
-  month: number
+  month: number,
+  runtime?: { context: SofiaContextPanel; dispatch: DispatchContext }
 ): Promise<SofiaRespondResult> {
   const parsed = parseProjectQuery(message);
-  const panel = await buildSofiaContextPanel(ctx, year, month);
-  const dispatch = await buildDispatchContext(ctx, year, month);
+  const panel = runtime?.context ?? (await buildSofiaContextPanel(ctx, year, month));
+  const dispatch = runtime?.dispatch ?? (await buildDispatchContext(ctx, year, month));
   const pricing = dispatch.rules.rules.pricing;
+
+  if (isSmallTalk(message)) {
+    const active = dispatch.plan.activeProjects.length;
+    return {
+      messages: [
+        {
+          id: id(),
+          role: "sofia",
+          kind: "bubble",
+          text: `Привет. Смотрю ${panel.monthLabel.toLowerCase()}: надёжная прибыль ${formatRub(panel.reliableProfitRub)}, ${panel.deadlinesNote.toLowerCase()}.${active ? ` В работе ${active} ${active === 1 ? "проект" : active < 5 ? "проекта" : "проектов"}.` : ""} Чем помочь?`,
+          chips: ["Можно брать новый проект?", "Что делать сейчас?", "Перестроить план"],
+        },
+      ],
+    };
+  }
 
   if (parsed.isReplan || message === "Перестроить план") {
     const preview = await buildReplanPreview(ctx, year, month);

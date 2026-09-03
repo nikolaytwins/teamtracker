@@ -1,4 +1,5 @@
 import { buildDispatchContext } from "@/lib/v2/agency/dispatch/dispatch-context";
+import type { DispatchContext } from "@/lib/v2/agency/dispatch/dispatch-types";
 import {
   dayModeMap,
   findModeDate,
@@ -41,9 +42,10 @@ async function loadPlanCalendarSlice(
 export async function buildSofiaContextPanel(
   ctx: V2SessionContext,
   year: number,
-  month: number
+  month: number,
+  dispatchIn?: DispatchContext
 ): Promise<SofiaContextPanel> {
-  const dispatch = await buildDispatchContext(ctx, year, month);
+  const dispatch = dispatchIn ?? (await buildDispatchContext(ctx, year, month));
   const today = new Date();
   const todayKey = toYmd(today);
   const from = toYmd(mondayOf(today));
@@ -105,6 +107,58 @@ export async function buildSofiaContextPanel(
     rulesUsed,
     planCalendarReady,
   };
+}
+
+export function minimalSofiaContextPanel(
+  dispatch: DispatchContext,
+  year: number,
+  month: number
+): SofiaContextPanel {
+  const todayKey = toYmd(new Date());
+  const overdue = dispatch.plan.activeProjects.filter((p) => {
+    if (!p.workDeadline) return false;
+    return p.workDeadline < todayKey;
+  });
+  const pricing = dispatch.rules.rules.pricing;
+  return {
+    year,
+    month,
+    monthLabel: monthName(new Date(year, month - 1, 1)),
+    workScheduledUntil: null,
+    nextFreeWindow: null,
+    deadlinesOk: overdue.length === 0,
+    deadlinesNote:
+      overdue.length === 0
+        ? "Все текущие проекты помещаются"
+        : overdue.length === 1
+          ? `Риск по сроку: ${overdue[0]!.name}`
+          : `Риск по срокам: ${overdue.length} проекта`,
+    reliableProfitRub: dispatch.finance.reliableProfitRub,
+    plannedProfitRub: dispatch.finance.plannedProfitRub,
+    protectedDays: [],
+    rulesUsed: [
+      `Нижний порог — ${formatRub(pricing.minEffectiveRateRub)}/ч`,
+      "Срочность оплачивается отдельно",
+      "Резерв не используется под обычный новый проект",
+    ],
+    planCalendarReady: false,
+  };
+}
+
+/** Один проход: dispatch + панель контекста для чата и GET /sofia/chat. */
+export async function loadSofiaRuntimeContext(
+  ctx: V2SessionContext,
+  year: number,
+  month: number
+): Promise<{ context: SofiaContextPanel; dispatch: DispatchContext }> {
+  const dispatch = await buildDispatchContext(ctx, year, month);
+  try {
+    const context = await buildSofiaContextPanel(ctx, year, month, dispatch);
+    return { context, dispatch };
+  } catch (error) {
+    console.warn("Sofia: context panel fallback", error);
+    return { context: minimalSofiaContextPanel(dispatch, year, month), dispatch };
+  }
 }
 
 /** Rough free project hours before a deadline (excluding protected low-cap days). */
