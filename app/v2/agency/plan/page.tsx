@@ -1,11 +1,10 @@
-import { DispatchPagePlaceholder } from "@/components/v2/agency/dispatch/dispatch-page-placeholder";
+import { DispatchPlanClient } from "@/components/v2/agency/plan/dispatch-plan-client";
+import { Suspense } from "react";
 
 export default function V2AgencyPlanPage() {
   return (
-    <DispatchPagePlaceholder
-      title="План"
-      description="Диспетчер мощности: активные проекты, резерв, стратегия и Аркалиум. Данные уже доступны через API dispatch/context."
-      apiHint="GET /api/v2/agency/dispatch/context?year=&month="
-    />
+    <Suspense fallback={<div className="p-6 text-[14px] text-[var(--v2-ink-400)]">Загрузка…</div>}>
+      <DispatchPlanClient />
+    </Suspense>
   );
 }

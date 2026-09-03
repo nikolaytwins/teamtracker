@@ -28,12 +28,16 @@ export type DispatchRulesPayload = {
   finance: {
     reliableProfitMinRub: number;
     plannedProfitTargetRub: number;
+    pauseProfitMinRub?: number;
   };
 };
+
+import type { WorkRulesDocument } from "@/lib/v2/agency/dispatch/work-rules-document";
 
 export type DispatchRulesRow = {
   id: string;
   rules: DispatchRulesPayload;
+  workRules: WorkRulesDocument;
   rulesTextMd: string | null;
   updatedAt: string;
 };

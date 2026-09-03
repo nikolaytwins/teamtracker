@@ -449,7 +449,7 @@ export function TasksInboxPanel({
   };
 
   return (
-    <>
+    <div className="tasks-panels">
       <section className="card pad" data-section="task-list-inbox">
         <div className="sec-head">
           <h2 className="sec-title">Входящие (ближайшие)</h2>
@@ -694,6 +694,6 @@ export function TasksInboxPanel({
       </IdeasTasksDrawer>
 
       <IdeasTasksToast message={toast?.text ?? null} actionLabel={toast?.undo ? "Вернуть" : undefined} onAction={toast?.undo} />
-    </>
+    </div>
   );
 }

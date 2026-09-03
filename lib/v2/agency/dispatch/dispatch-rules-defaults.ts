@@ -19,6 +19,7 @@ export const DEFAULT_DISPATCH_RULES: DispatchRulesPayload = {
   finance: {
     reliableProfitMinRub: 170_000,
     plannedProfitTargetRub: 200_000,
+    pauseProfitMinRub: 245_000,
   },
 };
 
@@ -44,6 +45,7 @@ export function normalizeDispatchRules(raw: unknown): DispatchRulesPayload {
     finance: {
       reliableProfitMinRub: num(o.finance?.reliableProfitMinRub, base.finance.reliableProfitMinRub),
       plannedProfitTargetRub: num(o.finance?.plannedProfitTargetRub, base.finance.plannedProfitTargetRub),
+      pauseProfitMinRub: num(o.finance?.pauseProfitMinRub, base.finance.pauseProfitMinRub ?? 245_000),
     },
   };
 }

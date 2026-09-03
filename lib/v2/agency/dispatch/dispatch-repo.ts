@@ -9,6 +9,13 @@ import {
   normalizeDispatchRules,
 } from "@/lib/v2/agency/dispatch/dispatch-rules-defaults";
 import {
+  DEFAULT_WORK_RULES_DOCUMENT,
+  normalizeWorkRulesDocument,
+  rulesJsonWithWorkRules,
+  syncWorkRulesToRules,
+  type WorkRulesDocument,
+} from "@/lib/v2/agency/dispatch/work-rules-document";
+import {
   dispatchStatusMeta,
   isDispatchWorkStatus,
   isActiveDispatchStatus,
@@ -125,38 +132,64 @@ export async function getDispatchRules(): Promise<DispatchRulesRow> {
 
     if (error) {
       console.warn("dispatch rules: table unavailable, using defaults", error.message);
-      return {
-        id: "default",
-        rules: DEFAULT_DISPATCH_RULES,
-        rulesTextMd: null,
-        updatedAt: new Date(0).toISOString(),
-      };
+      return defaultDispatchRulesRow();
     }
 
     if (!data) {
-      return {
-        id: "default",
-        rules: DEFAULT_DISPATCH_RULES,
-        rulesTextMd: null,
-        updatedAt: new Date(0).toISOString(),
-      };
+      return defaultDispatchRulesRow();
     }
 
-    return {
-      id: String(data.id),
-      rules: normalizeDispatchRules(data.rules_json),
-      rulesTextMd: data.rules_text_md ? String(data.rules_text_md) : null,
-      updatedAt: String(data.updated_at),
-    };
+    return mapDispatchRulesRow(data);
   } catch (e) {
     console.warn("dispatch rules: fallback to defaults", e);
-    return {
-      id: "default",
-      rules: DEFAULT_DISPATCH_RULES,
-      rulesTextMd: null,
-      updatedAt: new Date(0).toISOString(),
-    };
+    return defaultDispatchRulesRow();
   }
+}
+
+function defaultDispatchRulesRow(): DispatchRulesRow {
+  return {
+    id: "default",
+    rules: DEFAULT_DISPATCH_RULES,
+    workRules: structuredClone(DEFAULT_WORK_RULES_DOCUMENT),
+    rulesTextMd: null,
+    updatedAt: new Date(0).toISOString(),
+  };
+}
+
+function mapDispatchRulesRow(data: {
+  id: unknown;
+  rules_json: unknown;
+  rules_text_md: unknown;
+  updated_at: unknown;
+}): DispatchRulesRow {
+  const raw = data.rules_json as Record<string, unknown> | null;
+  const workRules = normalizeWorkRulesDocument(raw?.workRules);
+  return {
+    id: String(data.id),
+    rules: normalizeDispatchRules(raw),
+    workRules,
+    rulesTextMd: data.rules_text_md ? String(data.rules_text_md) : null,
+    updatedAt: String(data.updated_at),
+  };
+}
+
+export async function updateDispatchRules(input: {
+  workRules: WorkRulesDocument;
+}): Promise<DispatchRulesRow> {
+  const sb = createSupabaseServiceClient();
+  const current = await getDispatchRules();
+  const rules = syncWorkRulesToRules(input.workRules, current.rules);
+  const rules_json = rulesJsonWithWorkRules(rules, input.workRules);
+  const updated_at = new Date().toISOString();
+
+  const { data, error } = await sb
+    .from("agency_dispatch_rules")
+    .upsert({ id: "default", rules_json, updated_at }, { onConflict: "id" })
+    .select("id, rules_json, rules_text_md, updated_at")
+    .single();
+
+  if (error) throw error;
+  return mapDispatchRulesRow(data);
 }
 
 export async function listDispatchProjects(

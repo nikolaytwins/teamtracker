@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { appPath } from "@/lib/api-url";
 import {
   addSeasonTask,
@@ -150,6 +150,7 @@ function SeasonTaskCard({
   onDragStart,
   onDragEnd,
   dragDisabled,
+  isDragging,
 }: {
   task: TaskView;
   expanded: boolean;
@@ -157,9 +158,10 @@ function SeasonTaskCard({
   onToggleDone: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onDragStart: () => void;
+  onDragStart: (e: DragEvent) => void;
   onDragEnd: () => void;
   dragDisabled: boolean;
+  isDragging: boolean;
 }) {
   const hasDetails =
     Boolean(task.note) ||
@@ -170,7 +172,14 @@ function SeasonTaskCard({
   const priorityMeta = PRIORITY_GROUPS.find((g) => g.id === task.priority);
 
   return (
-    <div className="group relative">
+    <div
+      className="group relative"
+      onDragOver={(e) => {
+        if (!isDragging || dragDisabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
       <div
         className={`overflow-hidden rounded-2xl transition ${
           task.done
@@ -183,7 +192,11 @@ function SeasonTaskCard({
           <button
             type="button"
             draggable={!dragDisabled}
-            onDragStart={onDragStart}
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", task.id);
+              onDragStart(e);
+            }}
             onDragEnd={onDragEnd}
             onClick={onToggleDone}
             className="mt-0.5 shrink-0 cursor-grab active:cursor-grabbing"
@@ -584,7 +597,6 @@ export function HomeSeasonBand() {
         onDelete={onDelete}
         onAdd={onAdd}
         onEdit={onEdit}
-        onDropToMonth={onDropToMonth}
         onDropToPriority={onDropToPriority}
       />
     </section>
@@ -602,7 +614,6 @@ function MonthPanel({
   onDelete,
   onAdd,
   onEdit,
-  onDropToMonth,
   onDropToPriority,
 }: {
   month: MonthView;
@@ -618,7 +629,6 @@ function MonthPanel({
     taskId: string,
     input: { text: string; href?: string; note?: string; priority?: HomeSeasonPriority }
   ) => void;
-  onDropToMonth: (monthId: string) => void;
   onDropToPriority: (monthId: string, taskId: string, priority: HomeSeasonPriority | undefined) => void;
 }) {
   const done = month.tasks.filter((t) => t.done).length;
@@ -630,7 +640,7 @@ function MonthPanel({
   const [draftHref, setDraftHref] = useState("");
   const [draftPriority, setDraftPriority] = useState<HomeSeasonPriority | undefined>(undefined);
 
-  const usePriorityGroups = month.id === "sep" && month.tasks.some((t) => t.priority);
+  const usePriorityGroups = month.id === "sep";
   const taskGroups = useMemo((): PriorityTaskGroup[] => {
     if (!usePriorityGroups) return [{ key: "all", label: "", tasks: month.tasks }];
     const grouped = groupTasksByPriority(month.tasks);
@@ -705,17 +715,7 @@ function MonthPanel({
   const dragDisabled = Boolean(adding || editingId);
 
   return (
-    <div
-      className="mt-4 rounded-[20px] bg-white p-7 shadow-[var(--v2-shadow-card)]"
-      onDragOver={(e) => {
-        if (!dragTaskId) return;
-        e.preventDefault();
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDropToMonth(month.id);
-      }}
-    >
+    <div className="mt-4 rounded-[20px] bg-white p-7 shadow-[var(--v2-shadow-card)]">
       <div className="mb-5 flex flex-wrap items-baseline gap-3.5">
         <h3 className="v2-tight text-[26px] font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)]">
           {month.headline}
@@ -781,7 +781,7 @@ function MonthPanel({
             }}
             className={`rounded-2xl transition ${
               isDropTarget ? "bg-[var(--v2-brand-50)] ring-2 ring-[var(--v2-brand-300)] ring-offset-2" : ""
-            }`}
+            } ${dragTaskId && usePriorityGroups ? "min-h-[88px]" : ""}`}
           >
             {group.label ? (
               <div className="mb-3 flex items-center gap-2 px-0.5">
@@ -800,7 +800,15 @@ function MonthPanel({
                 ) : null}
               </div>
             ) : null}
-            <div className="grid grid-cols-1 gap-3 p-0.5 md:grid-cols-2">
+            <div
+              className="grid grid-cols-1 gap-3 p-0.5 md:grid-cols-2"
+              onDragOver={(e) => {
+                if (!dragTaskId || !usePriorityGroups) return;
+                e.preventDefault();
+                e.stopPropagation();
+                onDropPriorityKeyChange(group.key);
+              }}
+            >
               {group.tasks.length ? (
                 group.tasks.map((task) =>
                   editingId === task.id ? (
@@ -832,6 +840,7 @@ function MonthPanel({
                       onDragStart={() => onDragStart(task.id)}
                       onDragEnd={onDragEnd}
                       dragDisabled={dragDisabled}
+                      isDragging={Boolean(dragTaskId)}
                     />
                   )
                 )

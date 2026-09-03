@@ -264,6 +264,7 @@ function setTaskPriority(
   storage.taskEdits[taskId] = {
     text: existing?.text ?? seedTask.text,
     ...(existing?.href ? { href: existing.href } : seedTask.href ? { href: seedTask.href } : {}),
+    ...(existing && "note" in existing ? { note: existing.note } : {}),
     priority,
   };
 }
