@@ -2,10 +2,17 @@ import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PlanDayMode, PlanItemKind, PlanPayload, PlanItemRow } from "@/lib/v2/agency/plan/plan-types";
 import type { DispatchWorkStatus } from "@/lib/v2/agency/dispatch/dispatch-work-status";
 
+export type PlanFetchResult = {
+  plan: PlanPayload;
+  storageWarning: string | null;
+};
+
 export async function fetchPlan(from: string, to: string, year: number, month: number) {
   const q = new URLSearchParams({ from, to, year: String(year), month: String(month) });
-  const data = await fetchJson<{ plan: PlanPayload }>(`/api/v2/agency/plan?${q}`);
-  return data.plan;
+  const data = await fetchJson<{ plan: PlanPayload; storageWarning?: string | null }>(
+    `/api/v2/agency/plan?${q}`
+  );
+  return { plan: data.plan, storageWarning: data.storageWarning ?? null };
 }
 
 export async function createPlanItemApi(body: {

@@ -142,6 +142,7 @@ function DispatchPlanCalendar({
   const todayKey = toYmd(today);
 
   const [plan, setPlan] = useState<PlanPayload | null>(null);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [calMode, setCalMode] = useState<CalMode>("week");
@@ -167,8 +168,9 @@ function DispatchPlanCalendar({
   const reload = useCallback(async () => {
     const year = anchor.getFullYear();
     const month = anchor.getMonth() + 1;
-    const data = await fetchPlan(range.from, range.to, year, month);
+    const { plan: data, storageWarning: warning } = await fetchPlan(range.from, range.to, year, month);
     setPlan(data);
+    setStorageWarning(warning);
     return data;
   }, [anchor, range.from, range.to]);
 
@@ -334,6 +336,16 @@ function DispatchPlanCalendar({
         <main className="main">
           <div className="page">
             <PlanPageTabs tab={pageTab} onTab={onPageTabChange} />
+            {storageWarning === "migration_076_required" ? (
+              <div
+                className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-snug text-amber-950"
+                role="status"
+              >
+                Календарь плана пока не сохраняется: в базе нужна миграция{" "}
+                <code className="rounded bg-white/80 px-1 py-0.5 text-[12px]">076_agency_plan_user_id_text</code>.
+                Запустите её в Supabase SQL Editor — после этого задачи и дни будут записываться.
+              </div>
+            ) : null}
             <section className="card hero">
               <div className="hero-l">
                 <div className="hero-top">

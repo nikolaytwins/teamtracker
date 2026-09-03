@@ -93,8 +93,10 @@
 | 072 | `072_v2_fx_monthly_rates.sql` | Помесячные средние курсы ЦБ (таблица) |
 | 073 | `073_fx_monthly_usd_seed.sql` | Seed средних курсов USD 2018–2026 |
 | 074 | `074_personal_income_capital_2023_h2.sql` | Капитал на счетах: июн 2023 — янв 2024 |
+| 075 | `075_agency_plan_calendar.sql` | Sofia Plan UI: agency_plan_item, agency_plan_day_mode, pauseProfitMinRub |
+| 076 | `076_agency_plan_user_id_text.sql` | Fix plan tables: user_id TEXT (v2 ids u_…) |
 
-**Следующий свободный номер:** `075`
+**Следующий свободный номер:** `077`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

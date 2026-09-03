@@ -34,6 +34,10 @@ export async function listPlanItems(
   const { data, error } = await q;
   if (error) {
     if (error.code === "42P01") return [];
+    if (error.code === "22P02") {
+      console.warn("agency_plan_item: user_id type mismatch — apply migration 076");
+      return [];
+    }
     throw error;
   }
   return (data ?? []).map((r) => mapItem(r as Record<string, unknown>));
@@ -53,6 +57,10 @@ export async function listPlanDayModes(
     .lte("plan_date", to);
   if (error) {
     if (error.code === "42P01") return [];
+    if (error.code === "22P02") {
+      console.warn("agency_plan_item: user_id type mismatch — apply migration 076");
+      return [];
+    }
     throw error;
   }
   return (data ?? []).map((r) => ({

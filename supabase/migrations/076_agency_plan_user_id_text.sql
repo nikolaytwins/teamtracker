@@ -1,6 +1,9 @@
--- 075 agency plan calendar: day modes and scheduled items (Sofia Plan UI)
+-- 076 — agency plan: user_id TEXT (v2 ids u_…), исправление 075 с UUID
 
-CREATE TABLE IF NOT EXISTS agency_plan_day_mode (
+DROP TABLE IF EXISTS agency_plan_item;
+DROP TABLE IF EXISTS agency_plan_day_mode;
+
+CREATE TABLE agency_plan_day_mode (
   user_id TEXT NOT NULL,
   plan_date DATE NOT NULL,
   mode TEXT NOT NULL CHECK (mode IN ('strategy', 'creative', 'rest')),
@@ -11,7 +14,7 @@ CREATE TABLE IF NOT EXISTS agency_plan_day_mode (
 CREATE INDEX IF NOT EXISTS idx_agency_plan_day_mode_user_date
   ON agency_plan_day_mode (user_id, plan_date);
 
-CREATE TABLE IF NOT EXISTS agency_plan_item (
+CREATE TABLE agency_plan_item (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('task', 'call', 'personal')),
@@ -36,7 +39,6 @@ CREATE INDEX IF NOT EXISTS idx_agency_plan_item_project
 COMMENT ON TABLE agency_plan_day_mode IS 'Sofia Plan: strategy / creative / rest markers on calendar days.';
 COMMENT ON TABLE agency_plan_item IS 'Sofia Plan: project subtasks, calls, personal events; plan_date NULL = backlog.';
 
--- Pause threshold for auto load status (reliable profit >= pauseProfitMinRub)
 UPDATE agency_dispatch_rules
 SET rules_json = jsonb_set(
   rules_json,
