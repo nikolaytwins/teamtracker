@@ -5,6 +5,7 @@ import {
   createPlanItemApi,
   deletePlanItemApi,
   fetchPlan,
+  fetchPlanCalendar,
   updatePlanItemApi,
   updateProjectApi,
   upsertDayModeApi,
@@ -165,30 +166,54 @@ function DispatchPlanCalendar({
     return { from: toYmd(anchor), to: toYmd(addDays(anchor, 6)) };
   }, [anchor, calMode]);
 
+  const planMonthKey = useMemo(
+    () => `${anchor.getFullYear()}-${anchor.getMonth() + 1}`,
+    [anchor]
+  );
+
+  const calendarRangeKey = `${range.from}:${range.to}`;
+  const loadedCoreMonth = useRef<string | null>(null);
+  const loadedCalendarRange = useRef<string | null>(null);
+
   const reload = useCallback(async () => {
     const year = anchor.getFullYear();
     const month = anchor.getMonth() + 1;
     const { plan: data, storageWarning: warning } = await fetchPlan(range.from, range.to, year, month);
     setPlan(data);
     setStorageWarning(warning);
+    loadedCoreMonth.current = planMonthKey;
+    loadedCalendarRange.current = calendarRangeKey;
     return data;
-  }, [anchor, range.from, range.to]);
+  }, [anchor, calendarRangeKey, planMonthKey, range.from, range.to]);
+
+  const reloadCalendar = useCallback(async () => {
+    const cal = await fetchPlanCalendar(range.from, range.to);
+    setPlan((prev) => (prev ? { ...prev, ...cal } : prev));
+    loadedCalendarRange.current = calendarRangeKey;
+  }, [calendarRangeKey, range.from, range.to]);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const calendarOnly =
+      loadedCoreMonth.current === planMonthKey && loadedCalendarRange.current !== calendarRangeKey;
+
+    setLoading(!calendarOnly);
     setError(null);
-    reload()
+
+    const run = calendarOnly ? reloadCalendar() : reload();
+
+    run
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [reload]);
+  }, [calendarRangeKey, planMonthKey, reload, reloadCalendar]);
 
   const showToast = useCallback((text: string, undo?: () => void) => {
     setToast({ text, undo });

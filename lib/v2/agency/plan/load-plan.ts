@@ -1,5 +1,11 @@
-import { buildDispatchContext } from "@/lib/v2/agency/dispatch/dispatch-context";
-import { isPlanRelevantProject } from "@/lib/v2/agency/dispatch/dispatch-repo";
+import { getAgencyRepoV2 } from "@/lib/agency-store";
+import { buildDispatchFinanceSnapshotFromLoaded } from "@/lib/v2/agency/dispatch/dispatch-finance-summary";
+import {
+  getDispatchRules,
+  isPlanRelevantProject,
+  mapRawAgencyProjects,
+  selectDispatchProjectsForContext,
+} from "@/lib/v2/agency/dispatch/dispatch-repo";
 import { listPlanDayModes, listPlanItems } from "@/lib/v2/agency/plan/plan-repo";
 import type { PlanPayload, PlanProjectView } from "@/lib/v2/agency/plan/plan-types";
 import {
@@ -8,39 +14,23 @@ import {
   loadStatusLabels,
   projectColor,
 } from "@/lib/v2/agency/plan/plan-utils";
+import { listFinanceGeneralExpenses } from "@/lib/v2/finance/finance-repo";
+import { isInFinanceMonth } from "@/lib/v2/finance/meta";
 import type { V2SessionContext } from "@/lib/v2/types";
 
-export async function buildPlanPayload(
-  ctx: V2SessionContext,
-  year: number,
-  month: number,
-  rangeFrom: string,
-  rangeTo: string
-): Promise<PlanPayload> {
-  const dispatch = await buildDispatchContext(ctx, year, month);
-  let items: Awaited<ReturnType<typeof listPlanItems>> = [];
-  let dayModes: Awaited<ReturnType<typeof listPlanDayModes>> = [];
-  try {
-    [items, dayModes] = await Promise.all([
-      listPlanItems(ctx, rangeFrom, rangeTo),
-      listPlanDayModes(ctx, rangeFrom, rangeTo),
-    ]);
-  } catch (error) {
-    console.warn("plan: calendar storage unavailable", error);
-  }
-
-  const finance = dispatch.finance;
-  const rules = dispatch.rules.rules.finance;
-  const loadStatus = computeLoadStatus(
-    finance.reliableProfitRub,
-    rules.reliableProfitMinRub,
-    rules.pauseProfitMinRub ?? 245_000
-  );
-
-  const allProjects = [...dispatch.plan.activeProjects, ...dispatch.plan.approvalRiskProjects];
-  const doneProjects = await listDoneProjectsForPlan(ctx, year, month);
-
-  const mapProject = (p: (typeof allProjects)[number]): PlanProjectView => ({
+function mapPlanProject(p: {
+  id: string;
+  name: string;
+  businessLine: PlanProjectView["businessLine"];
+  dispatchWorkStatus: PlanProjectView["dispatchWorkStatus"];
+  workDeadline: string | null;
+  plannedHoursRemaining: number | null;
+  paymentCertainThisMonth: boolean;
+  effectiveTotalAmount: number;
+  paidAmount: number;
+  financeDeadline: string | null;
+}): PlanProjectView {
+  return {
     id: p.id,
     name: p.name,
     clientLabel: p.name.split("·")[0]?.trim() || p.name,
@@ -55,14 +45,74 @@ export async function buildPlanPayload(
     paidAmount: p.paidAmount,
     onApprovalSince:
       p.dispatchWorkStatus === "on_approval" ? p.workDeadline ?? p.financeDeadline : null,
-  });
+  };
+}
 
-  const projects: PlanProjectView[] = [
-    ...allProjects.filter((p) => isPlanRelevantProject(p, year, month)).map(mapProject),
-    ...doneProjects.map(mapProject),
+export async function loadPlanCalendarSlice(
+  ctx: V2SessionContext,
+  rangeFrom: string,
+  rangeTo: string
+): Promise<Pick<PlanPayload, "items" | "dayModes" | "backlog">> {
+  const [items, dayModes] = await Promise.all([
+    listPlanItems(ctx, rangeFrom, rangeTo),
+    listPlanDayModes(ctx, rangeFrom, rangeTo),
+  ]);
+  return {
+    items: items.filter((i) => i.plan_date),
+    dayModes,
+    backlog: items.filter((i) => !i.plan_date),
+  };
+}
+
+export async function buildPlanPayload(
+  ctx: V2SessionContext,
+  year: number,
+  month: number,
+  rangeFrom: string,
+  rangeTo: string
+): Promise<PlanPayload> {
+  const [rules, rawProjects, generalExpenses, calendar] = await Promise.all([
+    getDispatchRules(),
+    getAgencyRepoV2().listProjectsWithTotalExpenses(),
+    listFinanceGeneralExpenses(ctx, year, month),
+    loadPlanCalendarSlice(ctx, rangeFrom, rangeTo).catch(() => ({
+      items: [],
+      dayModes: [],
+      backlog: [],
+    })),
+  ]);
+
+  const allAgency = mapRawAgencyProjects(rawProjects, new Map());
+  const contextProjects = selectDispatchProjectsForContext(allAgency, year, month);
+  const finance = buildDispatchFinanceSnapshotFromLoaded(
+    ctx.workspaceId,
+    year,
+    month,
+    rules.rules,
+    contextProjects,
+    allAgency,
+    generalExpenses
+  );
+
+  const rulesFinance = rules.rules.finance;
+  const loadStatus = computeLoadStatus(
+    finance.reliableProfitRub,
+    rulesFinance.reliableProfitMinRub,
+    rulesFinance.pauseProfitMinRub ?? 245_000
+  );
+
+  const activeIds = new Set(contextProjects.map((p) => p.id));
+  const activeAndRisk = [
+    ...contextProjects.filter((p) => isPlanRelevantProject(p, year, month)),
+    ...allAgency.filter(
+      (p) =>
+        p.dispatchWorkStatus === "done" &&
+        isInFinanceMonth(p.createdAt, year, month) &&
+        !activeIds.has(p.id)
+    ),
   ];
 
-  const backlog = items.filter((i) => !i.plan_date);
+  const projects = activeAndRisk.map(mapPlanProject);
 
   return {
     year,
@@ -75,23 +125,11 @@ export async function buildPlanPayload(
       certainUnpaidRevenueRub: finance.certainUnpaidRevenueRub,
       totalExpensesRub: finance.totalExpensesRub,
       reliableProfitRub: finance.reliableProfitRub,
-      passiveMinRub: rules.reliableProfitMinRub,
-      pauseMinRub: rules.pauseProfitMinRub ?? 245_000,
+      passiveMinRub: rulesFinance.reliableProfitMinRub,
+      pauseMinRub: rulesFinance.pauseProfitMinRub ?? 245_000,
     },
-    plannedHoursPerDay: dispatch.plan.plannedHoursPerDay,
-    items: items.filter((i) => i.plan_date),
-    dayModes,
+    plannedHoursPerDay: rules.rules.capacity.plannedHoursPerDay,
+    ...calendar,
     projects,
-    backlog,
   };
-}
-
-async function listDoneProjectsForPlan(ctx: V2SessionContext, year: number, month: number) {
-  const dispatch = await buildDispatchContext(ctx, year, month);
-  const { listDispatchProjectsForContext } = await import("@/lib/v2/agency/dispatch/dispatch-repo");
-  const all = await listDispatchProjectsForContext(ctx, year, month);
-  const activeIds = new Set(
-    [...dispatch.plan.activeProjects, ...dispatch.plan.approvalRiskProjects].map((p) => p.id)
-  );
-  return all.filter((p) => p.dispatchWorkStatus === "done" && !activeIds.has(p.id));
 }

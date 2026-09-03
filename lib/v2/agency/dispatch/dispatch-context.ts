@@ -1,16 +1,20 @@
-import { buildDispatchFinanceSnapshot } from "@/lib/v2/agency/dispatch/dispatch-finance-summary";
+import { buildDispatchFinanceSnapshotFromLoaded } from "@/lib/v2/agency/dispatch/dispatch-finance-summary";
 import {
   getDispatchRules,
-  listDispatchProjectsForContext,
+  loadEffectiveTotals,
+  mapRawAgencyProjects,
+  selectDispatchProjectsForContext,
   splitDispatchProjectsForPlan,
 } from "@/lib/v2/agency/dispatch/dispatch-repo";
 import type { DispatchContext, DispatchPlanSnapshot } from "@/lib/v2/agency/dispatch/dispatch-types";
+import { listFinanceGeneralExpenses } from "@/lib/v2/finance/finance-repo";
+import { getAgencyRepoV2 } from "@/lib/agency-store";
 import type { V2SessionContext } from "@/lib/v2/types";
 
 function buildPlanSnapshot(
   year: number,
   month: number,
-  projects: Awaited<ReturnType<typeof listDispatchProjectsForContext>>,
+  projects: Awaited<ReturnType<typeof selectDispatchProjectsForContext>>,
   rules: Awaited<ReturnType<typeof getDispatchRules>>
 ): DispatchPlanSnapshot {
   const { activeProjects, approvalRiskProjects, totalPlannedHoursRemaining } =
@@ -34,11 +38,31 @@ function buildPlanSnapshot(
 export async function buildDispatchContext(
   ctx: V2SessionContext,
   year: number,
-  month: number
+  month: number,
+  options?: { loadProjectDetails?: boolean }
 ): Promise<DispatchContext> {
-  const rules = await getDispatchRules();
-  const projects = await listDispatchProjectsForContext(ctx, year, month);
-  const finance = await buildDispatchFinanceSnapshot(ctx, year, month, rules.rules, projects);
+  const loadDetails = options?.loadProjectDetails ?? false;
+
+  const [rules, rawProjects, generalExpenses] = await Promise.all([
+    getDispatchRules(),
+    getAgencyRepoV2().listProjectsWithTotalExpenses(),
+    listFinanceGeneralExpenses(ctx, year, month),
+  ]);
+
+  const effectiveTotals = loadDetails
+    ? await loadEffectiveTotals(rawProjects)
+    : new Map<string, number>();
+  const allAgency = mapRawAgencyProjects(rawProjects, effectiveTotals);
+  const projects = selectDispatchProjectsForContext(allAgency, year, month);
+  const finance = buildDispatchFinanceSnapshotFromLoaded(
+    ctx.workspaceId,
+    year,
+    month,
+    rules.rules,
+    projects,
+    allAgency,
+    generalExpenses
+  );
   const plan = buildPlanSnapshot(year, month, projects, rules);
 
   return {

@@ -53,7 +53,7 @@ function inferWorkModelType(serviceType: unknown, explicit: unknown): DispatchWo
   return "other";
 }
 
-async function loadEffectiveTotals(
+export async function loadEffectiveTotals(
   rawProjects: Record<string, unknown>[]
 ): Promise<Map<string, number>> {
   const out = new Map<string, number>();
@@ -81,6 +81,33 @@ async function loadEffectiveTotals(
     out.set(pid, (out.get(pid) ?? 0) + sum);
   }
   return out;
+}
+
+export function mapRawAgencyProjects(
+  rawProjects: Record<string, unknown>[],
+  effectiveTotals: Map<string, number>
+): DispatchProjectView[] {
+  return rawProjects
+    .map((r) => mapDispatchProject(r, effectiveTotals))
+    .filter((p) => p.businessLine === "agency");
+}
+
+export function selectDispatchProjectsForContext(
+  allAgency: DispatchProjectView[],
+  year: number,
+  month: number
+): DispatchProjectView[] {
+  const inMonth = allAgency.filter((p) => isInFinanceMonth(p.createdAt, year, month));
+  const carryOver = allAgency.filter(
+    (p) =>
+      !isInFinanceMonth(p.createdAt, year, month) &&
+      (p.dispatchWorkStatus === "in_progress" ||
+        p.dispatchWorkStatus === "revisions" ||
+        p.dispatchWorkStatus === "on_approval")
+  );
+  const byId = new Map<string, DispatchProjectView>();
+  for (const p of [...inMonth, ...carryOver]) byId.set(p.id, p);
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "ru"));
 }
 
 function mapDispatchProject(
@@ -250,24 +277,13 @@ export function splitDispatchProjectsForPlan(
 export async function listDispatchProjectsForContext(
   ctx: V2SessionContext,
   year: number,
-  month: number
+  month: number,
+  options?: { loadProjectDetails?: boolean }
 ): Promise<DispatchProjectView[]> {
   const rawProjects = await getAgencyRepoV2().listProjectsWithTotalExpenses();
-  const effectiveTotals = await loadEffectiveTotals(rawProjects);
-  const all = rawProjects
-    .map((r) => mapDispatchProject(r, effectiveTotals))
-    .filter((p) => p.businessLine === "agency");
-
-  const inMonth = all.filter((p) => isInFinanceMonth(p.createdAt, year, month));
-  const carryOver = all.filter(
-    (p) =>
-      !isInFinanceMonth(p.createdAt, year, month) &&
-      (p.dispatchWorkStatus === "in_progress" ||
-        p.dispatchWorkStatus === "revisions" ||
-        p.dispatchWorkStatus === "on_approval")
-  );
-
-  const byId = new Map<string, DispatchProjectView>();
-  for (const p of [...inMonth, ...carryOver]) byId.set(p.id, p);
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const effectiveTotals = options?.loadProjectDetails
+    ? await loadEffectiveTotals(rawProjects)
+    : new Map<string, number>();
+  const allAgency = mapRawAgencyProjects(rawProjects, effectiveTotals);
+  return selectDispatchProjectsForContext(allAgency, year, month);
 }

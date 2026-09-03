@@ -15,6 +15,11 @@ export async function fetchPlan(from: string, to: string, year: number, month: n
   return { plan: data.plan, storageWarning: data.storageWarning ?? null };
 }
 
+export async function fetchPlanCalendar(from: string, to: string) {
+  const q = new URLSearchParams({ from, to, calendar: "1" });
+  return fetchJson<Pick<PlanPayload, "items" | "dayModes" | "backlog">>(`/api/v2/agency/plan?${q}`);
+}
+
 export async function createPlanItemApi(body: {
   kind: PlanItemKind;
   title: string;
