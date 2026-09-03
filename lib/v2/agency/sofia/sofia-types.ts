@@ -66,6 +66,8 @@ export type SofiaContextPanel = {
   plannedProfitRub: number;
   protectedDays: { label: string; date: string; mode: "strategy" | "creative" }[];
   rulesUsed: string[];
+  /** false when календарь плана недоступен (миграция / схема); остальной контекст из агентства всё равно загружен */
+  planCalendarReady: boolean;
 };
 
 export type SofiaChatTurn = { role: "user" | "assistant"; text: string };

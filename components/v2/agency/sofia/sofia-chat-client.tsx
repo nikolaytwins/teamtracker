@@ -231,12 +231,55 @@ function MessageRow({
 function ContextPanel({
   context,
   collapsed,
+  loading,
+  error,
+  onRetry,
   onToggle,
 }: {
   context: SofiaContextPanel | null;
   collapsed: boolean;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
   onToggle: () => void;
 }) {
+  if (loading && !context) {
+    return (
+      <aside className={`card ctx${collapsed ? " collapsed" : ""}`}>
+        <div className="ctx-h">
+          <span className="sec-title" style={{ fontSize: 17 }}>
+            Контекст решения
+          </span>
+        </div>
+        {!collapsed ? (
+          <div className="ctx-b text-[13px] leading-snug text-[var(--ink-500)]">
+            Загружаю из проектов, финансов и правил…
+          </div>
+        ) : null}
+      </aside>
+    );
+  }
+
+  if (error && !context) {
+    return (
+      <aside className={`card ctx${collapsed ? " collapsed" : ""}`}>
+        <div className="ctx-h">
+          <span className="sec-title" style={{ fontSize: 17 }}>
+            Контекст решения
+          </span>
+        </div>
+        {!collapsed ? (
+          <div className="ctx-b space-y-2 text-[13px] leading-snug">
+            <p className="text-[var(--red)]">{error}</p>
+            <button type="button" className="btn btn--gh text-[12px]" onClick={onRetry}>
+              Повторить
+            </button>
+          </div>
+        ) : null}
+      </aside>
+    );
+  }
+
   if (!context) {
     return (
       <aside className={`card ctx${collapsed ? " collapsed" : ""}`}>
@@ -274,6 +317,14 @@ function ContextPanel({
       </div>
       {!collapsed ? (
         <div className="ctx-b">
+          {!context.planCalendarReady ? (
+            <p
+              className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-snug text-amber-950"
+              role="status"
+            >
+              Слоты календаря пока недоступны — сроки, деньги и правила уже из разделов агентства.
+            </p>
+          ) : null}
           <div className="cg">
             <span className="cg-t">План</span>
             <div className="cg-box">
@@ -437,6 +488,8 @@ export function SofiaChatClient() {
   const [year] = useState(now.getFullYear());
   const [month] = useState(now.getMonth() + 1);
   const [context, setContext] = useState<SofiaContextPanel | null>(null);
+  const [contextLoading, setContextLoading] = useState(true);
+  const [contextError, setContextError] = useState<string | null>(null);
   const [messages, setMessages] = useState<SofiaMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -461,18 +514,24 @@ export function SofiaChatClient() {
   }, []);
 
   const refreshContext = useCallback(() => {
+    setContextLoading(true);
+    setContextError(null);
     fetchSofiaContext(year, month)
       .then(({ context: c }) => setContext(c))
-      .catch(() => {});
+      .catch((e: Error) => setContextError(e.message || "Не удалось загрузить контекст"))
+      .finally(() => setContextLoading(false));
   }, [year, month]);
 
   useEffect(() => {
+    setContextLoading(true);
+    setContextError(null);
     fetchSofiaContext(year, month)
       .then(({ context: c, staleChecks }) => {
         setContext(c);
         if (staleChecks.length) setMessages(staleChecks);
       })
-      .catch(() => {});
+      .catch((e: Error) => setContextError(e.message || "Не удалось загрузить контекст"))
+      .finally(() => setContextLoading(false));
   }, [year, month]);
 
   useEffect(() => {
@@ -685,6 +744,9 @@ export function SofiaChatClient() {
               <ContextPanel
                 context={context}
                 collapsed={ctxCollapsed}
+                loading={contextLoading}
+                error={contextError}
+                onRetry={refreshContext}
                 onToggle={() => setCtxCollapsed((v) => !v)}
               />
             </div>

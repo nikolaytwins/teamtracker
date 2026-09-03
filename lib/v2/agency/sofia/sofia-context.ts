@@ -6,6 +6,7 @@ import {
   tasksOnDay,
 } from "@/lib/v2/agency/plan/plan-calendar-logic";
 import { listPlanDayModes, listPlanItems } from "@/lib/v2/agency/plan/plan-repo";
+import type { PlanDayMode, PlanItemRow } from "@/lib/v2/agency/plan/plan-types";
 import { addDays, fmtWeekday, mondayOf, monthName, toYmd } from "@/lib/v2/agency/plan/plan-utils";
 import type { SofiaContextPanel } from "@/lib/v2/agency/sofia/sofia-types";
 import { formatRub } from "@/lib/v2/finance/meta";
@@ -19,6 +20,24 @@ function lastScheduledDay(items: { plan_date: string | null }[], todayKey: strin
   return keys.length ? keys.at(-1)! : null;
 }
 
+/** Календарь плана — дополнение; сбой не должен ломать контекст из агентства/финансов. */
+async function loadPlanCalendarSlice(
+  ctx: V2SessionContext,
+  from: string,
+  to: string
+): Promise<{ items: PlanItemRow[]; dayModes: { plan_date: string; mode: PlanDayMode }[]; ok: boolean }> {
+  try {
+    const [items, dayModes] = await Promise.all([
+      listPlanItems(ctx, from, to),
+      listPlanDayModes(ctx, from, to),
+    ]);
+    return { items, dayModes, ok: true };
+  } catch (error) {
+    console.warn("Sofia context: plan calendar unavailable", error);
+    return { items: [], dayModes: [], ok: false };
+  }
+}
+
 export async function buildSofiaContextPanel(
   ctx: V2SessionContext,
   year: number,
@@ -30,19 +49,16 @@ export async function buildSofiaContextPanel(
   const from = toYmd(mondayOf(today));
   const to = toYmd(addDays(mondayOf(today), 41));
 
-  const [items, dayModes] = await Promise.all([
-    listPlanItems(ctx, from, to),
-    listPlanDayModes(ctx, from, to),
-  ]);
+  const { items, dayModes, ok: planCalendarReady } = await loadPlanCalendarSlice(ctx, from, to);
   const modes = dayModeMap(dayModes);
   const dailyCap = dispatch.plan.plannedHoursPerDay;
 
-  const scheduledUntilKey = lastScheduledDay(items, todayKey);
+  const scheduledUntilKey = planCalendarReady ? lastScheduledDay(items, todayKey) : null;
   const scheduledUntil = scheduledUntilKey
     ? fmtWeekday(new Date(`${scheduledUntilKey}T12:00:00`))
     : null;
 
-  const freeDay = nextFreeWindowDay(items, modes, today, dailyCap);
+  const freeDay = planCalendarReady ? nextFreeWindowDay(items, modes, today, dailyCap) : null;
   const nextFreeWindow = freeDay ? fmtWeekday(freeDay) : null;
 
   const overdue = dispatch.plan.activeProjects.filter((p) => {
@@ -57,8 +73,8 @@ export async function buildSofiaContextPanel(
       ? `Риск по сроку: ${overdue[0]!.name}`
       : `Риск по срокам: ${overdue.length} проекта`;
 
-  const strategyDate = findModeDate(modes, "strategy", todayKey);
-  const creativeDate = findModeDate(modes, "creative", todayKey);
+  const strategyDate = planCalendarReady ? findModeDate(modes, "strategy", todayKey) : null;
+  const creativeDate = planCalendarReady ? findModeDate(modes, "creative", todayKey) : null;
 
   const protectedDays: SofiaContextPanel["protectedDays"] = [];
   if (strategyDate) {
@@ -87,6 +103,7 @@ export async function buildSofiaContextPanel(
     plannedProfitRub: dispatch.finance.plannedProfitRub,
     protectedDays,
     rulesUsed,
+    planCalendarReady,
   };
 }
 

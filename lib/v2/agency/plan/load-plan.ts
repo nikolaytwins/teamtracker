@@ -17,10 +17,16 @@ export async function buildPlanPayload(
   rangeTo: string
 ): Promise<PlanPayload> {
   const dispatch = await buildDispatchContext(ctx, year, month);
-  const [items, dayModes] = await Promise.all([
-    listPlanItems(ctx, rangeFrom, rangeTo),
-    listPlanDayModes(ctx, rangeFrom, rangeTo),
-  ]);
+  let items: Awaited<ReturnType<typeof listPlanItems>> = [];
+  let dayModes: Awaited<ReturnType<typeof listPlanDayModes>> = [];
+  try {
+    [items, dayModes] = await Promise.all([
+      listPlanItems(ctx, rangeFrom, rangeTo),
+      listPlanDayModes(ctx, rangeFrom, rangeTo),
+    ]);
+  } catch (error) {
+    console.warn("plan: calendar storage unavailable", error);
+  }
 
   const loadStatus = computeLoadStatus(
     dispatch.finance.reliableProfitRub,
