@@ -31,6 +31,7 @@ export type UpdateProjectBody = {
   clientContact: string | null;
   notes: string | null;
   hourlyRateRub?: number;
+  paymentCertainThisMonth?: boolean;
 };
 
 export type AgencyDetailBillingType = "fixed" | "hourly";

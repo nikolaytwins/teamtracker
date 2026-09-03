@@ -50,6 +50,7 @@ function mapAgencyProject(raw: Record<string, unknown>, workspaceId: string): V2
     client_contact: raw.clientContact ? String(raw.clientContact) : null,
     notes: raw.notes ? String(raw.notes) : null,
     source_lead_id: raw.source_lead_id ? String(raw.source_lead_id) : null,
+    payment_certain_this_month: raw.paymentCertainThisMonth === true,
     created_at: String(raw.createdAt),
     updated_at: String(raw.updatedAt),
   };
@@ -335,6 +336,7 @@ export async function updateFinanceProject(
     payment_method: string | null;
     client_contact: string | null;
     notes: string | null;
+    payment_certain_this_month?: boolean;
   }>
 ): Promise<V2FinanceProjectRow | null> {
   const cur = await repo().getProjectById(id);
@@ -367,6 +369,9 @@ export async function updateFinanceProject(
         ? patch.client_contact
         : (cur.clientContact as string | null) ?? null,
     notes: patch.notes !== undefined ? patch.notes : (cur.notes as string | null) ?? null,
+    ...(patch.payment_certain_this_month !== undefined
+      ? { paymentCertainThisMonth: patch.payment_certain_this_month }
+      : {}),
   });
   if (!updated) return null;
   return mapAgencyProject(updated, ctx.workspaceId);

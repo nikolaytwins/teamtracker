@@ -63,7 +63,7 @@ type AnalyticsPayload = {
 };
 
 const PROJECT_COLS =
-  "grid grid-cols-[1.7fr_0.95fr_0.95fr_0.95fr_0.8fr_0.95fr_0.95fr_0.95fr]";
+  "grid grid-cols-[1.7fr_0.95fr_0.95fr_0.95fr_0.8fr_0.95fr_0.95fr_0.65fr_0.95fr_0.95fr]";
 const EXPENSE_COLS = "grid grid-cols-[1.3fr_2fr_1fr_1.7fr_0.9fr]";
 
 function Card({ className = "", children }: { className?: string; children: React.ReactNode }) {
@@ -641,6 +641,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                   <div>Статус</div>
                   <div>Контакт</div>
                   <div>Способ оплаты</div>
+                  <div className="text-center">Точно в месяце</div>
                   <div className="text-right">Сумма</div>
                   <div className="text-right">Оплачено</div>
                 </div>
@@ -797,6 +798,22 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                               ))}
                             </select>
                           </div>
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={p.payment_certain_this_month}
+                              disabled={p.status === "paid"}
+                              title={
+                                p.status === "paid"
+                                  ? "Уже оплачен — учтён в фактической выручке"
+                                  : "Точно получу в этом месяце (для надёжной прибыли в Плане)"
+                              }
+                              onChange={(e) =>
+                                void patchProject(p.id, { paymentCertainThisMonth: e.target.checked })
+                              }
+                              className="h-4 w-4 rounded border-[var(--v2-ink-300)] text-[var(--v2-brand-600)] focus:ring-[var(--v2-brand-500)]/40"
+                            />
+                          </div>
                           <div className="text-right">
                             <InlineMoney
                               value={p.effective_total_amount}
@@ -850,7 +867,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                   <div
                     className={`${PROJECT_COLS} border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-5 py-3.5 text-[13px]`}
                   >
-                    <div className="v2-tight col-span-6 flex items-center gap-2 font-semibold text-[var(--v2-ink-900)]">
+                    <div className="v2-tight col-span-7 flex items-center gap-2 font-semibold text-[var(--v2-ink-900)]">
                       Итого по проектам
                       <span className="text-[12px] font-normal text-[var(--v2-ink-500)]">
                         · {projects.length} шт.

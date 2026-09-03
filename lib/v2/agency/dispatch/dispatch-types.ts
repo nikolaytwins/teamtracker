@@ -69,6 +69,8 @@ export type DispatchFinanceSnapshot = {
   reliableProfitRub: number;
   plannedProfitRub: number;
   actualRevenueRub: number;
+  /** Неоплаченное, отмеченное «точно в этом месяце» */
+  certainUnpaidRevenueRub: number;
   reliableRevenueRub: number;
   expectedRevenueRub: number;
   totalExpensesRub: number;

@@ -44,11 +44,15 @@ describe("normalizeDispatchRules", () => {
 describe("splitDispatchProjectsForPlan", () => {
   it("counts hours only for consuming statuses", () => {
     const { activeProjects, approvalRiskProjects, totalPlannedHoursRemaining } =
-      splitDispatchProjectsForPlan([
-        project({ id: "a", dispatchWorkStatus: "in_progress", plannedHoursRemaining: 8 }),
-        project({ id: "b", dispatchWorkStatus: "on_approval", plannedHoursRemaining: 20 }),
-        project({ id: "c", dispatchWorkStatus: "done", plannedHoursRemaining: 5 }),
-      ]);
+      splitDispatchProjectsForPlan(
+        [
+          project({ id: "a", dispatchWorkStatus: "in_progress", plannedHoursRemaining: 8 }),
+          project({ id: "b", dispatchWorkStatus: "on_approval", plannedHoursRemaining: 20 }),
+          project({ id: "c", dispatchWorkStatus: "done", plannedHoursRemaining: 5 }),
+        ],
+        2026,
+        9
+      );
 
     expect(activeProjects.map((p) => p.id)).toEqual(["a"]);
     expect(approvalRiskProjects.map((p) => p.id)).toEqual(["b"]);

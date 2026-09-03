@@ -10,7 +10,6 @@ import {
   upsertDayModeApi,
 } from "@/lib/v2/agency/plan/plan-api-client";
 import {
-  activeProjects,
   dayModeMap,
   dmode,
   eventsOnDay,
@@ -50,6 +49,7 @@ import {
   planHoursToMinutes,
   toYmd,
 } from "@/lib/v2/agency/plan/plan-utils";
+import { formatRub } from "@/lib/v2/finance/meta";
 import type { DispatchWorkStatus } from "@/lib/v2/agency/dispatch/dispatch-work-status";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -323,10 +323,10 @@ function DispatchPlanCalendar({
       ? `${monthName(anchor)} ${anchor.getFullYear()}`
       : `${fmtShort(anchor)} – ${fmtShort(addDays(anchor, 6))}`;
 
-  const placeIds = activeProjects(plan.projects).filter((p) => {
-    const u = unplacedHours(p, items, todayKey);
-    return u === null || u > 0;
-  });
+  const tasksToPlace = plan.backlog.filter((i) => i.kind === "task");
+  const visibleProjects = showDone
+    ? plan.projects
+    : plan.projects.filter((p) => p.dispatchWorkStatus !== "done");
 
   const kanbanCols = showDone ? [...KANBAN_ORDER, "done" as const] : KANBAN_ORDER;
 
@@ -353,7 +353,7 @@ function DispatchPlanCalendar({
                   <span className="sec-sub">Сегодня {fmtWeekday(today).toLowerCase()}</span>
                 </div>
                 <h1 className="hero-h1">План</h1>
-                <StatusBlock loadStatus={loadStatus} labels={plan.loadStatusLabels} />
+                <StatusBlock loadStatus={loadStatus} labels={plan.loadStatusLabels} finance={plan.loadStatusFinance} />
                 <div className="hero-nums">
                   <HeroDayButton
                     label="День стратегии"
@@ -544,73 +544,40 @@ function DispatchPlanCalendar({
               <div className="headrow" style={{ marginBottom: 18 }}>
                 <h2 className="sec-title">Нужно разместить</h2>
                 <span className="sec-sub">
-                  {placeIds.length
-                    ? `${pluralRu(placeIds.length, "проект ждёт", "проекта ждут", "проектов ждут")} места в календаре`
+                  {tasksToPlace.length
+                    ? `${pluralRu(tasksToPlace.length, "задача ждёт", "задачи ждут", "задач ждут")} места в календаре`
                     : "всё размещено"}
                 </span>
               </div>
               <div className="place">
-                {placeIds.length === 0 ? (
-                  <p className="plc-note">Все оценённые проекты размещены в будущем календаре.</p>
+                {tasksToPlace.length === 0 ? (
+                  <p className="plc-note">
+                    Задач для размещения нет. Создайте подзадачу в проекте или через «Создать задачу» — затем
+                    перетащите её в календарь.
+                  </p>
                 ) : (
-                  placeIds.map((p) => {
-                    const u = unplacedHours(p, items, todayKey);
-                    const dl = p.workDeadline ? parseYmd(p.workDeadline) : null;
-                    const hot = dl && (dl.getTime() - today.getTime()) / 864e5 <= 9;
-                    if (u === null) {
-                      return (
-                        <div key={p.id} className="plc plc--nodata">
-                          <span className="plc-h">
-                            <span className="dot" style={{ background: p.color }} />
-                            <span className="plc-n">{p.name}</span>
-                          </span>
-                          <p className="plc-note">
-                            <b>Оценка не указана.</b>
-                            <br />
-                            Проект не участвует в расчёте загрузки.
-                          </p>
-                          <span className="plc-f">
-                            <button
-                              type="button"
-                              className="btn btn--gh btn--sm"
-                              onClick={() => setDrawer({ type: "project", projectId: p.id, estFocus: true })}
-                            >
-                              Указать оценку
-                            </button>
-                          </span>
-                        </div>
-                      );
-                    }
+                  tasksToPlace.map((item) => {
+                    const p = projectById(plan.projects, item.project_id);
                     return (
                       <button
-                        key={p.id}
+                        key={item.id}
                         type="button"
                         className="plc"
                         draggable
-                        onDragStart={() => setDrag({ kind: "new", projectId: p.id })}
+                        onDragStart={() => setDrag({ kind: "backlog", itemId: item.id })}
                         onDragEnd={() => setDrag(null)}
-                        onClick={() => setDrawer({ type: "project", projectId: p.id })}
+                        onClick={() => setDrawer({ type: "item", itemId: item.id })}
                       >
                         <span className="plc-h">
-                          <span className="dot" style={{ background: p.color }} />
-                          <span className="plc-n">{p.name}</span>
+                          <span className="dot" style={{ background: p?.color ?? "#71717A" }} />
+                          <span className="plc-n">{item.title}</span>
                         </span>
-                        <span className="plc-v tnum">≈ {u} ч</span>
-                        <span className="plc-r">
-                          Оценка остатка
-                          <b className="tnum">{p.plannedHoursRemaining} ч</b>
-                        </span>
-                        <span className="plc-r">
-                          В календаре
-                          <b className="tnum">{futureProjectHours(items, p.id, todayKey)} ч</b>
-                        </span>
+                        {item.planned_minutes ? (
+                          <span className="plc-v tnum">≈ {hoursLabel(item)}</span>
+                        ) : null}
                         <span className="plc-f">
-                          {dl ? (
-                            <span className={hot ? "hot" : ""}>Дедлайн {fmtShort(dl)}</span>
-                          ) : (
-                            <span>Без дедлайна</span>
-                          )}
-                          <span style={{ marginLeft: "auto" }}>{STATUS_UI[p.dispatchWorkStatus].label}</span>
+                          <span>{p ? p.businessLineLabel : "Без проекта"}</span>
+                          <span style={{ marginLeft: "auto" }}>Перетащите в календарь</span>
                         </span>
                       </button>
                     );
@@ -618,8 +585,8 @@ function DispatchPlanCalendar({
                 )}
               </div>
               <p className="hint">
-                Перетащите проект в день календаря — появится слот на 2 часа. «В календаре» считает только будущие
-                слоты, «не размещено» — разницу с вашей оценкой остатка.
+                Сюда попадают задачи без даты — из backlog или после создания. Проекты сами по себе в календарь не
+                ставятся: сначала задача, потом слот в дне.
               </p>
             </section>
 
@@ -646,7 +613,7 @@ function DispatchPlanCalendar({
               {projView === "kb" ? (
                 <div className="kb">
                   {kanbanCols.map((col) => {
-                    const ids = plan.projects.filter((p) => p.dispatchWorkStatus === col);
+                    const ids = visibleProjects.filter((p) => p.dispatchWorkStatus === col);
                     const meta = STATUS_UI[col];
                     return (
                       <div key={col} className="kbcol">
@@ -674,7 +641,7 @@ function DispatchPlanCalendar({
                 </div>
               ) : (
                 <ProjectList
-                  projects={plan.projects}
+                  projects={visibleProjects}
                   cols={kanbanCols}
                   items={items}
                   todayKey={todayKey}
@@ -741,9 +708,11 @@ function DispatchPlanCalendar({
 function StatusBlock({
   loadStatus,
   labels,
+  finance,
 }: {
   loadStatus: LoadStatus;
   labels: { title: string; headline: string; detail: string };
+  finance: PlanPayload["loadStatusFinance"];
 }) {
   return (
     <div className={`status${loadStatus === "active" ? "" : ` status--${loadStatus}`}`}>
@@ -755,7 +724,12 @@ function StatusBlock({
         <b>{labels.headline}.</b> {labels.detail}
       </p>
       <p className="status-s" style={{ marginTop: 8, fontSize: 13 }}>
-        Рассчитывается автоматически по гарантированной чистой прибыли месяца.
+        Надёжная прибыль {formatRub(finance.reliableProfitRub)} = оплачено {formatRub(finance.actualRevenueRub)}
+        {finance.certainUnpaidRevenueRub > 0
+          ? ` + подтверждено к поступлению ${formatRub(finance.certainUnpaidRevenueRub)}`
+          : ""}{" "}
+        − расходы {formatRub(finance.totalExpensesRub)}. Пассивный режим от {formatRub(finance.passiveMinRub)},
+        пауза от {formatRub(finance.pauseMinRub)}. Галочка «точно в месяце» — в таблице проектов агентства.
       </p>
     </div>
   );
@@ -1085,9 +1059,7 @@ function ProjectCard({
         <span className="dot" style={{ background: p.color }} />
         <span className="kbc-n">{p.name}</span>
       </span>
-      <span className="kbc-c">
-        {p.businessLineLabel} · {p.clientLabel}
-      </span>
+      <span className="kbc-c">{p.businessLineLabel}</span>
       <span className="kbc-rows">
         {p.workDeadline ? (
           <span>
@@ -1157,9 +1129,7 @@ function ProjectList({
               <span className="dot" style={{ background: p.color }} />
               <span className="prow-mid">
                 <span className="prow-n">{p.name}</span>
-                <span className="prow-c">
-                  {p.businessLineLabel} · {p.clientLabel}
-                </span>
+                <span className="prow-c">{p.businessLineLabel}</span>
               </span>
               <span className="prow-cell">
                 <span className="kick">Дедлайн</span>
@@ -1844,7 +1814,7 @@ function ProjectDrawer({
       <div className="dr-h">
         <div style={{ flex: 1 }}>
           <span className="kick">
-            {p.businessLineLabel} · {p.clientLabel}
+            {p.businessLineLabel}
           </span>
           <h2 className="sec-title" style={{ marginTop: 6 }}>
             {p.name}

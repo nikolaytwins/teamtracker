@@ -14,7 +14,7 @@ function buildPlanSnapshot(
   rules: Awaited<ReturnType<typeof getDispatchRules>>
 ): DispatchPlanSnapshot {
   const { activeProjects, approvalRiskProjects, totalPlannedHoursRemaining } =
-    splitDispatchProjectsForPlan(projects);
+    splitDispatchProjectsForPlan(projects, year, month);
 
   return {
     year,

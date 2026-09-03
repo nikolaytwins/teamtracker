@@ -206,11 +206,34 @@ export async function listDispatchProjects(
     .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 }
 
-export function splitDispatchProjectsForPlan(projects: DispatchProjectView[]) {
+export function isPlanRelevantProject(
+  p: DispatchProjectView,
+  year: number,
+  month: number
+): boolean {
+  if (p.dispatchWorkStatus === "done") return false;
+  if (
+    p.dispatchWorkStatus === "in_progress" ||
+    p.dispatchWorkStatus === "revisions" ||
+    p.dispatchWorkStatus === "on_approval"
+  ) {
+    return true;
+  }
+  if (p.dispatchWorkStatus === "planned") {
+    return isInFinanceMonth(p.createdAt, year, month);
+  }
+  return false;
+}
+
+export function splitDispatchProjectsForPlan(
+  projects: DispatchProjectView[],
+  year: number,
+  month: number
+) {
   const activeProjects = projects.filter((p) => {
-    if (!isActiveDispatchStatus(p.dispatchWorkStatus)) return false;
-    const meta = dispatchStatusMeta(p.dispatchWorkStatus);
-    return meta.consumesPlanHours;
+    if (!isPlanRelevantProject(p, year, month)) return false;
+    if (p.dispatchWorkStatus === "on_approval") return false;
+    return dispatchStatusMeta(p.dispatchWorkStatus).consumesPlanHours;
   });
 
   const approvalRiskProjects = projects.filter((p) => p.dispatchWorkStatus === "on_approval");
@@ -239,7 +262,9 @@ export async function listDispatchProjectsForContext(
   const carryOver = all.filter(
     (p) =>
       !isInFinanceMonth(p.createdAt, year, month) &&
-      isActiveDispatchStatus(p.dispatchWorkStatus)
+      (p.dispatchWorkStatus === "in_progress" ||
+        p.dispatchWorkStatus === "revisions" ||
+        p.dispatchWorkStatus === "on_approval")
   );
 
   const byId = new Map<string, DispatchProjectView>();

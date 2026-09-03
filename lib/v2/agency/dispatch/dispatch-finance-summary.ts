@@ -44,6 +44,7 @@ export async function buildDispatchFinanceSnapshot(
     reliableProfitRub: Math.round(reliableProfitRub),
     plannedProfitRub: Math.round(plannedProfitRub),
     actualRevenueRub: Math.round(actualRevenueRub),
+    certainUnpaidRevenueRub: Math.round(certainUnpaidRevenue),
     reliableRevenueRub: Math.round(reliableRevenueRub),
     expectedRevenueRub: Math.round(summary.expectedRevenue),
     totalExpensesRub: Math.round(totalExpensesRub),

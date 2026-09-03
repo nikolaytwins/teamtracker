@@ -108,6 +108,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     if (typeof body.hourlyRateRub === "number") {
       patch.hourly_rate_rub = body.hourlyRateRub;
     }
+    if (typeof body.paymentCertainThisMonth === "boolean") {
+      patch.payment_certain_this_month = body.paymentCertainThisMonth;
+    }
     const { error } = await this.sb.from("agency_project").update(patch).eq("id", id);
     if (error) throw error;
     return this.getProjectById(id);

@@ -8,11 +8,11 @@ export const DISPATCH_WORK_STATUSES: {
   consumesPlanHours: boolean;
   planRiskOnly: boolean;
 }[] = [
-  { key: "planned", label: "Запланирован", consumesPlanHours: true, planRiskOnly: false },
+  { key: "planned", label: "Планируется", consumesPlanHours: true, planRiskOnly: false },
   { key: "in_progress", label: "В работе", consumesPlanHours: true, planRiskOnly: false },
-  { key: "on_approval", label: "На согласовании", consumesPlanHours: false, planRiskOnly: true },
+  { key: "on_approval", label: "Согласование", consumesPlanHours: false, planRiskOnly: true },
   { key: "revisions", label: "Правки", consumesPlanHours: true, planRiskOnly: false },
-  { key: "done", label: "Готов", consumesPlanHours: false, planRiskOnly: false },
+  { key: "done", label: "Завершён", consumesPlanHours: false, planRiskOnly: false },
 ];
 
 export function isDispatchWorkStatus(v: unknown): v is DispatchWorkStatus {

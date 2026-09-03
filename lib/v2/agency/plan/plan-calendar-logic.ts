@@ -8,16 +8,16 @@ export const STATUS_UI: Record<
 > = {
   in_progress: { label: "В работе", css: "st--work", color: "#2A56EB" },
   revisions: { label: "Правки", css: "st--edit", color: "#E5604D" },
-  planned: { label: "Запланирован", css: "st--plan", color: "#A1A1AA" },
-  on_approval: { label: "На согласовании", css: "st--rev", color: "#F59E0B" },
-  done: { label: "Готов", css: "st--done", color: "#10B981" },
+  planned: { label: "Планируется", css: "st--plan", color: "#A1A1AA" },
+  on_approval: { label: "Согласование", css: "st--rev", color: "#F59E0B" },
+  done: { label: "Завершён", css: "st--done", color: "#10B981" },
 };
 
 export const KANBAN_ORDER: DispatchWorkStatus[] = [
-  "in_progress",
-  "revisions",
   "planned",
+  "in_progress",
   "on_approval",
+  "revisions",
 ];
 
 export type DayModeKey = PlanDayMode | null;

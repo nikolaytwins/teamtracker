@@ -19,6 +19,8 @@ export type V2FinanceProjectRow = {
   client_contact: string | null;
   notes: string | null;
   source_lead_id: string | null;
+  /** Sofia Plan: пользователь подтвердил поступление в этом месяце */
+  payment_certain_this_month: boolean;
   created_at: string;
   updated_at: string;
 };

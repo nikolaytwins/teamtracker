@@ -37,6 +37,9 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if (body.clientContact === null || typeof body.clientContact === "string") {
       patch.client_contact = body.clientContact;
     }
+    if (typeof body.paymentCertainThisMonth === "boolean") {
+      patch.payment_certain_this_month = body.paymentCertainThisMonth;
+    }
 
     const project = await updateFinanceProject(auth.ctx, id, patch);
     if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });

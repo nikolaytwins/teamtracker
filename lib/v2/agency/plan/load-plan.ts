@@ -1,4 +1,5 @@
 import { buildDispatchContext } from "@/lib/v2/agency/dispatch/dispatch-context";
+import { isPlanRelevantProject } from "@/lib/v2/agency/dispatch/dispatch-repo";
 import { listPlanDayModes, listPlanItems } from "@/lib/v2/agency/plan/plan-repo";
 import type { PlanPayload, PlanProjectView } from "@/lib/v2/agency/plan/plan-types";
 import {
@@ -28,16 +29,18 @@ export async function buildPlanPayload(
     console.warn("plan: calendar storage unavailable", error);
   }
 
+  const finance = dispatch.finance;
+  const rules = dispatch.rules.rules.finance;
   const loadStatus = computeLoadStatus(
-    dispatch.finance.reliableProfitRub,
-    dispatch.finance.reliableProfitMinRub,
-    dispatch.rules.rules.finance.pauseProfitMinRub ?? 245_000
+    finance.reliableProfitRub,
+    rules.reliableProfitMinRub,
+    rules.pauseProfitMinRub ?? 245_000
   );
 
   const allProjects = [...dispatch.plan.activeProjects, ...dispatch.plan.approvalRiskProjects];
   const doneProjects = await listDoneProjectsForPlan(ctx, year, month);
 
-  const projects: PlanProjectView[] = [...allProjects, ...doneProjects].map((p) => ({
+  const mapProject = (p: (typeof allProjects)[number]): PlanProjectView => ({
     id: p.id,
     name: p.name,
     clientLabel: p.name.split("·")[0]?.trim() || p.name,
@@ -52,7 +55,12 @@ export async function buildPlanPayload(
     paidAmount: p.paidAmount,
     onApprovalSince:
       p.dispatchWorkStatus === "on_approval" ? p.workDeadline ?? p.financeDeadline : null,
-  }));
+  });
+
+  const projects: PlanProjectView[] = [
+    ...allProjects.filter((p) => isPlanRelevantProject(p, year, month)).map(mapProject),
+    ...doneProjects.map(mapProject),
+  ];
 
   const backlog = items.filter((i) => !i.plan_date);
 
@@ -61,7 +69,15 @@ export async function buildPlanPayload(
     month,
     loadStatus,
     loadStatusLabels: loadStatusLabels(loadStatus),
-    reliableProfitRub: dispatch.finance.reliableProfitRub,
+    reliableProfitRub: finance.reliableProfitRub,
+    loadStatusFinance: {
+      actualRevenueRub: finance.actualRevenueRub,
+      certainUnpaidRevenueRub: finance.certainUnpaidRevenueRub,
+      totalExpensesRub: finance.totalExpensesRub,
+      reliableProfitRub: finance.reliableProfitRub,
+      passiveMinRub: rules.reliableProfitMinRub,
+      pauseMinRub: rules.pauseProfitMinRub ?? 245_000,
+    },
     plannedHoursPerDay: dispatch.plan.plannedHoursPerDay,
     items: items.filter((i) => i.plan_date),
     dayModes,

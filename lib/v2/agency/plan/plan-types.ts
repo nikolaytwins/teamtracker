@@ -46,6 +46,14 @@ export type PlanPayload = {
   loadStatus: LoadStatus;
   loadStatusLabels: { title: string; headline: string; detail: string };
   reliableProfitRub: number;
+  loadStatusFinance: {
+    actualRevenueRub: number;
+    certainUnpaidRevenueRub: number;
+    totalExpensesRub: number;
+    reliableProfitRub: number;
+    passiveMinRub: number;
+    pauseMinRub: number;
+  };
   plannedHoursPerDay: number;
   items: PlanItemRow[];
   dayModes: PlanDayModeRow[];
