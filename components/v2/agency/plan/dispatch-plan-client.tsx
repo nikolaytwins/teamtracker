@@ -771,56 +771,64 @@ function DispatchPlanCalendar({
                 </div>
               </div>
               {projView === "kb" ? (
-                <div className="kb">
-                  {kanbanCols.map((col) => {
-                    const ids = boardProjects.filter((p) => p.dispatchWorkStatus === col);
-                    const meta = STATUS_UI[col];
-                    return (
-                      <div
-                        key={col}
-                        className={`kbcol${kanbanDrop === col ? " drop" : ""}${col === "done" ? " kbcol--done" : ""}${col === "permanent" ? " kbcol--perm" : ""}`}
-                        onDragOver={(e) => {
-                          if (!drag || drag.kind !== "kanban") return;
-                          e.preventDefault();
-                          setKanbanDrop(col);
-                        }}
-                        onDragLeave={() => {
-                          setKanbanDrop((cur) => (cur === col ? null : cur));
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          void onDropKanban(col);
-                        }}
-                      >
-                        <div className="kbh">
-                          <span className="dot" style={{ background: meta.color }} />
-                          <span className="kbh-n">{meta.label}</span>
-                          <span className="kbh-c">{ids.length}</span>
+                <div className="kb-scroll">
+                  <div className="kb">
+                    {kanbanCols.map((col) => {
+                      const ids = boardProjects.filter((p) => p.dispatchWorkStatus === col);
+                      const meta = STATUS_UI[col];
+                      return (
+                        <div
+                          key={col}
+                          className={`kbcol${kanbanDrop === col ? " drop" : ""}${col === "done" ? " kbcol--done" : ""}${col === "permanent" ? " kbcol--perm" : ""}`}
+                          onDragOver={(e) => {
+                            if (!drag || drag.kind !== "kanban") return;
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            setKanbanDrop(col);
+                          }}
+                          onDragLeave={(e) => {
+                            const next = e.relatedTarget as Node | null;
+                            if (next && e.currentTarget.contains(next)) return;
+                            setKanbanDrop((cur) => (cur === col ? null : cur));
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            void onDropKanban(col);
+                          }}
+                        >
+                          <div className="kbh">
+                            <span className="dot" style={{ background: meta.color }} />
+                            <span className="kbh-n">{meta.label}</span>
+                            <span className="kbh-c">{ids.length}</span>
+                          </div>
+                          <div className="kbcol-body">
+                            {ids.length === 0 ? (
+                              <p className="kbc-nodata">Пусто</p>
+                            ) : (
+                              ids.map((p) => (
+                                <ProjectCard
+                                  key={p.id}
+                                  project={p}
+                                  items={items}
+                                  todayKey={todayKey}
+                                  dragging={drag?.kind === "kanban" && drag.projectId === p.id}
+                                  onOpen={() => setDrawer({ type: "project", projectId: p.id })}
+                                  onDragStart={() =>
+                                    setDrag({ kind: "kanban", projectId: p.id, fromStatus: p.dispatchWorkStatus })
+                                  }
+                                  onDragEnd={() => {
+                                    setDrag(null);
+                                    setKanbanDrop(null);
+                                  }}
+                                />
+                              ))
+                            )}
+                            <div className="kbcol-fill" aria-hidden />
+                          </div>
                         </div>
-                        {ids.length === 0 ? (
-                          <p className="kbc-nodata">Пусто</p>
-                        ) : (
-                          ids.map((p) => (
-                            <ProjectCard
-                              key={p.id}
-                              project={p}
-                              items={items}
-                              todayKey={todayKey}
-                              dragging={drag?.kind === "kanban" && drag.projectId === p.id}
-                              onOpen={() => setDrawer({ type: "project", projectId: p.id })}
-                              onDragStart={() =>
-                                setDrag({ kind: "kanban", projectId: p.id, fromStatus: p.dispatchWorkStatus })
-                              }
-                              onDragEnd={() => {
-                                setDrag(null);
-                                setKanbanDrop(null);
-                              }}
-                            />
-                          ))
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <ProjectList
