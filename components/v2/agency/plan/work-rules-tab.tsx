@@ -1,10 +1,12 @@
 "use client";
 
 import "./work-rules-design.css";
-import type {
-  WorkRulesAgreement,
-  WorkRulesCapCard,
-  WorkRulesDocument,
+import {
+  DEFAULT_WORK_RULES_DOCUMENT,
+  normalizeWorkRulesDocument,
+  type WorkRulesAgreement,
+  type WorkRulesCapCard,
+  type WorkRulesDocument,
 } from "@/lib/v2/agency/dispatch/work-rules-document";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { DispatchRulesRow } from "@/lib/v2/agency/dispatch/dispatch-types";
@@ -65,11 +67,16 @@ async function saveWorkRules(doc: WorkRulesDocument) {
   });
 }
 
+function rulesFromApiPayload(data: DispatchRulesRow | null | undefined): WorkRulesDocument {
+  return normalizeWorkRulesDocument(data?.workRules);
+}
+
 export function WorkRulesTab() {
-  const [doc, setDoc] = useState<WorkRulesDocument | null>(null);
+  const [doc, setDoc] = useState<WorkRulesDocument>(() => structuredClone(DEFAULT_WORK_RULES_DOCUMENT));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usedFallback, setUsedFallback] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,10 +107,16 @@ export function WorkRulesTab() {
     let cancelled = false;
     fetchJson<DispatchRulesRow>("/api/v2/agency/dispatch/rules")
       .then((data) => {
-        if (!cancelled) setDoc(data.workRules);
+        if (cancelled) return;
+        setDoc(rulesFromApiPayload(data));
+        setUsedFallback(!data?.workRules);
+        setError(null);
       })
       .catch((e: Error) => {
-        if (!cancelled) setError(e.message);
+        if (cancelled) return;
+        setDoc(structuredClone(DEFAULT_WORK_RULES_DOCUMENT));
+        setUsedFallback(true);
+        setError(e.message);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -121,16 +134,17 @@ export function WorkRulesTab() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  if (loading && !doc) {
-    return <div className="work-rules-v3 p-8 text-[var(--ink-500)]">Загрузка правил…</div>;
-  }
-  if (error && !doc) {
-    return <div className="work-rules-v3 p-8 text-[var(--red)]">{error}</div>;
-  }
-  if (!doc) return null;
-
   return (
     <div className="work-rules-v3">
+      {loading ? (
+        <div className="px-9 py-3 text-[13px] text-[var(--ink-500)]">Обновляем правила…</div>
+      ) : null}
+      {usedFallback && error ? (
+        <div className="mx-9 mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-[13px] text-amber-900">
+          Не удалось загрузить сохранённые правила ({error}). Показаны значения по умолчанию — правки сохранятся при
+          редактировании.
+        </div>
+      ) : null}
       <div className="shell">
         <main className="main">
           <div className="page">

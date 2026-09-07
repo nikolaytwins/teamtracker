@@ -9,7 +9,10 @@ export async function GET() {
 
   try {
     const rules = await getDispatchRules();
-    return NextResponse.json(rules);
+    return NextResponse.json({
+      ...rules,
+      workRules: normalizeWorkRulesDocument(rules.workRules),
+    });
   } catch (error) {
     console.error("v2/agency/dispatch/rules GET:", error);
     return NextResponse.json({ error: "Failed to load dispatch rules" }, { status: 500 });
@@ -27,7 +30,10 @@ export async function PATCH(request: NextRequest) {
     }
     const workRules = normalizeWorkRulesDocument(body.workRules);
     const rules = await updateDispatchRules({ workRules });
-    return NextResponse.json(rules);
+    return NextResponse.json({
+      ...rules,
+      workRules: normalizeWorkRulesDocument(rules.workRules),
+    });
   } catch (error) {
     console.error("v2/agency/dispatch/rules PATCH:", error);
     return NextResponse.json({ error: "Failed to save dispatch rules" }, { status: 500 });
