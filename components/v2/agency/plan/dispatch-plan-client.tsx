@@ -398,7 +398,6 @@ function DispatchPlanCalendar({
     }
     const snap = structuredClone(plan);
     const label = STATUS_UI[status].label;
-    if (status === "done" && !showDone) setShowDone(true);
     await mutate(
       () => updateProjectApi(drag.projectId, { dispatch_work_status: status }),
       `«${project.name}» → ${label}`,
@@ -469,15 +468,11 @@ function DispatchPlanCalendar({
   const weekDays = weekIncludesToday ? weekDates.filter((d) => toYmd(d) >= todayKey) : weekDates;
 
   const tasksToPlace = plan.backlog.filter((i) => i.kind === "task");
-  const visibleProjects = plan.projects.filter((p) => {
-    if (!showHidden && p.planHidden) return false;
-    if (!showDone && p.dispatchWorkStatus === "done") return false;
-    return true;
-  });
-
+  const boardProjects = plan.projects.filter((p) => showHidden || !p.planHidden);
+  const visibleProjects = boardProjects.filter((p) => showDone || p.dispatchWorkStatus !== "done");
   const hiddenCount = plan.projects.filter((p) => p.planHidden).length;
 
-  const kanbanCols = showDone ? [...KANBAN_ORDER, "done" as const] : KANBAN_ORDER;
+  const kanbanCols = [...KANBAN_ORDER, "done" as const];
 
   return (
     <div className="plan-v3 min-h-0 min-w-0 flex-1 overflow-y-auto">
@@ -778,12 +773,12 @@ function DispatchPlanCalendar({
               {projView === "kb" ? (
                 <div className="kb">
                   {kanbanCols.map((col) => {
-                    const ids = visibleProjects.filter((p) => p.dispatchWorkStatus === col);
+                    const ids = boardProjects.filter((p) => p.dispatchWorkStatus === col);
                     const meta = STATUS_UI[col];
                     return (
                       <div
                         key={col}
-                        className={`kbcol${kanbanDrop === col ? " drop" : ""}`}
+                        className={`kbcol${kanbanDrop === col ? " drop" : ""}${col === "done" ? " kbcol--done" : ""}`}
                         onDragOver={(e) => {
                           if (!drag || drag.kind !== "kanban") return;
                           e.preventDefault();

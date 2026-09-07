@@ -167,6 +167,29 @@
 .plan-v3 .madd:hover{border-color:var(--brand-500);color:var(--brand-700)}
 .plan-v3 .wkrow-live{display:grid;gap:12px}
 
+/* Projects kanban: fixed columns + horizontal scroll, done on the right */
+.plan-v3 .kb{
+  display:flex;
+  gap:14px;
+  align-items:stretch;
+  overflow-x:auto;
+  padding-bottom:8px;
+  scroll-snap-type:x proximity;
+}
+.plan-v3 .kbcol{
+  flex:0 0 260px;
+  width:260px;
+  min-width:260px;
+  max-width:260px;
+  scroll-snap-align:start;
+}
+.plan-v3 .kbcol--done{
+  flex-basis:280px;
+  width:280px;
+  min-width:280px;
+  max-width:280px;
+}
+
 /* Kanban project drag between status columns */
 .plan-v3 .kbcol{min-height:120px;transition:background .15s,box-shadow .15s}
 .plan-v3 .kbcol.drop{background:var(--brand-50);box-shadow:inset 0 0 0 2px var(--brand-300)}
