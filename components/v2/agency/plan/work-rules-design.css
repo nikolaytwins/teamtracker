@@ -14,3 +14,12 @@
 
 @media(max-width:1440px){.work-rules-v3 .hero{grid-template-columns:minmax(0,1fr) minmax(340px,500px)}.work-rules-v3 .cap{grid-template-columns:repeat(2,minmax(0,1fr))}.work-rules-v3 .prio{grid-template-columns:1fr}}
 @media(max-width:1180px){.work-rules-v3 .hero{grid-template-columns:1fr}.work-rules-v3 .hero-img{display:none}.work-rules-v3 .money,.work-rules-v3 .agr{grid-template-columns:1fr}}
+
+/* App shell already provides nav — compact embedded layout. */
+.work-rules-v3 .sidebar{display:none!important}
+.work-rules-v3 .shell{display:block;min-height:0}
+.work-rules-v3 .main{min-width:0}
+.work-rules-v3 .page{padding:18px 28px 72px;gap:18px;max-width:1760px}
+.work-rules-v3 .hero-l{min-height:0;justify-content:flex-start;padding:22px 26px}
+.work-rules-v3 .hero-img{min-height:0}
+.work-rules-v3 .hero-h1{font-size:32px}

@@ -53,7 +53,7 @@ import {
 import { formatRub } from "@/lib/v2/finance/meta";
 import type { DispatchWorkStatus } from "@/lib/v2/agency/dispatch/dispatch-work-status";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { WorkRulesTab } from "@/components/v2/agency/plan/work-rules-tab";
 
@@ -61,7 +61,7 @@ type PlanPageTab = "plan" | "rules";
 
 function PlanPageTabs({ tab, onTab }: { tab: PlanPageTab; onTab: (t: PlanPageTab) => void }) {
   return (
-    <div className="headrow" style={{ marginBottom: 6 }}>
+    <div className="headrow">
       <div className="seg">
         <button type="button" className={tab === "plan" ? "on" : ""} onClick={() => onTab("plan")}>
           План
@@ -104,28 +104,42 @@ function allItems(plan: PlanPayload): PlanItemRow[] {
 
 export function DispatchPlanClient() {
   const searchParams = useSearchParams();
+  const pathname = usePathname() ?? "";
+  const router = useRouter();
   const [pageTab, setPageTab] = useState<PlanPageTab>(() =>
     searchParams.get("tab") === "rules" ? "rules" : "plan"
+  );
+
+  const setPlanTab = useCallback(
+    (tab: PlanPageTab) => {
+      setPageTab(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      if (tab === "rules") params.set("tab", "rules");
+      else params.delete("tab");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
   );
 
   useEffect(() => {
     const t = searchParams.get("tab");
     if (t === "rules") setPageTab("rules");
-    else if (t === "plan") setPageTab("plan");
+    else if (t === "plan" || !t) setPageTab("plan");
   }, [searchParams]);
 
   if (pageTab === "rules") {
     return (
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div className="plan-v3" style={{ padding: "28px 36px 0", maxWidth: 1760, margin: "0 auto" }}>
-          <PlanPageTabs tab={pageTab} onTab={setPageTab} />
+          <PlanPageTabs tab={pageTab} onTab={setPlanTab} />
         </div>
         <WorkRulesTab />
       </div>
     );
   }
 
-  return <DispatchPlanCalendar onPageTabChange={setPageTab} pageTab={pageTab} />;
+  return <DispatchPlanCalendar onPageTabChange={setPlanTab} pageTab={pageTab} />;
 }
 
 function DispatchPlanCalendar({
@@ -319,23 +333,51 @@ function DispatchPlanCalendar({
     }
   };
 
-  if (loading && !plan) {
-    return (
-      <div className="plan-v3 min-h-0 min-w-0 flex-1 overflow-y-auto p-8 text-[15px] text-[var(--ink-500)]">
-        Загрузка плана…
-      </div>
-    );
-  }
-
   if (error && !plan) {
     return (
-      <div className="plan-v3 min-h-0 min-w-0 flex-1 overflow-y-auto p-8 text-[15px] text-[var(--red)]">
-        {error}
+      <div className="plan-v3 min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className="shell">
+          <main className="main">
+            <div className="page">
+              <PlanPageTabs tab={pageTab} onTab={onPageTabChange} />
+              <p className="text-[15px] text-[var(--red)]">{error}</p>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
 
-  if (!plan) return null;
+  if (!plan) {
+    return (
+      <div className="plan-v3 min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className="shell">
+          <main className="main">
+            <div className="page">
+              <PlanPageTabs tab={pageTab} onTab={onPageTabChange} />
+              <section className="card hero">
+                <div className="hero-l">
+                  <div className="hero-top">
+                    <span className="kick">Планирование</span>
+                  </div>
+                  <h1 className="hero-h1">План</h1>
+                  <p className="sec-sub" style={{ marginTop: 8 }}>
+                    {loading ? "Загрузка…" : "Нет данных"}
+                  </p>
+                </div>
+              </section>
+              <section className="card pad">
+                <h2 className="big-title">Календарь</h2>
+                <p className="sec-sub" style={{ marginTop: 12 }}>
+                  {loading ? "Подтягиваем слоты и проекты…" : ""}
+                </p>
+              </section>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   const items = allItems(plan);
   const loadStatus = plan.loadStatus;
