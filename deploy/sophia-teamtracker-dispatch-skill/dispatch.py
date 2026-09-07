@@ -114,7 +114,8 @@ def format_summary(ctx: dict) -> str:
     lines.append("  **Что изменится:** …")
     lines.append("  **Клиенту:** … (если нужно)")
     lines.append("")
-    lines.append("Не создавай проект и не меняй план без явной команды «беру/добавь/перенеси».")
+    lines.append("Не создавай проект без явной команды «беру/добавь».")
+    lines.append("Блоки плана меняй только по явной команде через plan.py (create/update/delete/day-mode).")
     return "\n".join(lines)
 
 

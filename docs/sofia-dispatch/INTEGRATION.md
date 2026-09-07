@@ -26,6 +26,19 @@ Header: x-tt-integration-secret: <TT_INTEGRATION_SECRET>
 
 Ответ — тот же JSON, что и у admin endpoint: правила, финансы месяца (actual / reliable / planned profit), срез плана.
 
+### План / календарь (чтение + запись)
+
+```
+GET    /api/integrations/sophia/plan?from=YYYY-MM-DD&to=YYYY-MM-DD&calendar=1
+POST   /api/integrations/sophia/plan/items
+PATCH  /api/integrations/sophia/plan/items/:id
+DELETE /api/integrations/sophia/plan/items/:id
+PATCH  /api/integrations/sophia/plan/day-mode
+```
+
+Тот же секрет. Доменный слой — `lib/v2/agency/plan/plan-repo.ts` (как веб `/api/v2/agency/plan/*`).
+OpenClaw skill: `deploy/sophia-teamtracker-dispatch-skill/plan.py`.
+
 ## Доменный слой
 
 ```
@@ -57,9 +70,8 @@ lib/v2/agency/dispatch/
 
 Полная постановка: `docs/sofia-dispatch/00_README.md` и файлы 01–05.
 
-## Следующие шаги (не в этой фазе)
+## Следующие шаги
 
-- UI по макету пользователя
-- PATCH правил и dispatch-полей проекта
-- Preview/confirm для чувствительных изменений
-- OpenClaw tools для Sophia
+- Preview/confirm для переноса клиентского дедлайна и массового replan через integration API
+- Создание agency_project из OpenClaw по явной команде
+- UI polish по макету

@@ -32,11 +32,12 @@ TT_INTEGRATION_SECRET=...   # мин. 16 символов
 
 Тот же ключ в env деплоя `tt.twinlabs.ru`.
 
-## Как пользоваться в Telegram
+## Как пользоваться в Telegram / VK
 
-1. Напиши `@sofilorebot` как обычно.
-2. Вопросы про проект / цену / срок / загрузку → София **должна** вызвать skill (см. `SKILL.md`).
-3. Ответ — текстом в формате: решение → запасной → почему → клиенту.
+1. Напиши `@sofilorebot` (или ВК-бот) как обычно.
+2. Вопросы про проект / цену / срок / загрузку → София **должна** вызвать `dispatch.py`.
+3. Явная команда «добавь в план / перенеси / поставь стратегию» → `plan.py` (запись в календарь).
+4. Ответ — текстом в формате: решение → запасной → почему → клиенту.
 
 Примеры:
 
@@ -44,8 +45,22 @@ TT_INTEGRATION_SECRET=...   # мин. 16 символов
 - «Можно брать новый проект?»
 - «Что делать сейчас?»
 - «Перестроить план»
+- «Добавь в план Автосайт на среду, 4 часа»
+- «Поставь стратегию на четверг»
 
 Красивые карточки — только на сайте: `/v2/agency/sofia`.
+
+## Write API (секрет, как у diary)
+
+```
+GET    /api/integrations/sophia/plan?from=&to=&calendar=1
+POST   /api/integrations/sophia/plan/items
+PATCH  /api/integrations/sophia/plan/items/:id
+DELETE /api/integrations/sophia/plan/items/:id
+PATCH  /api/integrations/sophia/plan/day-mode
+```
+
+Header: `x-tt-integration-secret: <TT_INTEGRATION_SECRET>`
 
 ## Workspace-файлы OpenClaw
 

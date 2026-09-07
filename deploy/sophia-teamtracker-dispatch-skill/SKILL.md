@@ -2,9 +2,11 @@
 name: teamtracker-dispatch
 description: >
   Рабочий диспетчер Team Tracker (tt.twinlabs.ru): проекты агентства, план, ставки, сроки,
-  прибыль месяца. Use when Nikolay asks about taking a project, price, deadline, workload,
-  replanning, what to do now, strategy/creative day, or agency money. Always run dispatch.py
-  before advising — never guess hours or profit from memory.
+  прибыль месяца; чтение и запись календарных блоков плана. Use when Nikolay asks about
+  taking a project, price, deadline, workload, replanning, what to do now, strategy/creative
+  day, agency money, or explicitly asks to add/move/delete plan blocks or set day modes.
+  Always run dispatch.py before advising. Run plan.py only on explicit write commands —
+  never guess hours or profit from memory.
 ---
 
 # Team Tracker — рабочий диспетчер (Sofia Plan)
@@ -21,38 +23,84 @@ description: >
 - перестроить план;
 - «что делать сейчас»;
 - загрузку, резерв, стратегию или **творческий день**;
-- деньги агентства в этом месяце (надёжная vs плановая прибыль).
+- деньги агентства в этом месяце (надёжная vs плановая прибыль);
+- **добавить / перенести / удалить блок в плане**;
+- **поставить стратегию / творческий / выходной**.
 
 **Не** проси вручную перечислять проекты и цифры — сначала прочитай Team Tracker.
 
-## Команда (каждый раз перед советом)
+## Чтение контекста (каждый раз перед советом)
 
 ```bash
 python3 /root/.openclaw/workspace/skills/teamtracker-dispatch/dispatch.py
 ```
 
-С вопросом пользователя (удобно для себя):
+С вопросом пользователя:
 
 ```bash
 python3 /root/.openclaw/workspace/skills/teamtracker-dispatch/dispatch.py \
   --for-message "лендинг 35 000 ₽, до 12 сентября, 10 часов — брать?"
 ```
 
-Другой месяц:
+## Календарь плана (чтение блоков)
+
+Перед записью или если нужны даты/часы по дням:
 
 ```bash
-python3 .../dispatch.py --year 2026 --month 9
+python3 /root/.openclaw/workspace/skills/teamtracker-dispatch/plan.py calendar
+python3 /root/.openclaw/workspace/skills/teamtracker-dispatch/plan.py calendar \
+  --from 2026-09-08 --to 2026-09-21
 ```
 
-Сырой JSON (если нужны все поля):
+В выводе у каждого блока есть `id` — он нужен для update/delete.
+
+## Запись в план (только по явной команде)
+
+Пиши в календарь **только** если Николай явно сказал: «добавь», «запиши в план»,
+«перенеси», «поставь стратегию», «убери блок» и т.п.  
+«Можно брать?» / совет — **без** записи.
+
+### Создать блок
 
 ```bash
-python3 .../dispatch.py --json
+python3 /root/.openclaw/workspace/skills/teamtracker-dispatch/plan.py create \
+  --title "Автосайт — вёрстка" \
+  --date 2026-09-10 \
+  --hours 4 \
+  --kind task
 ```
 
-Секрет: `TT_INTEGRATION_SECRET` из `/etc/team-tracker.env` (как у `teamtracker-diary`).
+Опционально: `--project-id <uuid>`, `--time 10:00`, `--kind call|personal`.
 
-## Формат ответа в Telegram
+### Перенести / изменить блок
+
+```bash
+python3 /root/.openclaw/workspace/skills/teamtracker-dispatch/plan.py update \
+  --id <item-id> \
+  --date 2026-09-12 \
+  --hours 3
+```
+
+### Удалить блок
+
+```bash
+python3 /root/.openclaw/workspace/skills/teamtracker-dispatch/plan.py delete --id <item-id>
+```
+
+### Режим дня (стратегия / творчество / отдых)
+
+```bash
+python3 /root/.openclaw/workspace/skills/teamtracker-dispatch/plan.py day-mode \
+  --date 2026-09-11 \
+  --mode strategy
+```
+
+`--mode`: `strategy` | `creative` | `rest` | `normal` (снять режим).
+
+После успешной записи коротко подтверди, что изменилось, и при необходимости
+перечитай `dispatch.py` или `plan.py calendar`.
+
+## Формат ответа в Telegram / VK
 
 Коротко, по-русски, в голосе Софии, но **структурно**:
 
@@ -73,21 +121,18 @@ python3 .../dispatch.py --json
 1. Ставка ниже порога из контекста → предложи поднять цену, сократить объём или сдвинуть срок.
 2. Резерв — не обычное место под новый проект.
 3. Сохраняй стратегию и творческий день.
-4. «Можно брать?» — только совет, **без** создания проекта.
-5. «Беру / добавь проект» — только если данных достаточно; иначе один уточняющий вопрос.
-6. Перенос **клиентского** дедлайна — только после явного подтверждения.
-
-## Что скрипт не делает
-
-- Не создаёт проекты и не двигает календарь (только чтение).
-- Запись в TT — через веб или будущие write-tools; пока предупреди, что нужно подтверждение в интерфейсе.
+4. «Можно брать?» — только совет, **без** создания проекта и без записи в план.
+5. «Беру / добавь проект» — создание сущности проекта пока через веб; в план блок можно добавить через `plan.py create`.
+6. Перенос **клиентского** дедлайна — только после явного подтверждения (пока через веб).
+7. Внутренний блок плана / режим дня — можно менять сразу после явной команды.
 
 ## Ошибки
 
 - `ERROR: TT_INTEGRATION_SECRET` — проверить `/etc/team-tracker.env` на VPS.
-- `ERROR: API 401` — секрет не совпадает с Team Tracker.
-- `ERROR: API 500` — деплой TT или миграции; сообщи Николаю.
+- `API 401` — секрет не совпадает с Team Tracker.
+- `API 404` на plan/* — деплой TT ещё без write-API; скажи Николаю обновить tt.twinlabs.ru.
+- `API 500` — деплой TT или миграции; сообщи Николаю.
 
 ## Связанные skills
 
-- `teamtracker-diary` — личный дневник (`дневник:`, хештеги внизу). Не путать с dispatch.
+- `teamtracker-diary` — личный дневник (`дневник:`, хештеги). Не путать с планом.
