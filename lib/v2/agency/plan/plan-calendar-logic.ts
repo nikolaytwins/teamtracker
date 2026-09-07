@@ -11,6 +11,7 @@ export const STATUS_UI: Record<
   planned: { label: "Планируется", css: "st--plan", color: "#A1A1AA" },
   on_approval: { label: "Согласование", css: "st--rev", color: "#F59E0B" },
   done: { label: "Завершён", css: "st--done", color: "#10B981" },
+  permanent: { label: "Постоянные", css: "st--perm", color: "#6366F1" },
 };
 
 export const KANBAN_ORDER: DispatchWorkStatus[] = [
@@ -19,6 +20,9 @@ export const KANBAN_ORDER: DispatchWorkStatus[] = [
   "on_approval",
   "revisions",
 ];
+
+/** Полный ряд колонок канбана Плана, включая завершённые и постоянные справа. */
+export const KANBAN_BOARD_COLS: DispatchWorkStatus[] = [...KANBAN_ORDER, "done", "permanent"];
 
 export type DayModeKey = PlanDayMode | null;
 

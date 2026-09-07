@@ -1,6 +1,12 @@
 /** Рабочие статусы Sofia Plan — отдельно от work_status канбана. */
 
-export type DispatchWorkStatus = "planned" | "in_progress" | "on_approval" | "revisions" | "done";
+export type DispatchWorkStatus =
+  | "planned"
+  | "in_progress"
+  | "on_approval"
+  | "revisions"
+  | "done"
+  | "permanent";
 
 export const DISPATCH_WORK_STATUSES: {
   key: DispatchWorkStatus;
@@ -13,6 +19,7 @@ export const DISPATCH_WORK_STATUSES: {
   { key: "on_approval", label: "Согласование", consumesPlanHours: false, planRiskOnly: true },
   { key: "revisions", label: "Правки", consumesPlanHours: true, planRiskOnly: false },
   { key: "done", label: "Завершён", consumesPlanHours: false, planRiskOnly: false },
+  { key: "permanent", label: "Постоянные", consumesPlanHours: true, planRiskOnly: false },
 ];
 
 export function isDispatchWorkStatus(v: unknown): v is DispatchWorkStatus {

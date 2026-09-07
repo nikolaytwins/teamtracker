@@ -103,7 +103,8 @@ export function selectDispatchProjectsForContext(
       !isInFinanceMonth(p.createdAt, year, month) &&
       (p.dispatchWorkStatus === "in_progress" ||
         p.dispatchWorkStatus === "revisions" ||
-        p.dispatchWorkStatus === "on_approval")
+        p.dispatchWorkStatus === "on_approval" ||
+        p.dispatchWorkStatus === "permanent")
   );
   const byId = new Map<string, DispatchProjectView>();
   for (const p of [...inMonth, ...carryOver]) byId.set(p.id, p);
@@ -243,7 +244,8 @@ export function isPlanRelevantProject(
   if (
     p.dispatchWorkStatus === "in_progress" ||
     p.dispatchWorkStatus === "revisions" ||
-    p.dispatchWorkStatus === "on_approval"
+    p.dispatchWorkStatus === "on_approval" ||
+    p.dispatchWorkStatus === "permanent"
   ) {
     return true;
   }

@@ -20,7 +20,7 @@ import {
   futureProjectHours,
   hoursLabel,
   itemHours,
-  KANBAN_ORDER,
+  KANBAN_BOARD_COLS,
   modeCssClass,
   nextFreeWindowDay,
   pluralRu,
@@ -472,7 +472,7 @@ function DispatchPlanCalendar({
   const visibleProjects = boardProjects.filter((p) => showDone || p.dispatchWorkStatus !== "done");
   const hiddenCount = plan.projects.filter((p) => p.planHidden).length;
 
-  const kanbanCols = [...KANBAN_ORDER, "done" as const];
+  const kanbanCols = KANBAN_BOARD_COLS;
 
   return (
     <div className="plan-v3 min-h-0 min-w-0 flex-1 overflow-y-auto">
@@ -778,7 +778,7 @@ function DispatchPlanCalendar({
                     return (
                       <div
                         key={col}
-                        className={`kbcol${kanbanDrop === col ? " drop" : ""}${col === "done" ? " kbcol--done" : ""}`}
+                        className={`kbcol${kanbanDrop === col ? " drop" : ""}${col === "done" ? " kbcol--done" : ""}${col === "permanent" ? " kbcol--perm" : ""}`}
                         onDragOver={(e) => {
                           if (!drag || drag.kind !== "kanban") return;
                           e.preventDefault();

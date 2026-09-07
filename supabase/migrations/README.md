@@ -96,8 +96,9 @@
 | 075 | `075_agency_plan_calendar.sql` | Sofia Plan UI: agency_plan_item, agency_plan_day_mode, pauseProfitMinRub |
 | 076 | `076_agency_plan_user_id_text.sql` | Fix plan tables: user_id TEXT (v2 ids u_…) |
 | 077 | `077_agency_project_plan_hidden.sql` | План: plan_hidden — скрыть проект из канбана/списка |
+| 078 | `078_agency_project_dispatch_permanent.sql` | План: статус permanent («Постоянные») |
 
-**Следующий свободный номер:** `078`
+**Следующий свободный номер:** `079`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

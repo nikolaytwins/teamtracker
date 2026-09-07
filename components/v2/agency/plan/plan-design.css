@@ -189,6 +189,13 @@
   min-width:280px;
   max-width:280px;
 }
+.plan-v3 .kbcol--perm{
+  flex-basis:280px;
+  width:280px;
+  min-width:280px;
+  max-width:280px;
+}
+.plan-v3 .st--perm{background:#eef2ff;color:#4338ca}
 
 /* Kanban project drag between status columns */
 .plan-v3 .kbcol{min-height:120px;transition:background .15s,box-shadow .15s}
