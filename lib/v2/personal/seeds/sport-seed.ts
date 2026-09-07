@@ -137,6 +137,28 @@ export const SP_WEEKS_SEED: SportWeek[] = [
     avg: { w: 68.98, f: 14.56, l: 54.42 },
     note: "Первое измерение живота: 83 по пупку, 85 по широкому месту.",
   },
+  {
+    id: "w5",
+    label: "Неделя 5",
+    dates: "",
+    kcal: 2300,
+    protein: null,
+    wn: null,
+    ww: null,
+    avg: { w: 68.81, f: 14.2, l: 54.61 },
+    note: "",
+  },
+  {
+    id: "w6",
+    label: "Неделя 6",
+    dates: "",
+    kcal: null,
+    protein: null,
+    wn: null,
+    ww: null,
+    avg: { w: 69.31, f: 14.5, l: 54.8 },
+    note: "Неделя без правильного питания, с шашлыками и алкоголем.",
+  },
 ];
 
 export const SP_PROGRAM_SEED: SportProgramDay[] = [
