@@ -39,3 +39,23 @@
 @media(max-width:1200px){
   .plan-v3 .hero-l{padding:18px 20px}
 }
+
+/* Calendar header: title+seg | centered period | actions (design frame). */
+.plan-v3 .cal-head{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:16px;margin-bottom:22px}
+.plan-v3 .cal-head-l{display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-width:0}
+.plan-v3 .cal-head-c{display:flex;align-items:center;gap:10px;justify-content:center}
+.plan-v3 .cal-head-r{display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+@media(max-width:1100px){
+  .plan-v3 .cal-head{grid-template-columns:1fr;justify-items:start}
+  .plan-v3 .cal-head-c,.plan-v3 .cal-head-r{justify-content:flex-start}
+}
+
+/* Design frame: outlined secondary button + pastel fallbacks without oklab. */
+.plan-v3 .btn--gh{box-shadow:none;border:1.5px solid var(--ink-200)}
+.plan-v3 .btn--gh:hover{border-color:var(--brand-300)}
+.plan-v3 .mark{width:max-content;max-width:100%}
+.plan-v3 .slot{background:color-mix(in srgb,var(--c) 15%,#fff)}
+.plan-v3 .slot:hover{background:color-mix(in srgb,var(--c) 24%,#fff)}
+.plan-v3 .slot-m{color:color-mix(in srgb,var(--c) 74%,var(--ink-700))}
+.plan-v3 .mchip{background:color-mix(in srgb,var(--c) 15%,#fff)}
+.plan-v3 .mchip:hover{background:color-mix(in srgb,var(--c) 24%,#fff)}

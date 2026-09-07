@@ -48,6 +48,7 @@ import {
   parseDurationInput,
   parseYmd,
   planHoursToMinutes,
+  projectColor,
   toYmd,
 } from "@/lib/v2/agency/plan/plan-utils";
 import { formatRub } from "@/lib/v2/finance/meta";
@@ -92,6 +93,14 @@ type DrawerState =
   | { type: "project"; projectId: string; estFocus?: boolean };
 
 type CreateKind = "task" | "call" | "personal" | "strategy" | "creative" | "rest";
+
+function eventMetaLabel(ev: PlanItemRow): string {
+  const parts: string[] = [];
+  if (ev.event_time) parts.push(ev.event_time);
+  if (ev.duration_label) parts.push(ev.duration_label);
+  else if (!ev.event_time && ev.planned_minutes != null) parts.push(hoursLabel(ev));
+  return parts.join(" · ");
+}
 
 function projectById(projects: PlanProjectView[], id: string | null) {
   if (!id) return null;
@@ -458,17 +467,19 @@ function DispatchPlanCalendar({
             </section>
 
             <section className="card pad">
-              <div className="headrow" style={{ marginBottom: 22 }}>
-                <h2 className="big-title">Календарь</h2>
-                <div className="seg" id="mode-seg">
-                  <button type="button" className={calMode === "week" ? "on" : ""} onClick={() => setCalMode("week")}>
-                    Неделя
-                  </button>
-                  <button type="button" className={calMode === "month" ? "on" : ""} onClick={() => setCalMode("month")}>
-                    Месяц
-                  </button>
+              <div className="cal-head">
+                <div className="cal-head-l">
+                  <h2 className="big-title">Календарь</h2>
+                  <div className="seg" id="mode-seg">
+                    <button type="button" className={calMode === "week" ? "on" : ""} onClick={() => setCalMode("week")}>
+                      Неделя
+                    </button>
+                    <button type="button" className={calMode === "month" ? "on" : ""} onClick={() => setCalMode("month")}>
+                      Месяц
+                    </button>
+                  </div>
                 </div>
-                <div className="headrow" style={{ gap: 10, marginLeft: "auto" }}>
+                <div className="cal-head-c">
                   <button
                     type="button"
                     className="wk-btn tip"
@@ -498,6 +509,8 @@ function DispatchPlanCalendar({
                   >
                     ›
                   </button>
+                </div>
+                <div className="cal-head-r">
                   <button type="button" className="btn btn--gh" onClick={() => setDrawer({ type: "create", createKind: "call" })}>
                     Событие
                   </button>
@@ -910,17 +923,20 @@ function DayCell({
               </i>
             ) : null}
           </div>
-          {dayEvents.slice(0, 2).map((ev) => (
-            <button
-              key={ev.id}
-              type="button"
-              className={`mev${ev.kind === "personal" ? " mev--me" : ""}`}
-              onClick={() => onOpenItem(ev.id)}
-            >
-              {ev.title}
-              {ev.event_time ? <i>{ev.event_time}</i> : null}
-            </button>
-          ))}
+          {dayEvents.slice(0, 2).map((ev) => {
+            const meta = eventMetaLabel(ev);
+            return (
+              <button
+                key={ev.id}
+                type="button"
+                className={`mev${ev.kind === "personal" ? " mev--me" : ""}`}
+                onClick={() => onOpenItem(ev.id)}
+              >
+                {ev.title}
+                {meta ? <i>{meta}</i> : null}
+              </button>
+            );
+          })}
           {dayTasks.slice(0, 3).map((t) => {
             const p = t.project_id ? projectsMap.get(t.project_id) : null;
             return (
@@ -928,7 +944,7 @@ function DayCell({
                 key={t.id}
                 type="button"
                 className="mchip"
-                style={{ ["--c" as string]: p?.color ?? "#71717A" }}
+                style={{ ["--c" as string]: p?.color ?? projectColor(t.id) }}
                 onClick={() => onOpenItem(t.id)}
               >
                 {t.title}
@@ -975,20 +991,20 @@ function DayCell({
           ) : null}
           {dayEvents.length > 0 && (
             <div className="evs">
-              {dayEvents.map((ev) => (
-                <button
-                  key={ev.id}
-                  type="button"
-                  className={`ev${ev.kind === "personal" ? " ev--me" : ""}`}
-                  onClick={() => onOpenItem(ev.id)}
-                >
-                  <span className="ev-t">
-                    {ev.event_time}
-                    {ev.duration_label ? ` · ${ev.duration_label}` : ""}
-                  </span>
-                  <span className="ev-n">{ev.title}</span>
-                </button>
-              ))}
+              {dayEvents.map((ev) => {
+                const meta = eventMetaLabel(ev);
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    className={`ev${ev.kind === "personal" ? " ev--me" : ""}`}
+                    onClick={() => onOpenItem(ev.id)}
+                  >
+                    {meta ? <span className="ev-t">{meta}</span> : null}
+                    <span className="ev-n">{ev.title}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
           <div className="slots">
@@ -1000,7 +1016,7 @@ function DayCell({
                   type="button"
                   className="slot"
                   draggable={!past}
-                  style={{ ["--c" as string]: p?.color ?? "#71717A" }}
+                  style={{ ["--c" as string]: p?.color ?? projectColor(t.id) }}
                   onDragStart={() => onDragStart({ kind: "move", itemId: t.id })}
                   onDragEnd={onDragEnd}
                   onClick={() => onOpenItem(t.id)}
