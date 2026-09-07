@@ -81,6 +81,26 @@ export const SP_GOAL: SportGoal = {
   raw: "72–74 кг при 14–16% жира",
 };
 
+/** Средние по месяцам до системной диеты (для fullscreen-графиков). */
+export type SportPreDietMonth = {
+  id: string;
+  label: string;
+  n: number;
+  w: number;
+  fatPct: number;
+  f: number;
+  l: number;
+};
+
+export const SP_PRE_DIET_MONTHS: SportPreDietMonth[] = [
+  { id: "m-feb", label: "Фев", n: 7, w: 72.46, fatPct: 23.5, f: 17.03, l: 55.43 },
+  { id: "m-mar", label: "Мар", n: 4, w: 72.65, fatPct: 22.93, f: 16.66, l: 55.99 },
+  { id: "m-apr", label: "Апр", n: 1, w: 72.6, fatPct: 23.5, f: 17.06, l: 55.54 },
+  { id: "m-may", label: "Май", n: 2, w: 73.3, fatPct: 22.15, f: 16.24, l: 57.06 },
+  { id: "m-jun", label: "Июн", n: 6, w: 69.68, fatPct: 21.88, f: 15.25, l: 54.43 },
+  { id: "m-jul", label: "Июл", n: 24, w: 68.45, fatPct: 21.45, f: 14.68, l: 53.77 },
+];
+
 export const SP_WEEKS_SEED: SportWeek[] = [
   {
     id: "w0",
