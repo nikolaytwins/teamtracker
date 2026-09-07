@@ -89,6 +89,11 @@ export async function createPlanProjectApi(body: {
   name: string;
   planned_hours_remaining?: number | null;
   work_deadline?: string | null;
+  include_in_finance?: boolean;
+  total_amount?: number | null;
+  paid_amount?: number | null;
+  payment_status?: "not_paid" | "prepaid" | "paid" | null;
+  service_type?: string | null;
 }) {
   return fetchJson<{ project: { id: string; name: string } }>("/api/v2/agency/plan/projects", {
     method: "POST",

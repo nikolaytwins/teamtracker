@@ -5,7 +5,10 @@ import { ensureCardForAgencyProject } from "@/lib/db";
 
 /**
  * Быстрое создание agency-проекта из Плана (канбан).
- * Body: { name, planned_hours_remaining?, work_deadline? }
+ * Body: {
+ *   name, planned_hours_remaining?, work_deadline?,
+ *   include_in_finance?, total_amount?, paid_amount?, payment_status?, service_type?
+ * }
  */
 export async function POST(request: NextRequest) {
   const auth = await requireV2Admin();
@@ -16,6 +19,11 @@ export async function POST(request: NextRequest) {
       name?: string;
       planned_hours_remaining?: number | null;
       work_deadline?: string | null;
+      include_in_finance?: boolean;
+      total_amount?: number | null;
+      paid_amount?: number | null;
+      payment_status?: string | null;
+      service_type?: string | null;
     };
     const name = String(body.name ?? "").trim();
     if (!name) {
@@ -31,6 +39,34 @@ export async function POST(request: NextRequest) {
     }
 
     const workDeadline = body.work_deadline ? String(body.work_deadline).trim() || null : null;
+    const includeInFinance = body.include_in_finance === true;
+
+    let totalAmount = 0;
+    let paidAmount = 0;
+    let paymentStatus = "not_paid";
+    if (includeInFinance) {
+      totalAmount = Number(body.total_amount);
+      if (!Number.isFinite(totalAmount) || totalAmount < 0) {
+        return NextResponse.json(
+          { error: "total_amount required when include_in_finance" },
+          { status: 400 }
+        );
+      }
+      totalAmount = Math.round(totalAmount);
+      paidAmount = body.paid_amount == null ? 0 : Number(body.paid_amount);
+      if (!Number.isFinite(paidAmount) || paidAmount < 0) {
+        return NextResponse.json({ error: "invalid paid_amount" }, { status: 400 });
+      }
+      paidAmount = Math.round(paidAmount);
+      const rawStatus = String(body.payment_status ?? "not_paid");
+      paymentStatus =
+        rawStatus === "paid" || rawStatus === "prepaid" || rawStatus === "not_paid"
+          ? rawStatus
+          : "not_paid";
+      if (paymentStatus === "paid") paidAmount = totalAmount;
+    }
+
+    const serviceType = String(body.service_type ?? "other").trim() || "other";
     const id = `proj_${Date.now()}`;
     const now = new Date().toISOString();
 
@@ -40,11 +76,11 @@ export async function POST(request: NextRequest) {
       .insert({
         id,
         name,
-        total_amount: 0,
-        paid_amount: 0,
+        total_amount: totalAmount,
+        paid_amount: paidAmount,
         deadline: workDeadline,
-        status: "not_paid",
-        service_type: "other",
+        status: paymentStatus,
+        service_type: serviceType,
         business_line: "agency",
         dispatch_work_status: "planned",
         work_deadline: workDeadline,
@@ -53,7 +89,7 @@ export async function POST(request: NextRequest) {
         created_at: now,
         updated_at: now,
       })
-      .select("id, name")
+      .select("id, name, total_amount, status")
       .single();
     if (error) throw error;
 

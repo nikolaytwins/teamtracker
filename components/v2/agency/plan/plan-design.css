@@ -226,3 +226,33 @@
 .plan-v3 .kbc:active{cursor:grabbing}
 .plan-v3 .fld input[type="date"]{cursor:pointer}
 .plan-v3 .fld input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:1}
+
+.plan-v3 .plan-check{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:14px 16px;
+  border-radius:14px;
+  background:var(--ink-50);
+  cursor:pointer;
+  user-select:none;
+}
+.plan-v3 .plan-check input{
+  width:18px;
+  height:18px;
+  margin-top:2px;
+  flex-shrink:0;
+  accent-color:var(--brand-600);
+}
+.plan-v3 .plan-check span{display:flex;flex-direction:column;gap:4px;min-width:0}
+.plan-v3 .plan-check b{font-size:14.5px;font-weight:600;color:var(--ink-800)}
+.plan-v3 .plan-check em{font-style:normal;font-size:13px;color:var(--ink-500);line-height:1.35}
+.plan-v3 .plan-finance-box{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  padding:16px;
+  border-radius:14px;
+  border:1.5px solid var(--ink-200);
+  background:#fff;
+}

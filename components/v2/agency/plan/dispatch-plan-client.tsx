@@ -2206,6 +2206,10 @@ function CreateProjectDrawer({
   const [name, setName] = useState("");
   const [est, setEst] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [includeFinance, setIncludeFinance] = useState(false);
+  const [totalAmount, setTotalAmount] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<"not_paid" | "prepaid" | "paid">("not_paid");
   const snap = structuredClone(plan);
 
   const save = async () => {
@@ -2213,14 +2217,30 @@ function CreateProjectDrawer({
     if (!title) return;
     const hours = est.trim() === "" ? null : Number(est);
     if (hours != null && (!Number.isFinite(hours) || hours < 0)) return;
+
+    let amount: number | null = null;
+    let paid: number | null = null;
+    if (includeFinance) {
+      amount = Number(String(totalAmount).replace(/\s/g, "").replace(",", "."));
+      if (!Number.isFinite(amount) || amount < 0) return;
+      paid = paidAmount.trim() === "" ? 0 : Number(String(paidAmount).replace(/\s/g, "").replace(",", "."));
+      if (!Number.isFinite(paid) || paid < 0) return;
+    }
+
     await mutate(
       () =>
         createPlanProjectApi({
           name: title,
           planned_hours_remaining: hours,
           work_deadline: deadline || null,
+          include_in_finance: includeFinance,
+          total_amount: amount,
+          paid_amount: paid,
+          payment_status: includeFinance ? paymentStatus : null,
         }),
-      `Проект «${title}» добавлен`,
+      includeFinance
+        ? `Проект «${title}» добавлен в план и финансы`
+        : `Проект «${title}» добавлен`,
       snap
     );
     onClose();
@@ -2249,7 +2269,7 @@ function CreateProjectDrawer({
             placeholder="Клиент · задача"
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === "Enter") void save();
+              if (e.key === "Enter" && !includeFinance) void save();
             }}
           />
         </div>
@@ -2263,10 +2283,69 @@ function CreateProjectDrawer({
             <PlanDateInput id="plan-new-work-deadline" value={deadline} onChange={setDeadline} />
           </div>
         </div>
-        <p className="dr-note">Появится в колонке «Запланирован». Финансы можно дописать позже в разделе проектов.</p>
+
+        <label className="plan-check">
+          <input
+            type="checkbox"
+            checked={includeFinance}
+            onChange={(e) => setIncludeFinance(e.target.checked)}
+          />
+          <span>
+            <b>Добавить в финансы</b>
+            <em>Появится в «Проекты и финансы» с суммой</em>
+          </span>
+        </label>
+
+        {includeFinance ? (
+          <div className="plan-finance-box">
+            <div className="fld">
+              <label>Сумма, ₽</label>
+              <input
+                type="number"
+                min={0}
+                step={1000}
+                placeholder="например 80000"
+                value={totalAmount}
+                onChange={(e) => setTotalAmount(e.target.value)}
+              />
+            </div>
+            <div className="fld2">
+              <div className="fld">
+                <label>Статус оплаты</label>
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value as "not_paid" | "prepaid" | "paid")}
+                >
+                  <option value="not_paid">Не оплачен</option>
+                  <option value="prepaid">Предоплата</option>
+                  <option value="paid">Оплачен</option>
+                </select>
+              </div>
+              <div className="fld">
+                <label>Оплачено, ₽</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  placeholder="0"
+                  value={paymentStatus === "paid" ? totalAmount : paidAmount}
+                  disabled={paymentStatus === "paid"}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="dr-note">Появится в колонке «Запланирован». Финансы можно дописать позже.</p>
+        )}
       </div>
       <div className="dr-f">
-        <button type="button" className="btn btn--pri" disabled={!name.trim()} onClick={() => void save()}>
+        <button
+          type="button"
+          className="btn btn--pri"
+          disabled={!name.trim() || (includeFinance && totalAmount.trim() === "")}
+          onClick={() => void save()}
+        >
           Добавить
         </button>
         <button type="button" className="btn btn--gh" onClick={onClose}>
