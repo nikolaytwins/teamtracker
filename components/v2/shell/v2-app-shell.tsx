@@ -65,20 +65,24 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: "/v2/home", label: "Главная", icon: "home" },
   { href: "/v2/personal/ideas-tasks", label: "Идеи и задачи", icon: "tasks" },
-  { href: "/v2/personal/calendar", label: "Календарь", icon: "cal" },
+  // Скрыто: Календарь (/v2/personal/calendar — неактуален)
   // Скрыто: Доска, Проекты, Команда
-  { href: "/v2/agency/overview", label: "Агентство", icon: "reports", agency: true },
+  { href: "/v2/agency/overview", label: "Выручка", icon: "reports", agency: true },
   { href: "/v2/agency/plan", label: "План", icon: "cal", agency: true },
-  { href: "/v2/agency/sofia", label: "София", icon: "chat", agency: true },
-  { href: "/v2/impulse", label: "Импульс", icon: "spark", agency: true },
   { href: "/v2/personal/finance", label: "Финансы", icon: "ruble" },
+  // София — внизу меню, рядом с профилем (footerNav)
   // Скрыто: Финансы месяца (/v2/agency — итоги вынесены на главную)
+  // Импульс: вкладка внутри Выручки (/v2/agency/impulse)
   // Скрыто: Лиды
+];
+
+const FOOTER_NAV: NavItem[] = [
+  { href: "/v2/agency/sofia", label: "София", icon: "chat", agency: true },
 ];
 
 const PERSONAL_NAV: NavItem[] = [
   // Скрыто: Идеи (/v2/personal/ideas — вкладка в «Идеи и задачи»)
-  { href: "/v2/personal/dashboard", label: "Дашборд", icon: "reports" },
+  // Скрыто: Дашборд (/v2/personal/dashboard — YouTube неактуален)
   { href: "/v2/personal/sport", label: "Спорт", icon: "sport" },
   { href: "/v2/personal/wishes", label: "Желания", icon: "wish" },
   { href: "/v2/personal/observations", label: "Дневник", icon: "eye" },
@@ -190,6 +194,11 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
     if (isClient) return n.href === "/v2/home";
     return true;
   });
+  const footerNav = FOOTER_NAV.filter((n) => {
+    if (n.agency && !canAccessAgencyRoutes(normalizeTtUserRole(me?.role))) return false;
+    if (isClient) return false;
+    return true;
+  });
   const personalNav = isClient ? [] : PERSONAL_NAV;
   const teamProjects = useMemo(() => projects.filter((p) => p.scope === "team"), [projects]);
 
@@ -239,6 +248,7 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
         <V2ShellSidebar
           nav={nav}
           personalNav={personalNav}
+          footerNav={footerNav}
           teamProjects={teamProjects}
           taskCounts={taskCounts}
           me={me}

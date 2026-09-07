@@ -44,23 +44,12 @@ export type SportVerdict = { head: string; sub: string };
 export function spVerdict(rows: Array<{ a?: SportWeekAvg | null; kcal?: number | null }>): SportVerdict {
   const A = rows.filter((r) => r.a && r.a.w != null);
   if (A.length < 2) return { head: "", sub: "" };
-  const first = A[0]!.a!;
   const last = A[A.length - 1]!.a!;
-  const dl = last.l != null && first.l != null ? last.l - first.l : null;
-  const df = last.f != null && first.f != null ? last.f - first.f : null;
   const gL = last.l != null ? SP_GOAL.lTarget - last.l : null;
   const gF = last.f != null ? SP_GOAL.fTarget - last.f : null;
-  const kcal = [...rows].reverse().find((r) => r.kcal)?.kcal;
-  let v = "Изменений почти нет — данных на вывод пока мало.";
-  if (dl != null && df != null) {
-    if (dl > 0.3 && df <= 0.2) v = "Набор идёт чисто: безжировая растёт, жир стоит на месте.";
-    else if (dl > 0.3) v = "Набор идёт, но не чисто — жир прибавляется вместе с массой.";
-    else if (df > 0.2) v = "Безжировая стоит, жир растёт. Смотри калории и белок.";
-    else if (dl < -0.3) v = "Безжировая уходит. Это уже потеря, а не сушка.";
-  }
   return {
     head: `До цели ${gL != null ? sgn(gL, 1) : "—"} кг мышц и ${gF != null ? sgn(gF, 1) : "—"} кг жира`,
-    sub: `За ${A.length - 1} нед.: безжировая ${sgn(dl, 2)} кг, жир ${sgn(df, 2)} кг${kcal ? ` на ${kcal} ккал` : ""}. ${v}`,
+    sub: "",
   };
 }
 

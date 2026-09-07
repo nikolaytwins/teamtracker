@@ -124,6 +124,7 @@ function ProjectNavLink({
 export function V2ShellSidebar({
   nav,
   personalNav = [],
+  footerNav = [],
   teamProjects,
   taskCounts,
   me,
@@ -134,6 +135,7 @@ export function V2ShellSidebar({
 }: {
   nav: NavItem[];
   personalNav?: NavItem[];
+  footerNav?: NavItem[];
   teamProjects: V2ProjectRow[];
   taskCounts: { open: number; byProject: Record<string, number> };
   me: V2ShellUser | null;
@@ -304,7 +306,12 @@ export function V2ShellSidebar({
           } else if (item.href === "/v2/agency/sofia") {
             active = pathname?.startsWith(appPath("/v2/agency/sofia")) ?? false;
           } else if (item.href === "/v2/agency/overview") {
-            active = pathname?.startsWith(appPath("/v2/agency/overview")) ?? false;
+            // Выручка: overview + impulse (+ legacy all-lines / projects)
+            active =
+              (pathname?.startsWith(appPath("/v2/agency/overview")) ?? false) ||
+              (pathname?.startsWith(appPath("/v2/agency/impulse")) ?? false) ||
+              pathname === appPath("/v2/agency") ||
+              (pathname?.startsWith(appPath("/v2/agency/projects")) ?? false);
           } else if (item.href === "/v2/agency") {
             active =
               pathname === appPath("/v2/agency") ||
@@ -422,14 +429,23 @@ export function V2ShellSidebar({
         </div>
       ) : null}
 
-      {me ? (
-        <div className="mx-1 mt-auto pt-4">
-          <V2UserAccountMenu
-            user={me}
-            roleLabel={roleLabel}
-            onOpenProfile={onOpenProfile}
-            onLogout={onLogout}
-          />
+      {me || footerNav.length > 0 ? (
+        <div className="mx-1 mt-auto space-y-0.5 pt-4">
+          {footerNav.map((item) => {
+            let active = pathname === appPath(item.href) || (pathname?.startsWith(appPath(item.href + "/")) ?? false);
+            if (item.href === "/v2/agency/sofia") {
+              active = pathname?.startsWith(appPath("/v2/agency/sofia")) ?? false;
+            }
+            return <NavLink key={item.href} item={item} active={!!active} />;
+          })}
+          {me ? (
+            <V2UserAccountMenu
+              user={me}
+              roleLabel={roleLabel}
+              onOpenProfile={onOpenProfile}
+              onLogout={onLogout}
+            />
+          ) : null}
         </div>
       ) : null}
     </aside>

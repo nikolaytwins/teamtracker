@@ -63,8 +63,51 @@ type AnalyticsPayload = {
 };
 
 const PROJECT_COLS =
-  "grid grid-cols-[1.7fr_0.95fr_0.95fr_0.95fr_0.8fr_0.95fr_0.95fr_0.65fr_0.95fr_0.95fr]";
+  "grid grid-cols-[minmax(0,1.7fr)_minmax(0,0.95fr)_minmax(0,0.95fr)_minmax(0,0.95fr)_minmax(0,0.8fr)_minmax(0,0.95fr)_2.75rem_minmax(0,0.95fr)_minmax(0,0.95fr)]";
 const EXPENSE_COLS = "grid grid-cols-[1.3fr_2fr_1fr_1.7fr_0.9fr]";
+
+function MonthCertainCheckbox({
+  checked,
+  disabled,
+  title,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  title?: string;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      disabled={disabled}
+      title={title}
+      onClick={() => {
+        if (disabled) return;
+        onChange(!checked);
+      }}
+      className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition ${
+        checked
+          ? "border-[var(--v2-brand-600)] bg-[var(--v2-brand-600)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+          : "border-[var(--v2-ink-300)] bg-white hover:border-[var(--v2-brand-400)]"
+      } ${disabled ? "cursor-default opacity-100" : "cursor-pointer"}`}
+    >
+      {checked ? (
+        <svg viewBox="0 0 12 10" className="h-2.5 w-2.5" fill="none" aria-hidden>
+          <path
+            d="M1 5.2 4.2 8.4 11 1.6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : null}
+    </button>
+  );
+}
 
 function Card({ className = "", children }: { className?: string; children: React.ReactNode }) {
   return (
@@ -743,11 +786,11 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                               </button>
                             </span>
                           </div>
-                          <div>
+                          <div className="flex h-8 items-center">
                             <select
                               value={p.service_type}
                               onChange={(e) => void patchProject(p.id, { serviceType: e.target.value })}
-                              className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] font-medium text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                              className="v2-tight h-8 rounded-lg border-0 bg-transparent text-[12.5px] font-medium text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
                             >
                               {(Object.keys(FINANCE_SERVICE_META) as V2FinanceServiceType[]).map((k) => (
                                 <option key={k} value={k}>
@@ -756,11 +799,11 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                               ))}
                             </select>
                           </div>
-                          <div>
+                          <div className="flex h-8 items-center">
                             <select
                               value={p.client_type ?? ""}
                               onChange={(e) => void patchProject(p.id, { clientType: e.target.value || null })}
-                              className="v2-tight max-w-full rounded-lg border-0 bg-transparent text-[12.5px] text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                              className="v2-tight h-8 max-w-full rounded-lg border-0 bg-transparent text-[12.5px] text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
                             >
                               <option value="">—</option>
                               {FINANCE_CLIENT_TYPE_OPTIONS.map((o) => (
@@ -770,25 +813,30 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                               ))}
                             </select>
                           </div>
-                          <div>
+                          <div className="flex h-8 items-center">
                             <FinanceStatusSelect
                               value={p.status}
                               onChange={(status) => {
                                 const patch: Record<string, unknown> = { status };
-                                if (status === "paid") patch.paidAmount = p.effective_total_amount;
+                                if (status === "paid") {
+                                  patch.paidAmount = p.effective_total_amount;
+                                  patch.paymentCertainThisMonth = true;
+                                }
                                 if (status === "not_paid") patch.paidAmount = 0;
                                 void patchProject(p.id, patch);
                               }}
                             />
                           </div>
-                          <div className="v2-tight truncate text-[13px] text-[var(--v2-ink-600)]">
-                            {p.client_contact || <Dash />}
+                          <div className="flex h-8 items-center">
+                            <span className="v2-tight truncate text-[13px] text-[var(--v2-ink-600)]">
+                              {p.client_contact || <Dash />}
+                            </span>
                           </div>
-                          <div>
+                          <div className="flex h-8 items-center">
                             <select
                               value={p.payment_method ?? ""}
                               onChange={(e) => void patchProject(p.id, { paymentMethod: e.target.value || null })}
-                              className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                              className="v2-tight h-8 rounded-lg border-0 bg-transparent text-[12.5px] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
                             >
                               <option value="">—</option>
                               {FINANCE_PAYMENT_METHOD_OPTIONS.map((o) => (
@@ -798,29 +846,27 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                               ))}
                             </select>
                           </div>
-                          <div className="flex items-center justify-center">
-                            <input
-                              type="checkbox"
-                              checked={p.payment_certain_this_month}
+                          <div className="flex h-8 items-center justify-center">
+                            <MonthCertainCheckbox
+                              checked={p.status === "paid" || p.payment_certain_this_month}
                               disabled={p.status === "paid"}
                               title={
                                 p.status === "paid"
                                   ? "Уже оплачен — учтён в фактической выручке"
                                   : "Точно получу в этом месяце (для надёжной прибыли в Плане)"
                               }
-                              onChange={(e) =>
-                                void patchProject(p.id, { paymentCertainThisMonth: e.target.checked })
+                              onChange={(next) =>
+                                void patchProject(p.id, { paymentCertainThisMonth: next })
                               }
-                              className="h-4 w-4 rounded border-[var(--v2-ink-300)] text-[var(--v2-brand-600)] focus:ring-[var(--v2-brand-500)]/40"
                             />
                           </div>
-                          <div className="text-right">
+                          <div className="flex h-8 items-center justify-end">
                             <InlineMoney
                               value={p.effective_total_amount}
                               onChange={(n) => void patchProject(p.id, { totalAmount: n })}
                             />
                           </div>
-                          <div className="text-right">
+                          <div className="flex h-8 items-center justify-end">
                             <InlineMoney
                               value={p.paid_amount}
                               tone={paidTone}

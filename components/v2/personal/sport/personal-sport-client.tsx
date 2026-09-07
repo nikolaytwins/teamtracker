@@ -33,14 +33,16 @@ function SpKpi({
   good?: "down" | "up" | "none";
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="min-w-[112px] flex-1 rounded-2xl border border-[var(--v2-ink-100)]/90 bg-white/92 px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_20px_-14px_rgba(16,24,40,0.12)] backdrop-blur-[2px]">
       <SpKick>{label}</SpKick>
-      <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-        <span className="v2-tighter v2-tnum text-[30px] font-semibold leading-none text-[var(--v2-ink-900)]">{value}</span>
-        <span className="text-[12.5px] text-[var(--v2-ink-400)]">{unit}</span>
-        <span className="ml-1">
-          <SpDelta v={delta} d={dec} good={good} />
+      <div className="mt-2 flex items-baseline gap-1 whitespace-nowrap">
+        <span className="v2-tighter v2-tnum text-[24px] font-semibold leading-none tracking-tight text-[var(--v2-ink-900)]">
+          {value}
         </span>
+        <span className="text-[12px] font-medium text-[var(--v2-ink-400)]">{unit}</span>
+      </div>
+      <div className="mt-2">
+        <SpDelta v={delta} d={dec} good={good} />
       </div>
     </div>
   );
@@ -92,19 +94,22 @@ function SpBanner({
         }}
       />
 
-      <div className="relative z-10 min-w-0 max-w-[min(100%,640px)] px-7 py-6 pr-[min(34%,200px)] sm:pr-[min(38%,240px)]">
+      <div className="relative z-10 min-w-0 max-w-[min(100%,720px)] px-7 py-6 pr-[min(30%,180px)] sm:pr-[min(34%,220px)]">
         <SpKick className="text-[var(--v2-brand-600)]">Спорт · {weekLabel}</SpKick>
-        <h1 className="v2-tighter v2-tnum mt-2 text-[27px] font-semibold leading-[1.15] text-[var(--v2-ink-900)]">
-          {verdict.head}
+        <h1 className="v2-tighter v2-tnum mt-2 whitespace-nowrap text-[22px] font-semibold leading-none tracking-tight text-[var(--v2-ink-900)] sm:text-[24px]">
+          {verdict.head || "Спорт"}
         </h1>
-        <p className="mt-2 max-w-[520px] text-[13.5px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
-          {verdict.sub}
-        </p>
-        <div className="mt-6 flex flex-wrap items-start gap-x-8 gap-y-4">
+        <div className="mt-5 grid max-w-[560px] grid-cols-2 gap-2.5 sm:grid-cols-4">
           <SpKpi label="Средний вес" value={n1(cur?.w)} unit="кг" delta={d("w")} good="up" />
           <SpKpi label="Жир" value={n1(cur?.f)} unit="кг" delta={d("f")} good="down" dec={2} />
           <SpKpi label="Безжировая" value={n1(cur?.l)} unit="кг" delta={d("l")} good="up" />
-          <SpKpi label="Жир" value={n1(pc)} unit="%" delta={pc != null && pp != null ? pc - pp : null} good="down" />
+          <SpKpi
+            label="Жир %"
+            value={n1(pc)}
+            unit="%"
+            delta={pc != null && pp != null ? pc - pp : null}
+            good="down"
+          />
         </div>
       </div>
     </SpCard>

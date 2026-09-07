@@ -345,7 +345,12 @@ export async function updateFinanceProject(
   const totalAmount = patch.total_amount ?? (Number(cur.totalAmount) || 0);
   let paidAmount = patch.paid_amount ?? (Number(cur.paidAmount) || 0);
   const status = (patch.status ?? String(cur.status)) as V2FinancePaymentStatus;
-  if (patch.status === "paid") paidAmount = totalAmount;
+  let paymentCertainThisMonth = patch.payment_certain_this_month;
+  if (patch.status === "paid") {
+    paidAmount = totalAmount;
+    // Оплаченный проект всегда «точно в этом месяце»
+    if (paymentCertainThisMonth === undefined) paymentCertainThisMonth = true;
+  }
   if (patch.status === "not_paid") paidAmount = 0;
 
   const updated = await repo().updateProjectById(id, {
@@ -369,8 +374,8 @@ export async function updateFinanceProject(
         ? patch.client_contact
         : (cur.clientContact as string | null) ?? null,
     notes: patch.notes !== undefined ? patch.notes : (cur.notes as string | null) ?? null,
-    ...(patch.payment_certain_this_month !== undefined
-      ? { paymentCertainThisMonth: patch.payment_certain_this_month }
+    ...(paymentCertainThisMonth !== undefined
+      ? { paymentCertainThisMonth }
       : {}),
   });
   if (!updated) return null;

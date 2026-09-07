@@ -42,7 +42,14 @@ function SofiaAvatar({ size = 32 }: { size?: 32 | 44 }) {
   const cls = size === 44 ? "av av--44" : "av av--32";
   return (
     <span className={cls}>
-      <Image src={AVATAR} alt="" width={size} height={size} unoptimized />
+      <Image
+        src={AVATAR}
+        alt=""
+        width={size}
+        height={size}
+        unoptimized
+        style={{ objectFit: "cover", objectPosition: "90% 6%" }}
+      />
     </span>
   );
 }

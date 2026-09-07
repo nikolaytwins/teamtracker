@@ -4,43 +4,40 @@ import { appPath } from "@/lib/api-url";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const TABS = [
+const REVENUE_TABS = [
   {
     href: "/v2/agency/overview",
     label: "Агентство",
     match: (p: string) => p.startsWith(appPath("/v2/agency/overview")),
   },
   {
-    href: "/v2/agency",
-    label: "Все направления",
-    match: (p: string) =>
-      p === appPath("/v2/agency") || p.startsWith(appPath("/v2/agency/projects")),
-  },
-  {
-    href: "/v2/agency/kanban",
-    label: "Канбан",
-    match: (p: string) => p.startsWith(appPath("/v2/agency/kanban")),
-  },
-  {
-    href: "/v2/agency/plan",
-    label: "План",
-    match: (p: string) => p.startsWith(appPath("/v2/agency/plan")),
-  },
-  {
-    href: "/v2/agency/sofia",
-    label: "София",
-    match: (p: string) => p.startsWith(appPath("/v2/agency/sofia")),
+    href: "/v2/agency/impulse",
+    label: "Импульс",
+    match: (p: string) => p.startsWith(appPath("/v2/agency/impulse")),
   },
 ] as const;
 
+function isRevenuePath(pathname: string) {
+  return (
+    pathname.startsWith(appPath("/v2/agency/overview")) ||
+    pathname.startsWith(appPath("/v2/agency/impulse")) ||
+    pathname === appPath("/v2/agency") ||
+    pathname.startsWith(appPath("/v2/agency/projects"))
+  );
+}
+
 export default function AgencyLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
+
+  if (!isRevenuePath(pathname)) {
+    return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
+  }
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="shrink-0 border-b border-[var(--v2-ink-100)] bg-white px-6">
         <div className="flex gap-1 py-2">
-          {TABS.map((tab) => {
+          {REVENUE_TABS.map((tab) => {
             const active = tab.match(pathname);
             return (
               <Link

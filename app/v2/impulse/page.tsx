@@ -1,5 +1,6 @@
-import { BusinessLineClient } from "@/components/v2/agency/business-line-client";
+import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
-export default function V2ImpulsePage() {
-  return <BusinessLineClient line="impulse" />;
+export default function V2ImpulseRedirectPage() {
+  redirect(appPath("/v2/agency/impulse"));
 }
