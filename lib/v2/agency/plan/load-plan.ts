@@ -125,8 +125,9 @@ export async function buildPlanPayload(
     loadStatusLabels: loadStatusLabels(loadStatus),
     reliableProfitRub: finance.reliableProfitRub,
     loadStatusFinance: {
-      actualRevenueRub: finance.actualRevenueRub,
-      certainUnpaidRevenueRub: finance.certainUnpaidRevenueRub,
+      reliableRevenueRub: finance.reliableRevenueRub,
+      teamExpensesRub: finance.teamExpensesRub,
+      taxAmountRub: finance.taxAmountRub,
       totalExpensesRub: finance.totalExpensesRub,
       reliableProfitRub: finance.reliableProfitRub,
       passiveMinRub: rulesFinance.reliableProfitMinRub,

@@ -49,8 +49,9 @@ export type PlanPayload = {
   loadStatusLabels: { title: string; headline: string; detail: string };
   reliableProfitRub: number;
   loadStatusFinance: {
-    actualRevenueRub: number;
-    certainUnpaidRevenueRub: number;
+    reliableRevenueRub: number;
+    teamExpensesRub: number;
+    taxAmountRub: number;
     totalExpensesRub: number;
     reliableProfitRub: number;
     passiveMinRub: number;

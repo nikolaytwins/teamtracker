@@ -70,11 +70,16 @@ export type DispatchFinanceSnapshot = {
   reliableProfitRub: number;
   plannedProfitRub: number;
   actualRevenueRub: number;
-  /** Неоплаченное, отмеченное «точно в этом месяце» */
+  /** Неоплаченный остаток среди проектов с «точно в месяце» */
   certainUnpaidRevenueRub: number;
+  /** Полные суммы оплаченных + отмеченных «точно в месяце» */
   reliableRevenueRub: number;
   expectedRevenueRub: number;
   totalExpensesRub: number;
+  /** Взносы ИП / налог в составе расходов месяца */
+  taxAmountRub: number;
+  /** Расходы без налога (команда + проектные) */
+  teamExpensesRub: number;
   reliableProfitMinRub: number;
   plannedProfitTargetRub: number;
   thresholdsMet: {

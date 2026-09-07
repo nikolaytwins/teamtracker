@@ -905,6 +905,12 @@ function StatusBlock({
   labels: { title: string; headline: string; detail: string };
   finance: PlanPayload["loadStatusFinance"];
 }) {
+  const toPassive = Math.max(0, finance.passiveMinRub - finance.reliableProfitRub);
+  const passivePct = Math.min(
+    100,
+    Math.round((Math.max(0, finance.reliableProfitRub) / Math.max(1, finance.passiveMinRub)) * 100)
+  );
+
   return (
     <div className={`status${loadStatus === "active" ? "" : ` status--${loadStatus}`}`}>
       <span className="kick">Статус загруженности</span>
@@ -914,14 +920,33 @@ function StatusBlock({
       <p className="status-s">
         <b>{labels.headline}.</b> {labels.detail}
       </p>
-      <p className="status-s" style={{ marginTop: 8, fontSize: 13 }}>
-        Надёжная прибыль {formatRub(finance.reliableProfitRub)} = оплачено {formatRub(finance.actualRevenueRub)}
-        {finance.certainUnpaidRevenueRub > 0
-          ? ` + подтверждено к поступлению ${formatRub(finance.certainUnpaidRevenueRub)}`
-          : ""}{" "}
-        − расходы {formatRub(finance.totalExpensesRub)}. Пассивный режим от {formatRub(finance.passiveMinRub)},
-        пауза от {formatRub(finance.pauseMinRub)}. Галочка «точно в месяце» — в таблице проектов агентства.
-      </p>
+      <div className="status-s" style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55 }}>
+        <div>
+          <b>Надёжные поступления</b> {formatRub(finance.reliableRevenueRub)}
+          <span style={{ color: "var(--ink-500)", fontWeight: 400 }}>
+            {" "}
+            — проекты с галочкой «точно в месяце» и уже оплаченные
+          </span>
+        </div>
+        <div>
+          <b>− Расходы</b> {formatRub(finance.totalExpensesRub)}
+          <span style={{ color: "var(--ink-500)", fontWeight: 400 }}>
+            {" "}
+            (команда {formatRub(finance.teamExpensesRub)}
+            {finance.taxAmountRub > 0 ? ` + взносы ИП ${formatRub(finance.taxAmountRub)}` : ""})
+          </span>
+        </div>
+        <div>
+          <b>= Надёжная прибыль</b> {formatRub(finance.reliableProfitRub)}
+        </div>
+        <div style={{ marginTop: 6, color: "var(--ink-500)" }}>
+          Пассивный режим от {formatRub(finance.passiveMinRub)}
+          {finance.reliableProfitRub >= finance.passiveMinRub
+            ? ` — порог закрыт (${passivePct}%).`
+            : ` — сейчас ${passivePct}%, не хватает ${formatRub(toPassive)}.`}{" "}
+          Пауза от {formatRub(finance.pauseMinRub)}.
+        </div>
+      </div>
     </div>
   );
 }
