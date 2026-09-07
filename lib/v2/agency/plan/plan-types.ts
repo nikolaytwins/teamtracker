@@ -38,6 +38,8 @@ export type PlanProjectView = {
   effectiveTotalAmount: number;
   paidAmount: number;
   onApprovalSince: string | null;
+  planHidden: boolean;
+  createdAt: string;
 };
 
 export type PlanPayload = {

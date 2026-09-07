@@ -15,6 +15,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       dispatch_work_status?: string;
       work_deadline?: string | null;
       planned_hours_remaining?: number | null;
+      plan_hidden?: boolean;
     };
 
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -29,6 +30,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     }
     if (body.planned_hours_remaining !== undefined) {
       patch.planned_hours_remaining = body.planned_hours_remaining;
+    }
+    if (body.plan_hidden !== undefined) {
+      patch.plan_hidden = Boolean(body.plan_hidden);
     }
 
     const sb = createSupabaseServiceClient();

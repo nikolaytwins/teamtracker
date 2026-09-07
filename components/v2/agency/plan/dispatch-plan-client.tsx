@@ -3,6 +3,7 @@
 import "./plan-design.css";
 import {
   createPlanItemApi,
+  createPlanProjectApi,
   deletePlanItemApi,
   fetchPlan,
   fetchPlanCalendar,
@@ -84,15 +85,54 @@ type DragState =
   | { kind: "new"; projectId: string }
   | { kind: "move"; itemId: string }
   | { kind: "mark"; mode: PlanDayMode; from: string }
-  | { kind: "backlog"; itemId: string };
+  | { kind: "backlog"; itemId: string }
+  | { kind: "kanban"; projectId: string; fromStatus: DispatchWorkStatus };
 
 type DrawerState =
   | { type: "create"; createKind: CreateKind; day?: string }
+  | { type: "create-project" }
   | { type: "item"; itemId: string }
   | { type: "day"; dateKey: string }
   | { type: "project"; projectId: string; estFocus?: boolean };
 
 type CreateKind = "task" | "call" | "personal" | "strategy" | "creative" | "rest";
+
+function toDateInputValue(v: string | null | undefined): string {
+  if (!v) return "";
+  return v.slice(0, 10);
+}
+
+function PlanDateInput({
+  value,
+  onChange,
+  id,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  id?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const openPicker = () => {
+    const el = ref.current;
+    if (!el) return;
+    try {
+      el.showPicker?.();
+    } catch {
+      el.focus();
+    }
+  };
+  return (
+    <input
+      ref={ref}
+      id={id}
+      type="date"
+      value={toDateInputValue(value)}
+      onChange={(e) => onChange(e.target.value)}
+      onClick={openPicker}
+      onFocus={openPicker}
+    />
+  );
+}
 
 function eventMetaLabel(ev: PlanItemRow): string {
   const parts: string[] = [];
@@ -172,12 +212,14 @@ function DispatchPlanCalendar({
   const [calMode, setCalMode] = useState<CalMode>("week");
   const [projView, setProjView] = useState<ProjView>("kb");
   const [showDone, setShowDone] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
   const [anchor, setAnchor] = useState(() => mondayOf(today));
   const [openRows, setOpenRows] = useState<Set<string>>(() => new Set());
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
+  const [kanbanDrop, setKanbanDrop] = useState<DispatchWorkStatus | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const range = useMemo(() => {
@@ -274,6 +316,10 @@ function DispatchPlanCalendar({
   const onDropDay = async (dateKey: string) => {
     if (!drag || !plan) return;
     setDropKey(null);
+    if (drag.kind === "kanban") {
+      setDrag(null);
+      return;
+    }
     if (dateKey < todayKey) {
       showToast("В прошедшие дни планировать нельзя");
       return;
@@ -342,6 +388,25 @@ function DispatchPlanCalendar({
     }
   };
 
+  const onDropKanban = async (status: DispatchWorkStatus) => {
+    if (!drag || drag.kind !== "kanban" || !plan) return;
+    setKanbanDrop(null);
+    const project = plan.projects.find((p) => p.id === drag.projectId);
+    if (!project || drag.fromStatus === status) {
+      setDrag(null);
+      return;
+    }
+    const snap = structuredClone(plan);
+    const label = STATUS_UI[status].label;
+    if (status === "done" && !showDone) setShowDone(true);
+    await mutate(
+      () => updateProjectApi(drag.projectId, { dispatch_work_status: status }),
+      `«${project.name}» → ${label}`,
+      snap
+    );
+    setDrag(null);
+  };
+
   if (error && !plan) {
     return (
       <div className="plan-v3 min-h-0 min-w-0 flex-1 overflow-y-auto">
@@ -400,9 +465,13 @@ function DispatchPlanCalendar({
       : `${fmtShort(anchor)} – ${fmtShort(addDays(anchor, 6))}`;
 
   const tasksToPlace = plan.backlog.filter((i) => i.kind === "task");
-  const visibleProjects = showDone
-    ? plan.projects
-    : plan.projects.filter((p) => p.dispatchWorkStatus !== "done");
+  const visibleProjects = plan.projects.filter((p) => {
+    if (!showHidden && p.planHidden) return false;
+    if (!showDone && p.dispatchWorkStatus === "done") return false;
+    return true;
+  });
+
+  const hiddenCount = plan.projects.filter((p) => p.planHidden).length;
 
   const kanbanCols = showDone ? [...KANBAN_ORDER, "done" as const] : KANBAN_ORDER;
 
@@ -682,8 +751,16 @@ function DispatchPlanCalendar({
                   </button>
                 </div>
                 <div className="headrow" style={{ marginLeft: "auto", gap: 10 }}>
+                  {hiddenCount > 0 ? (
+                    <button type="button" className="btn btn--gh" onClick={() => setShowHidden((v) => !v)}>
+                      {showHidden ? "Скрыть спрятанные" : `Спрятанные (${hiddenCount})`}
+                    </button>
+                  ) : null}
                   <button type="button" className="btn btn--gh" onClick={() => setShowDone((v) => !v)}>
                     {showDone ? "Скрыть завершённые" : "Показать завершённые"}
+                  </button>
+                  <button type="button" className="btn btn--gh" onClick={() => setDrawer({ type: "create-project" })}>
+                    Добавить проект
                   </button>
                   <button type="button" className="btn btn--pri" onClick={() => setDrawer({ type: "create", createKind: "task" })}>
                     Создать задачу
@@ -696,7 +773,22 @@ function DispatchPlanCalendar({
                     const ids = visibleProjects.filter((p) => p.dispatchWorkStatus === col);
                     const meta = STATUS_UI[col];
                     return (
-                      <div key={col} className="kbcol">
+                      <div
+                        key={col}
+                        className={`kbcol${kanbanDrop === col ? " drop" : ""}`}
+                        onDragOver={(e) => {
+                          if (!drag || drag.kind !== "kanban") return;
+                          e.preventDefault();
+                          setKanbanDrop(col);
+                        }}
+                        onDragLeave={() => {
+                          setKanbanDrop((cur) => (cur === col ? null : cur));
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          void onDropKanban(col);
+                        }}
+                      >
                         <div className="kbh">
                           <span className="dot" style={{ background: meta.color }} />
                           <span className="kbh-n">{meta.label}</span>
@@ -711,7 +803,15 @@ function DispatchPlanCalendar({
                               project={p}
                               items={items}
                               todayKey={todayKey}
+                              dragging={drag?.kind === "kanban" && drag.projectId === p.id}
                               onOpen={() => setDrawer({ type: "project", projectId: p.id })}
+                              onDragStart={() =>
+                                setDrag({ kind: "kanban", projectId: p.id, fromStatus: p.dispatchWorkStatus })
+                              }
+                              onDragEnd={() => {
+                                setDrag(null);
+                                setKanbanDrop(null);
+                              }}
                             />
                           ))
                         )}
@@ -895,7 +995,7 @@ function DayCell({
       className={`${compact ? "mcell" : "day"}${monthOut ? " out" : ""}${past ? " past" : ""}${cssMode ? ` ${cssMode}` : ""}${k === todayKey ? " today" : ""}${!past && free === 0 && cap > 0 ? " full" : ""}${dropKey === k ? " drop" : ""}`}
       data-k={k}
       onDragOver={(e) => {
-        if (!drag) return;
+        if (!drag || drag.kind === "kanban") return;
         e.preventDefault();
         onDragOver(k);
       }}
@@ -1127,23 +1227,56 @@ function ProjectCard({
   project: p,
   items,
   todayKey,
+  dragging,
   onOpen,
+  onDragStart,
+  onDragEnd,
 }: {
   project: PlanProjectView;
   items: PlanItemRow[];
   todayKey: string;
+  dragging?: boolean;
   onOpen: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
   const u = unplacedHours(p, items, todayKey);
   const n = items.filter((it) => it.kind === "task" && it.project_id === p.id && it.plan_date && it.plan_date >= todayKey).length;
+  const createdLabel = p.createdAt ? fmtLong(new Date(p.createdAt)) : null;
+  const skipClick = useRef(false);
   return (
-    <button type="button" className="kbc" onClick={onOpen}>
+    <button
+      type="button"
+      className={`kbc${dragging ? " dragging" : ""}`}
+      draggable
+      onDragStart={(e) => {
+        skipClick.current = true;
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      onClick={() => {
+        if (skipClick.current) {
+          skipClick.current = false;
+          return;
+        }
+        onOpen();
+      }}
+    >
       <span className="kbc-top">
         <span className="dot" style={{ background: p.color }} />
         <span className="kbc-n">{p.name}</span>
       </span>
-      <span className="kbc-c">{p.businessLineLabel}</span>
+      <span className="kbc-c">
+        {p.businessLineLabel}
+        {p.planHidden ? " · скрыт из плана" : ""}
+      </span>
       <span className="kbc-rows">
+        {createdLabel ? (
+          <span>
+            Создан <b>{createdLabel}</b>
+          </span>
+        ) : null}
         {p.workDeadline ? (
           <span>
             Дедлайн <b>{fmtLong(parseYmd(p.workDeadline))}</b>
@@ -1212,7 +1345,11 @@ function ProjectList({
               <span className="dot" style={{ background: p.color }} />
               <span className="prow-mid">
                 <span className="prow-n">{p.name}</span>
-                <span className="prow-c">{p.businessLineLabel}</span>
+                <span className="prow-c">
+                  {p.businessLineLabel}
+                  {p.createdAt ? ` · создан ${fmtShort(new Date(p.createdAt))}` : ""}
+                  {p.planHidden ? " · скрыт" : ""}
+                </span>
               </span>
               <span className="prow-cell">
                 <span className="kick">Дедлайн</span>
@@ -1306,6 +1443,9 @@ function PlanDrawer({
         onNavigateWeek={onNavigateWeek}
       />
     );
+  }
+  if (drawer.type === "create-project") {
+    return <CreateProjectDrawer plan={plan} onClose={onClose} mutate={mutate} />;
   }
   if (drawer.type === "item") {
     const item = items.find((i) => i.id === drawer.itemId);
@@ -1504,7 +1644,7 @@ function CreateDrawer({
             </div>
             <div className="fld">
               <label>День</label>
-              <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+              <PlanDateInput value={day} onChange={setDay} />
             </div>
             <div className="fld">
               <label>Без даты (бэклог)</label>
@@ -1531,7 +1671,7 @@ function CreateDrawer({
             <div className="fld2">
               <div className="fld">
                 <label>День</label>
-                <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+                <PlanDateInput value={day} onChange={setDay} />
               </div>
               <div className="fld">
                 <label>Время</label>
@@ -1552,7 +1692,7 @@ function CreateDrawer({
           <>
             <div className="fld">
               <label>День</label>
-              <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+              <PlanDateInput value={day} onChange={setDay} />
             </div>
             <p className="dr-note">
               {kind === "strategy"
@@ -1679,7 +1819,7 @@ function ItemDrawer({
             </div>
             <div className="fld">
               <label>День</label>
-              <input type="date" value={day === "__backlog__" ? "" : day} onChange={(e) => setDay(e.target.value)} />
+              <PlanDateInput value={day === "__backlog__" ? "" : day} onChange={setDay} />
             </div>
             <button type="button" className="btn btn--gh btn--sm" onClick={() => setDay("__backlog__")}>
               Убрать дату (в бэклог)
@@ -1690,7 +1830,7 @@ function ItemDrawer({
             <div className="fld2">
               <div className="fld">
                 <label>День</label>
-                <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+                <PlanDateInput value={day} onChange={setDay} />
               </div>
               <div className="fld">
                 <label>Время</label>
@@ -1819,7 +1959,7 @@ function DayTypeDrawer({
         <p className="dr-note">{notes[sel === "norm" ? "norm" : sel]}</p>
         <div className="fld">
           <label>День</label>
-          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+          <PlanDateInput value={day} onChange={setDay} />
         </div>
         <p className="dr-note">
           Стратегия и творческий день бывают один раз в неделю — прежняя метка переедет на выбранный день. Метку также
@@ -1856,7 +1996,7 @@ function ProjectDrawer({
   mutate: (action: () => Promise<unknown>, message: string, snapshot?: PlanPayload) => Promise<void>;
   onCreateTask: () => void;
 }) {
-  const [deadline, setDeadline] = useState(p.workDeadline ?? "");
+  const [deadline, setDeadline] = useState(toDateInputValue(p.workDeadline));
   const [est, setEst] = useState(p.plannedHoursRemaining != null ? String(p.plannedHoursRemaining) : "");
   const [status, setStatus] = useState(p.dispatchWorkStatus);
   const estRef = useRef<HTMLInputElement>(null);
@@ -1902,6 +2042,11 @@ function ProjectDrawer({
           <h2 className="sec-title" style={{ marginTop: 6 }}>
             {p.name}
           </h2>
+          {p.createdAt ? (
+            <p className="sec-sub" style={{ marginTop: 6 }}>
+              Создан {fmtLong(new Date(p.createdAt))}
+            </p>
+          ) : null}
         </div>
         <button type="button" className="wk-btn" onClick={onClose}>
           ✕
@@ -1911,6 +2056,7 @@ function ProjectDrawer({
         <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
           <span className={`pill ${STATUS_UI[p.dispatchWorkStatus].css}`}>{STATUS_UI[p.dispatchWorkStatus].label}</span>
           <span className="pill st--plan">в календаре {futureProjectHours(items, p.id, todayKey)} ч</span>
+          {p.planHidden ? <span className="pill st--plan">скрыт из плана</span> : null}
           {u === null ? (
             <span className="pill st--plan">оценка не указана</span>
           ) : u > 0 ? (
@@ -1919,8 +2065,8 @@ function ProjectDrawer({
         </div>
         <div className="fld2">
           <div className="fld">
-            <label>Рабочий дедлайн</label>
-            <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            <label htmlFor="plan-work-deadline">Рабочий дедлайн</label>
+            <PlanDateInput id="plan-work-deadline" value={deadline} onChange={setDeadline} />
           </div>
           <div className="fld">
             <label>Оценка остатка, ч</label>
@@ -1964,14 +2110,111 @@ function ProjectDrawer({
             Снять будущие задачи
           </button>
         </div>
+        <button
+          type="button"
+          className="dr-act"
+          onClick={() =>
+            void mutate(
+              () => updateProjectApi(p.id, { plan_hidden: !p.planHidden }),
+              p.planHidden ? `«${p.name}» снова в плане` : `«${p.name}» скрыт из плана`,
+              snap
+            )
+          }
+        >
+          {p.planHidden ? "Вернуть в план" : "Скрыть из плана"}
+        </button>
         <p className="dr-note">
           Оценка остатка — последнее значение, которое вы указали. Система не уменьшает её сама и не считает прошедшие
-          слоты выполненными.
+          слоты выполненными. Скрытие убирает карточку из канбана и списка, но не удаляет проект и не трогает слоты в
+          календаре.
         </p>
       </div>
       <div className="dr-f">
         <button type="button" className="btn btn--pri" onClick={() => void save()}>
           Сохранить
+        </button>
+        <button type="button" className="btn btn--gh" onClick={onClose}>
+          Отмена
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function CreateProjectDrawer({
+  plan,
+  onClose,
+  mutate,
+}: {
+  plan: PlanPayload;
+  onClose: () => void;
+  mutate: (action: () => Promise<unknown>, message: string, snapshot?: PlanPayload) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [est, setEst] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const snap = structuredClone(plan);
+
+  const save = async () => {
+    const title = name.trim();
+    if (!title) return;
+    const hours = est.trim() === "" ? null : Number(est);
+    if (hours != null && (!Number.isFinite(hours) || hours < 0)) return;
+    await mutate(
+      () =>
+        createPlanProjectApi({
+          name: title,
+          planned_hours_remaining: hours,
+          work_deadline: deadline || null,
+        }),
+      `Проект «${title}» добавлен`,
+      snap
+    );
+    onClose();
+  };
+
+  return (
+    <aside className="drawer on" aria-hidden="false">
+      <div className="dr-h">
+        <div style={{ flex: 1 }}>
+          <span className="kick">Проекты</span>
+          <h2 className="sec-title" style={{ marginTop: 6 }}>
+            Новый проект
+          </h2>
+        </div>
+        <button type="button" className="wk-btn" onClick={onClose}>
+          ✕
+        </button>
+      </div>
+      <div className="dr-b">
+        <div className="fld">
+          <label>Название</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Клиент · задача"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void save();
+            }}
+          />
+        </div>
+        <div className="fld2">
+          <div className="fld">
+            <label>Оценка остатка, ч</label>
+            <input type="number" min={0} step={1} placeholder="необязательно" value={est} onChange={(e) => setEst(e.target.value)} />
+          </div>
+          <div className="fld">
+            <label htmlFor="plan-new-work-deadline">Рабочий дедлайн</label>
+            <PlanDateInput id="plan-new-work-deadline" value={deadline} onChange={setDeadline} />
+          </div>
+        </div>
+        <p className="dr-note">Появится в колонке «Запланирован». Финансы можно дописать позже в разделе проектов.</p>
+      </div>
+      <div className="dr-f">
+        <button type="button" className="btn btn--pri" disabled={!name.trim()} onClick={() => void save()}>
+          Добавить
         </button>
         <button type="button" className="btn btn--gh" onClick={onClose}>
           Отмена

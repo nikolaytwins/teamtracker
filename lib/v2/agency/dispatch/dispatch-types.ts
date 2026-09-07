@@ -59,6 +59,7 @@ export type DispatchProjectView = {
   totalExpenses: number;
   ownerNetTotal: number;
   unpaidOwnerNet: number;
+  planHidden: boolean;
   createdAt: string;
 };
 

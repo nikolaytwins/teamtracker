@@ -144,6 +144,7 @@ function mapDispatchProject(
     totalExpenses,
     ownerNetTotal,
     unpaidOwnerNet,
+    planHidden: raw.planHidden === true,
     createdAt: String(raw.createdAt),
   };
 }

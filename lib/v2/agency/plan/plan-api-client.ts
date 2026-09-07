@@ -75,10 +75,23 @@ export async function updateProjectApi(
     dispatch_work_status: DispatchWorkStatus;
     work_deadline: string | null;
     planned_hours_remaining: number | null;
+    plan_hidden: boolean;
   }>
 ) {
   await fetchJson(`/api/v2/agency/plan/projects/${id}`, {
     method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createPlanProjectApi(body: {
+  name: string;
+  planned_hours_remaining?: number | null;
+  work_deadline?: string | null;
+}) {
+  return fetchJson<{ project: { id: string; name: string } }>("/api/v2/agency/plan/projects", {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });

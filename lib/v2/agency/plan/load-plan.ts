@@ -29,6 +29,8 @@ function mapPlanProject(p: {
   effectiveTotalAmount: number;
   paidAmount: number;
   financeDeadline: string | null;
+  planHidden: boolean;
+  createdAt: string;
 }): PlanProjectView {
   return {
     id: p.id,
@@ -45,6 +47,8 @@ function mapPlanProject(p: {
     paidAmount: p.paidAmount,
     onApprovalSince:
       p.dispatchWorkStatus === "on_approval" ? p.workDeadline ?? p.financeDeadline : null,
+    planHidden: p.planHidden,
+    createdAt: p.createdAt,
   };
 }
 

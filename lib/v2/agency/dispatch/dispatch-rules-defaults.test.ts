@@ -21,6 +21,7 @@ function project(partial: Partial<DispatchProjectView>): DispatchProjectView {
     totalExpenses: 20_000,
     ownerNetTotal: 80_000,
     unpaidOwnerNet: 80_000,
+    planHidden: false,
     createdAt: "2026-09-01T00:00:00.000Z",
     ...partial,
   };
