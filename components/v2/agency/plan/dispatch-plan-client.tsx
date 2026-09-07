@@ -464,6 +464,10 @@ function DispatchPlanCalendar({
       ? `${monthName(anchor)} ${anchor.getFullYear()}`
       : `${fmtShort(anchor)} – ${fmtShort(addDays(anchor, 6))}`;
 
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(anchor, i));
+  const weekIncludesToday = weekDates.some((d) => toYmd(d) === todayKey);
+  const weekDays = weekIncludesToday ? weekDates.filter((d) => toYmd(d) >= todayKey) : weekDates;
+
   const tasksToPlace = plan.backlog.filter((i) => i.kind === "task");
   const visibleProjects = plan.projects.filter((p) => {
     if (!showHidden && p.planHidden) return false;
@@ -590,9 +594,11 @@ function DispatchPlanCalendar({
               </div>
               <div id="cal">
                 {calMode === "week" ? (
-                  <div className="wkrow">
-                    {Array.from({ length: 7 }, (_, i) => {
-                      const d = addDays(anchor, i);
+                  <div
+                    className="wkrow wkrow-live"
+                    style={{ gridTemplateColumns: `repeat(${weekDays.length},minmax(0,1fr))` }}
+                  >
+                    {weekDays.map((d) => {
                       return (
                         <DayCell
                           key={toYmd(d)}
@@ -633,6 +639,8 @@ function DispatchPlanCalendar({
                     onDragOver={setDropKey}
                     onDragLeave={() => setDropKey(null)}
                     onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
+                    onOpenDayType={(k) => setDrawer({ type: "day", dateKey: k })}
+                    onAddTask={(k) => setDrawer({ type: "create", createKind: "task", day: k })}
                     onWeekJump={(k) => {
                       setCalMode("week");
                       setAnchor(mondayOf(parseYmd(k)));
@@ -1007,22 +1015,16 @@ function DayCell({
     >
       {compact ? (
         <>
-          <div className="mday">
-            {date.getDate()}
-            {mode ? (
-              <i
-                style={
-                  mode === "strategy"
-                    ? { background: "var(--ink-900)", color: "#fff" }
-                    : mode === "creative"
-                      ? { background: "var(--blue)", color: "#fff" }
-                      : { background: "var(--ink-200)", color: "var(--ink-600)" }
-                }
-              >
-                {mode === "strategy" ? "Стр" : mode === "creative" ? "Твор" : "Отдых"}
-              </i>
-            ) : null}
-          </div>
+          <div className="mday">{date.getDate()}</div>
+          {mode ? (
+            <button
+              type="button"
+              className={`mchip mchip--mode mchip--${cssMode}`}
+              onClick={() => onOpenDayType(k)}
+            >
+              {mode === "strategy" ? "Стратегия" : mode === "creative" ? "Творческий день" : "Отдых"}
+            </button>
+          ) : null}
           {dayEvents.slice(0, 2).map((ev) => {
             const meta = eventMetaLabel(ev);
             return (
@@ -1047,8 +1049,8 @@ function DayCell({
                 style={{ ["--c" as string]: p?.color ?? projectColor(t.id) }}
                 onClick={() => onOpenItem(t.id)}
               >
-                {t.title}
-                <i>{hoursLabel(t)}</i>
+                <span className="mchip-n">{t.title}</span>
+                <span className="mchip-h tnum">{hoursLabel(t)}</span>
               </button>
             );
           })}
@@ -1057,7 +1059,18 @@ function DayCell({
               + ещё {dayTasks.length - 3}
             </button>
           ) : null}
-          {!past && free > 0 ? <div className="mfree">свободно {free} ч</div> : null}
+          {!past ? (
+            <>
+              {free > 0 ? (
+                <button type="button" className="mfree" onClick={() => onAddTask(k)}>
+                  свободно {free} ч
+                </button>
+              ) : null}
+              <button type="button" className="madd" onClick={() => onAddTask(k)}>
+                + задача
+              </button>
+            </>
+          ) : null}
         </>
       ) : (
         <>
@@ -1076,7 +1089,8 @@ function DayCell({
             ) : null}
           </div>
           {mode ? (
-            <span
+            <button
+              type="button"
               className={`mark mark--${cssMode}`}
               draggable={!past}
               onDragStart={() => onDragStart({ kind: "mark", mode, from: k })}
@@ -1087,7 +1101,7 @@ function DayCell({
               }}
             >
               {mode === "strategy" ? "Стратегия" : mode === "creative" ? "Творческий день" : "Отдых"}
-            </span>
+            </button>
           ) : null}
           {dayEvents.length > 0 && (
             <div className="evs">
@@ -1123,7 +1137,7 @@ function DayCell({
                 >
                   <span className="slot-n">{t.title}</span>
                   <span className="slot-m tnum">
-                    {hoursLabel(t)}
+                    <span className="slot-h">{hoursLabel(t)}</span>
                     <span>{p ? p.clientLabel : "без проекта"}</span>
                   </span>
                 </button>
@@ -1165,6 +1179,8 @@ function MonthGrid({
   onDragOver,
   onDragLeave,
   onOpenItem,
+  onOpenDayType,
+  onAddTask,
   onWeekJump,
 }: {
   anchor: Date;
@@ -1181,44 +1197,78 @@ function MonthGrid({
   onDragOver: (k: string) => void;
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
+  onOpenDayType: (k: string) => void;
+  onAddTask: (k: string) => void;
   onWeekJump: (k: string) => void;
 }) {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const start = mondayOf(first);
+  const weeks = Array.from({ length: 6 }, (_, wi) =>
+    Array.from({ length: 7 }, (_, di) => addDays(start, wi * 7 + di))
+  );
+  const currentWeekIdx = weeks.findIndex((week) => week.some((d) => toYmd(d) === todayKey));
+  const currentWeekRef = useRef<HTMLDivElement | null>(null);
+  const monthKey = `${anchor.getFullYear()}-${anchor.getMonth()}`;
+  const didScroll = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (currentWeekIdx < 0) return;
+    if (didScroll.current === monthKey) return;
+    const el = currentWeekRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ block: "start", behavior: "auto" });
+      didScroll.current = monthKey;
+    });
+  }, [currentWeekIdx, monthKey]);
+
   return (
-    <div className="month">
-      {DW.map((n) => (
-        <div key={n} className="mhead">
-          {n}
-        </div>
-      ))}
-      {Array.from({ length: 42 }, (_, i) => {
-        const d = addDays(start, i);
-        return (
-          <DayCell
-            key={toYmd(d)}
-            date={d}
-            todayKey={todayKey}
-            items={items}
-            modes={modes}
-            projectsMap={projectsMap}
-            dailyCap={dailyCap}
-            drag={drag}
-            dropKey={dropKey}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onOpenItem={onOpenItem}
-            onOpenDayType={() => {}}
-            onAddTask={() => {}}
-            compact
-            monthOut={d.getMonth() !== anchor.getMonth()}
-            onWeekJump={onWeekJump}
-          />
-        );
-      })}
+    <div className="month-wrap">
+      <div className="month-heads">
+        {DW.map((n) => (
+          <div key={n} className="mhead">
+            {n}
+          </div>
+        ))}
+      </div>
+      <div className="month-scroll">
+        {weeks.map((week, wi) => {
+          const weekEnd = toYmd(week[6]!);
+          const isPastWeek = weekEnd < todayKey;
+          return (
+            <div
+              key={wi}
+              className={`month-week${isPastWeek ? " is-past" : ""}`}
+              ref={wi === currentWeekIdx ? currentWeekRef : undefined}
+            >
+              {week.map((d) => (
+                <DayCell
+                  key={toYmd(d)}
+                  date={d}
+                  todayKey={todayKey}
+                  items={items}
+                  modes={modes}
+                  projectsMap={projectsMap}
+                  dailyCap={dailyCap}
+                  drag={drag}
+                  dropKey={dropKey}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                  onDrop={onDrop}
+                  onDragOver={onDragOver}
+                  onDragLeave={onDragLeave}
+                  onOpenItem={onOpenItem}
+                  onOpenDayType={onOpenDayType}
+                  onAddTask={onAddTask}
+                  compact
+                  monthOut={d.getMonth() !== anchor.getMonth()}
+                  onWeekJump={onWeekJump}
+                />
+              ))}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

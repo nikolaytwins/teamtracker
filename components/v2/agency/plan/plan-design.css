@@ -60,6 +60,113 @@
 .plan-v3 .mchip{background:color-mix(in srgb,var(--c) 15%,#fff)}
 .plan-v3 .mchip:hover{background:color-mix(in srgb,var(--c) 24%,#fff)}
 
+/* Compact calendar chips — no lonely "ч" wrap, no stretched cards */
+.plan-v3 .slot{min-height:0;padding:8px 10px;gap:3px}
+.plan-v3 .slot-n{-webkit-line-clamp:2}
+.plan-v3 .slot-m{margin-top:0;flex-wrap:nowrap;min-width:0;gap:6px}
+.plan-v3 .slot-h{white-space:nowrap;flex-shrink:0;color:inherit;font-weight:600;overflow:visible}
+.plan-v3 .slot-m > span:not(.slot-h){color:var(--ink-400);font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0}
+.plan-v3 .free{min-height:36px}
+.plan-v3 .free.big{min-height:52px}
+.plan-v3 .day-h{flex-wrap:nowrap}
+.plan-v3 .day-d{flex-shrink:1;min-width:0}
+.plan-v3 .day-hrs{flex-shrink:0}
+
+.plan-v3 .mchip{
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  white-space:nowrap;
+  overflow:hidden;
+  -webkit-line-clamp:unset;
+  line-clamp:unset;
+  padding:6px 8px;
+}
+.plan-v3 .mchip-n{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.plan-v3 .mchip-h{flex-shrink:0;opacity:.55;font-weight:600;font-style:normal;margin:0}
+.plan-v3 .mchip i{display:none}
+
+/* Day modes as full task-like chips */
+.plan-v3 .mark{
+  width:100%;
+  max-width:none;
+  align-self:stretch;
+  box-sizing:border-box;
+  border-radius:13px;
+  padding:8px 10px;
+  font-size:13px;
+  letter-spacing:-.014em;
+  text-transform:none;
+  line-height:1.3;
+  min-height:0;
+}
+.plan-v3 .mchip--mode{
+  width:100%;
+  justify-content:flex-start;
+  white-space:normal;
+  font-weight:600;
+}
+.plan-v3 .mchip--mode.mchip--strat{background:var(--ink-900);color:#fff}
+.plan-v3 .mchip--mode.mchip--ark{background:var(--blue);color:#fff}
+.plan-v3 .mchip--mode.mchip--rest{background:var(--ink-200);color:var(--ink-600)}
+
+/* Month: sticky heads + scroll; current week starts at top */
+.plan-v3 .month-wrap{display:flex;flex-direction:column;gap:8px;min-width:0}
+.plan-v3 .month-heads{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:8px;
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:linear-gradient(180deg,#fff 70%,rgba(255,255,255,0));
+  padding-bottom:4px;
+}
+.plan-v3 .month-scroll{
+  max-height:min(72vh,900px);
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding-bottom:8px;
+  scroll-behavior:smooth;
+}
+.plan-v3 .month-week{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:8px;
+  scroll-margin-top:4px;
+}
+.plan-v3 .month-week.is-past .mcell:not(.today){opacity:.55}
+.plan-v3 .mfree{
+  margin-top:auto;
+  border:0;
+  background:none;
+  padding:2px 0;
+  text-align:left;
+  cursor:pointer;
+  font:inherit;
+  font-size:11.5px;
+  color:var(--ink-400);
+  font-weight:500;
+}
+.plan-v3 .mfree:hover{color:var(--brand-700)}
+.plan-v3 .madd{
+  border:1.5px dashed var(--ink-300);
+  border-radius:10px;
+  background:none;
+  padding:6px 8px;
+  font:inherit;
+  font-size:12px;
+  font-weight:500;
+  color:var(--ink-400);
+  cursor:pointer;
+  text-align:center;
+  width:100%;
+}
+.plan-v3 .madd:hover{border-color:var(--brand-500);color:var(--brand-700)}
+.plan-v3 .wkrow-live{display:grid;gap:12px}
+
 /* Kanban project drag between status columns */
 .plan-v3 .kbcol{min-height:120px;transition:background .15s,box-shadow .15s}
 .plan-v3 .kbcol.drop{background:var(--brand-50);box-shadow:inset 0 0 0 2px var(--brand-300)}
