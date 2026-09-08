@@ -3,7 +3,7 @@ import { agencyDetailLineTotal } from "@/lib/agency/detail-line-total";
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
 import { isInFinanceMonth } from "@/lib/v2/finance/meta";
 import { isFinanceBusinessLine } from "@/lib/v2/finance/meta";
-import type { V2FinancePaymentStatus } from "@/lib/v2/finance/types";
+import type { V2FinanceBusinessLine, V2FinancePaymentStatus } from "@/lib/v2/finance/types";
 import {
   DEFAULT_DISPATCH_RULES,
   normalizeDispatchRules,
@@ -83,13 +83,31 @@ export async function loadEffectiveTotals(
   return out;
 }
 
+export function mapRawDispatchProjects(
+  rawProjects: Record<string, unknown>[],
+  effectiveTotals: Map<string, number>,
+  lines: V2FinanceBusinessLine[] | "all" = "all"
+): DispatchProjectView[] {
+  const mapped = rawProjects.map((r) => mapDispatchProject(r, effectiveTotals));
+  if (lines === "all") return mapped;
+  const allow = new Set(lines);
+  return mapped.filter((p) => allow.has(p.businessLine));
+}
+
+/** Только агентство — для канбана / календарного плана. */
 export function mapRawAgencyProjects(
   rawProjects: Record<string, unknown>[],
   effectiveTotals: Map<string, number>
 ): DispatchProjectView[] {
-  return rawProjects
-    .map((r) => mapDispatchProject(r, effectiveTotals))
-    .filter((p) => p.businessLine === "agency");
+  return mapRawDispatchProjects(rawProjects, effectiveTotals, ["agency"]);
+}
+
+/** Агентство + импульс — для надёжной прибыли месяца. */
+export function mapRawRevenueProjects(
+  rawProjects: Record<string, unknown>[],
+  effectiveTotals: Map<string, number>
+): DispatchProjectView[] {
+  return mapRawDispatchProjects(rawProjects, effectiveTotals, ["agency", "impulse"]);
 }
 
 export function selectDispatchProjectsForContext(

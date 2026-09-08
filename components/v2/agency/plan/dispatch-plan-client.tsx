@@ -649,7 +649,7 @@ function DispatchPlanCalendar({
                 {freeWindow
                   ? `ближайший полностью свободный день — ${fmtLong(freeWindow)}`
                   : "свободных дней впереди нет"}
-                . Созвоны и личные события стоят выше рабочих слотов и часы не занимают.
+                . Созвоны и личные события стоят выше рабочих слотов; их часы входят в сумму дня.
               </p>
             </section>
 
@@ -920,17 +920,17 @@ function StatusBlock({
       <p className="status-s">
         <b>{labels.headline}.</b> {labels.detail}
       </p>
-      <div className="status-s" style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55 }}>
+      <div className="status-s" style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55, color: "#fff" }}>
         <div>
           <b>Надёжные поступления</b> {formatRub(finance.reliableRevenueRub)}
-          <span style={{ color: "var(--ink-500)", fontWeight: 400 }}>
+          <span style={{ color: "rgba(255,255,255,0.82)", fontWeight: 400 }}>
             {" "}
-            — проекты с галочкой «точно в месяце» и уже оплаченные
+            — агентство и импульс с галочкой «точно в месяце» и уже оплаченные
           </span>
         </div>
         <div>
           <b>− Расходы</b> {formatRub(finance.totalExpensesRub)}
-          <span style={{ color: "var(--ink-500)", fontWeight: 400 }}>
+          <span style={{ color: "rgba(255,255,255,0.82)", fontWeight: 400 }}>
             {" "}
             (команда {formatRub(finance.teamExpensesRub)}
             {finance.taxAmountRub > 0 ? ` + взносы ИП ${formatRub(finance.taxAmountRub)}` : ""})
@@ -939,7 +939,7 @@ function StatusBlock({
         <div>
           <b>= Надёжная прибыль</b> {formatRub(finance.reliableProfitRub)}
         </div>
-        <div style={{ marginTop: 6, color: "var(--ink-500)" }}>
+        <div style={{ marginTop: 6, color: "rgba(255,255,255,0.82)" }}>
           Пассивный режим от {formatRub(finance.passiveMinRub)}
           {finance.reliableProfitRub >= finance.passiveMinRub
             ? ` — порог закрыт (${passivePct}%).`
@@ -1926,7 +1926,7 @@ function ItemDrawer({
           </>
         )}
         <p className="dr-note">
-          {isTask ? "Часы в слоте — запланированный объём, а не отработанное время." : "События стоят выше рабочих слотов и плановые часы не занимают."}
+          {isTask ? "Часы в слоте — запланированный объём, а не отработанное время." : "Часы события входят в сумму дня вместе с рабочими слотами."}
         </p>
       </div>
       <div className="dr-f">

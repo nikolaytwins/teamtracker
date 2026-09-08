@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api-url";
+import { apiUrl, appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PersonalWish, PersonalWishImage } from "@/lib/v2/personal/personal-wishes-repo";
 import {
@@ -279,6 +279,14 @@ function ManifestoPlate() {
           </ol>
         </div>
       ) : null}
+      <div className="px-4 pb-4 pt-1 sm:px-5 sm:pb-5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={appPath("/wishes/ai-industry-hero.png")}
+          alt="Герой-референс: жизнь, которую я строю"
+          className="block h-auto w-full rounded-2xl object-cover"
+        />
+      </div>
     </section>
   );
 }

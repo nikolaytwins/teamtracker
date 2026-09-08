@@ -50,7 +50,9 @@ export function eventsOnDay(items: PlanItemRow[], dateKey: string): PlanItemRow[
 }
 
 export function dayHours(items: PlanItemRow[], dateKey: string): number {
-  return tasksOnDay(items, dateKey).reduce((s, it) => s + itemHours(it), 0);
+  const tasks = tasksOnDay(items, dateKey).reduce((s, it) => s + itemHours(it), 0);
+  const events = eventsOnDay(items, dateKey).reduce((s, it) => s + itemHours(it), 0);
+  return tasks + events;
 }
 
 export function capOf(mode: DayModeKey, dailyCap: number): number {

@@ -44,7 +44,12 @@ export function buildDispatchFinanceSnapshotFromLoaded(
     effective_total_amount: p.effectiveTotalAmount,
   }));
 
-  const summary = computeFinanceMonthSummary(monthProjects, generalExpenses, year, month);
+  const summary = computeFinanceMonthSummary(
+    monthProjects,
+    generalExpenses.filter((e) => e.business_line === "agency" || e.business_line === "impulse"),
+    year,
+    month
+  );
   const actualRevenueRub = monthProjects.reduce((s, p) => s + p.paid_amount, 0);
   const totalExpensesRub = summary.totalExpenses;
   const actualProfitRub = actualRevenueRub - totalExpensesRub;

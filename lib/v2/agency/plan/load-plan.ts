@@ -4,6 +4,7 @@ import {
   getDispatchRules,
   isPlanRelevantProject,
   mapRawAgencyProjects,
+  mapRawRevenueProjects,
   selectDispatchProjectsForContext,
 } from "@/lib/v2/agency/dispatch/dispatch-repo";
 import { listPlanDayModes, listPlanItems } from "@/lib/v2/agency/plan/plan-repo";
@@ -87,6 +88,7 @@ export async function buildPlanPayload(
   ]);
 
   const allAgency = mapRawAgencyProjects(rawProjects, new Map());
+  const revenueProjects = mapRawRevenueProjects(rawProjects, new Map());
   const contextProjects = selectDispatchProjectsForContext(allAgency, year, month);
   const finance = buildDispatchFinanceSnapshotFromLoaded(
     ctx.workspaceId,
@@ -94,7 +96,7 @@ export async function buildPlanPayload(
     month,
     rules.rules,
     contextProjects,
-    allAgency,
+    revenueProjects,
     generalExpenses
   );
 

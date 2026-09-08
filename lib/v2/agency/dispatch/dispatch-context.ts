@@ -3,6 +3,7 @@ import {
   getDispatchRules,
   loadEffectiveTotals,
   mapRawAgencyProjects,
+  mapRawRevenueProjects,
   selectDispatchProjectsForContext,
   splitDispatchProjectsForPlan,
 } from "@/lib/v2/agency/dispatch/dispatch-repo";
@@ -53,6 +54,7 @@ export async function buildDispatchContext(
     ? await loadEffectiveTotals(rawProjects)
     : new Map<string, number>();
   const allAgency = mapRawAgencyProjects(rawProjects, effectiveTotals);
+  const revenueProjects = mapRawRevenueProjects(rawProjects, effectiveTotals);
   const projects = selectDispatchProjectsForContext(allAgency, year, month);
   const finance = buildDispatchFinanceSnapshotFromLoaded(
     ctx.workspaceId,
@@ -60,7 +62,7 @@ export async function buildDispatchContext(
     month,
     rules.rules,
     projects,
-    allAgency,
+    revenueProjects,
     generalExpenses
   );
   const plan = buildPlanSnapshot(year, month, projects, rules);
