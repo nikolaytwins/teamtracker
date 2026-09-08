@@ -515,8 +515,7 @@ function DispatchPlanCalendar({
       : `${fmtShort(anchor)} – ${fmtShort(addDays(anchor, 6))}`;
 
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(anchor, i));
-  const weekIncludesToday = weekDates.some((d) => toYmd(d) === todayKey);
-  const weekDays = weekIncludesToday ? weekDates.filter((d) => toYmd(d) >= todayKey) : weekDates;
+  const weekDays = weekDates;
 
   const tasksToPlace = plan.backlog.filter((i) => i.kind === "task");
   const boardProjects = plan.projects.filter((p) => showHidden || !p.planHidden);

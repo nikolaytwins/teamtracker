@@ -24,15 +24,27 @@ export async function listPlanItems(
   to?: string
 ): Promise<PlanItemRow[]> {
   const sb = createSupabaseServiceClient();
-  let q = sb
-    .from("agency_plan_item")
-    .select("id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order, completed_at")
-    .eq("user_id", ctx.userId)
-    .order("plan_date", { ascending: true, nullsFirst: true })
-    .order("sort_order", { ascending: true });
+  const selectWithDone =
+    "id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order, completed_at";
+  const selectBasic =
+    "id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order";
 
-  if (from) q = q.or(`plan_date.is.null,and(plan_date.gte.${from},plan_date.lte.${to ?? from})`);
-  const { data, error } = await q;
+  const run = async (select: string) => {
+    let q = sb
+      .from("agency_plan_item")
+      .select(select)
+      .eq("user_id", ctx.userId)
+      .order("plan_date", { ascending: true, nullsFirst: true })
+      .order("sort_order", { ascending: true });
+    if (from) q = q.or(`plan_date.is.null,and(plan_date.gte.${from},plan_date.lte.${to ?? from})`);
+    return q;
+  };
+
+  let { data, error } = await run(selectWithDone);
+  // Миграция 079 ещё не применена — грузим без completed_at
+  if (error && (error.code === "42703" || /completed_at/i.test(error.message))) {
+    ({ data, error } = await run(selectBasic));
+  }
   if (error) {
     if (error.code === "42P01") return [];
     if (error.code === "22P02") {
