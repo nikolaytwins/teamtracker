@@ -14,6 +14,7 @@ function mapItem(row: Record<string, unknown>): PlanItemRow {
     event_time: row.event_time ? String(row.event_time) : null,
     duration_label: row.duration_label ? String(row.duration_label) : null,
     sort_order: Number(row.sort_order) || 0,
+    completed_at: row.completed_at ? String(row.completed_at) : null,
   };
 }
 
@@ -25,7 +26,7 @@ export async function listPlanItems(
   const sb = createSupabaseServiceClient();
   let q = sb
     .from("agency_plan_item")
-    .select("id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order")
+    .select("id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order, completed_at")
     .eq("user_id", ctx.userId)
     .order("plan_date", { ascending: true, nullsFirst: true })
     .order("sort_order", { ascending: true });
@@ -77,6 +78,7 @@ export type PlanItemInput = {
   planned_minutes?: number | null;
   event_time?: string | null;
   duration_label?: string | null;
+  completed_at?: string | null;
 };
 
 export async function createPlanItem(ctx: V2SessionContext, input: PlanItemInput): Promise<PlanItemRow> {
@@ -113,6 +115,7 @@ export async function updatePlanItem(
   if (patch.planned_minutes !== undefined) body.planned_minutes = patch.planned_minutes;
   if (patch.event_time !== undefined) body.event_time = patch.event_time;
   if (patch.duration_label !== undefined) body.duration_label = patch.duration_label;
+  if (patch.completed_at !== undefined) body.completed_at = patch.completed_at;
 
   const { data, error } = await sb
     .from("agency_plan_item")

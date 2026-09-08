@@ -22,7 +22,6 @@ import {
   itemHours,
   KANBAN_BOARD_COLS,
   modeCssClass,
-  nextFreeWindowDay,
   pluralRu,
   STATUS_UI,
   tasksOnDay,
@@ -140,6 +139,45 @@ function eventMetaLabel(ev: PlanItemRow): string {
   if (ev.duration_label) parts.push(ev.duration_label);
   else if (!ev.event_time && ev.planned_minutes != null) parts.push(hoursLabel(ev));
   return parts.join(" · ");
+}
+
+function DoneToggle({
+  done,
+  onToggle,
+  compact,
+}: {
+  done: boolean;
+  onToggle: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`done-tog${done ? " is-on" : ""}${compact ? " done-tog--sm" : ""}`}
+      aria-pressed={done}
+      aria-label={done ? "Снять отметку" : "Отметить выполненным"}
+      title={done ? "Снять отметку" : "Отметить выполненным"}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggle();
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {done ? (
+        <svg viewBox="0 0 12 10" className="done-tog-ico" fill="none" aria-hidden>
+          <path
+            d="M1 5.2 4.2 8.4 11 1.6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : null}
+    </button>
+  );
 }
 
 function projectById(projects: PlanProjectView[], id: string | null) {
@@ -313,6 +351,44 @@ function DispatchPlanCalendar({
     [plan, reload, showToast]
   );
 
+  const toggleItemDone = useCallback(
+    async (id: string) => {
+      if (!plan) return;
+      const item = allItems(plan).find((i) => i.id === id);
+      if (!item) return;
+      const nextCompleted = item.completed_at ? null : new Date().toISOString();
+      const patchList = (list: PlanItemRow[]) =>
+        list.map((i) => (i.id === id ? { ...i, completed_at: nextCompleted } : i));
+      setPlan((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: patchList(prev.items),
+              backlog: patchList(prev.backlog),
+            }
+          : prev
+      );
+      try {
+        await updatePlanItemApi(id, { completed_at: nextCompleted });
+      } catch (e) {
+        await reload().catch(() => {});
+        showToast(e instanceof Error ? e.message : "Не удалось обновить отметку");
+      }
+    },
+    [plan, reload, showToast]
+  );
+
+  const deleteItemQuick = useCallback(
+    async (id: string) => {
+      if (!plan) return;
+      const item = allItems(plan).find((i) => i.id === id);
+      if (!item) return;
+      const snap = structuredClone(plan);
+      await mutate(() => deletePlanItemApi(id), `«${item.title}» удалён`, snap);
+    },
+    [plan, mutate]
+  );
+
   const onDropDay = async (dateKey: string) => {
     if (!drag || !plan) return;
     setDropKey(null);
@@ -320,17 +396,9 @@ function DispatchPlanCalendar({
       setDrag(null);
       return;
     }
-    if (dateKey < todayKey) {
-      showToast("В прошедшие дни планировать нельзя");
-      return;
-    }
     const snap = structuredClone(plan);
 
     if (drag.kind === "mark") {
-      if (dayHours(allItems(plan), dateKey) > 0 && drag.mode !== "strategy") {
-        showToast("В этом дне есть рабочие слоты — сначала перенесите их");
-        return;
-      }
       await mutate(
         async () => {
           if (drag.from !== dateKey) await upsertDayModeApi(drag.from, null);
@@ -342,25 +410,9 @@ function DispatchPlanCalendar({
       return;
     }
 
-    const mode = dmode(modes, dateKey);
-    if (capOf(mode, dailyCap) === 0) {
-      showToast(mode === "rest" ? "Это день отдыха" : "Это творческий день — клиентские слоты не ставим");
-      return;
-    }
-    const free = freeHours(allItems(plan), modes, dateKey, dailyCap);
-    if (free === 0 && (drag.kind === "new" || drag.kind === "backlog" || drag.kind === "move")) {
-      showToast("В этом дне не осталось плановых часов");
-      return;
-    }
-
     if (drag.kind === "move" || drag.kind === "backlog") {
       const item = allItems(plan).find((i) => i.id === drag.itemId);
       if (!item || item.plan_date === dateKey) return;
-      const h = itemHours(item);
-      if (h > free) {
-        showToast(`В этом дне свободно только ${free} ч`);
-        return;
-      }
       await mutate(
         () => updatePlanItemApi(drag.itemId, { plan_date: dateKey }),
         `«${item.title}» → ${fmtWeekday(parseYmd(dateKey))}`,
@@ -372,7 +424,7 @@ function DispatchPlanCalendar({
     if (drag.kind === "new") {
       const proj = projectsMap.get(drag.projectId);
       const u = proj ? unplacedHours(proj, allItems(plan), todayKey) : null;
-      const h = Math.min(2, u ?? 2, free);
+      const h = Math.min(2, u ?? 2);
       await mutate(
         () =>
           createPlanItemApi({
@@ -454,7 +506,6 @@ function DispatchPlanCalendar({
 
   const items = allItems(plan);
   const loadStatus = plan.loadStatus;
-  const freeWindow = nextFreeWindowDay(items, modes, today, dailyCap);
   const stratDate = findModeDate(modes, "strategy", todayKey);
   const creativeDate = findModeDate(modes, "creative", todayKey);
 
@@ -611,6 +662,8 @@ function DispatchPlanCalendar({
                           onDragOver={(k) => setDropKey(k)}
                           onDragLeave={() => setDropKey(null)}
                           onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
+                          onToggleDone={toggleItemDone}
+                          onDeleteItem={deleteItemQuick}
                           onOpenDayType={(k) => setDrawer({ type: "day", dateKey: k })}
                           onAddTask={(k) => setDrawer({ type: "create", createKind: "task", day: k })}
                           compact={false}
@@ -634,6 +687,8 @@ function DispatchPlanCalendar({
                     onDragOver={setDropKey}
                     onDragLeave={() => setDropKey(null)}
                     onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
+                    onToggleDone={toggleItemDone}
+                    onDeleteItem={deleteItemQuick}
                     onOpenDayType={(k) => setDrawer({ type: "day", dateKey: k })}
                     onAddTask={(k) => setDrawer({ type: "create", createKind: "task", day: k })}
                     onWeekJump={(k) => {
@@ -644,12 +699,8 @@ function DispatchPlanCalendar({
                 )}
               </div>
               <p className="hint">
-                Тип дня — кнопка ⋯ в заголовке дня: обычный, стратегия, творческий или отдых. В обычном дне{" "}
-                {dailyCap} плановых часа, включая выходные:{" "}
-                {freeWindow
-                  ? `ближайший полностью свободный день — ${fmtLong(freeWindow)}`
-                  : "свободных дней впереди нет"}
-                . Созвоны и личные события стоят выше рабочих слотов; их часы входят в сумму дня.
+                Тип дня — кнопка ⋯ в заголовке дня. Ориентир нагрузки {dailyCap} ч/день (можно превышать). События
+                стоят выше рабочих слотов; их часы входят в сумму дня.
               </p>
             </section>
 
@@ -990,6 +1041,8 @@ function DayCell({
   onDragOver,
   onDragLeave,
   onOpenItem,
+  onToggleDone,
+  onDeleteItem,
   onOpenDayType,
   onAddTask,
   compact,
@@ -1010,6 +1063,8 @@ function DayCell({
   onDragOver: (k: string) => void;
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
+  onToggleDone: (id: string) => void;
+  onDeleteItem: (id: string) => void;
   onOpenDayType: (k: string) => void;
   onAddTask: (k: string) => void;
   compact: boolean;
@@ -1055,31 +1110,53 @@ function DayCell({
           ) : null}
           {dayEvents.slice(0, 2).map((ev) => {
             const meta = eventMetaLabel(ev);
+            const done = !!ev.completed_at;
             return (
-              <button
-                key={ev.id}
-                type="button"
-                className={`mev${ev.kind === "personal" ? " mev--me" : ""}`}
-                onClick={() => onOpenItem(ev.id)}
-              >
-                {ev.title}
-                {meta ? <i>{meta}</i> : null}
-              </button>
+              <div key={ev.id} className={`mev-row${done ? " is-done" : ""}`}>
+                <DoneToggle done={done} compact onToggle={() => onToggleDone(ev.id)} />
+                <button
+                  type="button"
+                  className={`mev${ev.kind === "personal" ? " mev--me" : ""}${done ? " is-done" : ""}`}
+                  onClick={() => onOpenItem(ev.id)}
+                >
+                  {ev.title}
+                  {meta ? <i>{meta}</i> : null}
+                </button>
+                <button
+                  type="button"
+                  className="ev-x"
+                  aria-label="Удалить"
+                  title="Удалить"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDeleteItem(ev.id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             );
           })}
           {dayTasks.slice(0, 3).map((t) => {
             const p = t.project_id ? projectsMap.get(t.project_id) : null;
+            const done = !!t.completed_at;
             return (
-              <button
+              <div
                 key={t.id}
-                type="button"
-                className="mchip"
+                className={`mchip-row${done ? " is-done" : ""}`}
                 style={{ ["--c" as string]: p?.color ?? projectColor(t.id) }}
-                onClick={() => onOpenItem(t.id)}
               >
-                <span className="mchip-n">{t.title}</span>
-                <span className="mchip-h tnum">{hoursLabel(t)}</span>
-              </button>
+                <DoneToggle done={done} compact onToggle={() => onToggleDone(t.id)} />
+                <button
+                  type="button"
+                  className={`mchip${done ? " is-done" : ""}`}
+                  onClick={() => onOpenItem(t.id)}
+                >
+                  <span className="mchip-n">{t.title}</span>
+                  <span className="mchip-h tnum">{hoursLabel(t)}</span>
+                </button>
+              </div>
             );
           })}
           {dayTasks.length > 3 && onWeekJump ? (
@@ -1087,18 +1164,16 @@ function DayCell({
               + ещё {dayTasks.length - 3}
             </button>
           ) : null}
-          {!past ? (
-            <>
-              {free > 0 ? (
-                <button type="button" className="mfree" onClick={() => onAddTask(k)}>
-                  свободно {free} ч
-                </button>
-              ) : null}
-              <button type="button" className="madd" onClick={() => onAddTask(k)}>
-                + задача
+          <>
+            {free > 0 ? (
+              <button type="button" className="mfree" onClick={() => onAddTask(k)}>
+                свободно {free} ч
               </button>
-            </>
-          ) : null}
+            ) : null}
+            <button type="button" className="madd" onClick={() => onAddTask(k)}>
+              + задача
+            </button>
+          </>
         </>
       ) : (
         <>
@@ -1110,17 +1185,15 @@ function DayCell({
                 {h} / {cap} ч
               </span>
             ) : null}
-            {!past ? (
-              <button type="button" className="dmbtn tip" data-tip="Тип дня" onClick={() => onOpenDayType(k)}>
-                ⋯
-              </button>
-            ) : null}
+            <button type="button" className="dmbtn tip" data-tip="Тип дня" onClick={() => onOpenDayType(k)}>
+              ⋯
+            </button>
           </div>
           {mode ? (
             <button
               type="button"
               className={`mark mark--${cssMode}`}
-              draggable={!past}
+              draggable
               onDragStart={() => onDragStart({ kind: "mark", mode, from: k })}
               onDragEnd={onDragEnd}
               onClick={(e) => {
@@ -1135,16 +1208,32 @@ function DayCell({
             <div className="evs">
               {dayEvents.map((ev) => {
                 const meta = eventMetaLabel(ev);
+                const done = !!ev.completed_at;
                 return (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    className={`ev${ev.kind === "personal" ? " ev--me" : ""}`}
-                    onClick={() => onOpenItem(ev.id)}
-                  >
-                    {meta ? <span className="ev-t">{meta}</span> : null}
-                    <span className="ev-n">{ev.title}</span>
-                  </button>
+                  <div key={ev.id} className={`ev-row${done ? " is-done" : ""}`}>
+                    <DoneToggle done={done} onToggle={() => onToggleDone(ev.id)} />
+                    <button
+                      type="button"
+                      className={`ev${ev.kind === "personal" ? " ev--me" : ""}${done ? " is-done" : ""}`}
+                      onClick={() => onOpenItem(ev.id)}
+                    >
+                      {meta ? <span className="ev-t">{meta}</span> : null}
+                      <span className="ev-n">{ev.title}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="ev-x"
+                      aria-label="Удалить"
+                      title="Удалить"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDeleteItem(ev.id);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -1152,40 +1241,46 @@ function DayCell({
           <div className="slots">
             {dayTasks.map((t) => {
               const p = t.project_id ? projectsMap.get(t.project_id) : null;
+              const done = !!t.completed_at;
               return (
-                <button
+                <div
                   key={t.id}
-                  type="button"
-                  className="slot"
-                  draggable={!past}
+                  className={`slot${done ? " is-done" : ""}`}
+                  draggable
                   style={{ ["--c" as string]: p?.color ?? projectColor(t.id) }}
                   onDragStart={() => onDragStart({ kind: "move", itemId: t.id })}
                   onDragEnd={onDragEnd}
-                  onClick={() => onOpenItem(t.id)}
                 >
-                  <span className="slot-n">{t.title}</span>
-                  <span className="slot-m tnum">
-                    <span className="slot-h">{hoursLabel(t)}</span>
-                    <span>{p ? p.clientLabel : "без проекта"}</span>
-                  </span>
-                </button>
+                  <DoneToggle done={done} onToggle={() => onToggleDone(t.id)} />
+                  <button type="button" className="slot-main" onClick={() => onOpenItem(t.id)}>
+                    <span className="slot-n">{t.title}</span>
+                    <span className="slot-m tnum">
+                      <span className="slot-h">{hoursLabel(t)}</span>
+                      <span>{p ? p.clientLabel : "без проекта"}</span>
+                    </span>
+                  </button>
+                </div>
               );
             })}
-            {free > 0 && !past ? (
+            {free > 0 ? (
               <button type="button" className={`free${free >= 3 ? " big" : ""}`} onClick={() => onAddTask(k)}>
                 + свободно {free} ч
               </button>
-            ) : null}
+            ) : (
+              <button type="button" className="free" onClick={() => onAddTask(k)}>
+                + добавить
+              </button>
+            )}
           </div>
           {mode === "rest" ? (
-            <div className="dayfoot">День отдыха · рабочие слоты не ставим</div>
+            <div className="dayfoot">День отдыха</div>
           ) : mode === "creative" ? (
-            <div className="dayfoot">Творческий день · клиентские слоты не ставим</div>
+            <div className="dayfoot">Творческий день</div>
           ) : mode === "strategy" ? (
-            <div className="dayfoot">Один слот стратегии, до 2 часов</div>
-          ) : !past ? (
+            <div className="dayfoot">День стратегии</div>
+          ) : (
             <div className="dayfoot">+ резерв на сопровождение</div>
-          ) : null}
+          )}
         </>
       )}
     </div>
@@ -1207,6 +1302,8 @@ function MonthGrid({
   onDragOver,
   onDragLeave,
   onOpenItem,
+  onToggleDone,
+  onDeleteItem,
   onOpenDayType,
   onAddTask,
   onWeekJump,
@@ -1225,6 +1322,8 @@ function MonthGrid({
   onDragOver: (k: string) => void;
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
+  onToggleDone: (id: string) => void;
+  onDeleteItem: (id: string) => void;
   onOpenDayType: (k: string) => void;
   onAddTask: (k: string) => void;
   onWeekJump: (k: string) => void;
@@ -1286,6 +1385,8 @@ function MonthGrid({
                   onDragOver={onDragOver}
                   onDragLeave={onDragLeave}
                   onOpenItem={onOpenItem}
+                  onToggleDone={onToggleDone}
+                  onDeleteItem={onDeleteItem}
                   onOpenDayType={onOpenDayType}
                   onAddTask={onAddTask}
                   compact
@@ -1611,18 +1712,6 @@ function CreateDrawer({
         return;
       }
       const planDate = day === "__backlog__" ? null : day;
-      if (planDate) {
-        const h = mins / 60;
-        const mode = dmode(modes, planDate);
-        if (capOf(mode, dailyCap) === 0) {
-          showToastLocal(mode === "rest" ? "Это день отдыха" : "Это творческий день — клиентские слоты не ставим");
-          return;
-        }
-        if (h > freeHours(items, modes, planDate, dailyCap)) {
-          showToastLocal(`В этом дне свободно только ${freeHours(items, modes, planDate, dailyCap)} ч`);
-          return;
-        }
-      }
       await mutate(
         () =>
           createPlanItemApi({
@@ -1657,10 +1746,6 @@ function CreateDrawer({
     }
     const modeMap: Record<string, PlanDayMode> = { strategy: "strategy", creative: "creative", rest: "rest" };
     const mode = modeMap[kind]!;
-    if (kind !== "strategy" && dayHours(items, day) > 0) {
-      showToastLocal("В этом дне есть рабочие слоты — сначала перенесите их");
-      return;
-    }
     await mutate(
       async () => {
         if (kind !== "rest") {
@@ -1764,7 +1849,7 @@ function CreateDrawer({
                 ))}
               </select>
             </div>
-            <p className="dr-note">Событие встанет выше рабочих слотов и не займёт плановые часы.</p>
+            <p className="dr-note">Событие отображается выше рабочих слотов; часы входят в сумму дня.</p>
           </>
         ) : (
           <>
@@ -1774,10 +1859,10 @@ function CreateDrawer({
             </div>
             <p className="dr-note">
               {kind === "strategy"
-                ? "Защищённый день стратегии: в него можно поставить один слот до двух часов."
+                ? "Поставит метку дня стратегии на выбранную дату."
                 : kind === "creative"
-                  ? "Творческий день: клиентские слоты в него не ставим."
-                  : "День отдыха: рабочие слоты в него не ставим."}
+                  ? "Поставит метку творческого дня на выбранную дату."
+                  : "Поставит метку дня отдыха на выбранную дату."}
             </p>
           </>
         )}
@@ -1827,13 +1912,6 @@ function ItemDrawer({
     if (isTask) {
       const mins = parseDurationInput(durationInput);
       if (!mins) return;
-      if (day && day !== "__backlog__") {
-        const h = mins / 60;
-        if (h > freeHours(items.filter((i) => i.id !== item.id), modes, day, dailyCap) + itemHours(item)) {
-          mutate(async () => {}, "Недостаточно свободных часов в этом дне");
-          return;
-        }
-      }
       await mutate(
         () =>
           updatePlanItemApi(item.id, {
@@ -1874,6 +1952,35 @@ function ItemDrawer({
         </button>
       </div>
       <div className="dr-b">
+        <button
+          type="button"
+          className={`done-row${item.completed_at ? " is-on" : ""}`}
+          onClick={() =>
+            void mutate(
+              () =>
+                updatePlanItemApi(item.id, {
+                  completed_at: item.completed_at ? null : new Date().toISOString(),
+                }),
+              item.completed_at ? `«${item.title}» снова в работе` : `«${item.title}» выполнен`,
+              snap
+            )
+          }
+        >
+          <span className={`done-tog${item.completed_at ? " is-on" : ""}`} aria-hidden>
+            {item.completed_at ? (
+              <svg viewBox="0 0 12 10" className="done-tog-ico" fill="none">
+                <path
+                  d="M1 5.2 4.2 8.4 11 1.6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : null}
+          </span>
+          <span>{item.completed_at ? "Выполнено — нажмите, чтобы снять" : "Отметить выполненным"}</span>
+        </button>
         <div className="fld">
           <label>Название</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -1973,18 +2080,14 @@ function DayTypeDrawer({
   const snap = structuredClone(plan);
 
   const notes: Record<string, string> = {
-    norm: "Четыре плановых часа под проектные задачи.",
-    strategy: "Защищённый день: один слот до двух часов, клиентские проекты не планируем.",
-    creative: "Творческий день: клиентские слоты не ставим, созвоны и личные события можно.",
-    rest: "День отдыха: рабочие слоты не ставим.",
+    norm: "Обычный день — планируйте как удобно.",
+    strategy: "Метка дня стратегии. Можно сочетать со слотами и событиями.",
+    creative: "Метка творческого дня. Можно сочетать со слотами и событиями.",
+    rest: "Метка дня отдыха. Можно сочетать со слотами и событиями.",
   };
 
   const save = async () => {
     if (!day) return;
-    if (sel !== "norm" && sel !== "strategy" && dayHours(items, day) > 0) {
-      mutate(async () => {}, "В этом дне есть рабочие слоты — сначала перенесите их");
-      return;
-    }
     await mutate(
       async () => {
         if (dateKey !== day) await upsertDayModeApi(dateKey, null);
@@ -2040,7 +2143,7 @@ function DayTypeDrawer({
           <PlanDateInput value={day} onChange={setDay} />
         </div>
         <p className="dr-note">
-          Стратегия и творческий день бывают один раз в неделю — прежняя метка переедет на выбранный день. Метку также
+          Если уже есть день стратегии или творческий впереди, прежняя метка снимется с него и переедет сюда. Метку также
           можно перетащить прямо в календаре.
         </p>
       </div>

@@ -256,3 +256,70 @@
   border:1.5px solid var(--ink-200);
   background:#fff;
 }
+
+/* Отметка выполненного слота / события */
+.plan-v3 .done-tog{
+  width:18px;height:18px;flex-shrink:0;border-radius:6px;
+  border:1.5px solid var(--ink-300);background:#fff;color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;
+  cursor:pointer;padding:0;transition:border-color .15s,background .15s,box-shadow .15s;
+}
+.plan-v3 .done-tog:hover{border-color:var(--brand-400)}
+.plan-v3 .done-tog.is-on{
+  border-color:var(--brand-600);background:var(--brand-600);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
+}
+.plan-v3 .done-tog--sm{width:15px;height:15px;border-radius:5px}
+.plan-v3 .done-tog-ico{width:10px;height:10px}
+.plan-v3 .done-tog--sm .done-tog-ico{width:8px;height:8px}
+.plan-v3 .done-row{
+  display:flex;align-items:center;gap:10px;width:100%;
+  border:none;border-radius:12px;padding:11px 12px;margin-bottom:14px;
+  background:var(--ink-50);cursor:pointer;text-align:left;
+  font-size:13.5px;font-weight:550;color:var(--ink-700);
+}
+.plan-v3 .done-row:hover{background:var(--ink-100)}
+.plan-v3 .done-row.is-on{background:color-mix(in srgb,var(--brand-50) 80%,#fff);color:var(--brand-700)}
+.plan-v3 .slot{
+  display:flex;align-items:flex-start;gap:8px;cursor:grab;
+}
+.plan-v3 .slot-main{
+  flex:1;min-width:0;border:none;background:transparent;padding:0;margin:0;
+  display:flex;flex-direction:column;gap:3px;text-align:left;cursor:pointer;color:inherit;
+}
+.plan-v3 .slot.is-done{opacity:.78}
+.plan-v3 .slot.is-done .slot-n{
+  text-decoration:line-through;
+  text-decoration-thickness:1.5px;
+  text-decoration-color:color-mix(in srgb,var(--ink-500) 55%,transparent);
+  color:var(--ink-500);
+}
+.plan-v3 .slot.is-done .slot-m{opacity:.72}
+.plan-v3 .ev-row,.plan-v3 .mev-row,.plan-v3 .mchip-row{
+  display:flex;align-items:flex-start;gap:7px;
+}
+.plan-v3 .ev-row .ev,.plan-v3 .mev-row .mev,.plan-v3 .mchip-row .mchip{flex:1;min-width:0}
+.plan-v3 .ev.is-done,.plan-v3 .mev.is-done,.plan-v3 .mchip.is-done{opacity:.78}
+.plan-v3 .ev.is-done .ev-n,
+.plan-v3 .mev.is-done,
+.plan-v3 .mchip.is-done .mchip-n{
+  text-decoration:line-through;
+  text-decoration-thickness:1.5px;
+  text-decoration-color:color-mix(in srgb,var(--ink-500) 55%,transparent);
+  color:var(--ink-500);
+}
+.plan-v3 .mev.is-done i,.plan-v3 .mchip.is-done .mchip-h{opacity:.65}
+.plan-v3 .ev-row.is-done .done-tog,
+.plan-v3 .mev-row.is-done .done-tog,
+.plan-v3 .mchip-row.is-done .done-tog,
+.plan-v3 .slot.is-done .done-tog{margin-top:1px}
+.plan-v3 .mchip{display:flex;align-items:baseline;gap:6px;-webkit-box-orient:initial;-webkit-line-clamp:unset;overflow:hidden}
+.plan-v3 .ev-x{
+  flex-shrink:0;width:18px;height:18px;margin-top:2px;border:none;border-radius:6px;
+  background:transparent;color:var(--ink-400);font-size:15px;line-height:1;
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;
+  opacity:.28;transition:opacity .15s,background .15s,color .15s;padding:0;
+}
+.plan-v3 .ev-row:hover .ev-x,.plan-v3 .mev-row:hover .ev-x{opacity:.55}
+.plan-v3 .ev-x:hover{opacity:1!important;background:var(--ink-100);color:var(--ink-700)}
+.plan-v3 .mev-row .ev-x{margin-top:1px;width:16px;height:16px;font-size:14px}

@@ -97,8 +97,9 @@
 | 076 | `076_agency_plan_user_id_text.sql` | Fix plan tables: user_id TEXT (v2 ids u_…) |
 | 077 | `077_agency_project_plan_hidden.sql` | План: plan_hidden — скрыть проект из канбана/списка |
 | 078 | `078_agency_project_dispatch_permanent.sql` | План: статус permanent («Постоянные») |
+| 079 | `079_agency_plan_item_completed_at.sql` | План: completed_at у слотов/событий дня |
 
-**Следующий свободный номер:** `079`
+**Следующий свободный номер:** `080`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

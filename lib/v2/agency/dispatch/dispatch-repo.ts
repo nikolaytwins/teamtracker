@@ -122,7 +122,9 @@ export function selectDispatchProjectsForContext(
       (p.dispatchWorkStatus === "in_progress" ||
         p.dispatchWorkStatus === "revisions" ||
         p.dispatchWorkStatus === "on_approval" ||
-        p.dispatchWorkStatus === "permanent")
+        p.dispatchWorkStatus === "permanent" ||
+        // Завершённые из прошлых месяцев остаются в колонке «Завершён», пока не скроют из плана
+        p.dispatchWorkStatus === "done")
   );
   const byId = new Map<string, DispatchProjectView>();
   for (const p of [...inMonth, ...carryOver]) byId.set(p.id, p);

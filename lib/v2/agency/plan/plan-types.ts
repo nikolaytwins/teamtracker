@@ -17,6 +17,7 @@ export type PlanItemRow = {
   event_time: string | null;
   duration_label: string | null;
   sort_order: number;
+  completed_at: string | null;
 };
 
 export type PlanDayModeRow = {

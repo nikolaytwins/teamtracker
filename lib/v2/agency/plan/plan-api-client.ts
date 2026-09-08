@@ -47,6 +47,7 @@ export async function updatePlanItemApi(
     planned_minutes: number | null;
     event_time: string | null;
     duration_label: string | null;
+    completed_at: string | null;
   }>
 ) {
   const data = await fetchJson<{ item: PlanItemRow }>(`/api/v2/agency/plan/items/${id}`, {

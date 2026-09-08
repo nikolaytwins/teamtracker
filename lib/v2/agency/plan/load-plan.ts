@@ -16,7 +16,6 @@ import {
   projectColor,
 } from "@/lib/v2/agency/plan/plan-utils";
 import { listFinanceGeneralExpenses } from "@/lib/v2/finance/finance-repo";
-import { isInFinanceMonth } from "@/lib/v2/finance/meta";
 import type { V2SessionContext } from "@/lib/v2/types";
 
 function mapPlanProject(p: {
@@ -107,18 +106,12 @@ export async function buildPlanPayload(
     rulesFinance.pauseProfitMinRub ?? 245_000
   );
 
-  const activeIds = new Set(contextProjects.map((p) => p.id));
-  const activeAndRisk = [
-    ...contextProjects.filter((p) => isPlanRelevantProject(p, year, month)),
-    ...allAgency.filter(
-      (p) =>
-        p.dispatchWorkStatus === "done" &&
-        isInFinanceMonth(p.createdAt, year, month) &&
-        !activeIds.has(p.id)
-    ),
-  ];
-
-  const projects = activeAndRisk.map(mapPlanProject);
+  // Активные + завершённые (колонка «Завершён» всегда должна их видеть).
+  // Раньше done из текущего месяца отфильтровывались isPlanRelevant и не возвращались
+  // из-за ошибки !activeIds.has(id).
+  const projects = contextProjects
+    .filter((p) => isPlanRelevantProject(p, year, month) || p.dispatchWorkStatus === "done")
+    .map(mapPlanProject);
 
   return {
     year,
