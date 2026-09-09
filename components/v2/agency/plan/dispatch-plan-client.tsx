@@ -22,6 +22,9 @@ import {
   itemHours,
   KANBAN_BOARD_COLS,
   modeCssClass,
+  normalizePlanPriority,
+  PLAN_PRIORITIES,
+  PLAN_PRIORITY_UI,
   pluralRu,
   STATUS_UI,
   tasksOnDay,
@@ -35,6 +38,7 @@ import type {
   PlanItemKind,
   PlanItemRow,
   PlanPayload,
+  PlanPriority,
   PlanProjectView,
 } from "@/lib/v2/agency/plan/plan-types";
 import {
@@ -257,6 +261,7 @@ function DispatchPlanCalendar({
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [kanbanDrop, setKanbanDrop] = useState<DispatchWorkStatus | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -389,9 +394,10 @@ function DispatchPlanCalendar({
     [plan, mutate]
   );
 
-  const onDropDay = async (dateKey: string) => {
+  const onDropDay = async (dateKey: string, insertAt: number | null = null) => {
     if (!drag || !plan) return;
     setDropKey(null);
+    setDropIndex(null);
     if (drag.kind === "kanban") {
       setDrag(null);
       return;
@@ -412,10 +418,41 @@ function DispatchPlanCalendar({
 
     if (drag.kind === "move" || drag.kind === "backlog") {
       const item = allItems(plan).find((i) => i.id === drag.itemId);
-      if (!item || item.plan_date === dateKey) return;
+      if (!item) {
+        setDrag(null);
+        return;
+      }
+      const sameDay = item.plan_date === dateKey;
+      const currentIds = tasksOnDay(allItems(plan), dateKey).map((t) => t.id);
+      const siblings = tasksOnDay(allItems(plan), dateKey).filter((t) => t.id !== item.id);
+      const fromIndex = sameDay ? currentIds.indexOf(item.id) : -1;
+      let at =
+        insertAt == null ? siblings.length : Math.max(0, Math.min(insertAt, siblings.length));
+      if (sameDay && fromIndex >= 0 && insertAt != null && insertAt > fromIndex) {
+        at = Math.max(0, Math.min(insertAt - 1, siblings.length));
+      }
+      const orderedIds = [
+        ...siblings.slice(0, at).map((t) => t.id),
+        item.id,
+        ...siblings.slice(at).map((t) => t.id),
+      ];
+      if (sameDay) {
+        if (currentIds.join("\0") === orderedIds.join("\0")) {
+          setDrag(null);
+          return;
+        }
+      }
+
       await mutate(
-        () => updatePlanItemApi(drag.itemId, { plan_date: dateKey }),
-        `«${item.title}» → ${fmtWeekday(parseYmd(dateKey))}`,
+        async () => {
+          if (!sameDay) {
+            await updatePlanItemApi(item.id, { plan_date: dateKey });
+          }
+          await Promise.all(orderedIds.map((id, i) => updatePlanItemApi(id, { sort_order: i })));
+        },
+        sameDay
+          ? `Порядок в ${fmtWeekday(parseYmd(dateKey))} обновлён`
+          : `«${item.title}» → ${fmtWeekday(parseYmd(dateKey))}`,
         snap
       );
       return;
@@ -433,6 +470,8 @@ function DispatchPlanCalendar({
             title: "Работа по проекту",
             plan_date: dateKey,
             planned_minutes: planHoursToMinutes(h),
+            sort_order: insertAt,
+            priority: 3,
           }),
         `${proj?.name ?? "Проект"} · ${h} ч → ${fmtWeekday(parseYmd(dateKey))}. Откройте слот, чтобы назвать задачу.`,
         snap
@@ -655,11 +694,21 @@ function DispatchPlanCalendar({
                           dailyCap={dailyCap}
                           drag={drag}
                           dropKey={dropKey}
+                          dropIndex={dropIndex}
                           onDragStart={setDrag}
-                          onDragEnd={() => setDrag(null)}
+                          onDragEnd={() => {
+                            setDrag(null);
+                            setDropIndex(null);
+                          }}
                           onDrop={onDropDay}
-                          onDragOver={(k) => setDropKey(k)}
-                          onDragLeave={() => setDropKey(null)}
+                          onDragOver={(k, idx = null) => {
+                            setDropKey(k);
+                            setDropIndex(idx);
+                          }}
+                          onDragLeave={() => {
+                            setDropKey(null);
+                            setDropIndex(null);
+                          }}
                           onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
                           onToggleDone={toggleItemDone}
                           onDeleteItem={deleteItemQuick}
@@ -680,11 +729,21 @@ function DispatchPlanCalendar({
                     dailyCap={dailyCap}
                     drag={drag}
                     dropKey={dropKey}
+                    dropIndex={dropIndex}
                     onDragStart={setDrag}
-                    onDragEnd={() => setDrag(null)}
+                    onDragEnd={() => {
+                      setDrag(null);
+                      setDropIndex(null);
+                    }}
                     onDrop={onDropDay}
-                    onDragOver={setDropKey}
-                    onDragLeave={() => setDropKey(null)}
+                    onDragOver={(k, idx = null) => {
+                      setDropKey(k);
+                      setDropIndex(idx);
+                    }}
+                    onDragLeave={() => {
+                      setDropKey(null);
+                      setDropIndex(null);
+                    }}
                     onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
                     onToggleDone={toggleItemDone}
                     onDeleteItem={deleteItemQuick}
@@ -699,7 +758,8 @@ function DispatchPlanCalendar({
               </div>
               <p className="hint">
                 Тип дня — кнопка ⋯ в заголовке дня. Ориентир нагрузки {dailyCap} ч/день (можно превышать). События
-                стоят выше рабочих слотов; их часы входят в сумму дня.
+                стоят выше рабочих слотов; их часы входят в сумму дня. Внутри дня задачи можно переставлять
+                перетаскиванием; цвет слота — приоритет (P1–P4).
               </p>
             </section>
 
@@ -1034,6 +1094,7 @@ function DayCell({
   dailyCap,
   drag,
   dropKey,
+  dropIndex,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -1056,10 +1117,11 @@ function DayCell({
   dailyCap: number;
   drag: DragState | null;
   dropKey: string | null;
+  dropIndex: number | null;
   onDragStart: (d: DragState) => void;
   onDragEnd: () => void;
-  onDrop: (k: string) => void;
-  onDragOver: (k: string) => void;
+  onDrop: (k: string, insertAt?: number | null) => void;
+  onDragOver: (k: string, insertAt?: number | null) => void;
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
   onToggleDone: (id: string) => void;
@@ -1079,6 +1141,7 @@ function DayCell({
   const free = freeHours(items, modes, k, dailyCap);
   const dayTasks = tasksOnDay(items, k);
   const dayEvents = eventsOnDay(items, k);
+  const canReorder = Boolean(drag && (drag.kind === "move" || drag.kind === "backlog" || drag.kind === "new"));
 
   return (
     <div
@@ -1087,12 +1150,13 @@ function DayCell({
       onDragOver={(e) => {
         if (!drag || drag.kind === "kanban") return;
         e.preventDefault();
-        onDragOver(k);
+        if (canReorder) onDragOver(k, dayTasks.length);
+        else onDragOver(k, null);
       }}
       onDragLeave={onDragLeave}
       onDrop={(e) => {
         e.preventDefault();
-        void onDrop(k);
+        void onDrop(k, canReorder ? dropKey === k ? dropIndex : dayTasks.length : null);
       }}
     >
       {compact ? (
@@ -1112,7 +1176,6 @@ function DayCell({
             const done = !!ev.completed_at;
             return (
               <div key={ev.id} className={`mev-row${done ? " is-done" : ""}`}>
-                <DoneToggle done={done} compact onToggle={() => onToggleDone(ev.id)} />
                 <button
                   type="button"
                   className={`mev${ev.kind === "personal" ? " mev--me" : ""}${done ? " is-done" : ""}`}
@@ -1138,18 +1201,16 @@ function DayCell({
             );
           })}
           {dayTasks.slice(0, 3).map((t) => {
-            const p = t.project_id ? projectsMap.get(t.project_id) : null;
             const done = !!t.completed_at;
+            const pri = normalizePlanPriority(t.priority);
             return (
               <div
                 key={t.id}
-                className={`mchip-row${done ? " is-done" : ""}`}
-                style={{ ["--c" as string]: p?.color ?? projectColor(t.id) }}
+                className={`mchip-row${done ? " is-done" : ""} mchip-row--${PLAN_PRIORITY_UI[pri].css}`}
               >
-                <DoneToggle done={done} compact onToggle={() => onToggleDone(t.id)} />
                 <button
                   type="button"
-                  className={`mchip${done ? " is-done" : ""}`}
+                  className={`mchip mchip--${PLAN_PRIORITY_UI[pri].css}${done ? " is-done" : ""}`}
                   onClick={() => onOpenItem(t.id)}
                 >
                   <span className="mchip-n">{t.title}</span>
@@ -1238,35 +1299,92 @@ function DayCell({
             </div>
           )}
           <div className="slots">
-            {dayTasks.map((t) => {
+            {dayTasks.map((t, index) => {
               const p = t.project_id ? projectsMap.get(t.project_id) : null;
               const done = !!t.completed_at;
+              const pri = normalizePlanPriority(t.priority);
+              const showDropLine = dropKey === k && dropIndex === index && canReorder;
               return (
-                <div
-                  key={t.id}
-                  className={`slot${done ? " is-done" : ""}`}
-                  draggable
-                  style={{ ["--c" as string]: p?.color ?? projectColor(t.id) }}
-                  onDragStart={() => onDragStart({ kind: "move", itemId: t.id })}
-                  onDragEnd={onDragEnd}
-                >
-                  <DoneToggle done={done} onToggle={() => onToggleDone(t.id)} />
-                  <button type="button" className="slot-main" onClick={() => onOpenItem(t.id)}>
-                    <span className="slot-n">{t.title}</span>
-                    <span className="slot-m tnum">
-                      <span className="slot-h">{hoursLabel(t)}</span>
-                      <span>{p ? p.clientLabel : "без проекта"}</span>
-                    </span>
-                  </button>
+                <div key={t.id} className="slot-wrap">
+                  {showDropLine ? <div className="slot-drop-line" aria-hidden /> : null}
+                  <div
+                    className={`slot slot--${PLAN_PRIORITY_UI[pri].css}${done ? " is-done" : ""}`}
+                    draggable
+                    onDragStart={() => onDragStart({ kind: "move", itemId: t.id })}
+                    onDragEnd={onDragEnd}
+                    onDragOver={(e) => {
+                      if (!canReorder) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      const before = e.clientY < rect.top + rect.height / 2;
+                      onDragOver(k, before ? index : index + 1);
+                    }}
+                    onDrop={(e) => {
+                      if (!canReorder) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      const before = e.clientY < rect.top + rect.height / 2;
+                      void onDrop(k, before ? index : index + 1);
+                    }}
+                  >
+                    <DoneToggle done={done} onToggle={() => onToggleDone(t.id)} />
+                    <button type="button" className="slot-main" onClick={() => onOpenItem(t.id)}>
+                      <span className="slot-n">
+                        <span className={`prio-dot prio-dot--${PLAN_PRIORITY_UI[pri].css}`} title={PLAN_PRIORITY_UI[pri].label} />
+                        {t.title}
+                      </span>
+                      <span className="slot-m tnum">
+                        <span className="slot-h">{hoursLabel(t)}</span>
+                        <span>{p ? p.clientLabel : "без проекта"}</span>
+                      </span>
+                    </button>
+                  </div>
                 </div>
               );
             })}
+            {dropKey === k && dropIndex === dayTasks.length && canReorder ? (
+              <div className="slot-drop-line" aria-hidden />
+            ) : null}
             {free > 0 ? (
-              <button type="button" className={`free${free >= 3 ? " big" : ""}`} onClick={() => onAddTask(k)}>
+              <button
+                type="button"
+                className={`free${free >= 3 ? " big" : ""}`}
+                onClick={() => onAddTask(k)}
+                onDragOver={(e) => {
+                  if (!canReorder) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDragOver(k, dayTasks.length);
+                }}
+                onDrop={(e) => {
+                  if (!canReorder) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void onDrop(k, dayTasks.length);
+                }}
+              >
                 + свободно {free} ч
               </button>
             ) : (
-              <button type="button" className="free" onClick={() => onAddTask(k)}>
+              <button
+                type="button"
+                className="free"
+                onClick={() => onAddTask(k)}
+                onDragOver={(e) => {
+                  if (!canReorder) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDragOver(k, dayTasks.length);
+                }}
+                onDrop={(e) => {
+                  if (!canReorder) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void onDrop(k, dayTasks.length);
+                }}
+              >
                 + добавить
               </button>
             )}
@@ -1295,6 +1413,7 @@ function MonthGrid({
   dailyCap,
   drag,
   dropKey,
+  dropIndex,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -1315,10 +1434,11 @@ function MonthGrid({
   dailyCap: number;
   drag: DragState | null;
   dropKey: string | null;
+  dropIndex: number | null;
   onDragStart: (d: DragState) => void;
   onDragEnd: () => void;
-  onDrop: (k: string) => void;
-  onDragOver: (k: string) => void;
+  onDrop: (k: string, insertAt?: number | null) => void;
+  onDragOver: (k: string, insertAt?: number | null) => void;
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
   onToggleDone: (id: string) => void;
@@ -1378,6 +1498,7 @@ function MonthGrid({
                   dailyCap={dailyCap}
                   drag={drag}
                   dropKey={dropKey}
+                  dropIndex={dropIndex}
                   onDragStart={onDragStart}
                   onDragEnd={onDragEnd}
                   onDrop={onDrop}
@@ -1628,7 +1749,7 @@ function PlanDrawer({
   if (drawer.type === "item") {
     const item = items.find((i) => i.id === drawer.itemId);
     if (!item) return null;
-    return <ItemDrawer item={item} plan={plan} dailyCap={dailyCap} modes={modes} items={items} onClose={onClose} mutate={mutate} />;
+    return <ItemDrawer key={item.id} item={item} plan={plan} dailyCap={dailyCap} modes={modes} items={items} onClose={onClose} mutate={mutate} />;
   }
   if (drawer.type === "day") {
     return (
@@ -1657,6 +1778,33 @@ function PlanDrawer({
       mutate={mutate}
       onCreateTask={() => {}}
     />
+  );
+}
+
+function PriorityField({
+  value,
+  onChange,
+}: {
+  value: PlanPriority;
+  onChange: (p: PlanPriority) => void;
+}) {
+  return (
+    <div className="fld">
+      <label>Приоритет</label>
+      <div className="prio-sel">
+        {PLAN_PRIORITIES.map((p) => (
+          <button
+            key={p}
+            type="button"
+            className={`prio-opt prio-opt--${PLAN_PRIORITY_UI[p].css}${value === p ? " on" : ""}`}
+            onClick={() => onChange(p)}
+          >
+            <span className={`prio-dot prio-dot--${PLAN_PRIORITY_UI[p].css}`} />
+            {PLAN_PRIORITY_UI[p].label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1690,6 +1838,7 @@ function CreateDrawer({
   const [time, setTime] = useState("11:00");
   const [duration, setDuration] = useState("1 ч");
   const [durationInput, setDurationInput] = useState("2");
+  const [priority, setPriority] = useState<PlanPriority>(3);
   const snap = structuredClone(plan);
 
   const kinds: [CreateKind, string][] = [
@@ -1719,6 +1868,7 @@ function CreateDrawer({
             project_id: projectId || null,
             plan_date: planDate,
             planned_minutes: mins,
+            priority,
           }),
         planDate ? `Задача поставлена на ${fmtWeekday(parseYmd(planDate))}` : "Задача добавлена в бэклог",
         snap
@@ -1736,6 +1886,7 @@ function CreateDrawer({
             plan_date: day,
             event_time: time,
             duration_label: duration,
+            priority,
           }),
         `${kind === "call" ? "Созвон" : "Событие"} добавлен на ${fmtWeekday(parseYmd(day))}`,
         snap
@@ -1804,6 +1955,7 @@ function CreateDrawer({
               <label>Сколько времени (часы или минуты)</label>
               <input type="text" value={durationInput} onChange={(e) => setDurationInput(e.target.value)} placeholder="2 ч или 90 мин" />
             </div>
+            <PriorityField value={priority} onChange={setPriority} />
             <div className="fld">
               <label>День</label>
               <PlanDateInput value={day} onChange={setDay} />
@@ -1848,6 +2000,7 @@ function CreateDrawer({
                 ))}
               </select>
             </div>
+            <PriorityField value={priority} onChange={setPriority} />
             <p className="dr-note">Событие отображается выше рабочих слотов; часы входят в сумму дня.</p>
           </>
         ) : (
@@ -1904,6 +2057,7 @@ function ItemDrawer({
   );
   const [time, setTime] = useState(item.event_time ?? "11:00");
   const [durLabel, setDurLabel] = useState(item.duration_label ?? "1 ч");
+  const [priority, setPriority] = useState<PlanPriority>(normalizePlanPriority(item.priority));
   const snap = structuredClone(plan);
   const activeProj = plan.projects.filter((p) => p.dispatchWorkStatus !== "done");
 
@@ -1918,6 +2072,7 @@ function ItemDrawer({
             project_id: projectId || null,
             plan_date: day === "__backlog__" || !day ? null : day,
             planned_minutes: mins,
+            priority,
           }),
         `«${title}» обновлён`,
         snap
@@ -1930,6 +2085,7 @@ function ItemDrawer({
             plan_date: day || null,
             event_time: time,
             duration_label: durLabel,
+            priority,
           }),
         `«${title}» обновлён`,
         snap
@@ -2001,6 +2157,7 @@ function ItemDrawer({
               <label>Сколько времени</label>
               <input type="text" value={durationInput} onChange={(e) => setDurationInput(e.target.value)} placeholder="2 ч или 90 мин" />
             </div>
+            <PriorityField value={priority} onChange={setPriority} />
             <div className="fld">
               <label>День</label>
               <PlanDateInput value={day === "__backlog__" ? "" : day} onChange={setDay} />
@@ -2029,6 +2186,7 @@ function ItemDrawer({
                 ))}
               </select>
             </div>
+            <PriorityField value={priority} onChange={setPriority} />
           </>
         )}
         <p className="dr-note">

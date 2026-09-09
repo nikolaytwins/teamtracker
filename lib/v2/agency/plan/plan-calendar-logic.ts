@@ -1,6 +1,35 @@
-import type { PlanDayMode, PlanItemRow, PlanProjectView } from "@/lib/v2/agency/plan/plan-types";
+import type {
+  PlanDayMode,
+  PlanItemRow,
+  PlanPriority,
+  PlanProjectView,
+} from "@/lib/v2/agency/plan/plan-types";
 import { displayHoursFromMinutes, parseYmd, toYmd } from "@/lib/v2/agency/plan/plan-utils";
 import type { DispatchWorkStatus } from "@/lib/v2/agency/dispatch/dispatch-work-status";
+
+export const PLAN_PRIORITIES: PlanPriority[] = [1, 2, 3, 4];
+
+export const PLAN_PRIORITY_UI: Record<
+  PlanPriority,
+  { label: string; short: string; css: string }
+> = {
+  1: { label: "Критичный", short: "P1", css: "p1" },
+  2: { label: "Высокий", short: "P2", css: "p2" },
+  3: { label: "Обычный", short: "P3", css: "p3" },
+  4: { label: "Низкий", short: "P4", css: "p4" },
+};
+
+export function normalizePlanPriority(value: unknown): PlanPriority {
+  const n = Number(value);
+  if (n === 1 || n === 2 || n === 3 || n === 4) return n;
+  return 3;
+}
+
+export function comparePlanItems(a: PlanItemRow, b: PlanItemRow): number {
+  const byOrder = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  if (byOrder !== 0) return byOrder;
+  return a.id.localeCompare(b.id);
+}
 
 export const STATUS_UI: Record<
   DispatchWorkStatus,
@@ -40,7 +69,9 @@ export function dmode(modes: Map<string, PlanDayMode>, dateKey: string): DayMode
 }
 
 export function tasksOnDay(items: PlanItemRow[], dateKey: string): PlanItemRow[] {
-  return items.filter((it) => it.kind === "task" && it.plan_date === dateKey);
+  return items
+    .filter((it) => it.kind === "task" && it.plan_date === dateKey)
+    .sort(comparePlanItems);
 }
 
 export function eventsOnDay(items: PlanItemRow[], dateKey: string): PlanItemRow[] {

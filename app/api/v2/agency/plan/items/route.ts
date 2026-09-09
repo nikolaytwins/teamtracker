@@ -19,6 +19,8 @@ export async function POST(request: NextRequest) {
       planned_minutes: body.planned_minutes ?? null,
       event_time: body.event_time ?? null,
       duration_label: body.duration_label ?? null,
+      sort_order: body.sort_order ?? null,
+      priority: body.priority ?? null,
     });
     return NextResponse.json({ item });
   } catch (error) {

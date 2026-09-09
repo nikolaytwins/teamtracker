@@ -5,6 +5,9 @@ export type PlanDayMode = "strategy" | "creative" | "rest";
 
 export type PlanItemKind = "task" | "call" | "personal";
 
+/** 1 критичный · 2 высокий · 3 обычный · 4 низкий */
+export type PlanPriority = 1 | 2 | 3 | 4;
+
 export type LoadStatus = "active" | "passive" | "pause";
 
 export type PlanItemRow = {
@@ -17,6 +20,7 @@ export type PlanItemRow = {
   event_time: string | null;
   duration_label: string | null;
   sort_order: number;
+  priority: PlanPriority;
   completed_at: string | null;
 };
 

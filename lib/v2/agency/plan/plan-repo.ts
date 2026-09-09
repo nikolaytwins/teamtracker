@@ -1,6 +1,7 @@
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
 import { newV2Id } from "@/lib/v2/db/client";
-import type { PlanDayMode, PlanItemKind, PlanItemRow } from "@/lib/v2/agency/plan/plan-types";
+import type { PlanDayMode, PlanItemKind, PlanItemRow, PlanPriority } from "@/lib/v2/agency/plan/plan-types";
+import { normalizePlanPriority } from "@/lib/v2/agency/plan/plan-calendar-logic";
 import type { V2SessionContext } from "@/lib/v2/types";
 
 function mapItem(row: Record<string, unknown>): PlanItemRow {
@@ -14,6 +15,7 @@ function mapItem(row: Record<string, unknown>): PlanItemRow {
     event_time: row.event_time ? String(row.event_time) : null,
     duration_label: row.duration_label ? String(row.duration_label) : null,
     sort_order: Number(row.sort_order) || 0,
+    priority: normalizePlanPriority(row.priority),
     completed_at: row.completed_at ? String(row.completed_at) : null,
   };
 }
@@ -24,7 +26,9 @@ export async function listPlanItems(
   to?: string
 ): Promise<PlanItemRow[]> {
   const sb = createSupabaseServiceClient();
-  const selectWithDone =
+  const selectFull =
+    "id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order, priority, completed_at";
+  const selectNoPriority =
     "id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order, completed_at";
   const selectBasic =
     "id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order";
@@ -40,7 +44,10 @@ export async function listPlanItems(
     return q;
   };
 
-  let { data, error } = await run(selectWithDone);
+  let { data, error } = await run(selectFull);
+  if (error && (error.code === "42703" || /priority/i.test(error.message))) {
+    ({ data, error } = await run(selectNoPriority));
+  }
   // Миграция 079 ещё не применена — грузим без completed_at
   if (error && (error.code === "42703" || /completed_at/i.test(error.message))) {
     ({ data, error } = await run(selectBasic));
@@ -90,12 +97,34 @@ export type PlanItemInput = {
   planned_minutes?: number | null;
   event_time?: string | null;
   duration_label?: string | null;
+  sort_order?: number | null;
+  priority?: PlanPriority | null;
   completed_at?: string | null;
 };
+
+async function nextSortOrder(
+  ctx: V2SessionContext,
+  planDate: string | null | undefined
+): Promise<number> {
+  if (!planDate) return 0;
+  const sb = createSupabaseServiceClient();
+  const { data } = await sb
+    .from("agency_plan_item")
+    .select("sort_order")
+    .eq("user_id", ctx.userId)
+    .eq("plan_date", planDate)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (Number(data?.sort_order) || 0) + 1;
+}
 
 export async function createPlanItem(ctx: V2SessionContext, input: PlanItemInput): Promise<PlanItemRow> {
   const sb = createSupabaseServiceClient();
   const id = newV2Id();
+  const sort_order =
+    input.sort_order != null ? Number(input.sort_order) : await nextSortOrder(ctx, input.plan_date);
+  const priority = normalizePlanPriority(input.priority ?? 3);
   const row = {
     id,
     user_id: ctx.userId,
@@ -106,11 +135,21 @@ export async function createPlanItem(ctx: V2SessionContext, input: PlanItemInput
     planned_minutes: input.planned_minutes ?? null,
     event_time: input.event_time ?? null,
     duration_label: input.duration_label ?? null,
-    sort_order: 0,
+    sort_order,
+    priority,
   };
   const { data, error } = await sb.from("agency_plan_item").insert(row).select().single();
-  if (error) throw error;
-  return mapItem(data as Record<string, unknown>);
+  if (error) {
+    // Миграция 080 ещё не применена
+    if (error.code === "42703" || /priority/i.test(error.message)) {
+      const { priority: _drop, ...withoutPriority } = row;
+      const retry = await sb.from("agency_plan_item").insert(withoutPriority).select().single();
+      if (retry.error) throw retry.error;
+      return mapItem(retry.data as unknown as Record<string, unknown>);
+    }
+    throw error;
+  }
+  return mapItem(data as unknown as Record<string, unknown>);
 }
 
 export async function updatePlanItem(
@@ -127,6 +166,8 @@ export async function updatePlanItem(
   if (patch.planned_minutes !== undefined) body.planned_minutes = patch.planned_minutes;
   if (patch.event_time !== undefined) body.event_time = patch.event_time;
   if (patch.duration_label !== undefined) body.duration_label = patch.duration_label;
+  if (patch.sort_order !== undefined) body.sort_order = patch.sort_order;
+  if (patch.priority !== undefined) body.priority = normalizePlanPriority(patch.priority);
   if (patch.completed_at !== undefined) body.completed_at = patch.completed_at;
 
   const { data, error } = await sb
@@ -136,8 +177,33 @@ export async function updatePlanItem(
     .eq("user_id", ctx.userId)
     .select()
     .single();
-  if (error) throw error;
-  return mapItem(data as Record<string, unknown>);
+  if (error) {
+    if ((error.code === "42703" || /priority/i.test(error.message)) && "priority" in body) {
+      const { priority: _drop, ...withoutPriority } = body;
+      const retry = await sb
+        .from("agency_plan_item")
+        .update(withoutPriority)
+        .eq("id", id)
+        .eq("user_id", ctx.userId)
+        .select()
+        .single();
+      if (retry.error) throw retry.error;
+      return mapItem(retry.data as unknown as Record<string, unknown>);
+    }
+    throw error;
+  }
+  return mapItem(data as unknown as Record<string, unknown>);
+}
+
+export async function reorderPlanItemsOnDay(
+  ctx: V2SessionContext,
+  planDate: string,
+  orderedIds: string[]
+): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i += 1) {
+    const id = orderedIds[i]!;
+    await updatePlanItem(ctx, id, { plan_date: planDate, sort_order: i });
+  }
 }
 
 export async function deletePlanItem(ctx: V2SessionContext, id: string): Promise<void> {

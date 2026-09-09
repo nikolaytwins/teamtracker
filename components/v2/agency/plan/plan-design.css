@@ -57,6 +57,41 @@
 .plan-v3 .slot{background:color-mix(in srgb,var(--c) 15%,#fff)}
 .plan-v3 .slot:hover{background:color-mix(in srgb,var(--c) 24%,#fff)}
 .plan-v3 .slot-m{color:color-mix(in srgb,var(--c) 74%,var(--ink-700))}
+.plan-v3 .slot--p1,.plan-v3 .mchip--p1{--c:#E5604D}
+.plan-v3 .slot--p2,.plan-v3 .mchip--p2{--c:#F59E0B}
+.plan-v3 .slot--p3,.plan-v3 .mchip--p3{--c:#2A56EB}
+.plan-v3 .slot--p4,.plan-v3 .mchip--p4{--c:#A1A1AA}
+.plan-v3 .slot-wrap{display:flex;flex-direction:column;gap:0}
+.plan-v3 .slot-drop-line{
+  height:3px;margin:2px 2px 4px;border-radius:99px;
+  background:var(--brand-500);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand-500) 18%,transparent);
+}
+.plan-v3 .prio-dot{
+  display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:6px;
+  vertical-align:middle;flex-shrink:0;
+  background:var(--c, var(--brand-500));
+}
+.plan-v3 .prio-dot--p1{--c:#E5604D;background:#E5604D}
+.plan-v3 .prio-dot--p2{--c:#F59E0B;background:#F59E0B}
+.plan-v3 .prio-dot--p3{--c:#2A56EB;background:#2A56EB}
+.plan-v3 .prio-dot--p4{--c:#A1A1AA;background:#A1A1AA}
+.plan-v3 .slot-n{display:flex;align-items:flex-start}
+.plan-v3 .prio-sel{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.plan-v3 .prio-opt{
+  display:flex;align-items:center;gap:8px;border:1px solid var(--ink-100);
+  background:#fff;border-radius:12px;padding:10px 12px;cursor:pointer;
+  font-size:13px;font-weight:550;color:var(--ink-700);text-align:left;
+}
+.plan-v3 .prio-opt:hover{border-color:var(--ink-200);background:var(--ink-50)}
+.plan-v3 .prio-opt.on{border-color:color-mix(in srgb,var(--c,#2A56EB) 55%,var(--ink-200));background:color-mix(in srgb,var(--c,#2A56EB) 10%,#fff);color:var(--ink-900)}
+.plan-v3 .prio-opt--p1{--c:#E5604D}
+.plan-v3 .prio-opt--p2{--c:#F59E0B}
+.plan-v3 .prio-opt--p3{--c:#2A56EB}
+.plan-v3 .prio-opt--p4{--c:#A1A1AA}
+.plan-v3 .mchip-row--p1 .mchip,.plan-v3 .mchip--p1{background:color-mix(in srgb,#E5604D 14%,#fff)}
+.plan-v3 .mchip-row--p2 .mchip,.plan-v3 .mchip--p2{background:color-mix(in srgb,#F59E0B 16%,#fff)}
+.plan-v3 .mchip-row--p3 .mchip,.plan-v3 .mchip--p3{background:color-mix(in srgb,#2A56EB 12%,#fff)}
+.plan-v3 .mchip-row--p4 .mchip,.plan-v3 .mchip--p4{background:color-mix(in srgb,#A1A1AA 16%,#fff)}
 .plan-v3 .mchip{background:color-mix(in srgb,var(--c) 15%,#fff)}
 .plan-v3 .mchip:hover{background:color-mix(in srgb,var(--c) 24%,#fff)}
 
