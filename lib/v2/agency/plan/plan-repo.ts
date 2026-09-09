@@ -53,7 +53,7 @@ export async function listPlanItems(
     }
     throw error;
   }
-  return (data ?? []).map((r) => mapItem(r as Record<string, unknown>));
+  return (data ?? []).map((r) => mapItem(r as unknown as Record<string, unknown>));
 }
 
 export async function listPlanDayModes(
