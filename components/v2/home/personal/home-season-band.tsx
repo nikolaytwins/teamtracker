@@ -128,13 +128,22 @@ function groupTasksByPriority(tasks: TaskView[]): PriorityTaskGroup[] {
 
 function TaskBullets({ items, tone }: { items: string[]; tone: "default" | "on-blue" }) {
   return (
-    <ul
-      className={`v2-tight space-y-1.5 pl-4 text-[13.5px] leading-snug ${
-        tone === "on-blue" ? "text-white/85 marker:text-white/50" : "text-[var(--v2-ink-600)] marker:text-[var(--v2-ink-300)]"
-      } list-disc`}
-    >
+    <ul className="space-y-1.5">
       {items.map((item) => (
-        <li key={item}>{item}</li>
+        <li
+          key={item}
+          className={`v2-tight flex gap-2.5 text-[13.5px] leading-snug ${
+            tone === "on-blue" ? "text-white/85" : "text-[var(--v2-ink-600)]"
+          }`}
+        >
+          <span
+            className={`mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full ${
+              tone === "on-blue" ? "bg-white/45" : "bg-[var(--v2-ink-300)]"
+            }`}
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1 whitespace-pre-wrap">{item}</span>
+        </li>
       ))}
     </ul>
   );
@@ -219,7 +228,7 @@ function SeasonTaskCard({
                   aria-hidden
                 />
               ) : null}
-              <span className="min-w-0 flex-1">{task.text}</span>
+              <span className="min-w-0 flex-1 whitespace-pre-wrap">{task.text}</span>
             </button>
           </div>
           {hasDetails ? (
@@ -249,7 +258,7 @@ function SeasonTaskCard({
           >
             {task.note ? (
               <p
-                className={`v2-tight text-[13px] leading-relaxed ${
+                className={`v2-tight whitespace-pre-wrap text-[13px] leading-relaxed ${
                   task.done ? "text-white/80" : "text-[var(--v2-ink-500)]"
                 }`}
               >
@@ -289,7 +298,7 @@ function SeasonTaskCard({
             ) : null}
             {task.doneWhen ? (
               <p
-                className={`v2-tight rounded-xl px-3 py-2.5 text-[13px] leading-snug ${
+                className={`v2-tight whitespace-pre-wrap rounded-xl px-3 py-2.5 text-[13px] leading-snug ${
                   task.done
                     ? "bg-white/10 text-white/90"
                     : "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-100"
