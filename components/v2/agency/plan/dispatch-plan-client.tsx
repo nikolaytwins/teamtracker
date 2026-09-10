@@ -1488,8 +1488,7 @@ function DayCell({
                   >
                     <DoneToggle done={done} onToggle={() => onToggleDone(t.id)} />
                     <button type="button" className="slot-main" onClick={() => onOpenItem(t.id)}>
-                      <span className="slot-n">
-                        <span className={`prio-dot prio-dot--${PLAN_PRIORITY_UI[pri].css}`} title={PLAN_PRIORITY_UI[pri].label} />
+                      <span className="slot-n" title={PLAN_PRIORITY_UI[pri].label}>
                         <span className="slot-n-text">{t.title}</span>
                       </span>
                       <span className="slot-m tnum">
