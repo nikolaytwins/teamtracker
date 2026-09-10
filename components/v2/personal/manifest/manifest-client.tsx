@@ -308,15 +308,15 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex max-w-[1720px] flex-col gap-7 px-9 pb-24 pt-7">
-        <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,620px)]">
-          <div className="flex min-h-[430px] flex-col justify-center gap-2.5 px-8 py-8">
+        <div className="flex flex-col gap-5">
+          <section className="v2-card px-8 py-8">
             <Kicker>Еженедельный код · личный план</Kicker>
             <h1 className="v2-tight mt-1 text-[40px] font-semibold leading-[1.08] tracking-[-0.036em] text-[var(--v2-ink-900)]">
               {doc.title}
             </h1>
             {doc.lead ? (
               <div
-                className="mt-4 max-w-[880px] rounded-[20px] px-7 py-6 text-white"
+                className="mt-5 max-w-[920px] rounded-[20px] px-7 py-6 text-white"
                 style={{ background: HERO_BLUE, boxShadow: "0 16px 40px -18px rgba(45,94,239,0.85)" }}
               >
                 <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-white/60">
@@ -327,40 +327,17 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
                 </p>
               </div>
             ) : null}
-            <div className="mt-4 flex flex-wrap gap-2.5">
-              {["Читаю раз в неделю", "Заканчивается действием", `${doc.chapters.length} глав`].map((chip) => (
-                <span
-                  key={chip}
-                  className="v2-tight rounded-[10px] bg-[var(--v2-ink-50)] px-3.5 py-2 text-[13.5px] font-medium text-[var(--v2-ink-600)]"
-                >
-                  {chip}
-                </span>
-              ))}
-            </div>
-          </div>
+          </section>
 
-          <div className="relative hidden min-h-[430px] overflow-hidden lg:block">
+          <section className="v2-card overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={appPath("/wishes/ai-industry-hero.png")}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover object-[50%_32%]"
-              style={{
-                WebkitMaskImage:
-                  "linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 11%, rgba(0,0,0,0.82) 22%, #000 36%)",
-                maskImage:
-                  "linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 11%, rgba(0,0,0,0.82) 22%, #000 36%)",
-              }}
+              alt="Образ жизни, которую я строю"
+              className="block h-auto w-full"
             />
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 w-[34%]"
-              style={{
-                background:
-                  "linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.45) 52%, rgba(255,255,255,0) 100%)",
-              }}
-            />
-          </div>
-        </section>
+          </section>
+        </div>
 
         <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
           <section className="v2-card flex h-full flex-col px-7 py-6">
