@@ -53,17 +53,6 @@ function Kicker({ children, tint }: { children: ReactNode; tint?: string }) {
   );
 }
 
-function SectionHead({ title, sub }: { title: string; sub?: string }) {
-  return (
-    <div className="mb-[18px] flex flex-wrap items-baseline gap-3.5">
-      <h2 className="v2-tight text-[24px] font-semibold tracking-[-0.028em] text-[var(--v2-ink-900)]">
-        {title}
-      </h2>
-      {sub ? <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">{sub}</span> : null}
-    </div>
-  );
-}
-
 function Quote({ text, dark }: { text: string; dark?: boolean }) {
   if (dark) {
     return (
@@ -263,12 +252,12 @@ function ChapterCard({ chapter, dark }: { chapter: ManifestChapter; dark?: boole
           : undefined
       }
     >
-      <div className="mb-6 flex flex-wrap items-baseline gap-3.5">
+      <div className="mb-6">
         <Kicker tint={dark ? "rgba(147,180,253,.9)" : "var(--v2-brand-600)"}>
           Глава {String(chapter.index).padStart(2, "0")}
         </Kicker>
         <h2
-          className={`v2-tight text-[26px] font-semibold tracking-[-0.03em] ${
+          className={`v2-tight mt-2 text-[26px] font-semibold tracking-[-0.03em] ${
             dark ? "text-white" : "text-[var(--v2-ink-900)]"
           }`}
         >
@@ -339,27 +328,14 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
           </section>
         </div>
 
-        <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-          <section className="v2-card flex h-full flex-col px-7 py-6">
-            <SectionHead title="Направление" sub="Не обязательное будущее, а вектор" />
-            {doc.vision.intro ? (
-              <p className="v2-tight mb-4 max-w-[86ch] text-[15.5px] leading-relaxed text-[var(--v2-ink-500)]">
-                <Inline text={doc.vision.intro} />
-              </p>
-            ) : null}
-            <BulletTiles items={doc.vision.items} />
-            {doc.vision.outro ? (
-              <p className="v2-tight mt-4 max-w-[86ch] text-[15.5px] leading-relaxed text-[var(--v2-ink-600)]">
-                <Inline text={doc.vision.outro} />
-              </p>
-            ) : null}
-          </section>
-
-          <section className="v2-card flex h-full flex-col px-7 py-6">
-            <SectionHead title={doc.howTo.title} sub="ритуал недели" />
-            <Blocks blocks={doc.howTo.blocks} />
-          </section>
-        </div>
+        <section
+          className="rounded-[20px] px-8 py-7 text-white"
+          style={{ background: HERO_BLUE, boxShadow: "0 16px 40px -18px rgba(45,94,239,0.85)" }}
+        >
+          <p className="v2-tight text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] sm:text-[30px]">
+            Манифест заканчивается действием. Иначе он не работает.
+          </p>
+        </section>
 
         <nav className="v2-card sticky top-0 z-10 flex flex-wrap gap-1.5 px-4 py-3">
           {doc.chapters.map((c) => (
