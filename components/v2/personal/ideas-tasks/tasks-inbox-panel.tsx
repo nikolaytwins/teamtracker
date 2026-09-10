@@ -81,6 +81,7 @@ type TaskListProps = {
   onAssignFocus: (todo: PersonalTodoRow) => void;
   onToIdea: (todo: PersonalTodoRow) => void;
   onMoveSection: (todo: PersonalTodoRow, section: PersonalTodoInboxSection) => void;
+  onDelete: (todo: PersonalTodoRow) => void;
 };
 
 function TaskList({
@@ -95,6 +96,7 @@ function TaskList({
   onAssignFocus,
   onToIdea,
   onMoveSection,
+  onDelete,
 }: TaskListProps) {
   function projectLabel(todo: PersonalTodoRow) {
     return todo.project_name && todo.project_id !== inboxProjectId ? todo.project_name : "без проекта";
@@ -191,6 +193,17 @@ function TaskList({
                   }}
                 >
                   ⋯
+                </button>
+                <button
+                  type="button"
+                  className="iconbtn tip"
+                  data-tip="Удалить"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void onDelete(todo);
+                  }}
+                >
+                  ⌫
                 </button>
               </div>
             </div>
@@ -424,17 +437,21 @@ export function TasksInboxPanel({
     }
   }
 
-  async function deleteTask() {
-    if (!selected) return;
-    const titleSaved = selected.title;
+  async function deleteTaskRow(todo: PersonalTodoRow) {
+    const titleSaved = todo.title;
     try {
-      await fetchJson(`/api/v2/personal/todos/${selected.id}`, { method: "DELETE" });
-      setSelected(null);
+      await fetchJson(`/api/v2/personal/todos/${todo.id}`, { method: "DELETE" });
+      if (selected?.id === todo.id) setSelected(null);
       await reload();
       flash(`«${titleSaved}» удалена`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось удалить");
     }
+  }
+
+  async function deleteTask() {
+    if (!selected) return;
+    await deleteTaskRow(selected);
   }
 
   const taskListProps = {
@@ -446,6 +463,7 @@ export function TasksInboxPanel({
     onAssignFocus: assignFocus,
     onToIdea: toIdea,
     onMoveSection: moveSection,
+    onDelete: deleteTaskRow,
   };
 
   return (

@@ -61,6 +61,19 @@
 .plan-v3 .slot--p2,.plan-v3 .mchip--p2{--c:#F59E0B}
 .plan-v3 .slot--p3,.plan-v3 .mchip--p3{--c:#2A56EB}
 .plan-v3 .slot--p4,.plan-v3 .mchip--p4{--c:#A1A1AA}
+.plan-v3 .slot--me,.plan-v3 .mchip--me{--c:#DB2777}
+.plan-v3 .slot--call,.plan-v3 .mchip--call{--c:#2A56EB}
+.plan-v3 .mchip-row--me .mchip,.plan-v3 .mchip--me{background:color-mix(in srgb,#DB2777 14%,#fff)}
+.plan-v3 .mchip-row--call .mchip,.plan-v3 .mchip--call{background:color-mix(in srgb,#2A56EB 12%,#fff)}
+.plan-v3 .mchip--me:hover{background:color-mix(in srgb,#DB2777 22%,#fff)}
+.plan-v3 .mchip--call:hover{background:color-mix(in srgb,#2A56EB 22%,#fff)}
+.plan-v3 .mchip.is-done .mchip-n{
+  text-decoration:line-through;
+  text-decoration-thickness:1.5px;
+  text-decoration-color:color-mix(in srgb,var(--ink-500) 55%,transparent);
+  color:var(--ink-500);
+}
+.plan-v3 .mchip.is-done{opacity:.78}
 .plan-v3 .slot-wrap{display:flex;flex-direction:column;gap:0}
 .plan-v3 .slot-drop-line{
   height:3px;margin:2px 2px 4px;border-radius:99px;

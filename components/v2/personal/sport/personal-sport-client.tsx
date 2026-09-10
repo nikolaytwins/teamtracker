@@ -17,6 +17,11 @@ const TABS: [SportView, string][] = [
   ["strategy", "Стратегия"],
 ];
 
+const SP_REFS = [
+  "https://txgktbegrknxsqfgrfjo.supabase.co/storage/v1/object/public/v2-attachments/wishes/d57c31f5-1dd9-42e4-ae36-ecdc0be68b9a/1787595205289-hq33zk-IMG_7920%202.PNG",
+  "https://txgktbegrknxsqfgrfjo.supabase.co/storage/v1/object/public/v2-attachments/wishes/f7241360-ad12-44b7-8bdc-f6dd10ae794b/1787597280168-xaglvg-1777065433270-dtv6z4pu.png",
+] as const;
+
 function SpKpi({
   label,
   value,
@@ -33,16 +38,16 @@ function SpKpi({
   good?: "down" | "up" | "none";
 }) {
   return (
-    <div className="min-w-[112px] flex-1 rounded-2xl border border-[var(--v2-ink-100)]/90 bg-white/92 px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_20px_-14px_rgba(16,24,40,0.12)] backdrop-blur-[2px]">
-      <SpKick>{label}</SpKick>
-      <div className="mt-2 flex items-baseline gap-1 whitespace-nowrap">
-        <span className="v2-tighter v2-tnum text-[24px] font-semibold leading-none tracking-tight text-[var(--v2-ink-900)]">
+    <div className="rounded-[18px] bg-[var(--v2-ink-50)] px-4 py-3.5">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">{label}</div>
+      <div className="mt-2.5 flex items-baseline gap-1.5 whitespace-nowrap">
+        <span className="v2-tighter v2-tnum text-[26px] font-semibold leading-none tracking-tight text-[var(--v2-ink-900)] sm:text-[28px]">
           {value}
         </span>
-        <span className="text-[12px] font-medium text-[var(--v2-ink-400)]">{unit}</span>
+        <span className="text-[13px] font-medium text-[var(--v2-ink-400)]">{unit}</span>
       </div>
       <div className="mt-2">
-        <SpDelta v={delta} d={dec} good={good} />
+        <SpDelta v={delta} d={dec} good={good} size="13.5px" />
       </div>
     </div>
   );
@@ -65,41 +70,18 @@ function SpBanner({
   const pp = fatPct(prev);
 
   return (
-    <SpCard className="relative overflow-hidden">
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 w-[min(62%,560px)] min-w-[220px] sm:min-w-[280px]"
-        aria-hidden
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={appPath("/sport/hero-banner.png")}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ objectPosition: "78% 18%" }}
-        />
-        <div
-          className="absolute inset-y-0 left-0 w-[62%]"
-          style={{
-            background:
-              "linear-gradient(90deg, #ffffff 0%, rgba(255,255,255,0.96) 14%, rgba(255,255,255,0.72) 36%, rgba(255,255,255,0.28) 58%, rgba(255,255,255,0) 100%)",
-          }}
-        />
-      </div>
-      <div
-        className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-[min(52%,480px)]"
-        aria-hidden
-        style={{
-          background:
-            "linear-gradient(90deg, #ffffff 0%, rgba(255,255,255,0.88) 55%, rgba(255,255,255,0) 100%)",
-        }}
-      />
-
-      <div className="relative z-10 min-w-0 max-w-[min(100%,720px)] px-7 py-6 pr-[min(30%,180px)] sm:pr-[min(34%,220px)]">
-        <SpKick className="text-[var(--v2-brand-600)]">Спорт · {weekLabel}</SpKick>
-        <h1 className="v2-tighter v2-tnum mt-2 whitespace-nowrap text-[22px] font-semibold leading-none tracking-tight text-[var(--v2-ink-900)] sm:text-[24px]">
-          {verdict.head || "Спорт"}
-        </h1>
-        <div className="mt-5 grid max-w-[560px] grid-cols-2 gap-2.5 sm:grid-cols-4">
+    <SpCard className="grid overflow-hidden lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.95fr)]">
+      <div className="relative z-10 flex min-h-[300px] flex-col justify-center gap-5 px-7 py-7 sm:min-h-[340px] sm:px-8 sm:py-8 lg:min-h-[380px]">
+        <div>
+          <SpKick className="text-[var(--v2-brand-600)]">Спорт · {weekLabel}</SpKick>
+          <h1 className="v2-tighter v2-tnum mt-3 text-[26px] font-semibold leading-[1.15] tracking-tight text-[var(--v2-ink-900)] sm:text-[32px]">
+            {verdict.head || "Спорт"}
+          </h1>
+          {verdict.sub ? (
+            <p className="mt-2 max-w-[34rem] text-[14.5px] leading-relaxed text-[var(--v2-ink-500)]">{verdict.sub}</p>
+          ) : null}
+        </div>
+        <div className="grid max-w-[640px] grid-cols-2 gap-3 sm:grid-cols-4">
           <SpKpi label="Средний вес" value={n1(cur?.w)} unit="кг" delta={d("w")} good="up" />
           <SpKpi label="Жир" value={n1(cur?.f)} unit="кг" delta={d("f")} good="down" dec={2} />
           <SpKpi label="Безжировая" value={n1(cur?.l)} unit="кг" delta={d("l")} good="up" />
@@ -111,6 +93,21 @@ function SpBanner({
             good="down"
           />
         </div>
+      </div>
+      <div className="relative hidden min-h-[320px] overflow-hidden lg:block lg:min-h-[380px]" aria-hidden>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={appPath("/sport/hero-banner.png")}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: "72% 16%" }}
+        />
+        <div
+          className="absolute inset-y-0 left-0 w-[22%]"
+          style={{
+            background: "linear-gradient(90deg, #ffffff 0%, rgba(255,255,255,0.55) 45%, rgba(255,255,255,0) 100%)",
+          }}
+        />
       </div>
     </SpCard>
   );
@@ -174,42 +171,20 @@ function SpGoal({ cur }: { cur: ReturnType<typeof spAvg> }) {
       <SpCard className="p-4">
         <div className="mb-3 flex items-center gap-2 px-1">
           <SpKick>Референсы</SpKick>
-          <span className="text-[12px] text-[var(--v2-ink-400)]">фото прогресса — скоро</span>
         </div>
         <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))" }}>
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="flex aspect-[3/4] items-center justify-center rounded-xl bg-[var(--v2-ink-50)] text-[13px] text-[var(--v2-ink-400)]"
-            >
-              Референс {i}
+          {SP_REFS.map((src, i) => (
+            <div key={src} className="overflow-hidden rounded-xl bg-[var(--v2-ink-50)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt={`Референс ${i + 1}`}
+                className="aspect-[3/4] w-full object-cover object-top"
+              />
             </div>
           ))}
         </div>
       </SpCard>
-    </div>
-  );
-}
-
-function SpPhotos({ weeks }: { weeks: SportWeek[] }) {
-  return (
-    <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(170px,1fr))" }}>
-      {weeks.map((wk) => {
-        const a = spAvg(wk);
-        return (
-          <SpCard key={wk.id} className="p-3">
-            <div className="flex aspect-[3/4] items-center justify-center rounded-xl bg-[var(--v2-ink-50)] text-[12px] text-[var(--v2-ink-400)]">
-              {wk.label}
-            </div>
-            <div className="mt-2.5 px-0.5 leading-tight">
-              <div className="v2-tight truncate text-[13px] font-medium text-[var(--v2-ink-900)]">{wk.label}</div>
-              <div className="v2-tnum mt-0.5 whitespace-nowrap text-[12.5px] text-[var(--v2-ink-500)]">
-                {n1(a?.w)} кг · {n1(fatPct(a))}%
-              </div>
-            </div>
-          </SpCard>
-        );
-      })}
     </div>
   );
 }
@@ -331,7 +306,7 @@ export function PersonalSportClient() {
         {saving ? <span className="ml-auto text-[12px] text-[var(--v2-ink-400)]">Сохранение…</span> : null}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-9 px-8 pb-16 pt-2 max-w-[1240px]">
+      <div className="flex min-w-0 flex-1 flex-col gap-9 px-8 pb-16 pt-2 max-w-[1400px]">
         <SpBanner
           cur={cur}
           prev={prev}
@@ -346,9 +321,6 @@ export function PersonalSportClient() {
             </SpSect>
             <SpSect accent="#C2410C" title="К чему стремлюсь">
               <SpGoal cur={cur} />
-            </SpSect>
-            <SpSect accent="#0A0A0B" title="Фото недель">
-              <SpPhotos weeks={doc.weeks} />
             </SpSect>
           </>
         ) : null}

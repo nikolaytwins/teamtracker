@@ -143,12 +143,21 @@ function PlanDateInput({
   );
 }
 
-function eventMetaLabel(ev: PlanItemRow): string {
-  const parts: string[] = [];
-  if (ev.event_time) parts.push(ev.event_time);
-  if (ev.duration_label) parts.push(ev.duration_label);
-  else if (!ev.event_time && ev.planned_minutes != null) parts.push(hoursLabel(ev));
-  return parts.join(" · ");
+function eventTitleWithTime(ev: PlanItemRow): string {
+  const time = ev.event_time?.trim();
+  return time ? `${time} ${ev.title}` : ev.title;
+}
+
+function eventHoursMeta(ev: PlanItemRow): string {
+  if (ev.duration_label?.trim()) return ev.duration_label.trim();
+  if (ev.planned_minutes != null) return hoursLabel(ev);
+  return "";
+}
+
+function eventKindMeta(ev: PlanItemRow): string {
+  if (ev.kind === "personal") return "личное";
+  if (ev.kind === "call") return "созвон";
+  return "";
 }
 
 function WeekChecklistBar({
@@ -477,17 +486,6 @@ function DispatchPlanCalendar({
       }
     },
     [plan, reload, showToast]
-  );
-
-  const deleteItemQuick = useCallback(
-    async (id: string) => {
-      if (!plan) return;
-      const item = allItems(plan).find((i) => i.id === id);
-      if (!item) return;
-      const snap = structuredClone(plan);
-      await mutate(() => deletePlanItemApi(id), `«${item.title}» удалён`, snap);
-    },
-    [plan, mutate]
   );
 
   const onDropDay = async (dateKey: string, insertAt: number | null = null) => {
@@ -868,7 +866,6 @@ function DispatchPlanCalendar({
                           }}
                           onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
                           onToggleDone={toggleItemDone}
-                          onDeleteItem={deleteItemQuick}
                           onOpenDayType={(k) => setDrawer({ type: "day", dateKey: k })}
                           onAddTask={(k) => setDrawer({ type: "create", createKind: "task", day: k })}
                           compact={false}
@@ -903,7 +900,6 @@ function DispatchPlanCalendar({
                     }}
                     onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
                     onToggleDone={toggleItemDone}
-                    onDeleteItem={deleteItemQuick}
                     onOpenDayType={(k) => setDrawer({ type: "day", dateKey: k })}
                     onAddTask={(k) => setDrawer({ type: "create", createKind: "task", day: k })}
                     onWeekJump={(k) => {
@@ -1259,7 +1255,6 @@ function DayCell({
   onDragLeave,
   onOpenItem,
   onToggleDone,
-  onDeleteItem,
   onOpenDayType,
   onAddTask,
   compact,
@@ -1282,7 +1277,6 @@ function DayCell({
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
   onToggleDone: (id: string) => void;
-  onDeleteItem: (id: string) => void;
   onOpenDayType: (k: string) => void;
   onAddTask: (k: string) => void;
   compact: boolean;
@@ -1329,32 +1323,18 @@ function DayCell({
             </button>
           ) : null}
           {dayEvents.slice(0, 2).map((ev) => {
-            const meta = eventMetaLabel(ev);
+            const hours = eventHoursMeta(ev);
             const done = !!ev.completed_at;
             return (
-              <div key={ev.id} className={`mev-row${done ? " is-done" : ""}`}>
-                <button
-                  type="button"
-                  className={`mev${ev.kind === "personal" ? " mev--me" : ""}${done ? " is-done" : ""}`}
-                  onClick={() => onOpenItem(ev.id)}
-                >
-                  {ev.title}
-                  {meta ? <i>{meta}</i> : null}
-                </button>
-                <button
-                  type="button"
-                  className="ev-x"
-                  aria-label="Удалить"
-                  title="Удалить"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onDeleteItem(ev.id);
-                  }}
-                >
-                  ×
-                </button>
-              </div>
+              <button
+                key={ev.id}
+                type="button"
+                className={`mchip mchip--${ev.kind === "personal" ? "me" : "call"}${done ? " is-done" : ""}`}
+                onClick={() => onOpenItem(ev.id)}
+              >
+                <span className="mchip-n">{eventTitleWithTime(ev)}</span>
+                {hours ? <span className="mchip-h tnum">{hours}</span> : null}
+              </button>
             );
           })}
           {dayTasks.slice(0, 3).map((t) => {
@@ -1422,33 +1402,27 @@ function DayCell({
             </button>
           ) : null}
           {dayEvents.length > 0 && (
-            <div className="evs">
+            <div className="slots">
               {dayEvents.map((ev) => {
-                const meta = eventMetaLabel(ev);
                 const done = !!ev.completed_at;
+                const hours = eventHoursMeta(ev);
+                const kindMeta = eventKindMeta(ev);
                 return (
-                  <div key={ev.id} className={`ev-row${done ? " is-done" : ""}`}>
+                  <div
+                    key={ev.id}
+                    className={`slot slot--${ev.kind === "personal" ? "me" : "call"}${done ? " is-done" : ""}`}
+                  >
                     <DoneToggle done={done} onToggle={() => onToggleDone(ev.id)} />
-                    <button
-                      type="button"
-                      className={`ev${ev.kind === "personal" ? " ev--me" : ""}${done ? " is-done" : ""}`}
-                      onClick={() => onOpenItem(ev.id)}
-                    >
-                      {meta ? <span className="ev-t">{meta}</span> : null}
-                      <span className="ev-n">{ev.title}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="ev-x"
-                      aria-label="Удалить"
-                      title="Удалить"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onDeleteItem(ev.id);
-                      }}
-                    >
-                      ×
+                    <button type="button" className="slot-main" onClick={() => onOpenItem(ev.id)}>
+                      <span className="slot-n">
+                        <span className="slot-n-text">{eventTitleWithTime(ev)}</span>
+                      </span>
+                      {hours || kindMeta ? (
+                        <span className="slot-m tnum">
+                          {hours ? <span className="slot-h">{hours}</span> : null}
+                          {kindMeta ? <span>{kindMeta}</span> : null}
+                        </span>
+                      ) : null}
                     </button>
                   </div>
                 );
@@ -1577,7 +1551,6 @@ function MonthGrid({
   onDragLeave,
   onOpenItem,
   onToggleDone,
-  onDeleteItem,
   onOpenDayType,
   onAddTask,
   onWeekJump,
@@ -1598,7 +1571,6 @@ function MonthGrid({
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
   onToggleDone: (id: string) => void;
-  onDeleteItem: (id: string) => void;
   onOpenDayType: (k: string) => void;
   onAddTask: (k: string) => void;
   onWeekJump: (k: string) => void;
@@ -1662,7 +1634,6 @@ function MonthGrid({
                   onDragLeave={onDragLeave}
                   onOpenItem={onOpenItem}
                   onToggleDone={onToggleDone}
-                  onDeleteItem={onDeleteItem}
                   onOpenDayType={onOpenDayType}
                   onAddTask={onAddTask}
                   compact
