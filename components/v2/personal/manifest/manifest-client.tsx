@@ -1,116 +1,291 @@
 "use client";
 
-import "./manifest-design.css";
-import {
-  slugifyManifestHeading,
-  type ManifestTocItem,
+import { appPath } from "@/lib/api-url";
+import type {
+  ManifestBlock,
+  ManifestChapter,
+  ManifestDoc,
 } from "@/lib/v2/personal/manifest-shared";
-import Image from "next/image";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useEffect, useState, type ReactNode } from "react";
 
-function preserveSourceLineBreaks(md: string) {
-  return md.replace(/([^\n])\n(?!\n)/g, "$1  \n");
-}
+const HERO_BLUE = "#2d5eef";
 
-function textOf(node: ReactNode): string {
-  if (node == null || typeof node === "boolean") return "";
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(textOf).join("");
-  if (typeof node === "object" && "props" in node) {
-    const props = node.props as { children?: ReactNode };
-    return textOf(props.children);
-  }
-  return "";
-}
-
-function splitHeading(raw: string): { num: string | null; title: string } {
-  const m = /^([IVXLC]+)\.\s*(.+)$/i.exec(raw.trim());
-  if (!m) return { num: null, title: raw.trim() };
-  return { num: m[1]!.toUpperCase(), title: m[2]!.trim() };
-}
-
-function ManifestMarkdown({ source, oath }: { source: string; oath?: boolean }) {
+/** Инлайн-разметка исходника: **жирный**, *курсив*, `код`. */
+function Inline({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).filter(Boolean);
   return (
-    <div className={oath ? "manifest-prose manifest-oath" : "manifest-prose"}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          h1: ({ children }) => {
-            const raw = textOf(children);
-            const { num, title } = splitHeading(raw);
-            const id = slugifyManifestHeading(raw);
-            return (
-              <h1 id={id}>
-                {num ? <span className="mf-num">Глава {num}</span> : null}
-                {title}
-              </h1>
-            );
-          },
-          h2: ({ children }) => <h2>{children}</h2>,
-          h3: ({ children }) => <h3>{children}</h3>,
-          p: ({ children }) => <p>{children}</p>,
-          ul: ({ children, className }) => (
-            <ul className={className}>{children}</ul>
-          ),
-          ol: ({ children }) => <ol>{children}</ol>,
-          li: ({ children, className }) => (
-            <li className={className}>{children}</li>
-          ),
-          strong: ({ children }) => <strong>{children}</strong>,
-          em: ({ children }) => <em>{children}</em>,
-          hr: () => <hr />,
-          code: ({ children }) => <code>{children}</code>,
-          blockquote: ({ children }) => <blockquote>{children}</blockquote>,
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noreferrer">
-              {children}
-            </a>
-          ),
-          table: ({ children }) => (
-            <div className="overflow-x-auto">
-              <table>{children}</table>
-            </div>
-          ),
-          thead: ({ children }) => <thead>{children}</thead>,
-          tbody: ({ children }) => <tbody>{children}</tbody>,
-          tr: ({ children }) => <tr>{children}</tr>,
-          th: ({ children }) => <th>{children}</th>,
-          td: ({ children }) => <td>{children}</td>,
-          img: () => null,
-        }}
-      >
-        {preserveSourceLineBreaks(source)}
-      </ReactMarkdown>
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return (
+            <strong key={i} className="font-semibold">
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        if (part.startsWith("`") && part.endsWith("`")) {
+          return (
+            <code
+              key={i}
+              className="v2-tnum rounded-md bg-[var(--v2-ink-100)] px-1.5 py-0.5 text-[0.92em] text-[var(--v2-ink-800)]"
+            >
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+        if (part.startsWith("*") && part.endsWith("*")) {
+          return <em key={i}>{part.slice(1, -1)}</em>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+function Kicker({ children, tint }: { children: ReactNode; tint?: string }) {
+  return (
+    <span
+      className="text-[11.5px] font-semibold uppercase tracking-[0.13em]"
+      style={{ color: tint ?? "var(--v2-ink-400)" }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SectionHead({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="mb-[18px] flex flex-wrap items-baseline gap-3.5">
+      <h2 className="v2-tight text-[24px] font-semibold tracking-[-0.028em] text-[var(--v2-ink-900)]">
+        {title}
+      </h2>
+      {sub ? <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">{sub}</span> : null}
     </div>
   );
 }
 
-export function ManifestClient({
-  title,
-  body,
-  toc,
-}: {
-  title: string;
-  body: string;
-  toc: ManifestTocItem[];
-}) {
-  const { main, oath } = useMemo(() => {
-    const re = /^#\s+XIII\./im;
-    const m = re.exec(body);
-    if (!m || m.index == null) return { main: body, oath: null as string | null };
-    return {
-      main: body.slice(0, m.index).trimEnd(),
-      oath: body.slice(m.index).trim(),
-    };
-  }, [body]);
+function Quote({ text, dark }: { text: string; dark?: boolean }) {
+  if (dark) {
+    return (
+      <blockquote className="rounded-[20px] bg-white/[0.07] px-7 py-6 ring-1 ring-inset ring-white/10">
+        <p className="v2-tight text-[19px] font-medium leading-[1.45] tracking-[-0.02em] text-white">
+          <Inline text={text} />
+        </p>
+      </blockquote>
+    );
+  }
+  return (
+    <blockquote
+      className="rounded-[20px] bg-[var(--v2-brand-50)] px-7 py-6"
+      style={{ boxShadow: "inset 4px 0 0 var(--v2-brand-600)" }}
+    >
+      <p className="v2-tight text-[19px] font-medium leading-[1.45] tracking-[-0.02em] text-[var(--v2-brand-800)]">
+        <Inline text={text} />
+      </p>
+    </blockquote>
+  );
+}
 
-  const [active, setActive] = useState(toc[0]?.id ?? "");
+function BulletTiles({ items, dark }: { items: string[]; dark?: boolean }) {
+  const avg = items.reduce((s, i) => s + i.length, 0) / Math.max(1, items.length);
+  const cols = avg < 46 ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2";
+  return (
+    <ul className={`grid grid-cols-1 gap-2.5 ${cols}`}>
+      {items.map((item, i) => (
+        <li
+          key={i}
+          className={`flex items-start gap-3 rounded-[16px] px-4 py-3.5 ${
+            dark ? "bg-white/[0.06]" : "bg-[var(--v2-ink-50)]"
+          }`}
+        >
+          <span
+            className="mt-[7px] h-[7px] w-[7px] shrink-0 rounded-full"
+            style={{ background: dark ? "rgba(255,255,255,.45)" : "var(--v2-brand-500)" }}
+          />
+          <span
+            className={`v2-tight text-[15px] leading-[1.5] ${
+              dark ? "text-white/80" : "text-[var(--v2-ink-700)]"
+            }`}
+          >
+            <Inline text={item} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function NumberedRows({ items, dark }: { items: string[]; dark?: boolean }) {
+  return (
+    <ol className="flex flex-col gap-2.5">
+      {items.map((item, i) => (
+        <li
+          key={i}
+          className={`flex items-start gap-4 rounded-2xl px-5 py-[15px] ${
+            dark ? "bg-white/[0.06]" : "bg-[var(--v2-ink-50)]"
+          }`}
+        >
+          <span
+            className={`v2-tnum pt-0.5 text-[13.5px] font-semibold ${
+              dark ? "text-white/40" : "text-[var(--v2-ink-300)]"
+            }`}
+          >
+            {String(i + 1).padStart(2, "0")}
+          </span>
+          <p
+            className={`v2-tight text-[16px] font-medium leading-snug tracking-[-0.015em] ${
+              dark ? "text-white/85" : "text-[var(--v2-ink-800)]"
+            }`}
+          >
+            <Inline text={item} />
+          </p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function TodoTiles({ items }: { items: string[] }) {
+  return (
+    <ul className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+      {items.map((item, i) => (
+        <li
+          key={i}
+          className="flex items-start gap-3.5 rounded-[16px] bg-white px-4 py-4 ring-1 ring-inset ring-[var(--v2-ink-200)]"
+        >
+          <span className="mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] border-[1.5px] border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)]" />
+          <span className="v2-tight text-[15px] leading-[1.5] text-[var(--v2-ink-700)]">
+            <Inline text={item} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CompareTable({ head, rows }: { head: [string, string]; rows: [string, string][] }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="hidden grid-cols-2 gap-3 px-1 md:grid">
+        <Kicker tint="#B42318">{head[0]}</Kicker>
+        <Kicker tint="var(--v2-brand-600)">{head[1]}</Kicker>
+      </div>
+      {rows.map(([oldWay, newWay], i) => (
+        <div key={i} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-[16px] bg-[#FEF3F2] px-4 py-3.5">
+            <span className="v2-tight text-[14.5px] leading-[1.5] text-[#912018]">
+              <Inline text={oldWay} />
+            </span>
+          </div>
+          <div
+            className="rounded-[16px] bg-[var(--v2-brand-50)] px-4 py-3.5"
+            style={{ boxShadow: "inset 0 0 0 1px rgba(59,111,247,.16)" }}
+          >
+            <span className="v2-tight text-[14.5px] font-medium leading-[1.5] text-[var(--v2-brand-800)]">
+              <Inline text={newWay} />
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Blocks({ blocks, dark }: { blocks: ManifestBlock[]; dark?: boolean }) {
+  return (
+    <div className="flex flex-col gap-4">
+      {blocks.map((block, i) => {
+        switch (block.kind) {
+          case "h2":
+            return (
+              <h3
+                key={i}
+                className={`v2-tight mt-4 border-l-[3px] pl-3.5 text-[19px] font-semibold tracking-[-0.022em] first:mt-0 ${
+                  dark ? "border-white/25 text-white" : "border-[var(--v2-brand-500)] text-[var(--v2-ink-900)]"
+                }`}
+              >
+                <Inline text={block.text} />
+              </h3>
+            );
+          case "h3":
+            return (
+              <h4
+                key={i}
+                className={`v2-tight mt-2 text-[16px] font-semibold tracking-[-0.018em] ${
+                  dark ? "text-white/90" : "text-[var(--v2-ink-800)]"
+                }`}
+              >
+                <Inline text={block.text} />
+              </h4>
+            );
+          case "p":
+            return (
+              <p
+                key={i}
+                className={`v2-tight max-w-[86ch] text-[16px] leading-[1.68] ${
+                  dark ? "text-white/75" : "text-[var(--v2-ink-600)]"
+                }`}
+                style={{ textWrap: "pretty" }}
+              >
+                <Inline text={block.text} />
+              </p>
+            );
+          case "ul":
+            return <BulletTiles key={i} items={block.items} dark={dark} />;
+          case "ol":
+            return <NumberedRows key={i} items={block.items} dark={dark} />;
+          case "todo":
+            return <TodoTiles key={i} items={block.items} />;
+          case "quote":
+            return <Quote key={i} text={block.text} dark={dark} />;
+          case "table":
+            return <CompareTable key={i} head={block.head} rows={block.rows} />;
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+}
+
+function ChapterCard({ chapter, dark }: { chapter: ManifestChapter; dark?: boolean }) {
+  return (
+    <section
+      id={chapter.id}
+      className={`scroll-mt-[76px] rounded-2xl px-8 py-7 ${dark ? "text-white" : "v2-card"}`}
+      style={
+        dark
+          ? {
+              background:
+                "radial-gradient(circle at 10% 0%, rgba(255,255,255,.10), transparent 45%), linear-gradient(160deg, #111827 0%, #0B1220 58%, #152238 100%)",
+              boxShadow: "var(--v2-shadow-card)",
+            }
+          : undefined
+      }
+    >
+      <div className="mb-6 flex flex-wrap items-baseline gap-3.5">
+        <Kicker tint={dark ? "rgba(147,180,253,.9)" : "var(--v2-brand-600)"}>
+          Глава {String(chapter.index).padStart(2, "0")}
+        </Kicker>
+        <h2
+          className={`v2-tight text-[26px] font-semibold tracking-[-0.03em] ${
+            dark ? "text-white" : "text-[var(--v2-ink-900)]"
+          }`}
+        >
+          {chapter.title}
+        </h2>
+      </div>
+      <Blocks blocks={chapter.blocks} dark={dark} />
+    </section>
+  );
+}
+
+export function ManifestClient({ doc }: { doc: ManifestDoc }) {
+  const [active, setActive] = useState(doc.chapters[0]?.id ?? "");
 
   useEffect(() => {
-    const nodes = toc
-      .map((t) => document.getElementById(t.id))
+    const nodes = doc.chapters
+      .map((c) => document.getElementById(c.id))
       .filter((n): n is HTMLElement => Boolean(n));
     if (!nodes.length) return;
 
@@ -122,95 +297,114 @@ export function ManifestClient({
         const id = visible[0]?.target.id;
         if (id) setActive(id);
       },
-      { rootMargin: "-18% 0px -62% 0px", threshold: [0.1, 0.4, 0.7] }
+      { rootMargin: "-12% 0px -70% 0px", threshold: [0.05, 0.3, 0.6] }
     );
     nodes.forEach((n) => obs.observe(n));
     return () => obs.disconnect();
-  }, [toc]);
+  }, [doc.chapters]);
+
+  const lastIndex = doc.chapters.length - 1;
 
   return (
-    <div className="manifest-page min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#F5F7FB_0%,#FFFFFF_32%)]">
-      <div className="mx-auto max-w-[1240px] px-5 pb-28 pt-6 sm:px-8">
-        <div className="manifest-hero mb-10">
-          <Image
-            src="/wishes/ai-industry-hero.png"
-            alt=""
-            fill
-            priority
-            className="manifest-hero-img"
-            sizes="(max-width: 1240px) 100vw, 1240px"
-          />
-          <div className="manifest-hero-scrim" />
-          <div className="manifest-hero-copy">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
-              Еженедельный код · личный план
-            </p>
-            <h1 className="v2-tighter mt-3 text-[clamp(34px,5vw,56px)] font-light leading-[1.02] text-white">
-              {title}
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto flex max-w-[1720px] flex-col gap-7 px-9 pb-24 pt-7">
+        <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,620px)]">
+          <div className="flex min-h-[430px] flex-col justify-center gap-2.5 px-8 py-8">
+            <Kicker>Еженедельный код · личный план</Kicker>
+            <h1 className="v2-tight mt-1 text-[40px] font-semibold leading-[1.08] tracking-[-0.036em] text-[var(--v2-ink-900)]">
+              {doc.title}
             </h1>
-            <p
-              className="v2-tight mt-5 max-w-[46ch] text-[17px] font-light leading-[1.45] text-white/88"
-              style={{ textWrap: "pretty" }}
-            >
-              Я больше не жду, когда новая жизнь выберет меня. Я становлюсь человеком,
-              способным её построить, выдержать и не разрушить собственными старыми привычками.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-2.5">
-              <span className="inline-flex rounded-full bg-white/12 px-3 py-1.5 text-[12px] font-medium text-white/90 ring-1 ring-white/15 backdrop-blur-sm">
-                Читать раз в неделю
-              </span>
-              <span className="inline-flex rounded-full bg-white/12 px-3 py-1.5 text-[12px] font-medium text-white/90 ring-1 ring-white/15 backdrop-blur-sm">
-                Заканчивается действием
-              </span>
+            {doc.lead ? (
+              <div
+                className="mt-4 max-w-[880px] rounded-[20px] px-7 py-6 text-white"
+                style={{ background: HERO_BLUE, boxShadow: "0 16px 40px -18px rgba(45,94,239,0.85)" }}
+              >
+                <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-white/60">
+                  Главное обещание себе
+                </span>
+                <p className="v2-tight mt-3 text-[23px] font-medium leading-[1.32] tracking-[-0.028em]">
+                  <Inline text={doc.lead} />
+                </p>
+              </div>
+            ) : null}
+            <div className="mt-4 flex flex-wrap gap-2.5">
+              {["Читаю раз в неделю", "Заканчивается действием", `${doc.chapters.length} глав`].map((chip) => (
+                <span
+                  key={chip}
+                  className="v2-tight rounded-[10px] bg-[var(--v2-ink-50)] px-3.5 py-2 text-[13.5px] font-medium text-[var(--v2-ink-600)]"
+                >
+                  {chip}
+                </span>
+              ))}
             </div>
           </div>
-        </div>
 
-        <div className="grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="manifest-toc-col">
-            <nav className="manifest-toc rounded-[20px] bg-white/80 p-4 shadow-[var(--v2-shadow-card)] backdrop-blur">
-              <p className="mb-3 px-3 font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--v2-ink-400)]">
-                Содержание
-              </p>
-              {toc.map((item) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  className={active === item.id ? "is-active" : undefined}
-                  onClick={() => setActive(item.id)}
-                  title={item.label}
-                >
-                  {item.short}
-                </a>
-              ))}
-            </nav>
-          </aside>
-
-          <div className="min-w-0">
-            <section className="mb-10 overflow-hidden rounded-[24px] bg-white px-7 py-8 shadow-[var(--v2-shadow-soft)] sm:px-10 sm:py-10">
-              <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--v2-brand-600)]">
-                Главный принцип
-              </p>
-              <p
-                className="v2-tighter mt-4 max-w-[34ch] text-[28px] font-light leading-[1.25] text-[var(--v2-ink-900)] sm:text-[32px]"
-                style={{ textWrap: "pretty" }}
-              >
-                Манифест заканчивается действием. Иначе он не работает.
-              </p>
-              <p
-                className="v2-tight mt-5 max-w-[58ch] text-[15.5px] leading-relaxed text-[var(--v2-ink-500)]"
-                style={{ textWrap: "pretty" }}
-              >
-                Этот образ — не обязательное будущее и не доказательство ценности. Это направление:
-                свобода, масштаб, любовь, тело, красота и форма. Читать один раз в неделю — и
-                сразу переносить правду в календарь, деньги и поступки.
-              </p>
-            </section>
-
-            <ManifestMarkdown source={main} />
-            {oath ? <ManifestMarkdown source={oath} oath /> : null}
+          <div className="relative hidden min-h-[430px] overflow-hidden lg:block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={appPath("/wishes/ai-industry-hero.png")}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover object-[50%_32%]"
+              style={{
+                WebkitMaskImage:
+                  "linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 11%, rgba(0,0,0,0.82) 22%, #000 36%)",
+                maskImage:
+                  "linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 11%, rgba(0,0,0,0.82) 22%, #000 36%)",
+              }}
+            />
+            <div
+              className="pointer-events-none absolute inset-y-0 left-0 w-[34%]"
+              style={{
+                background:
+                  "linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.45) 52%, rgba(255,255,255,0) 100%)",
+              }}
+            />
           </div>
+        </section>
+
+        <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+          <section className="v2-card flex h-full flex-col px-7 py-6">
+            <SectionHead title="Направление" sub="Не обязательное будущее, а вектор" />
+            {doc.vision.intro ? (
+              <p className="v2-tight mb-4 max-w-[86ch] text-[15.5px] leading-relaxed text-[var(--v2-ink-500)]">
+                <Inline text={doc.vision.intro} />
+              </p>
+            ) : null}
+            <BulletTiles items={doc.vision.items} />
+            {doc.vision.outro ? (
+              <p className="v2-tight mt-4 max-w-[86ch] text-[15.5px] leading-relaxed text-[var(--v2-ink-600)]">
+                <Inline text={doc.vision.outro} />
+              </p>
+            ) : null}
+          </section>
+
+          <section className="v2-card flex h-full flex-col px-7 py-6">
+            <SectionHead title={doc.howTo.title} sub="ритуал недели" />
+            <Blocks blocks={doc.howTo.blocks} />
+          </section>
         </div>
+
+        <nav className="v2-card sticky top-0 z-10 flex flex-wrap gap-1.5 px-4 py-3">
+          {doc.chapters.map((c) => (
+            <a
+              key={c.id}
+              href={`#${c.id}`}
+              onClick={() => setActive(c.id)}
+              className={`v2-tight rounded-[10px] px-3 py-1.5 text-[13px] font-medium transition ${
+                active === c.id
+                  ? "bg-[var(--v2-brand-600)] text-white"
+                  : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+              }`}
+            >
+              <span className="v2-tnum mr-1.5 opacity-55">{String(c.index).padStart(2, "0")}</span>
+              {c.title}
+            </a>
+          ))}
+        </nav>
+
+        {doc.chapters.map((c, i) => (
+          <ChapterCard key={c.id} chapter={c} dark={i === lastIndex} />
+        ))}
       </div>
     </div>
   );

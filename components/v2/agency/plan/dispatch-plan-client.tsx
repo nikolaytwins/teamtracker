@@ -172,7 +172,7 @@ function WeekChecklistBar({
     <div className="week-check">
       <div className="week-check-h">
         <span className="week-check-title">Подсказки недели</span>
-        <span className="week-check-meta tnum">
+        <span className={`week-check-meta tnum${openCount > 0 ? " is-warn" : ""}`}>
           {weekLabel}
           {" · "}
           {openCount === 0 ? "всё назначено" : `не назначено: ${openCount}`}

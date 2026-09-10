@@ -371,6 +371,7 @@
 .plan-v3 .week-check-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .plan-v3 .week-check-title{font-size:13px;font-weight:650;letter-spacing:-.01em;color:var(--ink-800)}
 .plan-v3 .week-check-meta{font-size:12px;font-weight:550;color:var(--ink-400)}
+.plan-v3 .week-check-meta.is-warn{color:#DC2626;font-weight:650}
 .plan-v3 .week-check-row{display:flex;flex-wrap:wrap;gap:8px}
 .plan-v3 .week-chip{
   display:inline-flex;align-items:center;gap:7px;max-width:100%;
@@ -378,8 +379,17 @@
   font-size:12.5px;font-weight:600;letter-spacing:-.012em;line-height:1.2;
   background:#fff;color:var(--ink-800);box-shadow:0 1px 0 rgba(15,23,42,.04);
 }
-.plan-v3 .week-chip.is-open{cursor:grab;border-color:color-mix(in srgb,var(--wc,#2A56EB) 28%,var(--ink-100));background:color-mix(in srgb,var(--wc,#2A56EB) 8%,#fff)}
+.plan-v3 .week-chip.is-open{
+  cursor:grab;
+  --wc:#DC2626;
+  border-color:color-mix(in srgb,#DC2626 38%,var(--ink-100));
+  background:color-mix(in srgb,#FEE2E2 92%,#fff);
+  color:#991B1B;
+  box-shadow:0 0 0 1px color-mix(in srgb,#DC2626 12%,transparent),0 1px 0 rgba(15,23,42,.04);
+}
 .plan-v3 .week-chip.is-open:active{cursor:grabbing}
+.plan-v3 .week-chip.is-open .week-chip-grip{color:#DC2626;opacity:.9}
+.plan-v3 .week-chip.is-open .week-chip-d{color:#DC2626;font-weight:650}
 .plan-v3 .week-chip.is-done{cursor:pointer;border-color:transparent;background:color-mix(in srgb,var(--wc,#10B981) 12%,#fff);color:var(--ink-700)}
 .plan-v3 .week-chip.is-done:hover{background:color-mix(in srgb,var(--wc,#10B981) 18%,#fff)}
 .plan-v3 .week-chip--social{--wc:#0E7490}

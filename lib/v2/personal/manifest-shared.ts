@@ -1,7 +1,26 @@
-export type ManifestTocItem = {
+export type ManifestBlock =
+  | { kind: "h2"; text: string }
+  | { kind: "h3"; text: string }
+  | { kind: "p"; text: string }
+  | { kind: "ul"; items: string[] }
+  | { kind: "ol"; items: string[] }
+  | { kind: "todo"; items: string[] }
+  | { kind: "quote"; text: string }
+  | { kind: "table"; head: [string, string]; rows: [string, string][] };
+
+export type ManifestChapter = {
   id: string;
-  label: string;
-  short: string;
+  index: number;
+  title: string;
+  blocks: ManifestBlock[];
+};
+
+export type ManifestDoc = {
+  title: string;
+  lead: string;
+  vision: { intro: string; items: string[]; outro: string };
+  howTo: { title: string; blocks: ManifestBlock[] };
+  chapters: ManifestChapter[];
 };
 
 export function slugifyManifestHeading(raw: string): string {
@@ -12,11 +31,9 @@ export function slugifyManifestHeading(raw: string): string {
     .slice(0, 72);
 }
 
-export function shortManifestLabel(heading: string): string {
-  const cleaned = heading
-    .replace(/^[ivxlc]+\.\s*/i, "")
-    .replace(/^манифест\s+/i, "")
-    .trim();
-  if (cleaned.length <= 38) return cleaned;
-  return `${cleaned.slice(0, 36).trim()}…`;
+/** «II. РАЗРЫВ: СТАРАЯ ЖИЗНЬ» → «Разрыв: старая жизнь» */
+export function humanizeManifestTitle(raw: string): string {
+  const cleaned = raw.replace(/^[ivxlc]+\.\s*/i, "").trim();
+  const lower = cleaned.toLocaleLowerCase("ru");
+  return lower.charAt(0).toLocaleUpperCase("ru") + lower.slice(1);
 }
