@@ -86,7 +86,6 @@ const PERSONAL_NAV: NavItem[] = [
   { href: "/v2/personal/sport", label: "Спорт", icon: "sport" },
   { href: "/v2/personal/wishes", label: "Желания", icon: "wish" },
   { href: "/v2/personal/observations", label: "Дневник", icon: "eye" },
-  { href: "/v2/personal/life-strategy", label: "Стратегия", icon: "compass" },
   { href: "/v2/personal/manifest", label: "Манифест", icon: "flag" },
 ];
 

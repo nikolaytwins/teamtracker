@@ -17,16 +17,16 @@ const PERSONAL_TABS = [
   },
 ] as const;
 
-const STRATEGY_TABS = [
-  {
-    href: "/v2/personal/life-strategy",
-    label: "Общая стратегия",
-    match: (p: string) => p.startsWith(appPath("/v2/personal/life-strategy")),
-  },
+const MANIFEST_TABS = [
   {
     href: "/v2/personal/manifest",
     label: "Манифест",
     match: (p: string) => p.startsWith(appPath("/v2/personal/manifest")),
+  },
+  {
+    href: "/v2/personal/life-strategy",
+    label: "Общая стратегия",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/life-strategy")),
   },
   {
     href: "/v2/personal/brand",
@@ -82,13 +82,13 @@ const FINANCE_TABS = [
   },
 ] as const;
 
-function isStrategyBlockPath(pathname: string) {
+function isManifestBlockPath(pathname: string) {
   const strategyDb =
     pathname === appPath("/v2/personal/strategy") ||
     pathname.startsWith(appPath("/v2/personal/strategy/"));
   return (
-    pathname.startsWith(appPath("/v2/personal/life-strategy")) ||
     pathname.startsWith(appPath("/v2/personal/manifest")) ||
+    pathname.startsWith(appPath("/v2/personal/life-strategy")) ||
     pathname.startsWith(appPath("/v2/personal/brand")) ||
     pathname.startsWith(appPath("/v2/personal/my-code")) ||
     strategyDb
@@ -109,13 +109,13 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }
 
-  const inStrategy = isStrategyBlockPath(pathname);
+  const inManifest = isManifestBlockPath(pathname);
   const tabs = inFinance
     ? FINANCE_TABS
     : inDashboard
       ? DASHBOARD_TABS
-      : inStrategy
-        ? STRATEGY_TABS
+      : inManifest
+        ? MANIFEST_TABS
         : PERSONAL_TABS;
 
   return (

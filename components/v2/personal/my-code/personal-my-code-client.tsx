@@ -82,64 +82,6 @@ function StateBadge({ k, states }: { k: MyCodeStateKey; states: MyCodeDoc["state
   );
 }
 
-function PatternRow({
-  p,
-  states,
-  onOpen,
-}: {
-  p: MyCodePattern;
-  states: MyCodeDoc["states"];
-  onOpen: (id: string) => void;
-}) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(p.id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen(p.id);
-        }
-      }}
-      className="group grid cursor-pointer gap-8 border-t border-[var(--v2-ink-200)]/80 py-7 transition"
-      style={{ gridTemplateColumns: "minmax(0,1fr) 340px" }}
-    >
-      <div className="min-w-0">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">{p.code}</span>
-          <StateBadge k={p.state} states={states} />
-        </div>
-        <h3 className="v2-tighter mt-2 text-[27px] font-light leading-[1.15] text-[var(--v2-ink-900)] transition group-hover:text-[var(--v2-brand-700)]">
-          {p.name}
-        </h3>
-        <p className="v2-tight mt-3 max-w-[62ch] text-[16px] leading-relaxed text-[var(--v2-ink-700)]" style={{ textWrap: "pretty" }}>
-          «{p.core}»
-        </p>
-        {p.phrase ? (
-          <p className="v2-tight mt-3 text-[13.5px] text-[var(--v2-ink-500)]">
-            <span className="text-[var(--v2-ink-400)]">Моя типичная фраза: </span>«{p.phrase}»
-          </p>
-        ) : null}
-      </div>
-      <div className="pt-1">
-        <div className="flex h-full flex-col rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">
-          <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-brand-600)]">→ Новая реакция</span>
-          <p className="v2-tight mt-2 text-[15px] leading-snug text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
-            «{p.reaction}»
-          </p>
-          <button
-            type="button"
-            className="mt-auto inline-flex items-center gap-1 self-start pt-4 text-[12.5px] font-medium text-[var(--v2-ink-600)] transition group-hover:text-[var(--v2-brand-700)]"
-          >
-            Подробнее <IcChevR className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function DBlock({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section className="mt-8">
@@ -678,16 +620,14 @@ function AddModal({
 }
 
 const TABS = [
-  { id: "patterns" as const, label: "Паттерны" },
   { id: "beliefs" as const, label: "Убеждения" },
-  { id: "rules" as const, label: "Правила" },
   { id: "archive" as const, label: "Все выводы" },
 ];
 
 export function PersonalMyCodeClient() {
   const [doc, setDoc] = useState<MyCodeDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("patterns");
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("beliefs");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const [quick, setQuick] = useState(false);
@@ -728,21 +668,8 @@ export function PersonalMyCodeClient() {
   const s = q.trim().toLowerCase();
   const match = (...parts: (string | undefined)[]) => !s || parts.filter(Boolean).join(" ").toLowerCase().includes(s);
 
-  const pats = useMemo(
-    () => (doc ? doc.patterns.filter((p) => match(p.code, p.name, p.core, p.phrase, p.reaction, p.lead)) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doc, s]
-  );
   const bels = useMemo(
     () => (doc ? doc.beliefs.filter((b) => match(b.text, b.note)) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doc, s]
-  );
-  const rls = useMemo(
-    () =>
-      doc
-        ? doc.rules.filter((r) => match(r.title, r.ifs, r.then, (r.list || []).join(" "), r.extra, r.forbid))
-        : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [doc, s]
   );
@@ -751,7 +678,7 @@ export function PersonalMyCodeClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [doc, s]
   );
-  const counts = { patterns: pats.length, beliefs: bels.length, rules: rls.length, archive: arch.length };
+  const counts = { beliefs: bels.length, archive: arch.length };
 
   if (!doc) {
     return (
@@ -838,7 +765,6 @@ export function PersonalMyCodeClient() {
         };
         next.focus = [...next.focus, focusItem].map((f, i) => ({ ...f, n: String(i + 1).padStart(2, "0") }));
       }
-      setTab("patterns");
     } else if (payload.type === "Убеждение") {
       const belief: MyCodeBelief = {
         n: String(next.beliefs.length + 1).padStart(2, "0"),
@@ -865,7 +791,6 @@ export function PersonalMyCodeClient() {
         };
         next.focus = [...next.focus, focusItem].map((f, i) => ({ ...f, n: String(i + 1).padStart(2, "0") }));
       }
-      setTab("rules");
     } else {
       const item: MyCodeArchiveItem = {
         id: `a-${Date.now()}`,
@@ -924,7 +849,7 @@ export function PersonalMyCodeClient() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Найти паттерн, правило или убеждение…"
+                placeholder="Найти убеждение или вывод…"
                 className="v2-tight min-w-0 flex-1 bg-transparent text-[12.5px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
               />
               {q ? (
@@ -967,10 +892,6 @@ export function PersonalMyCodeClient() {
                 type="button"
                 onClick={() => {
                   if (f.ref.kind === "pattern") setOpen(f.ref.id);
-                  else {
-                    setTab("rules");
-                    setQ("");
-                  }
                 }}
                 className="mt-auto inline-flex items-center gap-1 self-start pt-4 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:text-[var(--v2-brand-700)]"
               >
@@ -988,10 +909,11 @@ export function PersonalMyCodeClient() {
           ))}
         </div>
         <p className="v2-tight mt-3 text-[12px] text-[var(--v2-ink-400)]">
-          Эти же элементы показываются на главной Strategy.{" "}
-          <Link href="/v2/personal/life-strategy" className="text-[var(--v2-brand-600)] hover:underline">
-            Открыть стратегию
+          Паттерны и правила читаются в{" "}
+          <Link href="/v2/personal/manifest" className="text-[var(--v2-brand-600)] hover:underline">
+            Манифесте
           </Link>
+          .
         </p>
       </section>
 
@@ -1013,29 +935,6 @@ export function PersonalMyCodeClient() {
         </div>
       </div>
 
-      {tab === "patterns" ? (
-        <div className="flex max-w-[1120px] flex-col gap-12">
-          {doc.groups.map((g) => {
-            const rows = pats.filter((p) => p.group === g.id);
-            if (!rows.length) return null;
-            return (
-              <section key={g.id}>
-                <div className="flex items-center gap-4">
-                  <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--v2-ink-500)]">{g.label}</h2>
-                  <span className="v2-tnum text-[11px] text-[var(--v2-ink-400)]">{rows.length}</span>
-                </div>
-                <div className="mt-3">
-                  {rows.map((p) => (
-                    <PatternRow key={p.id} p={p} states={doc.states} onOpen={setOpen} />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-          {!pats.length ? <p className="v2-tight py-10 text-[14px] text-[var(--v2-ink-500)]">Ничего не нашлось. Попробуйте другой запрос.</p> : null}
-        </div>
-      ) : null}
-
       {tab === "beliefs" ? (
         <div className="max-w-[880px]">
           <p className="v2-tighter pb-2 text-[27px] font-light leading-[1.3] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
@@ -1055,68 +954,6 @@ export function PersonalMyCodeClient() {
             ))}
           </div>
           {!bels.length ? <p className="v2-tight py-10 text-[14px] text-[var(--v2-ink-500)]">Ничего не нашлось.</p> : null}
-        </div>
-      ) : null}
-
-      {tab === "rules" ? (
-        <div className="grid max-w-[1120px] grid-cols-2 gap-5">
-          {rls.map((r) => (
-            <article
-              key={r.id}
-              className="flex flex-col rounded-[20px] bg-white px-7 py-6 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
-            >
-              <h3 className="v2-tight text-[18px] font-medium text-[var(--v2-ink-900)]">{r.title}</h3>
-              <div className="mt-5 flex gap-4">
-                <span className="w-9 shrink-0 pt-[3px] font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">если</span>
-                <p className="v2-tight text-[14.5px] leading-relaxed text-[var(--v2-ink-600)]" style={{ textWrap: "pretty" }}>
-                  {r.ifs}
-                </p>
-              </div>
-              <div className="mt-3 flex gap-4">
-                <span className="w-9 shrink-0 pt-[3px] font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">то</span>
-                <div>
-                  <p className="v2-tight text-[15.5px] leading-relaxed text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
-                    {r.then}
-                  </p>
-                  {r.list ? (
-                    <ul className="mt-2.5 flex flex-wrap gap-1.5">
-                      {r.list.map((x, i) => (
-                        <li key={i} className="v2-tight rounded-full bg-[var(--v2-ink-100)] px-2.5 py-[3px] text-[12.5px] text-[var(--v2-ink-600)]">
-                          {x}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {r.extra ? (
-                    <p className="v2-tight mt-3 text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">
-                      <span className="text-[var(--v2-ink-400)]">{r.extraLabel} </span>
-                      {r.extra}
-                    </p>
-                  ) : null}
-                  {r.notList ? (
-                    <div className="mt-3">
-                      <span className="v2-tight text-[12.5px] text-[var(--v2-ink-400)]">{r.notLabel}</span>
-                      <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                        {r.notList.map((x, i) => (
-                          <li key={i} className="v2-tight text-[12.5px] text-[var(--v2-ink-500)] line-through decoration-[var(--v2-ink-300)]">
-                            {x}
-                            {i < r.notList!.length - 1 ? " ·" : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              {r.forbid ? (
-                <div className="mt-5 border-t border-[var(--v2-ink-100)] pt-4">
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-rose-500">Запрещённый сценарий</span>
-                  <p className="v2-tight mt-1.5 text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">«{r.forbid}»</p>
-                </div>
-              ) : null}
-            </article>
-          ))}
-          {!rls.length ? <p className="v2-tight py-10 text-[14px] text-[var(--v2-ink-500)]">Ничего не нашлось.</p> : null}
         </div>
       ) : null}
 
