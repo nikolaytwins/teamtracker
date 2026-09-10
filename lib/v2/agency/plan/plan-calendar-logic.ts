@@ -181,3 +181,108 @@ export function hoursLabel(item: PlanItemRow): string {
   const h = itemHours(item);
   return Number.isInteger(h) ? `${h} ч` : `${displayHoursFromMinutes(item.planned_minutes)} ч`;
 }
+
+export type WeekChecklistId = "social" | "lera" | "creative" | "strategy" | "rest";
+
+export type WeekChecklistDef =
+  | {
+      id: WeekChecklistId;
+      label: string;
+      kind: "mode";
+      mode: PlanDayMode;
+      css: string;
+    }
+  | {
+      id: WeekChecklistId;
+      label: string;
+      kind: "event";
+      title: string;
+      match: RegExp;
+      css: string;
+      defaultTime: string;
+      durationLabel: string;
+    };
+
+export const WEEK_CHECKLIST: WeekChecklistDef[] = [
+  {
+    id: "social",
+    label: "1 социальное событие",
+    kind: "event",
+    title: "Социальное событие",
+    match: /социальн/i,
+    css: "social",
+    defaultTime: "19:00",
+    durationLabel: "2 ч",
+  },
+  {
+    id: "lera",
+    label: "1 свидание с Лерой",
+    kind: "event",
+    title: "Свидание с Лерой",
+    match: /свидан|лер[аыуеой]/i,
+    css: "lera",
+    defaultTime: "19:00",
+    durationLabel: "3 ч",
+  },
+  {
+    id: "creative",
+    label: "1 творческий день",
+    kind: "mode",
+    mode: "creative",
+    css: "ark",
+  },
+  {
+    id: "strategy",
+    label: "1 стратегический день",
+    kind: "mode",
+    mode: "strategy",
+    css: "strat",
+  },
+  {
+    id: "rest",
+    label: "1 выходной",
+    kind: "mode",
+    mode: "rest",
+    css: "rest",
+  },
+];
+
+export type WeekChecklistStatus = {
+  def: WeekChecklistDef;
+  filled: boolean;
+  dateKey: string | null;
+  itemId: string | null;
+};
+
+export function resolveWeekChecklist(
+  weekKeys: string[],
+  items: PlanItemRow[],
+  modes: Map<string, PlanDayMode>
+): WeekChecklistStatus[] {
+  const keySet = new Set(weekKeys);
+  return WEEK_CHECKLIST.map((def) => {
+    if (def.kind === "mode") {
+      const dateKey =
+        weekKeys.find((k) => modes.get(k) === def.mode) ??
+        null;
+      return { def, filled: Boolean(dateKey), dateKey, itemId: null };
+    }
+    const hit = items.find(
+      (it) =>
+        (it.kind === "personal" || it.kind === "call") &&
+        it.plan_date != null &&
+        keySet.has(it.plan_date) &&
+        def.match.test(it.title)
+    );
+    return {
+      def,
+      filled: Boolean(hit),
+      dateKey: hit?.plan_date ?? null,
+      itemId: hit?.id ?? null,
+    };
+  });
+}
+
+export function weekChecklistDef(id: WeekChecklistId): WeekChecklistDef {
+  return WEEK_CHECKLIST.find((d) => d.id === id)!;
+}

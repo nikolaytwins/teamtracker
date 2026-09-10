@@ -200,10 +200,9 @@ export async function reorderPlanItemsOnDay(
   planDate: string,
   orderedIds: string[]
 ): Promise<void> {
-  for (let i = 0; i < orderedIds.length; i += 1) {
-    const id = orderedIds[i]!;
-    await updatePlanItem(ctx, id, { plan_date: planDate, sort_order: i });
-  }
+  await Promise.all(
+    orderedIds.map((id, i) => updatePlanItem(ctx, id, { plan_date: planDate, sort_order: i }))
+  );
 }
 
 export async function deletePlanItem(ctx: V2SessionContext, id: string): Promise<void> {

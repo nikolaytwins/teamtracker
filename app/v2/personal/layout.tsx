@@ -24,6 +24,11 @@ const STRATEGY_TABS = [
     match: (p: string) => p.startsWith(appPath("/v2/personal/life-strategy")),
   },
   {
+    href: "/v2/personal/manifest",
+    label: "Манифест",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/manifest")),
+  },
+  {
     href: "/v2/personal/brand",
     label: "Личный бренд",
     match: (p: string) => p.startsWith(appPath("/v2/personal/brand")),
@@ -83,6 +88,7 @@ function isStrategyBlockPath(pathname: string) {
     pathname.startsWith(appPath("/v2/personal/strategy/"));
   return (
     pathname.startsWith(appPath("/v2/personal/life-strategy")) ||
+    pathname.startsWith(appPath("/v2/personal/manifest")) ||
     pathname.startsWith(appPath("/v2/personal/brand")) ||
     pathname.startsWith(appPath("/v2/personal/my-code")) ||
     strategyDb

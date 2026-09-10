@@ -352,9 +352,10 @@ export function V2ShellSidebar({
               } else if (item.href.startsWith("/v2/personal/dashboard")) {
                 active = pathname?.startsWith(appPath("/v2/personal/dashboard")) ?? false;
               } else if (item.href.startsWith("/v2/personal/life-strategy")) {
-                // Блок Стратегия: общая + бренд + мой код + база данных
+                // Блок Стратегия: общая + манифест + бренд + мой код + база данных
                 active =
                   (pathname?.startsWith(appPath("/v2/personal/life-strategy")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/manifest")) ?? false) ||
                   (pathname?.startsWith(appPath("/v2/personal/brand")) ?? false) ||
                   (pathname?.startsWith(appPath("/v2/personal/my-code")) ?? false) ||
                   pathname === appPath("/v2/personal/strategy") ||

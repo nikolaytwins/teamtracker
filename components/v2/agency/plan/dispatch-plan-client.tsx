@@ -7,6 +7,7 @@ import {
   deletePlanItemApi,
   fetchPlan,
   fetchPlanCalendar,
+  reorderPlanItemsApi,
   updatePlanItemApi,
   updateProjectApi,
   upsertDayModeApi,
@@ -31,6 +32,10 @@ import {
   unplacedHours,
   capOf,
   dayHours,
+  resolveWeekChecklist,
+  weekChecklistDef,
+  type WeekChecklistId,
+  type WeekChecklistStatus,
 } from "@/lib/v2/agency/plan/plan-calendar-logic";
 import type {
   LoadStatus,
@@ -88,6 +93,7 @@ type DragState =
   | { kind: "new"; projectId: string }
   | { kind: "move"; itemId: string }
   | { kind: "mark"; mode: PlanDayMode; from: string }
+  | { kind: "checklist"; id: WeekChecklistId }
   | { kind: "backlog"; itemId: string }
   | { kind: "kanban"; projectId: string; fromStatus: DispatchWorkStatus };
 
@@ -145,6 +151,81 @@ function eventMetaLabel(ev: PlanItemRow): string {
   return parts.join(" · ");
 }
 
+function WeekChecklistBar({
+  rows,
+  openCount,
+  weekLabel,
+  onDragStart,
+  onDragEnd,
+  onJump,
+  onOpenItem,
+}: {
+  rows: WeekChecklistStatus[];
+  openCount: number;
+  weekLabel: string;
+  onDragStart: (id: WeekChecklistId) => void;
+  onDragEnd: () => void;
+  onJump: (dateKey: string) => void;
+  onOpenItem: (id: string) => void;
+}) {
+  return (
+    <div className="week-check">
+      <div className="week-check-h">
+        <span className="week-check-title">Подсказки недели</span>
+        <span className="week-check-meta tnum">
+          {weekLabel}
+          {" · "}
+          {openCount === 0 ? "всё назначено" : `не назначено: ${openCount}`}
+        </span>
+      </div>
+      <div className="week-check-row">
+        {rows.map((row) => {
+          const { def, filled, dateKey, itemId } = row;
+          if (filled && dateKey) {
+            return (
+              <button
+                key={def.id}
+                type="button"
+                className={`week-chip week-chip--${def.css} is-done`}
+                onClick={() => {
+                  if (itemId) onOpenItem(itemId);
+                  else onJump(dateKey);
+                }}
+                title="Уже в календаре — открыть"
+              >
+                <span className="week-chip-check" aria-hidden>
+                  ✓
+                </span>
+                <span className="week-chip-n">{def.label.replace(/^1\s+/, "")}</span>
+                <span className="week-chip-d tnum">{fmtShort(parseYmd(dateKey))}</span>
+              </button>
+            );
+          }
+          return (
+            <div
+              key={def.id}
+              className={`week-chip week-chip--${def.css} is-open`}
+              draggable
+              onDragStart={() => onDragStart(def.id)}
+              onDragEnd={onDragEnd}
+              title="Перетащите на день в календаре"
+            >
+              <span className="week-chip-grip" aria-hidden>
+                ⋮⋮
+              </span>
+              <span className="week-chip-n">{def.label}</span>
+              <span className="week-chip-d">не назначено</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="week-check-hint">
+        Неназначенные чипы перетащите на день недели. Назначенные остаются отмеченными здесь.
+      </p>
+    </div>
+  );
+}
+
 function DoneToggle({
   done,
   onToggle,
@@ -191,6 +272,21 @@ function projectById(projects: PlanProjectView[], id: string | null) {
 
 function allItems(plan: PlanPayload): PlanItemRow[] {
   return [...plan.items, ...plan.backlog];
+}
+
+/** Instant local reorder / move onto a day (before API round-trip). */
+function applyDayOrder(plan: PlanPayload, dateKey: string, orderedIds: string[]): PlanPayload {
+  const byId = new Map(allItems(plan).map((it) => [it.id, it]));
+  const ordered = new Set(orderedIds);
+  const placed = orderedIds
+    .map((id) => byId.get(id))
+    .filter((it): it is PlanItemRow => Boolean(it))
+    .map((it, i) => ({ ...it, plan_date: dateKey, sort_order: i }));
+  return {
+    ...plan,
+    items: [...plan.items.filter((it) => !ordered.has(it.id)), ...placed],
+    backlog: plan.backlog.filter((it) => !ordered.has(it.id)),
+  };
 }
 
 export function DispatchPlanClient() {
@@ -416,6 +512,39 @@ function DispatchPlanCalendar({
       return;
     }
 
+    if (drag.kind === "checklist") {
+      const def = weekChecklistDef(drag.id);
+      if (def.kind === "mode") {
+        await mutate(
+          async () => {
+            if (def.mode !== "rest") {
+              for (const [k, v] of modes) {
+                if (v === def.mode && k >= todayKey) await upsertDayModeApi(k, null);
+              }
+            }
+            await upsertDayModeApi(dateKey, def.mode);
+          },
+          `${def.label.replace(/^1\s+/, "")} → ${fmtWeekday(parseYmd(dateKey))}`,
+          snap
+        );
+        return;
+      }
+      await mutate(
+        () =>
+          createPlanItemApi({
+            kind: "personal",
+            title: def.title,
+            plan_date: dateKey,
+            event_time: def.defaultTime,
+            duration_label: def.durationLabel,
+            priority: 2,
+          }),
+        `${def.title} → ${fmtWeekday(parseYmd(dateKey))}`,
+        snap
+      );
+      return;
+    }
+
     if (drag.kind === "move" || drag.kind === "backlog") {
       const item = allItems(plan).find((i) => i.id === drag.itemId);
       if (!item) {
@@ -443,18 +572,21 @@ function DispatchPlanCalendar({
         }
       }
 
-      await mutate(
-        async () => {
-          if (!sameDay) {
-            await updatePlanItemApi(item.id, { plan_date: dateKey });
-          }
-          await Promise.all(orderedIds.map((id, i) => updatePlanItemApi(id, { sort_order: i })));
-        },
-        sameDay
-          ? `Порядок в ${fmtWeekday(parseYmd(dateKey))} обновлён`
-          : `«${item.title}» → ${fmtWeekday(parseYmd(dateKey))}`,
-        snap
-      );
+      const message = sameDay
+        ? `Порядок в ${fmtWeekday(parseYmd(dateKey))} обновлён`
+        : `«${item.title}» → ${fmtWeekday(parseYmd(dateKey))}`;
+      setPlan(applyDayOrder(plan, dateKey, orderedIds));
+      setDrag(null);
+      showToast(message, () => {
+        setPlan(snap);
+        showToast("Отменено");
+      });
+      try {
+        await reorderPlanItemsApi(dateKey, orderedIds);
+      } catch (e) {
+        setPlan(snap);
+        showToast(e instanceof Error ? e.message : "Не удалось сохранить порядок");
+      }
       return;
     }
 
@@ -555,6 +687,11 @@ function DispatchPlanCalendar({
 
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(anchor, i));
   const weekDays = weekDates;
+  const checklistWeekDates =
+    calMode === "week" ? weekDates : Array.from({ length: 7 }, (_, i) => addDays(mondayOf(today), i));
+  const checklistWeekKeys = checklistWeekDates.map((d) => toYmd(d));
+  const weekChecklist = resolveWeekChecklist(checklistWeekKeys, items, modes);
+  const weekChecklistOpen = weekChecklist.filter((row) => !row.filled).length;
 
   const tasksToPlace = plan.backlog.filter((i) => i.kind === "task");
   const boardProjects = plan.projects.filter((p) => showHidden || !p.planHidden);
@@ -676,6 +813,26 @@ function DispatchPlanCalendar({
                   </button>
                 </div>
               </div>
+              <WeekChecklistBar
+                rows={weekChecklist}
+                openCount={weekChecklistOpen}
+                weekLabel={
+                  calMode === "week"
+                    ? periodLabel
+                    : `${fmtShort(checklistWeekDates[0]!)} – ${fmtShort(checklistWeekDates[6]!)}`
+                }
+                onDragStart={(id) => setDrag({ kind: "checklist", id })}
+                onDragEnd={() => {
+                  setDrag(null);
+                  setDropIndex(null);
+                }}
+                onJump={(dateKey) => {
+                  setCalMode("week");
+                  setAnchor(mondayOf(parseYmd(dateKey)));
+                  showToast(`В календаре — ${fmtWeekday(parseYmd(dateKey))}`);
+                }}
+                onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
+              />
               <div id="cal">
                 {calMode === "week" ? (
                   <div
@@ -758,8 +915,8 @@ function DispatchPlanCalendar({
               </div>
               <p className="hint">
                 Тип дня — кнопка ⋯ в заголовке дня. Ориентир нагрузки {dailyCap} ч/день (можно превышать). События
-                стоят выше рабочих слотов; их часы входят в сумму дня. Внутри дня задачи можно переставлять
-                перетаскиванием; цвет слота — приоритет (P1–P4).
+                стоят выше рабочих слотов; их часы входят в сумму дня. Подсказки недели перетащите на день — оставшиеся
+                чипы сверху ещё не назначены. Внутри дня задачи можно переставлять; цвет слота — приоритет (P1–P4).
               </p>
             </section>
 

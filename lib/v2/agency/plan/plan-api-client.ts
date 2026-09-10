@@ -62,6 +62,14 @@ export async function updatePlanItemApi(
   return data.item;
 }
 
+export async function reorderPlanItemsApi(planDate: string, orderedIds: string[]) {
+  await fetchJson("/api/v2/agency/plan/items/reorder", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan_date: planDate, ordered_ids: orderedIds }),
+  });
+}
+
 export async function deletePlanItemApi(id: string) {
   await fetchJson(`/api/v2/agency/plan/items/${id}`, { method: "DELETE" });
 }

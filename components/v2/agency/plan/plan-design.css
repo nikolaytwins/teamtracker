@@ -365,3 +365,37 @@
 .plan-v3 .ev-row:hover .ev-x,.plan-v3 .mev-row:hover .ev-x{opacity:.55}
 .plan-v3 .ev-x:hover{opacity:1!important;background:var(--ink-100);color:var(--ink-700)}
 .plan-v3 .mev-row .ev-x{margin-top:1px;width:16px;height:16px;font-size:14px}
+
+/* Week essentials checklist under calendar title */
+.plan-v3 .week-check{margin:-6px 0 18px;padding:14px 14px 12px;border-radius:16px;background:var(--ink-50);border:1px solid var(--ink-100)}
+.plan-v3 .week-check-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.plan-v3 .week-check-title{font-size:13px;font-weight:650;letter-spacing:-.01em;color:var(--ink-800)}
+.plan-v3 .week-check-meta{font-size:12px;font-weight:550;color:var(--ink-400)}
+.plan-v3 .week-check-row{display:flex;flex-wrap:wrap;gap:8px}
+.plan-v3 .week-chip{
+  display:inline-flex;align-items:center;gap:7px;max-width:100%;
+  border-radius:999px;padding:7px 11px 7px 9px;border:1px solid transparent;
+  font-size:12.5px;font-weight:600;letter-spacing:-.012em;line-height:1.2;
+  background:#fff;color:var(--ink-800);box-shadow:0 1px 0 rgba(15,23,42,.04);
+}
+.plan-v3 .week-chip.is-open{cursor:grab;border-color:color-mix(in srgb,var(--wc,#2A56EB) 28%,var(--ink-100));background:color-mix(in srgb,var(--wc,#2A56EB) 8%,#fff)}
+.plan-v3 .week-chip.is-open:active{cursor:grabbing}
+.plan-v3 .week-chip.is-done{cursor:pointer;border-color:transparent;background:color-mix(in srgb,var(--wc,#10B981) 12%,#fff);color:var(--ink-700)}
+.plan-v3 .week-chip.is-done:hover{background:color-mix(in srgb,var(--wc,#10B981) 18%,#fff)}
+.plan-v3 .week-chip--social{--wc:#0E7490}
+.plan-v3 .week-chip--lera{--wc:#DB2777}
+.plan-v3 .week-chip--ark{--wc:#2A56EB}
+.plan-v3 .week-chip--strat{--wc:#111827}
+.plan-v3 .week-chip--rest{--wc:#64748B}
+.plan-v3 .week-chip-grip{font-size:10px;letter-spacing:-.08em;color:color-mix(in srgb,var(--wc,#2A56EB) 55%,var(--ink-400));opacity:.75}
+.plan-v3 .week-chip-check{
+  width:16px;height:16px;border-radius:99px;display:inline-flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--wc,#10B981) 85%,#065f46);color:#fff;font-size:10px;font-weight:700;flex-shrink:0;
+}
+.plan-v3 .week-chip-n{min-width:0}
+.plan-v3 .week-chip-d{font-size:11.5px;font-weight:550;color:var(--ink-400);white-space:nowrap}
+.plan-v3 .week-chip.is-done .week-chip-d{color:color-mix(in srgb,var(--wc,#10B981) 55%,var(--ink-500))}
+.plan-v3 .week-check-hint{margin-top:9px;font-size:12px;line-height:1.35;color:var(--ink-400)}
+@media (max-width:720px){
+  .plan-v3 .week-chip{border-radius:14px;width:100%;justify-content:flex-start}
+}
