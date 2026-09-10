@@ -1,30 +1,15 @@
 import fs from "fs";
 import path from "path";
+import {
+  shortManifestLabel,
+  slugifyManifestHeading,
+  type ManifestTocItem,
+} from "@/lib/v2/personal/manifest-shared";
+
+export type { ManifestTocItem } from "@/lib/v2/personal/manifest-shared";
+export { slugifyManifestHeading } from "@/lib/v2/personal/manifest-shared";
 
 const MANIFEST_PATH = path.join(process.cwd(), "content/manifest/novoi-zhizni.md");
-
-export type ManifestTocItem = {
-  id: string;
-  label: string;
-  short: string;
-};
-
-export function slugifyManifestHeading(raw: string): string {
-  return raw
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 72);
-}
-
-function shortLabel(heading: string): string {
-  const cleaned = heading
-    .replace(/^[ivxlc]+\.\s*/i, "")
-    .replace(/^манифест\s+/i, "")
-    .trim();
-  if (cleaned.length <= 38) return cleaned;
-  return `${cleaned.slice(0, 36).trim()}…`;
-}
 
 export function loadManifestSource(): { title: string; body: string; toc: ManifestTocItem[] } {
   const raw = fs.readFileSync(MANIFEST_PATH, "utf8");
@@ -46,7 +31,7 @@ export function loadManifestSource(): { title: string; body: string; toc: Manife
       toc.push({
         id: slugifyManifestHeading(text),
         label: text,
-        short: shortLabel(text),
+        short: shortManifestLabel(text),
       });
       bodyLines.push(line);
       continue;

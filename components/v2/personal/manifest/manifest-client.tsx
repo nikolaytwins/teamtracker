@@ -4,7 +4,7 @@ import "./manifest-design.css";
 import {
   slugifyManifestHeading,
   type ManifestTocItem,
-} from "@/lib/v2/personal/manifest";
+} from "@/lib/v2/personal/manifest-shared";
 import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
