@@ -131,59 +131,25 @@ function sortedHistory(rows: PersonalIncomeHistoryRow[]): PersonalIncomeHistoryR
   return [...rows].sort((a, b) => a.year - b.year || a.month - b.month);
 }
 
-function avgProfitLast6(
+function avgProfitLastN(
   rows: PersonalIncomeHistoryRow[],
+  n: number,
   currency: CurrencyMode,
   usdRates: Record<string, number>
 ): number | null {
-  const last6 = sortedHistory(rows).slice(-6);
-  const profits = last6
-    .map((r) => convertRubToDisplay(r.profit_rub ?? 0, r.year, r.month, currency, usdRates))
-    .filter((v) => v > 0 || currency === "rub");
-  if (!profits.length) return null;
-  return Math.round(profits.reduce((s, v) => s + v, 0) / profits.length);
+  const slice = sortedHistory(rows).slice(-n);
+  return avgProfitFromSlice(slice, currency, usdRates);
 }
 
-function avgMarginLast6(rows: PersonalIncomeHistoryRow[]): number | null {
-  const last6 = sortedHistory(rows).slice(-6);
-  const margins: number[] = [];
-  for (const r of last6) {
-    if (r.earned_rub != null && r.earned_rub > 0 && r.profit_rub != null) {
-      margins.push((r.profit_rub / r.earned_rub) * 100);
-    }
-  }
-  if (!margins.length) return null;
-  return Math.round(margins.reduce((s, v) => s + v, 0) / margins.length);
-}
-
-function marginDeltaLast6(rows: PersonalIncomeHistoryRow[]): string {
-  const sorted = sortedHistory(rows);
-  const cur = avgMarginFromSlice(sorted.slice(-6));
-  const prev = avgMarginFromSlice(sorted.slice(-12, -6));
-  if (cur == null || prev == null) return "—";
-  const d = cur - prev;
-  return `${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(1).replace(".", ",")} п.п.`;
-}
-
-function avgMarginFromSlice(slice: PersonalIncomeHistoryRow[]): number | null {
-  const margins: number[] = [];
-  for (const r of slice) {
-    if (r.earned_rub != null && r.earned_rub > 0 && r.profit_rub != null) {
-      margins.push((r.profit_rub / r.earned_rub) * 100);
-    }
-  }
-  if (!margins.length) return null;
-  return margins.reduce((s, v) => s + v, 0) / margins.length;
-}
-
-function profitDeltaLast6(
+function profitDeltaLastN(
   rows: PersonalIncomeHistoryRow[],
+  n: number,
   currency: CurrencyMode,
   usdRates: Record<string, number>
 ): string {
   const sorted = sortedHistory(rows);
-  const cur = avgProfitFromSlice(sorted.slice(-6), currency, usdRates);
-  const prev = avgProfitFromSlice(sorted.slice(-12, -6), currency, usdRates);
+  const cur = avgProfitFromSlice(sorted.slice(-n), currency, usdRates);
+  const prev = avgProfitFromSlice(sorted.slice(-(n * 2), -n), currency, usdRates);
   if (cur == null || prev == null) return "—";
   return pctChange(cur, prev);
 }
@@ -197,7 +163,7 @@ function avgProfitFromSlice(
     .map((r) => convertRubToDisplay(r.profit_rub ?? 0, r.year, r.month, currency, usdRates))
     .filter((v) => v > 0 || currency === "rub");
   if (!profits.length) return null;
-  return profits.reduce((s, v) => s + v, 0) / profits.length;
+  return Math.round(profits.reduce((s, v) => s + v, 0) / profits.length);
 }
 
 function axisMax(values: number[], currency: CurrencyMode): number {
@@ -327,15 +293,15 @@ export function HomeDynamicsChart() {
     const fmt = (n: number) => fmtMoney(n, currency);
 
     if (seriesKey === "profit") {
+      const avg12 = avgProfitLastN(history, 12, currency, usdRates);
       const avg6 =
-        avgProfitLast6(history, currency, usdRates) ??
+        avgProfitLastN(history, 6, currency, usdRates) ??
         (currency === "rub" ? dashboard.summary.avgProfit6m : null);
-      const margin6 = avgMarginLast6(history);
       const best = Math.max(...vals);
       const bestIdx = vals.indexOf(best);
       return [
-        ["Средняя прибыль · 6 мес.", avg6 != null ? fmt(avg6) : "—", profitDeltaLast6(history, currency, usdRates)],
-        ["Маржа · 6 мес.", margin6 != null ? `${margin6}%` : "—", marginDeltaLast6(history)],
+        ["Средняя прибыль · 12 мес.", avg12 != null ? fmt(avg12) : "—", profitDeltaLastN(history, 12, currency, usdRates)],
+        ["Средняя прибыль · 6 мес.", avg6 != null ? fmt(avg6) : "—", profitDeltaLastN(history, 6, currency, usdRates)],
         ["Лучший месяц", fmt(best), series.labels[bestIdx] ?? ""],
       ];
     }
