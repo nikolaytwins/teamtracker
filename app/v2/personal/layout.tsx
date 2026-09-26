@@ -105,7 +105,8 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
   const inObservations = pathname.startsWith(appPath("/v2/personal/observations"));
   const inSport = pathname.startsWith(appPath("/v2/personal/sport"));
   const inIdeasTasks = pathname.startsWith(appPath("/v2/personal/ideas-tasks"));
-  if (inTasks || inCalendar || inTime || inObservations || inSport || inIdeasTasks) {
+  const inImportant = pathname.startsWith(appPath("/v2/personal/important"));
+  if (inTasks || inCalendar || inTime || inObservations || inSport || inIdeasTasks || inImportant) {
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }
 
