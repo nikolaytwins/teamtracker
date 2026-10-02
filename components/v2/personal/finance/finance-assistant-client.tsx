@@ -25,7 +25,7 @@ const HERO_CHIPS = [
   "Как работает система?",
 ];
 
-const AVATAR = "/agency/sofia-hero.png";
+const AVATAR = "/agency/sofia-finance-hero.png";
 
 function uid() {
   return `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -38,14 +38,19 @@ function rub(n: number): string {
 function SofiaAvatar({ size = 32 }: { size?: 32 | 44 }) {
   const cls = size === 44 ? "av av--44" : "av av--32";
   return (
-    <span className={cls}>
+    <span className={cls} style={{ overflow: "hidden" }}>
       <Image
         src={AVATAR}
         alt=""
         width={size}
         height={size}
         unoptimized
-        style={{ objectFit: "cover", objectPosition: "90% 6%" }}
+        style={{
+          objectFit: "cover",
+          objectPosition: "78% 22%",
+          transform: "scale(1.35)",
+          transformOrigin: "78% 22%",
+        }}
       />
     </span>
   );
@@ -461,7 +466,13 @@ export function FinanceAssistantClient() {
                 </div>
               </div>
               <div className="hero-img">
-                <Image src={AVATAR} alt="" fill unoptimized style={{ objectFit: "cover" }} />
+                <Image
+                  src={AVATAR}
+                  alt=""
+                  fill
+                  unoptimized
+                  style={{ objectFit: "cover", objectPosition: "82% 35%" }}
+                />
               </div>
             </section>
 

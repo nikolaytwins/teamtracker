@@ -1893,13 +1893,13 @@ export function PersonalFinanceClient() {
           title="София — финансовый помощник"
         >
           <Image
-            src="/agency/sofia-hero.png"
+            src="/agency/sofia-finance-hero.png"
             alt=""
             width={56}
             height={56}
             unoptimized
             className="h-full w-full object-cover"
-            style={{ objectPosition: "90% 6%", transform: "scale(2.05)", transformOrigin: "90% 12%" }}
+            style={{ objectPosition: "78% 22%", transform: "scale(1.35)", transformOrigin: "78% 22%" }}
           />
         </Link>
       </div>
