@@ -26,6 +26,7 @@ import {
   PfNearestGoal,
 } from "./personal-finance-system";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { appPath } from "@/lib/api-url";
 import {
   formatPersonalPct,
   formatPersonalRub,
@@ -39,7 +40,7 @@ import type {
   PersonalMonthSnapshotRow,
 } from "@/lib/v2/personal/types";
 import { V2Icons } from "@/components/v2/ui/icons";
-import { appPath } from "@/lib/api-url";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -1884,6 +1885,23 @@ export function PersonalFinanceClient() {
           onSave={(form) => void saveTax(form)}
           onReload={() => void reload()}
         />
+
+        <Link
+          href={appPath("/v2/personal/finance/assistant")}
+          className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full shadow-lg ring-2 ring-white transition hover:scale-105 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v2-brand-500,#2a56eb)]"
+          aria-label="Финансовый помощник София"
+          title="София — финансовый помощник"
+        >
+          <Image
+            src="/agency/sofia-hero.png"
+            alt=""
+            width={56}
+            height={56}
+            unoptimized
+            className="h-full w-full object-cover"
+            style={{ objectPosition: "90% 6%", transform: "scale(2.05)", transformOrigin: "90% 12%" }}
+          />
+        </Link>
       </div>
     </PersonalMaskProvider>
   );
