@@ -82,6 +82,37 @@ export function PersonalFinanceSystemGuide() {
           </div>
         </section>
 
+        <section className="overflow-hidden rounded-3xl border border-[var(--v2-brand-200)] bg-white p-7 shadow-[var(--v2-shadow-card)] sm:p-9">
+          <Kicker>Горизонт до 1 октября 2027</Kicker>
+          <p className="v2-tighter mt-3 max-w-[760px] text-[24px] font-light leading-snug text-[var(--v2-ink-900)] sm:text-[28px]">
+            Две цели, к которым сходится вся система.
+          </p>
+          <div className="mt-7 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl bg-[var(--v2-ink-50)] p-6">
+              <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">
+                Доход
+              </p>
+              <p className="v2-tnum mt-3 text-[30px] font-semibold leading-none text-[var(--v2-ink-900)]">
+                400 000 ₽
+              </p>
+              <p className="mt-3 text-[14px] leading-relaxed text-[var(--v2-ink-600)]">
+                Выйти на стабильные 400 тысяч в месяц.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-[var(--v2-brand-50)] p-6">
+              <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
+                Капитал
+              </p>
+              <p className="v2-tnum mt-3 text-[30px] font-semibold leading-none text-[var(--v2-ink-900)]">
+                1,8–2,4 млн ₽
+              </p>
+              <p className="mt-3 text-[14px] leading-relaxed text-[var(--v2-ink-600)]">
+                Прибавить капитал до 1,8–2,4 миллионов рублей.
+              </p>
+            </div>
+          </div>
+        </section>
+
         <section className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-card)]">
             <Kicker>Сначала бизнес</Kicker>

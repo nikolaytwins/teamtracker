@@ -22,6 +22,7 @@ import {
   fundsTotal,
   PfAccountsAsFunds,
   PfGoalQueue,
+  PfHorizon2027,
   PfMoscowReady,
   PfNearestGoal,
 } from "./personal-finance-system";
@@ -1811,6 +1812,11 @@ export function PersonalFinanceClient() {
 
             <div className="space-y-7">
               <PfHeroCards summary={summary} accounts={accounts} funds={funds ?? []} history={history} year={year} month={month} />
+              <PfHorizon2027
+                capitalNow={summary.netWorth}
+                avgMonthlyProfit={summary.avgProfit6m}
+                monthProfit={summary.monthProfit}
+              />
               <PfNearestGoal nearest={nearest} cushionTotal={cushionTotal} />
               <PfGoalQueue allocated={allocated} monthly={monthlySurplus} onReload={() => void reload()} />
               <PfMoscowReady

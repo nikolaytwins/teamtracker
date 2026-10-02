@@ -45,6 +45,110 @@ export function fundsTotal(funds: PersonalFinanceFundRow[]): number {
   return funds.reduce((s, f) => s + f.amount_rub, 0);
 }
 
+/** Стратегический горизонт личных финансов. */
+export const FINANCE_HORIZON_2027 = {
+  deadlineIso: "2027-10-01",
+  deadlineLabel: "1 октября 2027",
+  incomeTargetRub: 400_000,
+  capitalMinRub: 1_800_000,
+  capitalMaxRub: 2_400_000,
+} as const;
+
+function horizonDaysLeft(from = new Date()): number {
+  const end = new Date(`${FINANCE_HORIZON_2027.deadlineIso}T12:00:00`);
+  return Math.max(0, Math.ceil((end.getTime() - from.getTime()) / 86_400_000));
+}
+
+export function PfHorizon2027({
+  capitalNow,
+  avgMonthlyProfit,
+  monthProfit,
+}: {
+  capitalNow: number;
+  avgMonthlyProfit: number;
+  monthProfit: number;
+}) {
+  const { incomeTargetRub, capitalMinRub, capitalMaxRub, deadlineLabel } = FINANCE_HORIZON_2027;
+  const days = horizonDaysLeft();
+  const capitalMid = (capitalMinRub + capitalMaxRub) / 2;
+  const capitalPct = Math.min(1, Math.max(0, capitalNow / capitalMid));
+  const incomeNow = Math.max(avgMonthlyProfit, monthProfit);
+  const incomePct = Math.min(1, Math.max(0, incomeNow / incomeTargetRub));
+  const capitalOk = capitalNow >= capitalMinRub;
+  const incomeOk = avgMonthlyProfit >= incomeTargetRub;
+
+  return (
+    <Sect
+      accent="#7C3AED"
+      title="Горизонт до 1 октября 2027"
+      hint={`осталось ${days.toLocaleString("ru-RU")} дн. · ${deadlineLabel}`}
+    >
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card className="p-6">
+          <Kick>Стабильный доход</Kick>
+          <div className="mt-2 flex flex-wrap items-baseline gap-2.5">
+            <span className="v2-tighter v2-tnum text-[32px] font-semibold text-[var(--v2-ink-900)]">
+              400 000 ₽
+            </span>
+            <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">в месяц</span>
+          </div>
+          <p className="v2-tight mt-2 text-[13px] leading-relaxed text-[var(--v2-ink-500)]">
+            Выйти на стабильные 400 тысяч в месяц к {deadlineLabel}.
+          </p>
+          <div className="mt-5">
+            <PfBar pct={incomePct} color={incomeOk ? "#10B981" : "#7C3AED"} />
+            <div className="v2-tight v2-tnum mt-2.5 flex items-center justify-between text-[12.5px] text-[var(--v2-ink-500)]">
+              <span>
+                сейчас ср. 6м <PersonalAmt v={avgMonthlyProfit} />
+                {monthProfit > 0 ? (
+                  <>
+                    {" "}
+                    · месяц <PersonalAmt v={monthProfit} />
+                  </>
+                ) : null}
+              </span>
+              <span className={incomeOk ? "font-medium text-emerald-600" : undefined}>
+                {Math.round(incomePct * 100)}%
+              </span>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <Kick>Капитал</Kick>
+          <div className="mt-2 flex flex-wrap items-baseline gap-2.5">
+            <span className="v2-tighter v2-tnum text-[32px] font-semibold text-[var(--v2-ink-900)]">
+              1,8–2,4 млн ₽
+            </span>
+          </div>
+          <p className="v2-tight mt-2 text-[13px] leading-relaxed text-[var(--v2-ink-500)]">
+            Прибавить капитал до 1,8–2,4 миллионов рублей к {deadlineLabel}.
+          </p>
+          <div className="mt-5">
+            <PfBar pct={capitalPct} color={capitalOk ? "#10B981" : "#7C3AED"} />
+            <div className="v2-tight v2-tnum mt-2.5 flex items-center justify-between text-[12.5px] text-[var(--v2-ink-500)]">
+              <span>
+                сейчас <PersonalAmt v={capitalNow} />
+                {capitalOk ? (
+                  " · минимум достигнут"
+                ) : (
+                  <>
+                    {" "}
+                    · до 1,8 млн <PersonalAmt v={capitalMinRub - capitalNow} />
+                  </>
+                )}
+              </span>
+              <span className={capitalOk ? "font-medium text-emerald-600" : undefined}>
+                {Math.round(capitalPct * 100)}%
+              </span>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </Sect>
+  );
+}
+
 export function allocateGoals(goals: PersonalFinanceGoalRow[], pool: number): AllocatedGoal[] {
   let remaining = Math.max(pool, 0);
   const rows: AllocatedGoal[] = goals.map((g) => {
