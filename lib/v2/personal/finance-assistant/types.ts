@@ -1,3 +1,8 @@
+import type { DayPlanContext, DayWeekPlan } from "@/lib/v2/personal/finance-assistant/day-plan-types";
+
+export type { DayPlanContext, DayWeekPlan };
+export type { AssistantDomain } from "@/lib/v2/personal/finance-assistant/day-plan-types";
+
 export type FinanceAssistantMode = "weak" | "economy" | "normal";
 
 export type FinanceAllocationLine = {
@@ -34,6 +39,7 @@ export type FinanceAssistantContext = {
 
 export type FinanceAssistantAction =
   | { type: "apply_allocation"; plan: FinanceAllocationPlan; label?: string }
+  | { type: "apply_day_plan"; plan: DayWeekPlan; label?: string }
   | { type: "prefill"; text: string; label?: string }
   | { type: "link"; href: string; label: string };
 
@@ -65,6 +71,7 @@ export type FinanceAssistantDecision = {
   alternative?: string;
   why: { text: string; warn?: boolean }[];
   plan?: FinanceAllocationPlan;
+  day_plan?: DayWeekPlan;
   actions?: FinanceAssistantAction[];
 };
 
@@ -79,6 +86,7 @@ export type FinanceAssistantChatTurn = { role: "user" | "assistant"; text: strin
 export type FinanceAssistantChatResponse = {
   messages: FinanceAssistantMessage[];
   plan?: FinanceAllocationPlan | null;
+  day_plan?: DayWeekPlan | null;
 };
 
 export type FinanceAssistantApplyResult = {

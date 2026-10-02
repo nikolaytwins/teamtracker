@@ -226,7 +226,7 @@ export const WEEK_CHECKLIST: WeekChecklistDef[] = [
   },
   {
     id: "creative",
-    label: "1 творческий день",
+    label: "1 творческий блок",
     kind: "mode",
     mode: "creative",
     css: "ark",
@@ -240,7 +240,7 @@ export const WEEK_CHECKLIST: WeekChecklistDef[] = [
   },
   {
     id: "rest",
-    label: "1 выходной",
+    label: "1 полный выходной",
     kind: "mode",
     mode: "rest",
     css: "rest",

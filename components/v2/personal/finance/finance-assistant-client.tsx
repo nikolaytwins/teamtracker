@@ -3,10 +3,12 @@
 import "@/components/v2/agency/sofia/sofia-design.css";
 import { appPath } from "@/lib/api-url";
 import {
+  applyDayAssistantPlan,
   applyFinanceAssistantPlan,
   fetchFinanceAssistantContext,
   sendFinanceAssistantMessage,
 } from "@/lib/v2/personal/finance-assistant/api-client";
+import type { AssistantDomain, DayPlanContext, DayWeekPlan } from "@/lib/v2/personal/finance-assistant/day-plan-types";
 import type {
   FinanceAllocationPlan,
   FinanceAssistantAction,
@@ -18,11 +20,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const HERO_CHIPS = [
+const FINANCE_CHIPS = [
   "Заработал 170 000",
   "Заработал 200 000",
   "Заработал 280 000",
   "Как работает система?",
+];
+
+const DAY_CHIPS = [
+  "Распланируй эту неделю",
+  "Следующая неделя",
+  "Стратегия в понедельник, свидание в субботу",
+  "Что ещё не закрыто?",
 ];
 
 const AVATAR = "/agency/sofia-finance-hero.png";
@@ -73,13 +82,17 @@ function ActionButtons({
           a.label ??
           (a.type === "apply_allocation"
             ? "Записать в фонды"
-            : a.type === "prefill"
-              ? "Изменить сумму"
-              : a.type === "link"
-                ? a.label
-                : "Действие");
+            : a.type === "apply_day_plan"
+              ? "Записать в план"
+              : a.type === "prefill"
+                ? "Изменить"
+                : a.type === "link"
+                  ? a.label
+                  : "Действие");
         const cls =
-          a.type === "apply_allocation" ? "btn btn--pri btn--sm" : "btn btn--line btn--sm";
+          a.type === "apply_allocation" || a.type === "apply_day_plan"
+            ? "btn btn--pri btn--sm"
+            : "btn btn--line btn--sm";
         if (a.type === "link") {
           return (
             <Link key={i} href={appPath(a.href)} className={cls}>
@@ -118,6 +131,19 @@ function PlanGrid({ plan }: { plan: FinanceAllocationPlan }) {
   );
 }
 
+function DayPlanGrid({ plan }: { plan: DayWeekPlan }) {
+  return (
+    <div className="tl" style={{ marginTop: 12 }}>
+      {plan.checklist.map((c) => (
+        <div key={c.id} className={`tlc${c.ok ? " tlc--acc" : ""}`}>
+          <span className="tlc-l">{c.label}</span>
+          <span className="tlc-v tnum">{c.ok ? c.plan_date ?? "ок" : "—"}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DecisionCard({
   msg,
   onAction,
@@ -127,10 +153,11 @@ function DecisionCard({
   onAction: (a: FinanceAssistantAction) => void;
   busy?: boolean;
 }) {
+  const isDay = Boolean(msg.day_plan);
   return (
     <div className="ans">
       <div className="ans-top">
-        <span className="kick">{msg.headline ?? "Распределение"}</span>
+        <span className="kick">{msg.headline ?? (isDay ? "Неделя" : "Распределение")}</span>
         <p className="ans-d">{msg.decision}</p>
         {msg.alternative ? (
           <div className="ans-alt">
@@ -142,7 +169,8 @@ function DecisionCard({
         ) : null}
       </div>
       <div className="ans-b">
-        <span className="kick">Куда класть</span>
+        <span className="kick">{isDay ? "Чеклист недели" : "Куда класть"}</span>
+        {msg.day_plan ? <DayPlanGrid plan={msg.day_plan} /> : null}
         {msg.plan ? <PlanGrid plan={msg.plan} /> : null}
         <ul className="why" style={{ marginTop: 16 }}>
           {msg.why.map((w, i) => (
@@ -232,7 +260,7 @@ function MessageRow({
   );
 }
 
-function ContextPanel({
+function FinanceContextPanel({
   context,
   collapsed,
   loading,
@@ -313,12 +341,98 @@ function ContextPanel({
   );
 }
 
+function DayContextPanel({
+  context,
+  collapsed,
+  loading,
+  error,
+  onRetry,
+  onToggle,
+}: {
+  context: DayPlanContext | null;
+  collapsed: boolean;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  onToggle: () => void;
+}) {
+  if (collapsed) {
+    return (
+      <section className="card ctx collapsed">
+        <button type="button" className="tgl" onClick={onToggle} aria-label="Развернуть">
+          ←
+        </button>
+        <span className="vlab">Неделя</span>
+      </section>
+    );
+  }
+
+  return (
+    <section className="card ctx">
+      <div className="ctx-h">
+        <span className="kick">Неделя</span>
+        <button type="button" className="tgl" style={{ marginLeft: "auto" }} onClick={onToggle}>
+          →
+        </button>
+      </div>
+      {loading && !context ? <p className="sec-sub">Загрузка…</p> : null}
+      {error ? (
+        <div>
+          <p className="sec-sub">{error}</p>
+          <button type="button" className="btn btn--line btn--sm" onClick={onRetry}>
+            Ещё раз
+          </button>
+        </div>
+      ) : null}
+      {context ? (
+        <div className="ctx-b">
+          <div className="cg">
+            <span className="cg-t">
+              {context.week_start} — {context.week_end}
+            </span>
+            <div className="cg-row">
+              Рабочий день <b className="tnum">{context.work_hours_per_day} ч</b>
+            </div>
+          </div>
+          <div className="ctx-div" />
+          <div className="cg">
+            <span className="cg-t">Чеклист</span>
+            {context.checklist.map((c) => (
+              <div key={c.id} className="cg-row">
+                {c.label}{" "}
+                <b className="tnum">{c.ok ? c.plan_date ?? "✓" : "—"}</b>
+              </div>
+            ))}
+          </div>
+          <div className="ctx-div" />
+          <div className="cg">
+            <span className="cg-t">Дни</span>
+            {context.days.map((d) => (
+              <div key={d.date} className="cg-row">
+                {d.weekday} {d.date.slice(5)}{" "}
+                <b className="tnum">
+                  {d.mode ?? "·"} · {d.hours}ч
+                </b>
+              </div>
+            ))}
+          </div>
+          <p className="sec-sub" style={{ marginTop: 4 }}>
+            {context.free_hint}
+          </p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function FinanceAssistantClient() {
+  const [domain, setDomain] = useState<AssistantDomain>("finance");
   const [messages, setMessages] = useState<FinanceAssistantMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
-  const [context, setContext] = useState<FinanceAssistantContext | null>(null);
+  const [financeContext, setFinanceContext] = useState<FinanceAssistantContext | null>(null);
+  const [dayContext, setDayContext] = useState<DayPlanContext | null>(null);
   const [contextLoading, setContextLoading] = useState(true);
   const [contextError, setContextError] = useState<string | null>(null);
   const [ctxCollapsed, setCtxCollapsed] = useState(false);
@@ -326,30 +440,42 @@ export function FinanceAssistantClient() {
   const threadRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const chips = domain === "day" ? DAY_CHIPS : FINANCE_CHIPS;
+
   const showToast = useCallback((text: string) => {
     setToast(text);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2800);
   }, []);
 
-  const refreshContext = useCallback(() => {
+  const refreshContext = useCallback((d: AssistantDomain = domain) => {
     setContextLoading(true);
     setContextError(null);
-    void fetchFinanceAssistantContext()
-      .then((r) => setContext(r.context))
+    void fetchFinanceAssistantContext(d)
+      .then((r) => {
+        if (r.domain === "day") setDayContext(r.context);
+        else setFinanceContext(r.context);
+      })
       .catch((e) => setContextError(e instanceof Error ? e.message : "Ошибка"))
       .finally(() => setContextLoading(false));
-  }, []);
+  }, [domain]);
 
   useEffect(() => {
-    refreshContext();
-  }, [refreshContext]);
+    refreshContext(domain);
+  }, [domain, refreshContext]);
 
   useEffect(() => {
     const el = threadRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [messages, loading]);
+
+  const switchDomain = useCallback((next: AssistantDomain) => {
+    if (next === domain) return;
+    setDomain(next);
+    setMessages([]);
+    setInput("");
+  }, [domain]);
 
   const historyFromMessages = useCallback((list: FinanceAssistantMessage[]): FinanceAssistantChatTurn[] => {
     const out: FinanceAssistantChatTurn[] = [];
@@ -374,6 +500,7 @@ export function FinanceAssistantClient() {
         const result = await sendFinanceAssistantMessage({
           message: text,
           history: historyFromMessages(messages),
+          domain,
         });
         setMessages((prev) => [...prev, ...result.messages]);
       } catch {
@@ -383,15 +510,18 @@ export function FinanceAssistantClient() {
             id: uid(),
             role: "assistant",
             kind: "bubble",
-            text: "Не удалось ответить. Попробуй ещё раз или напиши сумму цифрами.",
-            chips: HERO_CHIPS.slice(0, 3),
+            text:
+              domain === "day"
+                ? "Не удалось ответить. Попробуй ещё раз или напиши «распланируй неделю»."
+                : "Не удалось ответить. Попробуй ещё раз или напиши сумму цифрами.",
+            chips: chips.slice(0, 3),
           },
         ]);
       } finally {
         setLoading(false);
       }
     },
-    [historyFromMessages, loading, messages]
+    [chips, domain, historyFromMessages, loading, messages]
   );
 
   const onChip = useCallback(
@@ -412,7 +542,7 @@ export function FinanceAssistantClient() {
         setApplying(true);
         try {
           const result = await applyFinanceAssistantPlan(a.plan);
-          refreshContext();
+          refreshContext("finance");
           const lines = result.applied.map(
             (x) => `${x.name}: ${rub(x.before)} → ${rub(x.after)} (+${rub(x.delta)})`
           );
@@ -436,10 +566,62 @@ export function FinanceAssistantClient() {
         } finally {
           setApplying(false);
         }
+        return;
+      }
+      if (a.type === "apply_day_plan") {
+        if (applying) return;
+        setApplying(true);
+        try {
+          const result = await applyDayAssistantPlan(a.plan);
+          refreshContext("day");
+          const modes = result.day_modes.map((m) => `${m.plan_date}: ${m.mode}`).join("\n");
+          const items = result.created_items
+            .map((it) => `${it.plan_date ?? "—"} · ${it.title}`)
+            .join("\n");
+          const skip = result.skipped.length ? `\n\nПропущено: ${result.skipped.join("; ")}` : "";
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: uid(),
+              role: "assistant",
+              kind: "bubble",
+              text: `Записала в план.\n\nРежимы:\n${modes || "—"}\n\nБлоки:\n${items || "—"}${skip}`,
+              actions: [{ type: "link", href: "/v2/agency/plan", label: "Открыть календарь" }],
+            },
+          ]);
+          showToast(
+            result.created_items.length || result.day_modes.length
+              ? "План обновлён"
+              : "Нечего записывать"
+          );
+        } catch {
+          showToast("Не удалось записать в план");
+        } finally {
+          setApplying(false);
+        }
       }
     },
     [applying, refreshContext, showToast]
   );
+
+  const heroKick = domain === "day" ? "Планирование дня" : "Финансовый помощник";
+  const heroSub =
+    domain === "day"
+      ? "Скажи ограничения недели — раскидаю стратегию, творчество, выходы, свидание, выходной и рабочие дни. По одобрению занесу в календарь."
+      : "Скажи, сколько заработал — разложу по платежам, свободным и фондам. По одобрению запишу сама.";
+  const ask =
+    domain === "day" ? "Какую неделю собираем?" : "Сколько сейчас доступно?";
+  const role = domain === "day" ? "Планировщик недели" : "Финансовый аналитик";
+  const loadingText =
+    domain === "day" ? "Смотрю календарь и раскладываю дни…" : "Считаю платежи, свободные и фонды…";
+  const placeholder =
+    domain === "day"
+      ? "Например: распланируй неделю, мероприятие в среду, свидание в субботу…"
+      : "Например: заработал 250 тысяч после зарплаты…";
+  const footerHint =
+    domain === "day"
+      ? "После одобрения поставлю режимы дней и события в календарь Плана."
+      : "После одобрения пополню одежду, подарки, Леру и подушку. Платежи и свободные — подскажу отдельно.";
 
   return (
     <div className="sofia-v3 flex min-h-0 flex-1 flex-col">
@@ -448,17 +630,30 @@ export function FinanceAssistantClient() {
           <div className="page">
             <section className="card hero">
               <div className="hero-l">
-                <span className="kick">Финансовый помощник</span>
+                <span className="kick">{heroKick}</span>
                 <h1 className="hero-h1">София</h1>
-                <p className="hero-s">
-                  Скажи, сколько заработал — разложу по платежам, свободным и фондам. По одобрению
-                  запишу сама.
-                </p>
+                <p className="hero-s">{heroSub}</p>
+                <div className="chips" style={{ marginTop: 8, marginBottom: 4 }}>
+                  <button
+                    type="button"
+                    className={`chip${domain === "finance" ? " chip--q" : ""}`}
+                    onClick={() => switchDomain("finance")}
+                  >
+                    Финансы
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip${domain === "day" ? " chip--q" : ""}`}
+                    onClick={() => switchDomain("day")}
+                  >
+                    План дня
+                  </button>
+                </div>
                 <span className="ask" style={{ fontSize: 19, paddingTop: 12 }}>
-                  Сколько сейчас доступно?
+                  {ask}
                 </span>
                 <div className="chips">
-                  {HERO_CHIPS.map((c) => (
+                  {chips.map((c) => (
                     <button key={c} type="button" className="chip" onClick={() => void send(c)}>
                       {c}
                     </button>
@@ -482,7 +677,7 @@ export function FinanceAssistantClient() {
                   <SofiaAvatar size={44} />
                   <div>
                     <div className="chat-n">София</div>
-                    <div className="chat-r">Финансовый аналитик</div>
+                    <div className="chat-r">{role}</div>
                   </div>
                   <span className="chat-on">
                     <i /> {loading || applying ? "Думаю…" : "На связи"}
@@ -502,7 +697,7 @@ export function FinanceAssistantClient() {
                     <div className="msg">
                       <SofiaAvatar size={32} />
                       <div className="msg-body">
-                        <div className="bub">Считаю платежи, свободные и фонды…</div>
+                        <div className="bub">{loadingText}</div>
                       </div>
                     </div>
                   ) : null}
@@ -511,16 +706,13 @@ export function FinanceAssistantClient() {
                   <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Например: заработал 250 тысяч после зарплаты…"
+                    placeholder={placeholder}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(input);
                     }}
                   />
                   <div className="compose-r">
-                    <p className="eg">
-                      После одобрения пополню одежду, подарки, Леру и подушку. Платежи и свободные —
-                      подскажу отдельно.
-                    </p>
+                    <p className="eg">{footerHint}</p>
                     <button
                       type="button"
                       className="btn btn--pri"
@@ -533,14 +725,25 @@ export function FinanceAssistantClient() {
                 </div>
               </section>
 
-              <ContextPanel
-                context={context}
-                collapsed={ctxCollapsed}
-                loading={contextLoading}
-                error={contextError}
-                onRetry={refreshContext}
-                onToggle={() => setCtxCollapsed((v) => !v)}
-              />
+              {domain === "day" ? (
+                <DayContextPanel
+                  context={dayContext}
+                  collapsed={ctxCollapsed}
+                  loading={contextLoading}
+                  error={contextError}
+                  onRetry={() => refreshContext("day")}
+                  onToggle={() => setCtxCollapsed((v) => !v)}
+                />
+              ) : (
+                <FinanceContextPanel
+                  context={financeContext}
+                  collapsed={ctxCollapsed}
+                  loading={contextLoading}
+                  error={contextError}
+                  onRetry={() => refreshContext("finance")}
+                  onToggle={() => setCtxCollapsed((v) => !v)}
+                />
+              )}
             </div>
           </div>
         </main>
