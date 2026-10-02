@@ -99,8 +99,11 @@
 | 078 | `078_agency_project_dispatch_permanent.sql` | План: статус permanent («Постоянные») |
 | 079 | `079_agency_plan_item_completed_at.sql` | План: completed_at у слотов/событий дня |
 | 080 | `080_agency_plan_item_priority.sql` | План: priority 1–4 у слотов/событий дня |
+| 081 | `081_personal_eur_account.sql` | Личные финансы: евро-счёт по образцу долларового |
+| 082 | `082_drop_obsolete_personal_funds.sql` | Удаление лишних фондов: квартира, Москва, Китай, ИИ, залог |
+| 083 | `083_drop_life_fund.sql` | Удаление фонда «Траты на жизнь» |
 
-**Следующий свободный номер:** `081`
+**Следующий свободный номер:** `084`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

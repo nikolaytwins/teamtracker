@@ -11,7 +11,6 @@ import { DEFAULT_BUDGET_CATEGORIES } from "@/lib/v2/personal/formatters";
 import {
   ensureFxRatesFresh,
   getFxRateMap,
-  listFxRates,
   isPersonalAccountCurrency,
   isPersonalFxCurrency,
   rubFromNative,
@@ -106,13 +105,10 @@ function mapAccount(
   };
 }
 
-async function loadFxRateLookup(opts?: { refresh?: boolean }): Promise<
+async function loadFxRateLookup(): Promise<
   Map<PersonalFxCurrency, { rate: number; asOf: string }>
 > {
-  const rates = opts?.refresh ? (await ensureFxRatesFresh()) : await listFxRates().catch(() => []);
-  if (!opts?.refresh && rates.length === 0) {
-    return loadFxRateLookup({ refresh: true });
-  }
+  const rates = await ensureFxRatesFresh();
   return new Map(
     rates.map((r) => [r.currency_code, { rate: r.rate_to_rub, asOf: r.as_of_date }])
   );
@@ -2116,20 +2112,12 @@ const DEFAULT_FINANCE_FUNDS: Array<{
   sort_order: number;
 }> = [
   {
-    fund_key: "life",
-    name: "Траты на жизнь",
-    monthly_hint: "100 000 ₽ каждый месяц · счёт в USD",
-    icon_key: "wallet",
-    accent: "#10B981",
-    sort_order: 0,
-  },
-  {
     fund_key: "salary",
     name: "Фонд зарплат",
     monthly_hint: "зарплаты следующего месяца · счёт в ₽",
     icon_key: "bank",
     accent: "#3B6FF7",
-    sort_order: 1,
+    sort_order: 0,
   },
   {
     fund_key: "cushion",
@@ -2137,7 +2125,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
     monthly_hint: "остаток · делить между ₽ и USD",
     icon_key: "shield",
     accent: "#6366F1",
-    sort_order: 2,
+    sort_order: 1,
   },
   {
     fund_key: "clothing",
@@ -2145,7 +2133,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
     monthly_hint: "5 000 ₽ каждый месяц · счёт в ₽",
     icon_key: "target",
     accent: "#9A8CFF",
-    sort_order: 3,
+    sort_order: 2,
   },
   {
     fund_key: "gifts",
@@ -2153,15 +2141,7 @@ const DEFAULT_FINANCE_FUNDS: Array<{
     monthly_hint: "10 000 ₽ каждый месяц · счёт в ₽",
     icon_key: "target",
     accent: "#FF335F",
-    sort_order: 4,
-  },
-  {
-    fund_key: "apartment",
-    name: "Квартира",
-    monthly_hint: "аренда · счёт в USD",
-    icon_key: "key",
-    accent: "#0EA5E9",
-    sort_order: 5,
+    sort_order: 3,
   },
   {
     fund_key: "lera",
@@ -2169,33 +2149,11 @@ const DEFAULT_FINANCE_FUNDS: Array<{
     monthly_hint: "5 000 ₽ каждый месяц · счёт в ₽",
     icon_key: "coin",
     accent: "#F472B6",
-    sort_order: 6,
-  },
-  {
-    fund_key: "moscow",
-    name: "Фонд Москва",
-    monthly_hint: null,
-    icon_key: "flag",
-    accent: "#0EA5E9",
-    sort_order: 7,
-  },
-  {
-    fund_key: "china",
-    name: "Фонд Китай",
-    monthly_hint: null,
-    icon_key: "coin",
-    accent: "#EF4444",
-    sort_order: 8,
-  },
-  {
-    fund_key: "ai",
-    name: "ИИ",
-    monthly_hint: "20 000 ₽ каждый месяц · остаток можно на жизнь",
-    icon_key: "coin",
-    accent: "#9A8CFF",
-    sort_order: 9,
+    sort_order: 4,
   },
 ];
+
+const OBSOLETE_FUND_KEYS = ["life", "apartment", "moscow", "china", "ai", "rent_deposit"] as const;
 
 const DEFAULT_CAPITAL_ITEMS: Array<{
   name: string;
@@ -2239,7 +2197,17 @@ export async function ensureFinanceFunds(userId: string): Promise<PersonalFinanc
     .order("id", FINANCE_CARD_ORDER);
   if (error) throw error;
 
-  const existingKeys = new Set((data ?? []).map((r) => String(r.fund_key ?? "")).filter(Boolean));
+  const obsoleteKeys = new Set<string>(OBSOLETE_FUND_KEYS);
+  const obsoleteIds = (data ?? [])
+    .filter((r) => obsoleteKeys.has(String(r.fund_key ?? "")))
+    .map((r) => String(r.id));
+  if (obsoleteIds.length) {
+    const { error: delErr } = await sb.from("v2_personal_finance_funds").delete().in("id", obsoleteIds);
+    if (delErr) throw delErr;
+  }
+
+  const kept = (data ?? []).filter((r) => !obsoleteIds.includes(String(r.id)));
+  const existingKeys = new Set(kept.map((r) => String(r.fund_key ?? "")).filter(Boolean));
   const missing = DEFAULT_FINANCE_FUNDS.filter((f) => !existingKeys.has(f.fund_key));
   if (missing.length) {
     const ts = nowIso();

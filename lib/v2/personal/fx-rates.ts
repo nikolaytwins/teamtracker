@@ -122,7 +122,12 @@ export async function syncFxRatesFromCbr(opts?: {
   const existing = await listFxRates();
   const today = new Date().toISOString().slice(0, 10);
   const allFresh =
-    TRACKED_CODES.every((code) => existing.some((r) => r.currency_code === code && r.as_of_date === today)) &&
+    TRACKED_CODES.every(
+      (code) =>
+        existing.some(
+          (r) => r.currency_code === code && r.updated_at.slice(0, 10) === today
+        )
+    ) &&
     existing.length > 0;
 
   if (allFresh && !opts?.force) {

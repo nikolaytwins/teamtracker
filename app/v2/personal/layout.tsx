@@ -61,6 +61,11 @@ const FINANCE_TABS = [
     match: (p: string) => p === appPath("/v2/personal/finance"),
   },
   {
+    href: "/v2/personal/finance/system",
+    label: "Финансовая система",
+    match: (p: string) => p.startsWith(appPath("/v2/personal/finance/system")),
+  },
+  {
     href: "/v2/personal/finance/forecast",
     label: "Прогноз",
     match: (p: string) => p.startsWith(appPath("/v2/personal/finance/forecast")),

@@ -747,13 +747,10 @@ const ACCOUNT_CURRENCY_GROUPS: { code: PersonalAccountCurrency | "OTHER"; label:
 ];
 
 const FUND_SOURCE_CURRENCY: Partial<Record<string, PersonalAccountCurrency>> = {
-  life: "USD",
-  apartment: "USD",
   lera: "RUB",
   salary: "RUB",
   clothing: "RUB",
   gifts: "RUB",
-  ai: "RUB",
 };
 
 function accountCurrencyLabel(code: PersonalAccountCurrency): string {
