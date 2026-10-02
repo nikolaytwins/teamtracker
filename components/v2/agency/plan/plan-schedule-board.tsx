@@ -1,0 +1,740 @@
+"use client";
+
+import "./plan-schedule-design.css";
+import {
+  createPlanItemApi,
+  deletePlanItemApi,
+  updatePlanItemApi,
+} from "@/lib/v2/agency/plan/plan-api-client";
+import type { PlanItemRow } from "@/lib/v2/agency/plan/plan-types";
+import { addDays, toYmd } from "@/lib/v2/agency/plan/plan-utils";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+const WD = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
+const MON = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+];
+const VKEY = "tt-plan-schedule-view";
+
+function Icon({
+  name,
+  className = "svgi",
+}: {
+  name: "check" | "star" | "next" | "del" | "plus";
+  className?: string;
+}) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      {name === "check" ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : null}
+      {name === "star" ? (
+        <path
+          d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"
+          fill="currentColor"
+          stroke="none"
+        />
+      ) : null}
+      {name === "next" ? (
+        <>
+          <path d="M5 12h13" />
+          <path d="M13 6l6 6-6 6" />
+        </>
+      ) : null}
+      {name === "del" ? (
+        <>
+          <path d="M5 7h14" />
+          <path d="M10 7V5h4v2" />
+          <path d="M7 7l1 12h8l1-12" />
+        </>
+      ) : null}
+      {name === "plus" ? (
+        <>
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </>
+      ) : null}
+    </svg>
+  );
+}
+
+type SchKind = "task" | "event" | "prio";
+
+function itemKind(item: PlanItemRow): SchKind {
+  if (item.kind === "call" || item.kind === "personal") return "event";
+  if (item.priority === 1) return "prio";
+  return "task";
+}
+
+function fmtText(t: string) {
+  const m = t.match(/^(.{6,}?[.!?»])\s+([\s\S]+)$/);
+  if (m && t.length > 56) {
+    return (
+      <>
+        {m[1]} <span className="more">{m[2]}</span>
+      </>
+    );
+  }
+  return t;
+}
+
+function dm(s: string) {
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(y!, m! - 1, d!);
+  return `${dt.getDate()} ${MON[dt.getMonth()]}`;
+}
+
+function normTime(v: string) {
+  const m = v.trim().match(/^(\d{1,2})[:.\s]?(\d{2})?$/);
+  if (!m) return "";
+  const h = +m[1]!;
+  const mi = +(m[2] || 0);
+  if (h > 23 || mi > 59) return "";
+  return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
+}
+
+function dayList(todayKey: string, items: PlanItemRow[]) {
+  const lastItem = items.reduce((m, i) => (i.plan_date && i.plan_date > m ? i.plan_date : m), "");
+  const last = lastItem && lastItem > addDaysIso(todayKey, 20) ? lastItem : addDaysIso(todayKey, 20);
+  const out: string[] = [];
+  for (let s = addDaysIso(todayKey, -1); s <= last; s = addDaysIso(s, 1)) out.push(s);
+  return out;
+}
+
+function addDaysIso(s: string, n: number) {
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(y!, m! - 1, d!);
+  dt.setDate(dt.getDate() + n);
+  return toYmd(dt);
+}
+
+export function PlanScheduleBoard({
+  items,
+  todayKey,
+  onChanged,
+  onToast,
+  externalDragKind,
+  onExternalDrop,
+}: {
+  items: PlanItemRow[];
+  todayKey: string;
+  onChanged: () => Promise<void>;
+  onToast: (msg: string, undo?: () => void) => void;
+  externalDragKind?: "checklist" | "mark" | "new" | "move" | "backlog" | "kanban" | null;
+  onExternalDrop?: (day: string) => void;
+}) {
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState(4);
+  const [draft, setDraft] = useState<Record<string, SchKind>>({});
+  const [compose, setCompose] = useState<Record<string, string>>({});
+  const [eventTime, setEventTime] = useState<Record<string, string>>({});
+  const [rangeLabel, setRangeLabel] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropDay, setDropDay] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const undoSnap = useRef<PlanItemRow[] | null>(null);
+
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(VKEY) || "{}") as { cols?: number };
+      if (v.cols === 3 || v.cols === 4 || v.cols === 5) setCols(v.cols);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const days = useMemo(() => dayList(todayKey, items), [todayKey, items]);
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, PlanItemRow[]>();
+    for (const it of items) {
+      if (!it.plan_date) continue;
+      const list = map.get(it.plan_date) ?? [];
+      list.push(it);
+      map.set(it.plan_date, list);
+    }
+    return map;
+  }, [items]);
+
+  const colW = useCallback(() => {
+    const c = boardRef.current?.querySelector(".col") as HTMLElement | null;
+    return c ? c.offsetWidth + 14 : 300;
+  }, []);
+
+  const updRange = useCallback(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const colsEl = [...board.querySelectorAll<HTMLElement>(".col")];
+    if (!colsEl.length) return;
+    const i = Math.round(board.scrollLeft / colW());
+    const a = colsEl[i];
+    const b = colsEl[Math.min(colsEl.length - 1, i + cols - 1)];
+    if (!a || !b) return;
+    const da = new Date(a.dataset.day + "T12:00:00");
+    const db = new Date(b.dataset.day + "T12:00:00");
+    if (da.getMonth() === db.getMonth()) {
+      setRangeLabel(`${da.getDate()}–${db.getDate()} ${MON[db.getMonth()]} ${db.getFullYear()}`);
+    } else {
+      setRangeLabel(`${dm(a.dataset.day!)} – ${dm(b.dataset.day!)}`);
+    }
+  }, [colW, cols]);
+
+  const goToday = useCallback(
+    (smooth: boolean) => {
+      const board = boardRef.current;
+      const el = board?.querySelector(`.col[data-day="${todayKey}"]`) as HTMLElement | null;
+      if (!board || !el) return;
+      board.style.scrollBehavior = smooth ? "smooth" : "auto";
+      board.scrollLeft = el.offsetLeft - board.offsetLeft - 4;
+      board.style.scrollBehavior = "";
+      requestAnimationFrame(updRange);
+    },
+    [todayKey, updRange]
+  );
+
+  useEffect(() => {
+    const board = boardRef.current;
+    if (board) board.style.setProperty("--cols", String(cols));
+    localStorage.setItem(VKEY, JSON.stringify({ cols }));
+    updRange();
+  }, [cols, updRange, days.length]);
+
+  useEffect(() => {
+    goToday(false);
+  }, [goToday]);
+
+  const run = async (action: () => Promise<unknown>, msg: string, snap?: PlanItemRow[]) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await action();
+      await onChanged();
+      if (snap) {
+        undoSnap.current = snap;
+        onToast(msg, () => {
+          /* parent reload is source of truth — toast undo just notifies */
+          onToast("Обновите страницу, если нужно откатить");
+        });
+      } else onToast(msg);
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "Ошибка");
+      await onChanged().catch(() => {});
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submit = async (day: string) => {
+    let v = (compose[day] || "").trim();
+    if (!v) return;
+    let kind = draft[day] || "task";
+    let time = "";
+    const tm = v.match(/^(\d{1,2}[:.]\d{2})\s+(.+)$/);
+    if (tm) {
+      kind = "event";
+      time = normTime(tm[1]!);
+      v = tm[2]!;
+    } else if (v.startsWith("!")) {
+      kind = "prio";
+      v = v.slice(1).trim();
+    }
+    if (kind === "event" && !time) time = normTime(eventTime[day] || "");
+    setCompose((c) => ({ ...c, [day]: "" }));
+    await run(async () => {
+      if (kind === "event") {
+        await createPlanItemApi({
+          kind: "call",
+          title: v,
+          plan_date: day,
+          event_time: time || null,
+          priority: 2,
+        });
+      } else if (kind === "prio") {
+        await createPlanItemApi({ kind: "task", title: v, plan_date: day, priority: 1 });
+      } else {
+        await createPlanItemApi({ kind: "task", title: v, plan_date: day, priority: 3 });
+      }
+    }, "Добавлено");
+  };
+
+  const onDrop = async (day: string) => {
+    if (externalDragKind === "checklist" || externalDragKind === "mark" || externalDragKind === "new" || externalDragKind === "move" || externalDragKind === "backlog") {
+      setDropDay(null);
+      onExternalDrop?.(day);
+      return;
+    }
+    if (!dragId) return;
+    const it = items.find((i) => i.id === dragId);
+    setDragId(null);
+    setDropDay(null);
+    if (!it || it.plan_date === day) return;
+    await run(() => updatePlanItemApi(it.id, { plan_date: day }), `Перенесено на ${dm(day)}`);
+  };
+
+  return (
+    <div className="plan-sch">
+      <div className="bar">
+        <div className="bar-t" id="range">
+          {rangeLabel.split(" ").length > 1 ? (
+            <>
+              {rangeLabel.replace(/\s+\d{4}$/, "")} <span>{rangeLabel.match(/\d{4}$/)?.[0]}</span>
+            </>
+          ) : (
+            rangeLabel
+          )}
+        </div>
+        <div className="seg" id="cols">
+          {([3, 4, 5] as const).map((n) => (
+            <button
+              key={n}
+              type="button"
+              data-c={n}
+              className={cols === n ? "on" : ""}
+              onClick={() => setCols(n)}
+            >
+              {n === 3 ? "3 дня" : n === 4 ? "4 дня" : "5 дней"}
+            </button>
+          ))}
+        </div>
+        <div className="nav">
+          <button
+            type="button"
+            className="nb"
+            aria-label="Назад"
+            onClick={() => boardRef.current?.scrollBy({ left: -colW(), behavior: "smooth" })}
+          >
+            <svg className="svgi" viewBox="0 0 24 24">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
+          <button type="button" className="nb" onClick={() => goToday(true)}>
+            Сегодня
+          </button>
+          <button
+            type="button"
+            className="nb"
+            aria-label="Вперёд"
+            onClick={() => boardRef.current?.scrollBy({ left: colW(), behavior: "smooth" })}
+          >
+            <svg className="svgi" viewBox="0 0 24 24">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="board"
+        ref={boardRef}
+        onScroll={() => updRange()}
+        onDragOver={(e) => {
+          const c = (e.target as HTMLElement).closest(".col") as HTMLElement | null;
+          if (!c) return;
+          if (!dragId && !externalDragKind) return;
+          e.preventDefault();
+          setDropDay(c.dataset.day || null);
+          const r = boardRef.current!.getBoundingClientRect();
+          if (e.clientX > r.right - 60) boardRef.current!.scrollLeft += 12;
+          if (e.clientX < r.left + 60) boardRef.current!.scrollLeft -= 12;
+        }}
+      >
+        {days.map((d) => {
+          const dt = new Date(d + "T12:00:00");
+          const list = byDay.get(d) ?? [];
+          const pr = list.filter((i) => itemKind(i) === "prio");
+          const ev = list
+            .filter((i) => itemKind(i) === "event")
+            .sort((a, b) => (a.event_time || "99").localeCompare(b.event_time || "99"));
+          const tk = list
+            .filter((i) => itemKind(i) === "task")
+            .sort((a, b) => Number(!!a.completed_at) - Number(!!b.completed_at));
+          const wk = dt.getDay() % 6 === 0;
+          const k = draft[d] || "task";
+          const empty = !pr.length && !ev.length && !tk.length;
+
+          return (
+            <section
+              key={d}
+              className={`col${wk ? " wknd" : ""}${d === todayKey ? " today" : ""}${d < todayKey ? " past" : ""}${dropDay === d ? " drop" : ""}`}
+              data-day={d}
+              onDrop={(e) => {
+                e.preventDefault();
+                void onDrop(d);
+              }}
+            >
+              <div className="ch">
+                <span className="ch-n">{dt.getDate()}</span>
+                <span className="ch-m">
+                  <span className="ch-w">{WD[dt.getDay()]}</span>
+                  <span className="ch-mo">{MON[dt.getMonth()]}</span>
+                </span>
+                {d === todayKey ? <span className="ch-tag">Сегодня</span> : <span className="ch-sp" />}
+                <button
+                  type="button"
+                  className="ch-add"
+                  title="Добавить"
+                  aria-label="Добавить"
+                  onClick={() => {
+                    const input = boardRef.current?.querySelector(
+                      `.cmp[data-day="${d}"] .tx`
+                    ) as HTMLInputElement | null;
+                    input?.focus();
+                  }}
+                >
+                  <Icon name="plus" />
+                </button>
+              </div>
+
+              <div className="cb">
+                {pr.length ? (
+                  <div className="grp">
+                    {pr.map((i) => (
+                      <ItemCard
+                        key={i.id}
+                        item={i}
+                        kind="prio"
+                        editing={editingId === i.id}
+                        editText={editText}
+                        onEditStart={() => {
+                          setEditingId(i.id);
+                          setEditText(i.title);
+                        }}
+                        onEditChange={setEditText}
+                        onEditCancel={() => setEditingId(null)}
+                        onEditSave={async (text) => {
+                          setEditingId(null);
+                          if (text && text !== i.title) {
+                            await run(() => updatePlanItemApi(i.id, { title: text }), "Сохранено");
+                          }
+                        }}
+                        onDragStart={() => setDragId(i.id)}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDropDay(null);
+                        }}
+                        onDone={() =>
+                          run(
+                            () =>
+                              updatePlanItemApi(i.id, {
+                                completed_at: i.completed_at ? null : new Date().toISOString(),
+                              }),
+                            i.completed_at ? "Снято" : "Готово"
+                          )
+                        }
+                        onNext={() =>
+                          run(
+                            () => updatePlanItemApi(i.id, { plan_date: addDaysIso(d, 1), completed_at: null }),
+                            `Перенесено на ${dm(addDaysIso(d, 1))}`
+                          )
+                        }
+                        onDel={() => run(() => deletePlanItemApi(i.id), "Удалено")}
+                        onTogglePrio={() =>
+                          run(
+                            () => updatePlanItemApi(i.id, { priority: 3 }),
+                            "Убрано из главного"
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {ev.length ? (
+                  <div className="grp">
+                    <div className="gl">События</div>
+                    {ev.map((i) => (
+                      <ItemCard
+                        key={i.id}
+                        item={i}
+                        kind="event"
+                        editing={editingId === i.id}
+                        editText={editText}
+                        onEditStart={() => {
+                          setEditingId(i.id);
+                          setEditText(i.title);
+                        }}
+                        onEditChange={setEditText}
+                        onEditCancel={() => setEditingId(null)}
+                        onEditSave={async (text) => {
+                          setEditingId(null);
+                          if (!text) return;
+                          const tm = text.match(/^(\d{1,2}[:.]\d{2})\s+(.+)$/);
+                          await run(
+                            () =>
+                              updatePlanItemApi(i.id, {
+                                title: tm ? tm[2]! : text,
+                                event_time: tm ? normTime(tm[1]!) : i.event_time,
+                              }),
+                            "Сохранено"
+                          );
+                        }}
+                        onDragStart={() => setDragId(i.id)}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDropDay(null);
+                        }}
+                        onDone={() =>
+                          run(
+                            () =>
+                              updatePlanItemApi(i.id, {
+                                completed_at: i.completed_at ? null : new Date().toISOString(),
+                              }),
+                            i.completed_at ? "Снято" : "Готово"
+                          )
+                        }
+                        onNext={() =>
+                          run(
+                            () => updatePlanItemApi(i.id, { plan_date: addDaysIso(d, 1), completed_at: null }),
+                            `Перенесено на ${dm(addDaysIso(d, 1))}`
+                          )
+                        }
+                        onDel={() => run(() => deletePlanItemApi(i.id), "Удалено")}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {tk.length ? (
+                  <div className="grp">
+                    <div className="gl">Задачи</div>
+                    {tk.map((i) => (
+                      <ItemCard
+                        key={i.id}
+                        item={i}
+                        kind="task"
+                        editing={editingId === i.id}
+                        editText={editText}
+                        onEditStart={() => {
+                          setEditingId(i.id);
+                          setEditText(i.title);
+                        }}
+                        onEditChange={setEditText}
+                        onEditCancel={() => setEditingId(null)}
+                        onEditSave={async (text) => {
+                          setEditingId(null);
+                          if (text && text !== i.title) {
+                            await run(() => updatePlanItemApi(i.id, { title: text }), "Сохранено");
+                          }
+                        }}
+                        onDragStart={() => setDragId(i.id)}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDropDay(null);
+                        }}
+                        onDone={() =>
+                          run(
+                            () =>
+                              updatePlanItemApi(i.id, {
+                                completed_at: i.completed_at ? null : new Date().toISOString(),
+                              }),
+                            i.completed_at ? "Снято" : "Готово"
+                          )
+                        }
+                        onNext={() =>
+                          run(
+                            () => updatePlanItemApi(i.id, { plan_date: addDaysIso(d, 1), completed_at: null }),
+                            `Перенесено на ${dm(addDaysIso(d, 1))}`
+                          )
+                        }
+                        onDel={() => run(() => deletePlanItemApi(i.id), "Удалено")}
+                        onTogglePrio={() =>
+                          run(() => updatePlanItemApi(i.id, { priority: 1 }), "В главное")
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {empty ? <div className="zero">Свободный день</div> : null}
+              </div>
+
+              <div className={`cmp${compose[d] ? " open" : ""}`} data-day={d}>
+                <div className="cmp-row">
+                  <Icon name="plus" />
+                  <input
+                    className="tx"
+                    placeholder={`Добавить в ${WD[dt.getDay()]!.toLowerCase()}`}
+                    value={compose[d] || ""}
+                    onChange={(e) => setCompose((c) => ({ ...c, [d]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void submit(d);
+                      }
+                    }}
+                  />
+                </div>
+                <div className="cmp-opts">
+                  {(["task", "event", "prio"] as const).map((kk) => (
+                    <button
+                      key={kk}
+                      type="button"
+                      className={`ko${k === kk ? " on" : ""}`}
+                      data-k={kk}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setDraft((dr) => ({ ...dr, [d]: kk }))}
+                    >
+                      <i />
+                      {kk === "task" ? "Задача" : kk === "event" ? "Событие" : "Главное"}
+                    </button>
+                  ))}
+                  <input
+                    className="tmi"
+                    placeholder="время"
+                    maxLength={5}
+                    hidden={k !== "event"}
+                    value={eventTime[d] || ""}
+                    onChange={(e) => setEventTime((t) => ({ ...t, [d]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void submit(d);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ItemCard({
+  item,
+  kind,
+  editing,
+  editText,
+  onEditStart,
+  onEditChange,
+  onEditCancel,
+  onEditSave,
+  onDragStart,
+  onDragEnd,
+  onDone,
+  onNext,
+  onDel,
+  onTogglePrio,
+}: {
+  item: PlanItemRow;
+  kind: SchKind;
+  editing: boolean;
+  editText: string;
+  onEditStart: () => void;
+  onEditChange: (v: string) => void;
+  onEditCancel: () => void;
+  onEditSave: (text: string) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDone: () => void;
+  onNext: () => void;
+  onDel: () => void;
+  onTogglePrio?: () => void;
+}) {
+  const done = !!item.completed_at;
+  const cls =
+    kind === "prio" ? `it pr${done ? " done" : ""}` : kind === "event" ? `it ev${done ? " done" : ""}` : `it tk${done ? " done" : ""}`;
+
+  return (
+    <div
+      className={cls}
+      draggable={!editing}
+      onDragStart={(e) => {
+        onDragStart();
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", item.id);
+        (e.currentTarget as HTMLElement).classList.add("dragging");
+      }}
+      onDragEnd={(e) => {
+        (e.currentTarget as HTMLElement).classList.remove("dragging");
+        onDragEnd();
+      }}
+    >
+      {kind === "prio" ? (
+        <div className="it-k">
+          <Icon name="star" className="svgi" />
+          Главное
+        </div>
+      ) : null}
+      {kind === "event" ? (
+        <div className={`ev-tm${item.event_time ? "" : " nt"}`}>{item.event_time || "днём"}</div>
+      ) : null}
+      {kind === "task" ? (
+        <button type="button" className={`ck${done ? " on" : ""}`} aria-label="Готово" onClick={() => void onDone()}>
+          <Icon name="check" />
+        </button>
+      ) : null}
+      {editing ? (
+        <div
+          className="it-t"
+          contentEditable
+          suppressContentEditableWarning
+          dangerouslySetInnerHTML={{ __html: editText.replace(/</g, "&lt;") }}
+          ref={(el) => {
+            if (!el || el.dataset.focused) return;
+            el.dataset.focused = "1";
+            el.focus();
+            const r = document.createRange();
+            r.selectNodeContents(el);
+            r.collapse(false);
+            const sel = getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(r);
+          }}
+          onBlur={(e) => {
+            const cancel = e.currentTarget.dataset.cancel === "1";
+            const v = e.currentTarget.textContent?.trim() || "";
+            if (!cancel) onEditSave(v);
+            else onEditCancel();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.target as HTMLElement).blur();
+            }
+            if (e.key === "Escape") {
+              (e.target as HTMLElement).dataset.cancel = "1";
+              (e.target as HTMLElement).blur();
+            }
+          }}
+        />
+      ) : (
+        <div className="it-t" onClick={onEditStart}>
+          {fmtText(item.title)}
+        </div>
+      )}
+      <div className="it-a">
+        {kind !== "event" ? (
+          <button
+            type="button"
+            className="ib"
+            title={kind === "prio" ? "Убрать из главного" : "Сделать главным"}
+            onClick={() => (kind === "prio" ? void onDone() : onTogglePrio && void onTogglePrio())}
+          >
+            {kind === "prio" ? <Icon name="check" /> : <Icon name="star" />}
+          </button>
+        ) : (
+          <button type="button" className="ib" title="Отметить" onClick={() => void onDone()}>
+            <Icon name="check" />
+          </button>
+        )}
+        <button type="button" className="ib" title="На завтра" onClick={() => void onNext()}>
+          <Icon name="next" />
+        </button>
+        <button type="button" className="ib del" title="Удалить" onClick={() => void onDel()}>
+          <Icon name="del" />
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -66,6 +66,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { WorkRulesTab } from "@/components/v2/agency/plan/work-rules-tab";
+import { PlanScheduleBoard } from "@/components/v2/agency/plan/plan-schedule-board";
 
 type PlanPageTab = "plan" | "rules";
 
@@ -376,8 +377,9 @@ function DispatchPlanCalendar({
       const start = mondayOf(first);
       return { from: toYmd(start), to: toYmd(addDays(start, 41)) };
     }
-    return { from: toYmd(anchor), to: toYmd(addDays(anchor, 6)) };
-  }, [anchor, calMode]);
+    // Расписание: полоса дней вокруг сегодня (как в standalone)
+    return { from: toYmd(addDays(today, -1)), to: toYmd(addDays(today, 45)) };
+  }, [anchor, calMode, today]);
 
   const planMonthKey = useMemo(
     () => `${anchor.getFullYear()}-${anchor.getMonth() + 1}`,
@@ -683,10 +685,7 @@ function DispatchPlanCalendar({
       ? `${monthName(anchor)} ${anchor.getFullYear()}`
       : `${fmtShort(anchor)} – ${fmtShort(addDays(anchor, 6))}`;
 
-  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(anchor, i));
-  const weekDays = weekDates;
-  const checklistWeekDates =
-    calMode === "week" ? weekDates : Array.from({ length: 7 }, (_, i) => addDays(mondayOf(today), i));
+  const checklistWeekDates = Array.from({ length: 7 }, (_, i) => addDays(mondayOf(today), i));
   const checklistWeekKeys = checklistWeekDates.map((d) => toYmd(d));
   const weekChecklist = resolveWeekChecklist(checklistWeekKeys, items, modes);
   const weekChecklistOpen = weekChecklist.filter((row) => !row.filled).length;
@@ -759,9 +758,28 @@ function DispatchPlanCalendar({
             </section>
 
             <section className="card pad">
+              <WeekChecklistBar
+                rows={weekChecklist}
+                openCount={weekChecklistOpen}
+                weekLabel={`${fmtShort(checklistWeekDates[0]!)} – ${fmtShort(checklistWeekDates[6]!)}`}
+                onDragStart={(id) => setDrag({ kind: "checklist", id })}
+                onDragEnd={() => {
+                  setDrag(null);
+                  setDropIndex(null);
+                }}
+                onJump={(dateKey) => {
+                  setCalMode("week");
+                  setAnchor(mondayOf(parseYmd(dateKey)));
+                  showToast(`В расписании — ${fmtWeekday(parseYmd(dateKey))}`);
+                }}
+                onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
+              />
+            </section>
+
+            <section className="card pad">
               <div className="cal-head">
                 <div className="cal-head-l">
-                  <h2 className="big-title">Календарь</h2>
+                  <h2 className="big-title">{calMode === "week" ? "Расписание" : "Календарь"}</h2>
                   <div className="seg" id="mode-seg">
                     <button type="button" className={calMode === "week" ? "on" : ""} onClick={() => setCalMode("week")}>
                       Неделя
@@ -771,108 +789,59 @@ function DispatchPlanCalendar({
                     </button>
                   </div>
                 </div>
-                <div className="cal-head-c">
-                  <button
-                    type="button"
-                    className="wk-btn tip"
-                    data-tip="Назад"
-                    onClick={() =>
-                      setAnchor(
-                        calMode === "month"
-                          ? new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1)
-                          : addDays(anchor, -7)
-                      )
-                    }
-                  >
-                    ‹
-                  </button>
-                  <span className="wk-label tnum">{periodLabel}</span>
-                  <button
-                    type="button"
-                    className="wk-btn tip"
-                    data-tip="Вперёд"
-                    onClick={() =>
-                      setAnchor(
-                        calMode === "month"
-                          ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1)
-                          : addDays(anchor, 7)
-                      )
-                    }
-                  >
-                    ›
-                  </button>
-                </div>
-                <div className="cal-head-r">
-                  <button type="button" className="btn btn--gh" onClick={() => setDrawer({ type: "create", createKind: "call" })}>
-                    Событие
-                  </button>
-                  <button type="button" className="btn btn--pri" onClick={() => setDrawer({ type: "create", createKind: "task" })}>
-                    Создать задачу
-                  </button>
-                </div>
+                {calMode === "month" ? (
+                  <>
+                    <div className="cal-head-c">
+                      <button
+                        type="button"
+                        className="wk-btn tip"
+                        data-tip="Назад"
+                        onClick={() => setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1))}
+                      >
+                        ‹
+                      </button>
+                      <span className="wk-label tnum">{periodLabel}</span>
+                      <button
+                        type="button"
+                        className="wk-btn tip"
+                        data-tip="Вперёд"
+                        onClick={() => setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1))}
+                      >
+                        ›
+                      </button>
+                    </div>
+                    <div className="cal-head-r">
+                      <button type="button" className="btn btn--gh" onClick={() => setDrawer({ type: "create", createKind: "call" })}>
+                        Событие
+                      </button>
+                      <button type="button" className="btn btn--pri" onClick={() => setDrawer({ type: "create", createKind: "task" })}>
+                        Создать задачу
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="cal-head-r">
+                    <button type="button" className="btn btn--gh" onClick={() => setDrawer({ type: "create", createKind: "call" })}>
+                      Событие
+                    </button>
+                    <button type="button" className="btn btn--pri" onClick={() => setDrawer({ type: "create", createKind: "task" })}>
+                      Создать задачу
+                    </button>
+                  </div>
+                )}
               </div>
-              <WeekChecklistBar
-                rows={weekChecklist}
-                openCount={weekChecklistOpen}
-                weekLabel={
-                  calMode === "week"
-                    ? periodLabel
-                    : `${fmtShort(checklistWeekDates[0]!)} – ${fmtShort(checklistWeekDates[6]!)}`
-                }
-                onDragStart={(id) => setDrag({ kind: "checklist", id })}
-                onDragEnd={() => {
-                  setDrag(null);
-                  setDropIndex(null);
-                }}
-                onJump={(dateKey) => {
-                  setCalMode("week");
-                  setAnchor(mondayOf(parseYmd(dateKey)));
-                  showToast(`В календаре — ${fmtWeekday(parseYmd(dateKey))}`);
-                }}
-                onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
-              />
               <div id="cal">
                 {calMode === "week" ? (
-                  <div
-                    className="wkrow wkrow-live"
-                    style={{ gridTemplateColumns: `repeat(${weekDays.length},minmax(0,1fr))` }}
-                  >
-                    {weekDays.map((d) => {
-                      return (
-                        <DayCell
-                          key={toYmd(d)}
-                          date={d}
-                          todayKey={todayKey}
-                          items={items}
-                          modes={modes}
-                          projectsMap={projectsMap}
-                          dailyCap={dailyCap}
-                          drag={drag}
-                          dropKey={dropKey}
-                          dropIndex={dropIndex}
-                          onDragStart={setDrag}
-                          onDragEnd={() => {
-                            setDrag(null);
-                            setDropIndex(null);
-                          }}
-                          onDrop={onDropDay}
-                          onDragOver={(k, idx = null) => {
-                            setDropKey(k);
-                            setDropIndex(idx);
-                          }}
-                          onDragLeave={() => {
-                            setDropKey(null);
-                            setDropIndex(null);
-                          }}
-                          onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
-                          onToggleDone={toggleItemDone}
-                          onOpenDayType={(k) => setDrawer({ type: "day", dateKey: k })}
-                          onAddTask={(k) => setDrawer({ type: "create", createKind: "task", day: k })}
-                          compact={false}
-                        />
-                      );
-                    })}
-                  </div>
+                  <PlanScheduleBoard
+                    items={items}
+                    todayKey={todayKey}
+                    externalDragKind={drag?.kind ?? null}
+                    onExternalDrop={(day) => void onDropDay(day)}
+                    onChanged={async () => {
+                      await reload();
+                    }}
+                    onToast={(text, undo) => showToast(text, undo)}
+                  />
                 ) : (
                   <MonthGrid
                     anchor={anchor}
@@ -910,9 +879,9 @@ function DispatchPlanCalendar({
                 )}
               </div>
               <p className="hint">
-                Тип дня — кнопка ⋯ в заголовке дня. Ориентир нагрузки {dailyCap} ч/день (можно превышать). События
-                стоят выше рабочих слотов; их часы входят в сумму дня. Подсказки недели перетащите на день — оставшиеся
-                чипы сверху ещё не назначены. Внутри дня задачи можно переставлять; цвет слота — приоритет (P1–P4).
+                {calMode === "week"
+                  ? "Расписание: задачи, события и «Главное». Перетаскивайте карточки между днями. ! в начале — сразу в главное. Время в начале строки — событие."
+                  : `Тип дня — кнопка ⋯ в заголовке дня. Ориентир нагрузки ${dailyCap} ч/день. Подсказки недели — в блоке выше: перетащите чип на день.`}
               </p>
             </section>
 
