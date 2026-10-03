@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
     "/api/v2/personal/strategy": ["./content/strategy/articles/**/*"],
     "/api/v2/personal/strategy/articles/[slug]": ["./content/strategy/articles/**/*"],
     "/v2/personal/finance/rules": ["./content/personal/**/*"],
+    "/v2/personal/moscow": ["./content/personal/**/*"],
   },
 };
 

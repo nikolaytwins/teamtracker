@@ -84,6 +84,7 @@ const PERSONAL_NAV: NavItem[] = [
   // Скрыто: Идеи (/v2/personal/ideas — вкладка в «Идеи и задачи»)
   // Скрыто: Дашборд (/v2/personal/dashboard — YouTube неактуален)
   { href: "/v2/personal/important", label: "Важное 2.0", icon: "starFill" },
+  { href: "/v2/personal/moscow", label: "Москва", icon: "home" },
   { href: "/v2/personal/sport", label: "Спорт", icon: "sport" },
   { href: "/v2/personal/wishes", label: "Желания", icon: "wish" },
   { href: "/v2/personal/observations", label: "Дневник", icon: "eye" },
