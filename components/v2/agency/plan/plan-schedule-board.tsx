@@ -34,15 +34,16 @@ function Icon({
   name: "check" | "star" | "next" | "del" | "plus";
   className?: string;
 }) {
+  const fillStar = name === "star";
   return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+    <svg
+      className={`${className}${fillStar ? " svgi--fill" : ""}`}
+      viewBox="0 0 24 24"
+      aria-hidden
+    >
       {name === "check" ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : null}
       {name === "star" ? (
-        <path
-          d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"
-          fill="currentColor"
-          stroke="none"
-        />
+        <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
       ) : null}
       {name === "next" ? (
         <>
@@ -137,6 +138,7 @@ export function PlanScheduleBoard({
   const [draft, setDraft] = useState<Record<string, SchKind>>({});
   const [compose, setCompose] = useState<Record<string, string>>({});
   const [eventTime, setEventTime] = useState<Record<string, string>>({});
+  const [openDay, setOpenDay] = useState<string | null>(null);
   const [rangeLabel, setRangeLabel] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropDay, setDropDay] = useState<string | null>(null);
@@ -144,6 +146,14 @@ export function PlanScheduleBoard({
   const [editText, setEditText] = useState("");
   const [busy, setBusy] = useState(false);
   const undoSnap = useRef<PlanItemRow[] | null>(null);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const focusCompose = useCallback((day: string) => {
+    setOpenDay(day);
+    requestAnimationFrame(() => {
+      inputRefs.current[day]?.focus();
+    });
+  }, []);
 
   useEffect(() => {
     try {
@@ -251,6 +261,7 @@ export function PlanScheduleBoard({
     }
     if (kind === "event" && !time) time = normTime(eventTime[day] || "");
     setCompose((c) => ({ ...c, [day]: "" }));
+    setOpenDay(null);
     await run(async () => {
       if (kind === "event") {
         await createPlanItemApi({
@@ -383,20 +394,19 @@ export function PlanScheduleBoard({
                 <button
                   type="button"
                   className="ch-add"
+                  data-add={d}
                   title="Добавить"
                   aria-label="Добавить"
-                  onClick={() => {
-                    const input = boardRef.current?.querySelector(
-                      `.cmp[data-day="${d}"] .tx`
-                    ) as HTMLInputElement | null;
-                    input?.focus();
-                  }}
+                  onClick={() => focusCompose(d)}
                 >
                   <Icon name="plus" />
                 </button>
               </div>
 
-              <div className="cb">
+              <div className="cb" onClick={(e) => {
+                // Клик по «Свободный день» — сразу в поле добавления
+                if ((e.target as HTMLElement).closest(".zero")) focusCompose(d);
+              }}>
                 {pr.length ? (
                   <div className="grp">
                     {pr.map((i) => (
@@ -556,18 +566,39 @@ export function PlanScheduleBoard({
                 {empty ? <div className="zero">Свободный день</div> : null}
               </div>
 
-              <div className={`cmp${compose[d] ? " open" : ""}`} data-day={d}>
+              <div
+                className={`cmp${compose[d] || openDay === d ? " open" : ""}`}
+                data-day={d}
+              >
                 <div className="cmp-row">
                   <Icon name="plus" />
                   <input
+                    ref={(el) => {
+                      inputRefs.current[d] = el;
+                    }}
                     className="tx"
                     placeholder={`Добавить в ${WD[dt.getDay()]!.toLowerCase()}`}
                     value={compose[d] || ""}
+                    onFocus={() => setOpenDay(d)}
+                    onBlur={() => {
+                      // Дать клику по «Задача/Событие» сработать до закрытия
+                      window.setTimeout(() => {
+                        const active = document.activeElement;
+                        const cmp = inputRefs.current[d]?.closest(".cmp");
+                        if (cmp && active && cmp.contains(active)) return;
+                        if (!(compose[d] || "").trim()) setOpenDay((cur) => (cur === d ? null : cur));
+                      }, 0);
+                    }}
                     onChange={(e) => setCompose((c) => ({ ...c, [d]: e.target.value }))}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
                         void submit(d);
+                      }
+                      if (e.key === "Escape") {
+                        setCompose((c) => ({ ...c, [d]: "" }));
+                        setOpenDay(null);
+                        (e.target as HTMLInputElement).blur();
                       }
                     }}
                   />
@@ -580,7 +611,11 @@ export function PlanScheduleBoard({
                       className={`ko${k === kk ? " on" : ""}`}
                       data-k={kk}
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setDraft((dr) => ({ ...dr, [d]: kk }))}
+                      onClick={() => {
+                        setDraft((dr) => ({ ...dr, [d]: kk }));
+                        setOpenDay(d);
+                        inputRefs.current[d]?.focus();
+                      }}
                     >
                       <i />
                       {kk === "task" ? "Задача" : kk === "event" ? "Событие" : "Главное"}
@@ -592,6 +627,7 @@ export function PlanScheduleBoard({
                     maxLength={5}
                     hidden={k !== "event"}
                     value={eventTime[d] || ""}
+                    onFocus={() => setOpenDay(d)}
                     onChange={(e) => setEventTime((t) => ({ ...t, [d]: e.target.value }))}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {

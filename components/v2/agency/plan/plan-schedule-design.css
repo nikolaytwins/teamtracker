@@ -1,6 +1,16 @@
 .plan-sch{
   --amber:#b45309;--amber-50:#fff6e8;--amber-200:#f6d7a6;--green:#0e9f6e;--red:#dc2626;
 }
+/* Как в standalone: без stroke иконки плюса/навигации невидимы */
+.plan-sch .svgi{
+  width:17px;height:17px;flex-shrink:0;
+  stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.plan-sch .pr .it-k .svgi,
+.plan-sch .svgi--fill{
+  fill:currentColor;stroke:none;
+}
 .plan-v3 .plan-sch .seg{
   background:#fff;
   box-shadow:var(--shadow-card);
@@ -41,8 +51,19 @@
 .plan-sch .ch-w{font-size:14.5px;font-weight:600}
 .plan-sch .ch-mo{font-size:13px;color:var(--ink-400)}
 .plan-sch .col.wknd .ch-w{color:var(--brand-600)}
-.plan-sch .ch-tag{margin-left:auto;align-self:center;background:var(--brand-600);color:#fff;border-radius:999px;font-size:12px;font-weight:600;padding:5px 10px}
-.plan-sch .ch-add{margin-left:8px;align-self:center;width:34px;height:34px;border:none;border-radius:11px;background:var(--ink-100);color:var(--ink-600);cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:background .12s,color .12s}.plan-sch .ch-add:hover{background:var(--brand-600);color:#fff}.plan-sch .ch-add .svgi{width:18px;height:18px;stroke-width:2}.plan-sch .ch-sp{margin-left:auto}.plan-sch .ch-tag+.ch-add{margin-left:8px}
+.plan-sch .ch-tag{
+  margin-left:auto;align-self:center;flex-shrink:0;
+  background:var(--brand-600);color:#fff;border-radius:999px;font-size:12px;font-weight:600;padding:5px 10px;
+}
+.plan-sch .ch-add{
+  margin-left:8px;align-self:center;width:34px;height:34px;border:none;border-radius:11px;
+  background:var(--ink-100);color:var(--ink-600);cursor:pointer;display:grid;place-items:center;
+  flex-shrink:0;transition:background .12s,color .12s;padding:0;appearance:none;-webkit-appearance:none;
+}
+.plan-sch .ch-add:hover{background:var(--brand-600);color:#fff}
+.plan-sch .ch-add .svgi{width:18px;height:18px;stroke-width:2}
+.plan-sch .ch-sp{margin-left:auto;flex:1;min-width:0}
+.plan-sch .ch-tag+.ch-add{margin-left:8px}
 .plan-sch .col.today{box-shadow:inset 0 0 0 2px var(--brand-500),var(--shadow-card)}
 .plan-sch .cb{padding:12px 12px 6px;display:flex;flex-direction:column;gap:14px;flex:1}
 .plan-sch .grp{display:flex;flex-direction:column;gap:6px}
@@ -94,7 +115,7 @@
 .plan-sch .cmp-opts{display:none;align-items:center;gap:6px;padding:0 8px 8px;flex-wrap:wrap}
 .plan-sch .cmp:focus-within .cmp-opts,.plan-sch .cmp.open .cmp-opts{display:flex}
 .plan-sch .ko{border:none;background:var(--ink-100);border-radius:9px;padding:6px 10px;font-size:13px;font-weight:600;color:var(--ink-600);cursor:pointer;display:flex;align-items:center;gap:6px}
-.plan-sch .ko i{width:8px;height:8px;border-radius:3px;background:var(--ink-300)}
+.plan-sch .ko i{display:block;width:8px;height:8px;border-radius:3px;background:var(--ink-300);flex-shrink:0}
 .plan-sch .ko[data-k="task"] i{border-radius:9px;background:none;box-shadow:inset 0 0 0 1.6px var(--ink-400)}
 .plan-sch .ko[data-k="event"] i{background:var(--amber)}
 .plan-sch .ko[data-k="prio"] i{background:var(--brand-600)}
