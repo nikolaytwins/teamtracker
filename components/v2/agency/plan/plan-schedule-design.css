@@ -45,7 +45,7 @@
 .plan-sch .col{flex:0 0 calc((100% - (var(--cols) - 1) * 14px) / var(--cols));min-width:260px;scroll-snap-align:start;background:#fff;border-radius:20px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;min-height:540px;transition:box-shadow .15s}
 .plan-sch .col.drop{box-shadow:0 0 0 2px var(--brand-500),var(--shadow-card)}
 .plan-sch .col.past{opacity:.6}
-.plan-sch .ch{padding:18px 18px 12px;display:flex;align-items:flex-end;gap:12px;border-bottom:1px solid var(--ink-100)}
+.plan-sch .ch{padding:18px 18px 12px;display:flex;align-items:flex-end;gap:12px;border-bottom:1px solid var(--ink-100);cursor:text}
 .plan-sch .ch-n{font-size:36px;font-weight:600;letter-spacing:-.045em;line-height:1;font-variant-numeric:tabular-nums}
 .plan-sch .ch-m{display:flex;flex-direction:column;gap:2px;padding-bottom:2px}
 .plan-sch .ch-w{font-size:14.5px;font-weight:600}
@@ -65,7 +65,7 @@
 .plan-sch .ch-sp{margin-left:auto;flex:1;min-width:0}
 .plan-sch .ch-tag+.ch-add{margin-left:8px}
 .plan-sch .col.today{box-shadow:inset 0 0 0 2px var(--brand-500),var(--shadow-card)}
-.plan-sch .cb{padding:12px 12px 6px;display:flex;flex-direction:column;gap:14px;flex:1}
+.plan-sch .cb{padding:12px 12px 6px;display:flex;flex-direction:column;gap:14px;flex:1;cursor:text}
 .plan-sch .grp{display:flex;flex-direction:column;gap:6px}
 .plan-sch .gl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-400);padding:0 6px}
 .plan-sch .it{position:relative;border-radius:14px;cursor:grab;transition:background .12s}
@@ -121,7 +121,7 @@
 .plan-sch .ko[data-k="prio"] i{background:var(--brand-600)}
 .plan-sch .ko.on{background:var(--ink-900);color:#fff}
 .plan-sch .ko.on[data-k="task"] i{box-shadow:inset 0 0 0 1.6px #fff}
-.plan-sch .tmi{width:76px;border:none;background:var(--amber-50);color:var(--amber);border-radius:9px;height:30px;font:inherit;font-size:13px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.plan-sch .tmi{width:96px;border:none;background:var(--amber-50);color:var(--amber);border-radius:9px;height:30px;font:inherit;font-size:13px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
 .plan-sch .tmi::placeholder{color:#d9a86a;font-weight:600}
 .plan-sch .tmi[hidden]{display:none}
 .plan-sch .toast{position:fixed;left:50%;bottom:32px;transform:translate(-50%,180%);background:var(--ink-900);color:#fff;border-radius:16px;padding:12px 14px 12px 20px;font-size:15px;font-weight:500;box-shadow:0 20px 50px -18px rgba(0,0,0,.6);z-index:60;transition:transform .24s cubic-bezier(.2,.7,.2,1);display:flex;align-items:center;gap:14px;visibility:hidden}

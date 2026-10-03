@@ -95,12 +95,59 @@ function dm(s: string) {
 }
 
 function normTime(v: string) {
-  const m = v.trim().match(/^(\d{1,2})[:.\s]?(\d{2})?$/);
+  const m = v.trim().match(/^(\d{1,2})(?:[:.\s](\d{2}))?$/);
   if (!m) return "";
   const h = +m[1]!;
   const mi = +(m[2] || 0);
   if (h > 23 || mi > 59) return "";
   return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
+}
+
+/** `14:00 встреча` / `14 встреча` / `14-16 работа` / `14:00–16:30 созвон` */
+function parseComposeTime(raw: string): {
+  title: string;
+  time: string;
+  endTime: string;
+  asEvent: boolean;
+} {
+  const v = raw.trim();
+  const range = v.match(
+    /^(\d{1,2}(?:[:.]\d{2})?)\s*[-–—]\s*(\d{1,2}(?:[:.]\d{2})?)\s+(.+)$/
+  );
+  if (range) {
+    const time = normTime(range[1]!);
+    const endTime = normTime(range[2]!);
+    if (time && endTime) {
+      return { title: range[3]!.trim(), time, endTime, asEvent: true };
+    }
+  }
+  const single = v.match(/^(\d{1,2}(?:[:.]\d{2})?)\s+(.+)$/);
+  if (single) {
+    const time = normTime(single[1]!);
+    if (time) return { title: single[2]!.trim(), time, endTime: "", asEvent: true };
+  }
+  return { title: v, time: "", endTime: "", asEvent: false };
+}
+
+function eventTimeLabel(item: PlanItemRow) {
+  const start = item.event_time?.trim() || "";
+  const dur = item.duration_label?.trim() || "";
+  if (dur.includes("–") || dur.includes("-")) return dur;
+  if (start && /^\d{1,2}:\d{2}$/.test(dur)) return `${start}–${dur}`;
+  return start || "днём";
+}
+
+/** Поле «время»: `14`, `14:00`, `14-16`, `14:00–16:30` */
+function parseTimeField(raw: string): { time: string; endTime: string } {
+  const v = raw.trim();
+  if (!v) return { time: "", endTime: "" };
+  const range = v.match(/^(\d{1,2}(?:[:.]\d{2})?)\s*[-–—]\s*(\d{1,2}(?:[:.]\d{2})?)$/);
+  if (range) {
+    const time = normTime(range[1]!);
+    const endTime = normTime(range[2]!);
+    if (time && endTime) return { time, endTime };
+  }
+  return { time: normTime(v), endTime: "" };
 }
 
 function dayList(todayKey: string, items: PlanItemRow[]) {
@@ -250,17 +297,25 @@ export function PlanScheduleBoard({
     if (!v) return;
     let kind = draft[day] || "task";
     let time = "";
-    const tm = v.match(/^(\d{1,2}[:.]\d{2})\s+(.+)$/);
-    if (tm) {
+    let endTime = "";
+    const parsed = parseComposeTime(v);
+    if (parsed.asEvent && parsed.title) {
       kind = "event";
-      time = normTime(tm[1]!);
-      v = tm[2]!;
+      time = parsed.time;
+      endTime = parsed.endTime;
+      v = parsed.title;
     } else if (v.startsWith("!")) {
       kind = "prio";
       v = v.slice(1).trim();
     }
-    if (kind === "event" && !time) time = normTime(eventTime[day] || "");
+    if (kind === "event" && !time) {
+      const fromField = parseTimeField(eventTime[day] || "");
+      time = fromField.time;
+      endTime = fromField.endTime;
+    }
+    if (!v) return;
     setCompose((c) => ({ ...c, [day]: "" }));
+    setEventTime((t) => ({ ...t, [day]: "" }));
     setOpenDay(null);
     await run(async () => {
       if (kind === "event") {
@@ -269,6 +324,7 @@ export function PlanScheduleBoard({
           title: v,
           plan_date: day,
           event_time: time || null,
+          duration_label: endTime ? `${time}–${endTime}` : null,
           priority: 2,
         });
       } else if (kind === "prio") {
@@ -384,7 +440,21 @@ export function PlanScheduleBoard({
                 void onDrop(d);
               }}
             >
-              <div className="ch">
+              <div
+                className="ch"
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest(".ch-add")) return;
+                  focusCompose(d);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    focusCompose(d);
+                  }
+                }}
+              >
                 <span className="ch-n">{dt.getDate()}</span>
                 <span className="ch-m">
                   <span className="ch-w">{WD[dt.getDay()]}</span>
@@ -397,16 +467,23 @@ export function PlanScheduleBoard({
                   data-add={d}
                   title="Добавить"
                   aria-label="Добавить"
-                  onClick={() => focusCompose(d)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    focusCompose(d);
+                  }}
                 >
                   <Icon name="plus" />
                 </button>
               </div>
 
-              <div className="cb" onClick={(e) => {
-                // Клик по «Свободный день» — сразу в поле добавления
-                if ((e.target as HTMLElement).closest(".zero")) focusCompose(d);
-              }}>
+              <div
+                className="cb"
+                onClick={(e) => {
+                  const t = e.target as HTMLElement;
+                  if (t.closest(".it") || t.closest(".gl") || t.closest("button")) return;
+                  focusCompose(d);
+                }}
+              >
                 {pr.length ? (
                   <div className="grp">
                     {pr.map((i) => (
@@ -478,12 +555,17 @@ export function PlanScheduleBoard({
                         onEditSave={async (text) => {
                           setEditingId(null);
                           if (!text) return;
-                          const tm = text.match(/^(\d{1,2}[:.]\d{2})\s+(.+)$/);
+                          const parsed = parseComposeTime(text);
                           await run(
                             () =>
                               updatePlanItemApi(i.id, {
-                                title: tm ? tm[2]! : text,
-                                event_time: tm ? normTime(tm[1]!) : i.event_time,
+                                title: parsed.asEvent ? parsed.title : text,
+                                event_time: parsed.asEvent ? parsed.time : i.event_time,
+                                duration_label: parsed.asEvent
+                                  ? parsed.endTime
+                                    ? `${parsed.time}–${parsed.endTime}`
+                                    : null
+                                  : i.duration_label,
                               }),
                             "Сохранено"
                           );
@@ -577,7 +659,7 @@ export function PlanScheduleBoard({
                       inputRefs.current[d] = el;
                     }}
                     className="tx"
-                    placeholder={`Добавить в ${WD[dt.getDay()]!.toLowerCase()}`}
+                    placeholder="14:00 встреча · 14–16 работа"
                     value={compose[d] || ""}
                     onFocus={() => setOpenDay(d)}
                     onBlur={() => {
@@ -589,7 +671,13 @@ export function PlanScheduleBoard({
                         if (!(compose[d] || "").trim()) setOpenDay((cur) => (cur === d ? null : cur));
                       }, 0);
                     }}
-                    onChange={(e) => setCompose((c) => ({ ...c, [d]: e.target.value }))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCompose((c) => ({ ...c, [d]: val }));
+                      if (parseComposeTime(val).asEvent) {
+                        setDraft((dr) => ({ ...dr, [d]: "event" }));
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -623,8 +711,8 @@ export function PlanScheduleBoard({
                   ))}
                   <input
                     className="tmi"
-                    placeholder="время"
-                    maxLength={5}
+                    placeholder="14 или 14–16"
+                    maxLength={11}
                     hidden={k !== "event"}
                     value={eventTime[d] || ""}
                     onFocus={() => setOpenDay(d)}
@@ -703,7 +791,9 @@ function ItemCard({
         </div>
       ) : null}
       {kind === "event" ? (
-        <div className={`ev-tm${item.event_time ? "" : " nt"}`}>{item.event_time || "днём"}</div>
+        <div className={`ev-tm${item.event_time || item.duration_label ? "" : " nt"}`}>
+          {eventTimeLabel(item)}
+        </div>
       ) : null}
       {kind === "task" ? (
         <button type="button" className={`ck${done ? " on" : ""}`} aria-label="Готово" onClick={() => void onDone()}>
