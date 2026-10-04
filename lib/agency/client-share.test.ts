@@ -38,6 +38,34 @@ test("keeps fixed qty and price", () => {
   });
 });
 
+test("manual override beats hourly and fixed formulas", () => {
+  const hourly = publicLineFromDetail(
+    {
+      title: "Правки",
+      billingType: "hourly",
+      trackedSeconds: 3 * 3600,
+      totalOverrideRub: 999,
+    },
+    4000
+  );
+  assert.equal(hourly.sum, 999);
+  assert.equal(hourly.unitPrice, 999);
+
+  const fixed = publicLineFromDetail(
+    {
+      title: "Обложки",
+      billingType: "fixed",
+      quantity: 3,
+      unitPrice: 2500,
+      totalOverrideRub: 8000,
+    },
+    4000
+  );
+  assert.equal(fixed.sum, 8000);
+  assert.equal(fixed.quantity, 3);
+  assert.equal(fixed.unitPrice, 2500);
+});
+
 test("builds months without leaking internal fields", () => {
   const data = buildPublicClientEstimate(
     [

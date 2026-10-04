@@ -27,6 +27,10 @@ export async function loadPublicClientEstimate(
       billingType: row.billingType ? String(row.billingType) : "fixed",
       trackedSeconds: Number(row.trackedSeconds) || 0,
       timerStartedAt: row.timerStartedAt ? String(row.timerStartedAt) : null,
+      totalOverrideRub:
+        row.totalOverrideRub == null || !Number.isFinite(Number(row.totalOverrideRub))
+          ? null
+          : Number(row.totalOverrideRub),
       order: Number(row.order) || 0,
     }));
   }

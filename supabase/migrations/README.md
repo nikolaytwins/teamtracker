@@ -104,8 +104,9 @@
 | 083 | `083_drop_life_fund.sql` | Удаление фонда «Траты на жизнь» |
 | 084 | `084_agency_detail_timer_previous.sql` | Детализация: timer_previous_seconds — часы до последнего старта |
 | 085 | `085_agency_project_client_share.sql` | Публичная ссылка сметы: client_share_token на agency_project |
+| 086 | `086_agency_detail_total_override.sql` | Детализация: total_override_rub — ручная сумма строки важнее формулы |
 
-**Следующий свободный номер:** `086`
+**Следующий свободный номер:** `087`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

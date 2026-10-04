@@ -743,6 +743,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         trackedSeconds: number;
         timerStartedAt: string | null;
         timerPreviousSeconds: number;
+        totalOverrideRub: number | null;
         projectId?: string;
       }
     | undefined
@@ -760,6 +761,10 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       trackedSeconds: Number(m.trackedSeconds) || 0,
       timerStartedAt: m.timerStartedAt ? String(m.timerStartedAt) : null,
       timerPreviousSeconds: Number(m.timerPreviousSeconds) || 0,
+      totalOverrideRub:
+        m.totalOverrideRub == null || !Number.isFinite(Number(m.totalOverrideRub))
+          ? null
+          : Number(m.totalOverrideRub),
       projectId: m.projectId ? String(m.projectId) : undefined,
     };
   }
@@ -775,6 +780,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       trackedSeconds?: number;
       timerStartedAt?: string | null;
       timerPreviousSeconds?: number;
+      totalOverrideRub?: number | null;
     }
   ): Promise<Record<string, unknown> | undefined> {
     const patch: Record<string, unknown> = {
@@ -795,6 +801,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     }
     if (typeof extras?.timerPreviousSeconds === "number") {
       patch.timer_previous_seconds = Math.max(0, Math.floor(extras.timerPreviousSeconds));
+    }
+    if (extras && "totalOverrideRub" in extras) {
+      patch.total_override_rub = extras.totalOverrideRub;
     }
     const { error } = await this.sb.from("agency_project_detail").update(patch).eq("id", id);
     if (error) throw error;

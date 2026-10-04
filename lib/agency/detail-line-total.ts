@@ -5,14 +5,31 @@ export type AgencyDetailLineInput = {
   quantity?: number | null;
   unitPrice?: number | null;
   trackedSeconds?: number | null;
+  totalOverrideRub?: number | null;
 };
 
-/** Сумма строки детализации: фикс = qty×price, hourly = часы×ставка проекта. */
+export function readTotalOverrideRub(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** `15 000`, `15000,5` → число. Пустая строка → null. Иначе null. */
+export function parseAgencyDetailMoney(raw: string): number | null {
+  const v = raw.trim().replace(/\s/g, "").replace(",", ".");
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Сумма строки: ручная правка важнее формулы (фикс = qty×price, hourly = часы×ставка). */
 export function agencyDetailLineTotal(
   detail: AgencyDetailLineInput,
   hourlyRateRub: number,
   opts?: { liveElapsedSeconds?: number }
 ): number {
+  const override = readTotalOverrideRub(detail.totalOverrideRub);
+  if (override != null) return override;
   const billing = detail.billingType === "hourly" ? "hourly" : "fixed";
   if (billing === "hourly") {
     const tracked = Math.max(0, Number(detail.trackedSeconds) || 0);

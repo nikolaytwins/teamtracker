@@ -96,6 +96,10 @@ async function loadDetailsTotals(
         quantity: Number(row.quantity) || 0,
         unitPrice: Number(row.unitPrice) || 0,
         trackedSeconds: Number(row.trackedSeconds) || 0,
+        totalOverrideRub:
+          row.totalOverrideRub == null || !Number.isFinite(Number(row.totalOverrideRub))
+            ? null
+            : Number(row.totalOverrideRub),
       },
       rates.get(pid) ?? 0
     );

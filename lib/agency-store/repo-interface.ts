@@ -45,6 +45,7 @@ export type ProjectDetailRow = {
   trackedSeconds: number;
   timerStartedAt: string | null;
   timerPreviousSeconds: number;
+  totalOverrideRub: number | null;
   projectId?: string;
 };
 
@@ -174,6 +175,7 @@ export interface AgencyRepo {
       trackedSeconds?: number;
       timerStartedAt?: string | null;
       timerPreviousSeconds?: number;
+      totalOverrideRub?: number | null;
     }
   ): Promise<Record<string, unknown> | undefined>;
   deleteProjectDetailById(id: string): Promise<void>;

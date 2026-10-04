@@ -72,6 +72,11 @@ function ensureDetailTable(db: Database.Database) {
   } catch {
     /* exists */
   }
+  try {
+    db.exec(`ALTER TABLE AgencyProjectDetail ADD COLUMN totalOverrideRub REAL`);
+  } catch {
+    /* exists */
+  }
 }
 
 export class SqliteAgencyRepo implements AgencyRepo {
@@ -926,6 +931,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         trackedSeconds: number;
         timerStartedAt: string | null;
         timerPreviousSeconds: number;
+        totalOverrideRub: number | null;
         projectId?: string;
       }
     | undefined
@@ -946,6 +952,10 @@ export class SqliteAgencyRepo implements AgencyRepo {
         trackedSeconds: Number(row.trackedSeconds) || 0,
         timerStartedAt: row.timerStartedAt ? String(row.timerStartedAt) : null,
         timerPreviousSeconds: Number(row.timerPreviousSeconds) || 0,
+        totalOverrideRub:
+          row.totalOverrideRub == null || !Number.isFinite(Number(row.totalOverrideRub))
+            ? null
+            : Number(row.totalOverrideRub),
         projectId: row.projectId ? String(row.projectId) : undefined,
       };
     } finally {
@@ -964,6 +974,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
       trackedSeconds?: number;
       timerStartedAt?: string | null;
       timerPreviousSeconds?: number;
+      totalOverrideRub?: number | null;
     }
   ): Promise<Record<string, unknown> | undefined> {
     const db = openSqlite();
@@ -989,10 +1000,16 @@ export class SqliteAgencyRepo implements AgencyRepo {
         typeof extras?.timerPreviousSeconds === "number"
           ? Math.max(0, Math.floor(extras.timerPreviousSeconds))
           : Number(existing.timerPreviousSeconds) || 0;
+      const totalOverrideRub =
+        extras && "totalOverrideRub" in extras
+          ? extras.totalOverrideRub
+          : existing.totalOverrideRub == null || !Number.isFinite(Number(existing.totalOverrideRub))
+            ? null
+            : Number(existing.totalOverrideRub);
       db.prepare(
         `
       UPDATE AgencyProjectDetail
-      SET title = ?, quantity = ?, unitPrice = ?, "order" = ?, billingType = ?, trackedSeconds = ?, timerStartedAt = ?, timerPreviousSeconds = ?, updatedAt = datetime('now')
+      SET title = ?, quantity = ?, unitPrice = ?, "order" = ?, billingType = ?, trackedSeconds = ?, timerStartedAt = ?, timerPreviousSeconds = ?, totalOverrideRub = ?, updatedAt = datetime('now')
       WHERE id = ?
     `
       ).run(
@@ -1004,6 +1021,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         trackedSeconds,
         timerStartedAt,
         timerPreviousSeconds,
+        totalOverrideRub,
         id
       );
       return db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(id) as

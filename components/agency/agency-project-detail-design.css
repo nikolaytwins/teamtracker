@@ -76,7 +76,10 @@
 .agency-proj-v3 .clock{font-size:19px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;border:none;background:none;padding:0;cursor:pointer}
 .agency-proj-v3 .clock.run{color:var(--green)}
 .agency-proj-v3 .clock-inp{width:7.5rem;border:1.5px solid var(--brand-500);border-radius:10px;padding:6px 8px;font:inherit;font-size:16px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
-.agency-proj-v3 .sum{font-size:15.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.agency-proj-v3 .sum{font-size:15.5px;font-weight:600;font-variant-numeric:tabular-nums;border:none;background:none;padding:0;cursor:pointer;color:inherit}
+.agency-proj-v3 button.sum:hover{color:var(--brand-700)}
+.agency-proj-v3 .sum.is-manual{color:var(--brand-700)}
+.agency-proj-v3 .sum-inp{width:7.5rem;border:1.5px solid var(--brand-500);border-radius:10px;padding:6px 8px;font:inherit;font-size:16px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
 .agency-proj-v3 .acts{display:flex;gap:8px;justify-content:flex-end;align-items:center}
 .agency-proj-v3 .del{border:none;background:none;color:var(--ink-300);cursor:pointer;font-size:14px;padding:6px 8px;border-radius:9px}
 .agency-proj-v3 .del:hover{color:var(--red);background:#fef2f2}
@@ -99,9 +102,6 @@
 .agency-proj-v3 .cell-inp:hover,.agency-proj-v3 .cell-inp:focus{border-color:var(--ink-200);background:#fff;outline:none}
 .agency-proj-v3 .cell-inp--n{width:104px;text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
 .agency-proj-v3 .ratebar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:1px solid var(--ink-100)}
-.agency-proj-v3 .facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px}
-.agency-proj-v3 .fact-l{font-size:12.5px;color:var(--ink-400);margin-bottom:4px}
-.agency-proj-v3 .fact-v{font-size:15.5px;font-weight:500}
 .agency-proj-v3 .exp-form{background:var(--ink-50);border-radius:16px;padding:16px;margin-bottom:16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media(max-width:1180px){
   .agency-proj-v3 .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -110,6 +110,6 @@
 }
 @media(max-width:860px){
   .agency-proj-v3 .page{padding:20px 16px 60px}
-  .agency-proj-v3 .facts,.agency-proj-v3 .exp-form{grid-template-columns:1fr}
+  .agency-proj-v3 .exp-form{grid-template-columns:1fr}
   .agency-proj-v3 .big-title{font-size:28px}
 }

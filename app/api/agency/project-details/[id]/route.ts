@@ -8,7 +8,8 @@ export async function PUT(
   try {
     const params = await context.params;
     const body = await request.json();
-    const { title, quantity, unitPrice, order, billingType, trackedSeconds, timerStartedAt } = body;
+    const { title, quantity, unitPrice, order, billingType, trackedSeconds, timerStartedAt, totalOverrideRub } =
+      body;
 
     const repo = getAgencyRepo();
     await repo.ensureProjectDetailTable();
@@ -35,6 +36,7 @@ export async function PUT(
       billingType?: "fixed" | "hourly";
       trackedSeconds?: number;
       timerStartedAt?: string | null;
+      totalOverrideRub?: number | null;
     } = { billingType: nextBilling };
     if (trackedSeconds != null) {
       const n = typeof trackedSeconds === "number" ? trackedSeconds : parseFloat(String(trackedSeconds));
@@ -42,6 +44,15 @@ export async function PUT(
     }
     if (timerStartedAt === null) extras.timerStartedAt = null;
     else if (typeof timerStartedAt === "string") extras.timerStartedAt = timerStartedAt;
+    if (totalOverrideRub === null || totalOverrideRub === "") {
+      extras.totalOverrideRub = null;
+    } else if (totalOverrideRub != null) {
+      const n =
+        typeof totalOverrideRub === "number"
+          ? totalOverrideRub
+          : parseFloat(String(totalOverrideRub).replace(/\s/g, "").replace(",", "."));
+      if (!Number.isNaN(n)) extras.totalOverrideRub = n;
+    }
 
     const detail = await repo.updateProjectDetailById(
       params.id,

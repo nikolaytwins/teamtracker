@@ -14,6 +14,18 @@ function money(n: number): string {
   return `${Math.round(n).toLocaleString("ru-RU")} ₽`;
 }
 
+function TwinMark() {
+  return (
+    <span className="brand-mark" aria-hidden>
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M7 8h10" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M7 12h7.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M7 16h5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+      </svg>
+    </span>
+  );
+}
+
 export function AgencyClientEstimateView({ data }: { data: PublicClientEstimate }) {
   const lastKey = data.months[data.months.length - 1]?.key ?? "";
   const [monthKey, setMonthKey] = useState(lastKey);
@@ -28,7 +40,7 @@ export function AgencyClientEstimateView({ data }: { data: PublicClientEstimate 
         <div className="page">
           <section className="card pad">
             <div className="brand">
-              <span className="brand-mark" />
+              <TwinMark />
               <span className="brand-t">Twin Labs</span>
             </div>
             <h1>{data.name}</h1>
@@ -47,7 +59,7 @@ export function AgencyClientEstimateView({ data }: { data: PublicClientEstimate 
       <div className="page">
         <section className="card pad">
           <div className="brand">
-            <span className="brand-mark" />
+            <TwinMark />
             <span className="brand-t">Twin Labs</span>
           </div>
           <span className="kick">Проект</span>
@@ -74,7 +86,7 @@ export function AgencyClientEstimateView({ data }: { data: PublicClientEstimate 
         <section className="card pad">
           <div className="sum3">
             <div className="st">
-              <div className="st-l">Работ за месяц</div>
+              <div className="st-l">Задач за месяц</div>
               <div className="st-v">{month.lines.length}</div>
             </div>
             <div className="st st--acc">
@@ -135,17 +147,6 @@ export function AgencyClientEstimateView({ data }: { data: PublicClientEstimate 
               )}
             </tbody>
           </table>
-          <div className="note">
-            <svg className="svgi" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 11v5" />
-              <path d="M12 8h.01" />
-            </svg>
-            <div>
-              Работы по факту оцениваются пакетом: в сумму входит вся работа над задачей — подготовка, правки и
-              финальная сдача.
-            </div>
-          </div>
         </section>
 
         <section className="pay">

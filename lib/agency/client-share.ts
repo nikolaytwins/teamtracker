@@ -46,6 +46,7 @@ export type ClientShareDetailInput = {
   billingType?: string | null;
   trackedSeconds?: number | null;
   timerStartedAt?: string | null;
+  totalOverrideRub?: number | null;
   order?: number | null;
 };
 
@@ -95,6 +96,7 @@ export function publicLineFromDetail(
       quantity: detail.quantity,
       unitPrice: detail.unitPrice,
       trackedSeconds: liveSeconds,
+      totalOverrideRub: detail.totalOverrideRub,
     },
     hourlyRateRub
   );
@@ -113,7 +115,7 @@ export function publicLineFromDetail(
     title: String(detail.title || "Работа"),
     quantity,
     unitPrice,
-    sum: quantity * unitPrice,
+    sum,
     package: false,
   };
 }

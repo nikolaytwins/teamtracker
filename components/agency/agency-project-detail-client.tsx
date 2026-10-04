@@ -9,13 +9,13 @@ import {
   formatAgencyDetailClock,
   formatAgencyDetailHours,
   parseAgencyDetailClock,
+  parseAgencyDetailMoney,
 } from '@/lib/agency/detail-line-total'
 import { formatFinanceMonthLabel, projectMonthKey } from '@/lib/agency/client-share'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { formatDate } from '@/lib/utils'
 import './agency-project-detail-design.css'
 
 interface Project {
@@ -55,16 +55,7 @@ interface ProjectDetail {
   trackedSeconds?: number
   timerStartedAt?: string | null
   timerPreviousSeconds?: number
-}
-
-interface TrackedTimeRow {
-  id: string
-  task: string
-  activity: string
-  durationSeconds: number
-  trackedAt: string
-  inEstimate: boolean
-  detailId: string | null
+  totalOverrideRub?: number | null
 }
 
 function money(n: number): string {
@@ -298,6 +289,73 @@ function HourlyClockCell({
   )
 }
 
+function LineSumCell({
+  value,
+  overridden,
+  onCommit,
+}: {
+  value: number
+  overridden: boolean
+  onCommit: (next: number | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const startEdit = () => {
+    setDraft(String(Math.round(value)))
+    setEditing(true)
+  }
+
+  const commit = () => {
+    const trimmed = draft.trim()
+    setEditing(false)
+    if (!trimmed) {
+      if (overridden) onCommit(null)
+      return
+    }
+    const parsed = parseAgencyDetailMoney(draft)
+    if (parsed == null) return
+    if (overridden && parsed === value) return
+    onCommit(parsed)
+  }
+
+  return (
+    <div className="right">
+      {editing ? (
+        <input
+          type="text"
+          inputMode="decimal"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commit()
+            }
+            if (e.key === 'Escape') {
+              setEditing(false)
+            }
+          }}
+          aria-label="Сумма строки"
+          className="sum-inp"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={startEdit}
+          title="Переписать сумму"
+          className={`sum${overridden ? ' is-manual' : ''}`}
+        >
+          {money(value)}
+        </button>
+      )}
+      {overridden ? <div className="sub">вручную</div> : null}
+    </div>
+  )
+}
+
 export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceVariant }) {
   const paths = AGENCY_FINANCE_PATHS[variant]
   const params = useParams()
@@ -314,9 +372,6 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [hourlyRateDraft, setHourlyRateDraft] = useState('')
   const [savingRate, setSavingRate] = useState(false)
-  const [trackedTime, setTrackedTime] = useState<TrackedTimeRow[]>([])
-  const [togglingEstimateId, setTogglingEstimateId] = useState<string | null>(null)
-  const [estimateToggleError, setEstimateToggleError] = useState<string | null>(null)
   const [sharePath, setSharePath] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -327,15 +382,10 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
 
   const fetchData = useCallback(async () => {
     try {
-      const trackedPromise =
-        variant === 'v2'
-          ? fetch(apiUrl(`${apiBase}/projects/${id}/tracked-time`)).then((r) => (r.ok ? r.json() : []))
-          : Promise.resolve([])
-      const [projectRes, expensesRes, detailsRes, trackedRes] = await Promise.all([
+      const [projectRes, expensesRes, detailsRes] = await Promise.all([
         fetch(apiUrl(`${apiBase}/projects`)).then(r => r.json()),
         fetch(apiUrl(`${apiBase}/expenses?projectId=${id}`)).then(r => r.json()),
         fetch(apiUrl(`${apiBase}/project-details?projectId=${id}`)).then(r => r.json()),
-        trackedPromise,
       ])
       
       const proj = projectRes.find((p: Project) => p.id === id)
@@ -343,13 +393,12 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
       if (proj) setHourlyRateDraft(String(Number(proj.hourlyRateRub) || 0))
       setExpenses(expensesRes)
       setDetails(Array.isArray(detailsRes) ? detailsRes : [])
-      setTrackedTime(Array.isArray(trackedRes) ? trackedRes : [])
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
-  }, [id, apiBase, variant])
+  }, [id, apiBase])
 
   useEffect(() => {
     if (id) {
@@ -378,30 +427,6 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
     const t = window.setInterval(() => setNowMs(Date.now()), 1000)
     return () => window.clearInterval(t)
   }, [details])
-
-  const handleToggleTrackedInEstimate = async (row: TrackedTimeRow, next: boolean) => {
-    if (variant !== 'v2') return
-    setEstimateToggleError(null)
-    setTogglingEstimateId(row.id)
-    try {
-      const res = await fetch(apiUrl(`/api/v2/agency/tracked-time/${row.id}`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inEstimate: next }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setEstimateToggleError(String(json.error || 'Не удалось обновить смету'))
-        return
-      }
-      await fetchData()
-    } catch (e) {
-      console.error(e)
-      setEstimateToggleError('Не удалось обновить смету')
-    } finally {
-      setTogglingEstimateId(null)
-    }
-  }
 
   const handleAddDetail = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -443,6 +468,35 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
     }
   }
 
+  const persistDetailPatch = async (detailId: string, updated: ProjectDetail) => {
+    try {
+      const res = await fetch(apiUrl(`${apiBase}/project-details/${detailId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: updated.title,
+          quantity: updated.quantity,
+          unitPrice: updated.unitPrice,
+          order: updated.order,
+          billingType: updated.billingType ?? 'fixed',
+          totalOverrideRub: updated.totalOverrideRub ?? null,
+        }),
+      })
+      if (!res.ok) {
+        console.error('Failed to update project detail')
+        fetchData()
+        return
+      }
+      const json = await res.json().catch(() => null)
+      if (json?.detail) {
+        setDetails((prev) => prev.map((d) => (d.id === detailId ? { ...d, ...json.detail } : d)))
+      }
+    } catch (error) {
+      console.error('Error updating project detail:', error)
+      fetchData()
+    }
+  }
+
   const handleUpdateDetail = (detailId: string, field: 'title' | 'quantity' | 'unitPrice') => {
     return async (value: string) => {
       const current = details.find(d => d.id === detailId)
@@ -463,28 +517,16 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
 
       const updated: ProjectDetail = { ...current, ...next }
       setDetails((prev) => prev.map(d => d.id === detailId ? updated : d))
-
-      try {
-        const res = await fetch(apiUrl(`${apiBase}/project-details/${detailId}`), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: updated.title,
-            quantity: updated.quantity,
-            unitPrice: updated.unitPrice,
-            order: updated.order,
-            billingType: updated.billingType ?? 'fixed',
-          }),
-        })
-        if (!res.ok) {
-          console.error('Failed to update project detail')
-          fetchData()
-        }
-      } catch (error) {
-        console.error('Error updating project detail:', error)
-        fetchData()
-      }
+      await persistDetailPatch(detailId, updated)
     }
+  }
+
+  const handleUpdateLineTotal = (detailId: string, nextTotal: number | null) => {
+    const current = details.find((d) => d.id === detailId)
+    if (!current) return
+    const updated: ProjectDetail = { ...current, totalOverrideRub: nextTotal }
+    setDetails((prev) => prev.map((d) => (d.id === detailId ? updated : d)))
+    void persistDetailPatch(detailId, updated)
   }
 
   const handleDeleteDetail = async (detailId: string) => {
@@ -735,6 +777,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
             quantity: d.quantity,
             unitPrice: d.unitPrice,
             trackedSeconds: liveSeconds,
+            totalOverrideRub: d.totalOverrideRub,
           },
           hourlyRate
         )
@@ -782,7 +825,6 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   }
 
   const hourlyRate = Number(project.hourlyRateRub) || 0
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
   const lineMeta = details.map((d) => {
     const isHourly = d.billingType === 'hourly'
     const liveSeconds = isHourly
@@ -797,6 +839,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
         quantity: d.quantity,
         unitPrice: d.unitPrice,
         trackedSeconds: liveSeconds,
+        totalOverrideRub: d.totalOverrideRub,
       },
       hourlyRate
     )
@@ -806,7 +849,6 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   const hourlySeconds = lineMeta.reduce((sum, row) => sum + (row.isHourly ? row.liveSeconds : 0), 0)
   const fixedTotal = lineMeta.reduce((sum, row) => sum + (row.isHourly ? 0 : row.lineTotal), 0)
   const effectiveTotalAmount = details.length > 0 ? totalDetailsAmount : project.totalAmount
-  const profit = effectiveTotalAmount - totalExpenses
   const due = Math.max(0, effectiveTotalAmount - (Number(project.paidAmount) || 0))
   const monthMeta = formatFinanceMonthLabel(projectMonthKey(project.createdAt))
 
@@ -816,11 +858,6 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
     small_task: 'Мелкая задача',
     subscription: 'Подписка',
     ai_development: 'AI-разработка',
-  }
-
-  const paymentMethodLabels: Record<string, string> = {
-    card: 'Карта',
-    account: 'Расчетный счет',
   }
 
   const statusLabels: Record<string, string> = {
@@ -1022,7 +1059,11 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                       )}
                     </td>
                     <td className="right">
-                      <span className="sum">{money(lineTotal)}</span>
+                      <LineSumCell
+                        value={lineTotal}
+                        overridden={d.totalOverrideRub != null && Number.isFinite(d.totalOverrideRub)}
+                        onCommit={(next) => handleUpdateLineTotal(d.id, next)}
+                      />
                     </td>
                     <td className="right">
                       <div className="acts">
@@ -1079,105 +1120,6 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
             </button>
             <span className="sec-sub">В клиентской смете ставка и часы не показываются</span>
           </div>
-        </section>
-
-        {variant === 'v2' ? (
-          <section className="card pad">
-            <div className="headrow">
-              <h2 className="sec-title">Учёт времени</h2>
-              <span className="sec-sub">Личный таймер · в смету только по галочке</span>
-            </div>
-            {hourlyRate <= 0 ? <p className="sub" style={{ marginTop: 10 }}>Сначала укажите стоимость часа выше</p> : null}
-            {estimateToggleError ? <p className="sub" style={{ marginTop: 10, color: 'var(--red)' }}>{estimateToggleError}</p> : null}
-            <table>
-              <thead>
-                <tr>
-                  <th>Когда</th>
-                  <th>Задача</th>
-                  <th>Тип</th>
-                  <th className="right">Время</th>
-                  <th className="right">В смету</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trackedTime.map((row) => (
-                  <tr key={row.id}>
-                    <td className="sub">
-                      {new Date(row.trackedAt).toLocaleString('ru-RU', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="t-name">{row.task || '—'}</td>
-                    <td className="sub">{row.activity || '—'}</td>
-                    <td className="right tnum">{formatAgencyDetailHours(row.durationSeconds)}</td>
-                    <td className="right">
-                      <label className="sub" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={row.inEstimate}
-                          disabled={togglingEstimateId === row.id || (hourlyRate <= 0 && !row.inEstimate)}
-                          onChange={(e) => void handleToggleTrackedInEstimate(row, e.target.checked)}
-                        />
-                        {row.inEstimate ? 'в смете' : 'почасово'}
-                      </label>
-                    </td>
-                  </tr>
-                ))}
-                {!trackedTime.length ? (
-                  <tr>
-                    <td colSpan={5} className="empty">
-                      Записей пока нет. Запустите таймер на странице «Время / Экономика» с привязкой к этому проекту.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </section>
-        ) : null}
-
-        <section className="card pad">
-          <div className="headrow" style={{ marginBottom: 16 }}>
-            <h2 className="sec-title">О проекте</h2>
-            {project.deadline ? <span className="sec-sub">Дедлайн: {formatDate(new Date(project.deadline))}</span> : null}
-          </div>
-          <div className="facts">
-            <div>
-              <div className="fact-l">Направление</div>
-              <div className="fact-v">
-                {project.businessLine === 'impulse' ? 'Импульс' : project.businessLine === 'qmagic' ? 'Qmagic' : 'Агентство'}
-              </div>
-            </div>
-            <div>
-              <div className="fact-l">Способ оплаты</div>
-              <div className="fact-v">{project.paymentMethod ? paymentMethodLabels[project.paymentMethod] || project.paymentMethod : '—'}</div>
-            </div>
-            <div>
-              <div className="fact-l">Контакт заказчика</div>
-              <div className="fact-v">{project.clientContact || '—'}</div>
-            </div>
-            <div>
-              <div className="fact-l">Прибыль</div>
-              <div className="fact-v" style={{ color: profit >= 0 ? 'var(--green)' : 'var(--red)' }}>{money(profit)}</div>
-            </div>
-            <div>
-              <div className="fact-l">Расходы</div>
-              <div className="fact-v">{money(totalExpenses)}</div>
-            </div>
-            {project.source_lead_id ? (
-              <div>
-                <div className="fact-l">Лид</div>
-                <div className="fact-v">
-                  <Link href={`/sales/leads#lead-${project.source_lead_id}`}>открыть в воронке</Link>
-                </div>
-              </div>
-            ) : null}
-          </div>
-          {project.notes ? (
-            <p className="sec-sub" style={{ marginTop: 16 }}>{project.notes}</p>
-          ) : null}
         </section>
 
         <section className="card pad">
