@@ -462,13 +462,19 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
               })()
 
       const updated: ProjectDetail = { ...current, ...next }
-      setDetails(details.map(d => d.id === detailId ? updated : d))
+      setDetails((prev) => prev.map(d => d.id === detailId ? updated : d))
 
       try {
         const res = await fetch(apiUrl(`${apiBase}/project-details/${detailId}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updated),
+          body: JSON.stringify({
+            title: updated.title,
+            quantity: updated.quantity,
+            unitPrice: updated.unitPrice,
+            order: updated.order,
+            billingType: updated.billingType ?? 'fixed',
+          }),
         })
         if (!res.ok) {
           console.error('Failed to update project detail')
@@ -500,6 +506,25 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   }
 
   const handleDetailTimer = async (detailId: string, action: 'start' | 'stop') => {
+    const nowIso = new Date().toISOString()
+    setDetails((prev) =>
+      prev.map((d) => {
+        if (d.id !== detailId) return d
+        if (action === 'start') {
+          return {
+            ...d,
+            timerPreviousSeconds: Math.max(0, Number(d.trackedSeconds) || 0),
+            timerStartedAt: nowIso,
+          }
+        }
+        const live = agencyDetailEffectiveSeconds(
+          { trackedSeconds: d.trackedSeconds, timerStartedAt: d.timerStartedAt },
+          Date.now()
+        )
+        return { ...d, trackedSeconds: live, timerStartedAt: null }
+      })
+    )
+    setNowMs(Date.now())
     try {
       const res = await fetch(apiUrl(`${apiBase}/project-details/${detailId}/timer`), {
         method: 'POST',
@@ -508,6 +533,8 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
       })
       if (!res.ok) {
         console.error('Failed to toggle timer')
+        showToast('Не удалось переключить таймер')
+        fetchData()
         return
       }
       const json = await res.json()
@@ -519,6 +546,8 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
       }
     } catch (error) {
       console.error('Error toggling timer:', error)
+      showToast('Не удалось переключить таймер')
+      fetchData()
     }
   }
 
@@ -928,6 +957,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
             </button>
           </form>
 
+          <div className="tbl-wrap">
           <table>
             <thead>
               <tr>
@@ -999,8 +1029,9 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                         {isHourly ? (
                           <button
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => void handleDetailTimer(d.id, running ? 'stop' : 'start')}
-                            className={`btn btn--sm ${running ? 'btn--line' : 'btn--go'}`}
+                            className={`timer-go${running ? ' is-run' : ''}`}
                           >
                             {running ? 'Пауза' : fixedSeconds > 0 ? 'Продолжить' : 'Старт'}
                           </button>
@@ -1028,6 +1059,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
               )}
             </tbody>
           </table>
+          </div>
 
           <div className="ratebar">
             <div>
