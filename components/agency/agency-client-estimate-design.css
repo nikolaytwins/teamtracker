@@ -1,0 +1,72 @@
+.agency-client-v3{
+  --ink-900:#0a0a0b;--ink-800:#18181b;--ink-700:#27272a;--ink-600:#52525b;--ink-500:#71717a;--ink-400:#a1a1aa;--ink-300:#d4d4d8;--ink-200:#e4e4e7;--ink-100:#f4f4f5;--ink-50:#fafafa;
+  --brand-50:#eff4ff;--brand-300:#93b4fd;--brand-500:#3b6ff7;--brand-600:#2a56eb;--brand-700:#2244d8;
+  --green:#0e9f6e;--green-50:#e8f7f0;
+  --shadow-card:0 1px 2px rgba(16,24,40,.04),0 10px 30px -14px rgba(16,24,40,.10);
+  --shadow-glow:0 0 0 4px rgba(59,111,247,.1),0 6px 22px -8px rgba(59,111,247,.45);
+  font-family:Inter,system-ui,sans-serif;background:linear-gradient(180deg,#f6f8fc 0%,#eef2f9 100%);color:var(--ink-900);-webkit-font-smoothing:antialiased;font-size:15px;min-height:100vh;
+}
+.agency-client-v3 button{font:inherit;color:inherit}
+.agency-client-v3 a{color:var(--brand-700);text-decoration:none}
+.agency-client-v3 .page{max-width:1000px;margin:0 auto;padding:36px 24px 80px;display:flex;flex-direction:column;gap:18px}
+.agency-client-v3 .card{background:#fff;border-radius:20px;box-shadow:var(--shadow-card)}
+.agency-client-v3 .pad{padding:26px 28px}
+.agency-client-v3 .kick{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-400)}
+.agency-client-v3 .brand{display:flex;align-items:center;gap:11px;margin-bottom:18px}
+.agency-client-v3 .brand-mark{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--brand-500),var(--brand-600));box-shadow:var(--shadow-glow)}
+.agency-client-v3 .brand-t{font-size:15px;font-weight:600}
+.agency-client-v3 h1{font-size:34px;font-weight:600;letter-spacing:-.035em;margin-top:8px}
+.agency-client-v3 .lead{font-size:16px;color:var(--ink-500);margin-top:10px;max-width:560px;line-height:1.5}
+.agency-client-v3 .months{display:flex;gap:8px;overflow-x:auto;padding:4px}
+.agency-client-v3 .month{border:none;background:#fff;box-shadow:var(--shadow-card);border-radius:14px;padding:12px 18px;font-size:15px;font-weight:500;color:var(--ink-600);cursor:pointer;white-space:nowrap;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.agency-client-v3 .month span{font-size:12.5px;color:var(--ink-400);font-variant-numeric:tabular-nums}
+.agency-client-v3 .month.on{background:var(--brand-600);color:#fff;font-weight:600;box-shadow:0 10px 26px -14px rgba(42,86,235,.9)}
+.agency-client-v3 .month.on span{color:rgba(255,255,255,.75)}
+.agency-client-v3 .sum3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.agency-client-v3 .st{background:var(--ink-50);border-radius:18px;padding:18px 20px}
+.agency-client-v3 .st--acc{background:var(--brand-50)}
+.agency-client-v3 .st-l{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-400)}
+.agency-client-v3 .st--acc .st-l{color:var(--brand-600)}
+.agency-client-v3 .st-v{margin-top:9px;font-size:27px;font-weight:600;letter-spacing:-.034em;font-variant-numeric:tabular-nums}
+.agency-client-v3 .st--acc .st-v{color:var(--brand-700)}
+.agency-client-v3 .pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600;margin-top:10px}
+.agency-client-v3 .pill--ok{background:var(--green-50);color:var(--green)}
+.agency-client-v3 .pill--wait{background:#fef3f2;color:#b42318}
+.agency-client-v3 .dot{width:7px;height:7px;border-radius:999px;background:currentColor}
+.agency-client-v3 .sec-title{font-size:20px;font-weight:600;letter-spacing:-.025em}
+.agency-client-v3 .sec-sub{font-size:14.5px;color:var(--ink-500)}
+.agency-client-v3 .headrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.agency-client-v3 table{width:100%;border-collapse:collapse}
+.agency-client-v3 th{text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-400);padding:12px 14px;border-bottom:1px solid var(--ink-100);font-weight:600}
+.agency-client-v3 td{padding:15px 14px;border-bottom:1px solid var(--ink-100);vertical-align:middle}
+.agency-client-v3 .right{text-align:right;font-variant-numeric:tabular-nums}
+.agency-client-v3 .t-name{font-size:15.5px;font-weight:500}
+.agency-client-v3 .sub{font-size:13px;color:var(--ink-400);margin-top:3px}
+.agency-client-v3 .sum{font-size:15.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.agency-client-v3 .dash{color:var(--ink-300)}
+.agency-client-v3 .totrow td{background:var(--brand-50);font-weight:700;border-bottom:0;font-size:17px;padding:18px 14px}
+.agency-client-v3 .totrow td:first-child{border-radius:0 0 0 14px}
+.agency-client-v3 .totrow td:last-child{border-radius:0 0 14px 0}
+.agency-client-v3 .note{display:flex;gap:12px;align-items:flex-start;background:var(--ink-50);border-radius:16px;padding:16px 19px;font-size:14.5px;color:var(--ink-600);line-height:1.5;margin-top:18px}
+.agency-client-v3 .svgi{width:17px;height:17px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-400);margin-top:2px}
+.agency-client-v3 .pay{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;background:var(--ink-900);color:#fff;border-radius:20px;padding:26px 30px}
+.agency-client-v3 .pay .kick{color:rgba(255,255,255,.5)}
+.agency-client-v3 .pay h3{font-size:26px;font-weight:600;letter-spacing:-.03em;margin-top:8px;font-variant-numeric:tabular-nums}
+.agency-client-v3 .pay p{font-size:14.5px;color:rgba(255,255,255,.6);margin-top:9px;max-width:480px;line-height:1.5}
+.agency-client-v3 .btn{height:46px;padding:0 22px;border-radius:14px;border:none;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:9px;white-space:nowrap}
+.agency-client-v3 .btn--wh{background:#fff;color:var(--ink-900)}
+.agency-client-v3 .btn--wh:hover{background:var(--ink-100)}
+.agency-client-v3 .foot{color:var(--ink-400);font-size:13.5px;padding:0 6px;line-height:1.6}
+.agency-client-v3 .empty{padding:26px 14px;color:var(--ink-400);font-size:14.5px}
+@media(max-width:760px){
+  .agency-client-v3 .sum3{grid-template-columns:1fr}
+  .agency-client-v3 .pay{grid-template-columns:1fr}
+  .agency-client-v3 .page{padding:24px 14px 60px}
+  .agency-client-v3 h1{font-size:28px}
+}
+@media print{
+  .agency-client-v3{background:#fff}
+  .agency-client-v3 .card,.agency-client-v3 .pay{box-shadow:none;border:1px solid var(--ink-200)}
+  .agency-client-v3 .months{display:none}
+  .agency-client-v3 .btn{display:none}
+}

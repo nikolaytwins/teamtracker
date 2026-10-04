@@ -236,4 +236,8 @@ export interface AgencyRepo {
     nextContactDateIso: string;
     manualDateSet: number;
   }): Promise<Record<string, unknown> | undefined>;
+
+  /** Создаёт или возвращает токен публичной сметы. */
+  ensureClientShareToken(projectId: string): Promise<string | null>;
+  listProjectsByClientShareToken(token: string): Promise<Record<string, unknown>[]>;
 }

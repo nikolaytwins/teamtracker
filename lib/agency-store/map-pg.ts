@@ -20,6 +20,7 @@ export function mapProjectRow(r: Record<string, unknown>): Record<string, unknow
     workStatus: r.work_status ?? "not_started",
     kanbanSortOrder: Number(r.kanban_sort_order) || 0,
     hourlyRateRub: Number(r.hourly_rate_rub) || 0,
+    clientShareToken: r.client_share_token ? String(r.client_share_token) : null,
     dispatchWorkStatus: r.dispatch_work_status ?? "planned",
     workDeadline: r.work_deadline ?? null,
     plannedHoursRemaining:

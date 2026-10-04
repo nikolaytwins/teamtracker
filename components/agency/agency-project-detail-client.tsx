@@ -10,11 +10,13 @@ import {
   formatAgencyDetailHours,
   parseAgencyDetailClock,
 } from '@/lib/agency/detail-line-total'
+import { formatFinanceMonthLabel, projectMonthKey } from '@/lib/agency/client-share'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
+import './agency-project-detail-design.css'
 
 interface Project {
   id: string
@@ -32,6 +34,7 @@ interface Project {
   source_lead_id?: string | null
   hourlyRateRub?: number
   createdAt: string
+  clientShareToken?: string | null
 }
 
 interface Expense {
@@ -62,6 +65,10 @@ interface TrackedTimeRow {
   trackedAt: string
   inEstimate: boolean
   detailId: string | null
+}
+
+function money(n: number): string {
+  return `${Math.round(n).toLocaleString('ru-RU')} ₽`
 }
 
 function ExpenseRow({
@@ -106,7 +113,7 @@ function ExpenseRow({
 
   return (
     <tr>
-      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text)]">
+      <td>
         {editingField === 'employeeName' ? (
           <input
             type="text"
@@ -118,18 +125,15 @@ function ExpenseRow({
               if (e.key === 'Escape') handleCancel()
             }}
             autoFocus
-            className="w-full px-2 py-1 border border-[var(--primary)] rounded text-sm"
+            className="cell-inp"
           />
         ) : (
-          <button
-            onClick={() => handleStartEdit('employeeName', expense.employeeName)}
-            className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-left"
-          >
+          <button type="button" onClick={() => handleStartEdit('employeeName', expense.employeeName)} className="cell-inp" style={{ textAlign: 'left' }}>
             {expense.employeeName}
           </button>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--muted-foreground)]">
+      <td>
         {editingField === 'employeeRole' ? (
           <select
             value={tempValue}
@@ -139,22 +143,19 @@ function ExpenseRow({
             }}
             onBlur={() => setEditingField(null)}
             autoFocus
-            className="w-full px-2 py-1 border border-[var(--primary)] rounded text-sm"
+            className="inp"
           >
             {roleOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
         ) : (
-          <button
-            onClick={() => handleStartEdit('employeeRole', expense.employeeRole)}
-            className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded"
-          >
+          <button type="button" onClick={() => handleStartEdit('employeeRole', expense.employeeRole)} className="cell-inp" style={{ textAlign: 'left' }}>
             {roleLabels[expense.employeeRole] || expense.employeeRole}
           </button>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-[var(--text)]">
+      <td className="right">
         {editingField === 'amount' ? (
           <input
             type="number"
@@ -167,18 +168,15 @@ function ExpenseRow({
               if (e.key === 'Escape') handleCancel()
             }}
             autoFocus
-            className="w-24 px-2 py-1 border border-[var(--primary)] rounded text-sm text-right"
+            className="cell-inp cell-inp--n"
           />
         ) : (
-          <button
-            onClick={() => handleStartEdit('amount', expense.amount)}
-            className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-right"
-          >
+          <button type="button" onClick={() => handleStartEdit('amount', expense.amount)} className="cell-inp cell-inp--n">
             {expense.amount.toLocaleString('ru-RU')} ₽
           </button>
         )}
       </td>
-      <td className="px-6 py-4 text-sm text-[var(--muted-foreground)]">
+      <td>
         {editingField === 'notes' ? (
           <input
             type="text"
@@ -190,22 +188,16 @@ function ExpenseRow({
               if (e.key === 'Escape') handleCancel()
             }}
             autoFocus
-            className="w-full px-2 py-1 border border-[var(--primary)] rounded text-sm"
+            className="cell-inp"
           />
         ) : (
-          <button
-            onClick={() => handleStartEdit('notes', expense.notes || '')}
-            className="cursor-pointer hover:bg-[var(--surface-2)] px-2 py-1 rounded text-left w-full"
-          >
+          <button type="button" onClick={() => handleStartEdit('notes', expense.notes || '')} className="cell-inp" style={{ textAlign: 'left', width: '100%' }}>
             {expense.notes || '—'}
           </button>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-        <button
-          onClick={() => onDelete(expense.id)}
-          className="text-red-600 hover:text-red-900"
-        >
+      <td className="right">
+        <button type="button" onClick={() => onDelete(expense.id)} className="del">
           Удалить
         </button>
       </td>
@@ -249,7 +241,7 @@ function HourlyClockCell({
   const showPrev = previousSeconds > 0 && previousSeconds !== liveSeconds
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="right">
       {editing ? (
         <input
           type="text"
@@ -268,26 +260,24 @@ function HourlyClockCell({
             }
           }}
           aria-label="Время таймера"
-          className="w-[7.5rem] rounded-md border border-[var(--primary)] bg-[var(--surface)] px-1.5 py-0.5 text-right font-mono text-[18px] font-semibold tabular-nums leading-none"
+          className="clock-inp"
         />
       ) : (
         <button
           type="button"
           onClick={startEdit}
           title="Изменить время"
-          className={`rounded-md px-1 py-0.5 font-mono text-[20px] font-semibold tabular-nums leading-none tracking-tight hover:bg-[var(--surface-2)] ${
-            running ? 'text-emerald-700' : 'text-[var(--text)]'
-          }`}
+          className={`clock${running ? ' run' : ''}`}
         >
           {formatAgencyDetailClock(liveSeconds)}
         </button>
       )}
       {running ? (
-        <div className="text-[11px] text-emerald-700">
+        <div className="sub" style={{ color: 'var(--green)' }}>
           Идёт · сессия {formatAgencyDetailClock(sessionSeconds)}
         </div>
       ) : (
-        <div className="text-[11px] text-[var(--muted-foreground)]">
+        <div className="sub">
           {fixedSeconds > 0
             ? `На паузе · ${formatAgencyDetailHours(fixedSeconds)}`
             : 'Ещё не запускали'}
@@ -298,7 +288,8 @@ function HourlyClockCell({
           type="button"
           onClick={onRestore}
           title="Вернуть время до последнего старта"
-          className="text-[10px] leading-none text-[var(--muted-foreground)]/70 hover:text-[var(--muted-foreground)]"
+          className="del"
+          style={{ padding: '4px 0' }}
         >
           было {formatAgencyDetailClock(previousSeconds)}
         </button>
@@ -319,13 +310,20 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   const [details, setDetails] = useState<ProjectDetail[]>([])
   const [loading, setLoading] = useState(true)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
-  const [addBillingType, setAddBillingType] = useState<'fixed' | 'hourly'>('fixed')
+  const [addBillingType, setAddBillingType] = useState<'fixed' | 'hourly'>('hourly')
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [hourlyRateDraft, setHourlyRateDraft] = useState('')
   const [savingRate, setSavingRate] = useState(false)
   const [trackedTime, setTrackedTime] = useState<TrackedTimeRow[]>([])
   const [togglingEstimateId, setTogglingEstimateId] = useState<string | null>(null)
   const [estimateToggleError, setEstimateToggleError] = useState<string | null>(null)
+  const [sharePath, setSharePath] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const showToast = useCallback((text: string) => {
+    setToast(text)
+    window.setTimeout(() => setToast(null), 2200)
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -358,6 +356,21 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
       void fetchData()
     }
   }, [id, fetchData])
+
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    void fetch(apiUrl(`${apiBase}/projects/${id}/client-share`))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (cancelled || !json?.path) return
+        setSharePath(String(json.path))
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [id, apiBase])
 
   useEffect(() => {
     const hasRunning = details.some((d) => d.billingType === 'hourly' && d.timerStartedAt)
@@ -423,7 +436,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
           fetchData()
         }
         ;(e.currentTarget as HTMLFormElement).reset()
-        setAddBillingType('fixed')
+        setAddBillingType('hourly')
       }
     } catch (error) {
       console.error('Error adding project detail:', error)
@@ -571,6 +584,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
         } else {
           setProject({ ...project, hourlyRateRub: rate })
         }
+        showToast('Ставка сохранена')
       }
     } catch (error) {
       console.error('Error saving hourly rate:', error)
@@ -635,7 +649,6 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
 
       const updatedExpense = { ...expense, [field]: value }
       
-      // Optimistic update
       setExpenses(expenses.map(e => e.id === expenseId ? updatedExpense : e))
       
       const res = await fetch(apiUrl(`${apiBase}/expenses/${expenseId}`), {
@@ -650,7 +663,6 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
           setExpenses(expenses.map(e => e.id === expenseId ? data.expense : e))
         }
       } else {
-        // Revert on error
         fetchData()
       }
     } catch (error) {
@@ -659,24 +671,82 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
     }
   }
 
+  const shareUrl = useMemo(() => {
+    if (!sharePath) return ''
+    if (typeof window === 'undefined') return sharePath
+    return `${window.location.origin}${appPath(sharePath)}`
+  }, [sharePath])
+
+  const copyShareLink = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      showToast('Ссылка скопирована')
+    } catch {
+      showToast('Не удалось скопировать')
+    }
+  }
+
+  const exportEstimate = () => {
+    if (!project) return
+    const hourlyRate = Number(project.hourlyRateRub) || 0
+    const rows = [
+      ['Задача', 'Тип', 'Кол-во / часы', 'Стоимость', 'Итого'],
+      ...details.map((d) => {
+        const isHourly = d.billingType === 'hourly'
+        const liveSeconds = isHourly
+          ? agencyDetailEffectiveSeconds(
+              { trackedSeconds: d.trackedSeconds, timerStartedAt: d.timerStartedAt },
+              nowMs
+            )
+          : 0
+        const lineTotal = agencyDetailLineTotal(
+          {
+            billingType: d.billingType,
+            quantity: d.quantity,
+            unitPrice: d.unitPrice,
+            trackedSeconds: liveSeconds,
+          },
+          hourlyRate
+        )
+        return [
+          d.title,
+          isHourly ? 'По времени' : 'Фикс',
+          isHourly ? formatAgencyDetailHours(liveSeconds) : String(d.quantity),
+          isHourly ? String(hourlyRate) : String(d.unitPrice),
+          String(Math.round(lineTotal)),
+        ]
+      }),
+    ]
+    const csv = `\uFEFF${rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n')}`
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${project.name.replace(/[\\/:*?"<>|]+/g, '_')}-smeta.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    showToast('Смета экспортирована')
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--muted-foreground)]">Загрузка...</div>
+      <div className="agency-proj-v3">
+        <div className="page">
+          <div className="empty">Загрузка...</div>
+        </div>
       </div>
     )
   }
 
   if (!project) {
     return (
-      <div>
-        <div className="mb-6">
-          <Link href={appPath(paths.listHref)} className="text-[var(--primary)] hover:underline text-sm">
+      <div className="agency-proj-v3">
+        <div className="page">
+          <Link href={appPath(paths.listHref)} className="back">
             ← Назад к проектам
           </Link>
-        </div>
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          Проект не найден
+          <section className="card pad">Проект не найден</section>
         </div>
       </div>
     )
@@ -684,26 +754,32 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
 
   const hourlyRate = Number(project.hourlyRateRub) || 0
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
-  const totalDetailsAmount = details.reduce(
-    (sum, d) =>
-      sum +
-      agencyDetailLineTotal(
-        {
-          billingType: d.billingType,
-          quantity: d.quantity,
-          unitPrice: d.unitPrice,
-          trackedSeconds: agencyDetailEffectiveSeconds(
-            { trackedSeconds: d.trackedSeconds, timerStartedAt: d.timerStartedAt },
-            nowMs
-          ),
-        },
-        hourlyRate
-      ),
-    0
-  )
-  // Если есть детализация — она приоритетнее ручного totalAmount
+  const lineMeta = details.map((d) => {
+    const isHourly = d.billingType === 'hourly'
+    const liveSeconds = isHourly
+      ? agencyDetailEffectiveSeconds(
+          { trackedSeconds: d.trackedSeconds, timerStartedAt: d.timerStartedAt },
+          nowMs
+        )
+      : 0
+    const lineTotal = agencyDetailLineTotal(
+      {
+        billingType: d.billingType,
+        quantity: d.quantity,
+        unitPrice: d.unitPrice,
+        trackedSeconds: liveSeconds,
+      },
+      hourlyRate
+    )
+    return { d, isHourly, liveSeconds, lineTotal }
+  })
+  const totalDetailsAmount = lineMeta.reduce((sum, row) => sum + row.lineTotal, 0)
+  const hourlySeconds = lineMeta.reduce((sum, row) => sum + (row.isHourly ? row.liveSeconds : 0), 0)
+  const fixedTotal = lineMeta.reduce((sum, row) => sum + (row.isHourly ? 0 : row.lineTotal), 0)
   const effectiveTotalAmount = details.length > 0 ? totalDetailsAmount : project.totalAmount
   const profit = effectiveTotalAmount - totalExpenses
+  const due = Math.max(0, effectiveTotalAmount - (Number(project.paidAmount) || 0))
+  const monthMeta = formatFinanceMonthLabel(projectMonthKey(project.createdAt))
 
   const serviceLabels: Record<string, string> = {
     site: 'Сайт',
@@ -725,7 +801,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   }
 
   const clientTypeLabels: Record<string, string> = {
-    permanent: 'Постоянник',
+    permanent: 'Постоянный',
     referral: 'Рекомендация',
     profi_ru: 'Профи.ру',
     networking: 'Нетворкинг',
@@ -738,144 +814,150 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
     assistant: 'Ассистент',
   }
 
+  const lineLabel =
+    project.businessLine === 'impulse' ? 'impulse' : project.businessLine === 'qmagic' ? 'qmagic' : 'agency'
+  const unpaid = project.status !== 'paid'
+
   return (
-    <div>
-      <div className="mb-6">
-        <Link href={appPath(paths.listHref)} className="text-[var(--primary)] hover:underline text-sm">
+    <div className="agency-proj-v3">
+      <div className="page">
+        <Link href={appPath(paths.listHref)} className="back">
           ← Назад к проектам
         </Link>
-      </div>
 
-      {/* Детализация для клиента */}
-      <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6 mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-[var(--text)]">Детализация для клиента</h2>
-          {totalDetailsAmount > 0 && (
-            <div className="text-sm text-[var(--text)]">
-              Итого по детализации:{' '}
-              <span className="font-semibold">
-                {totalDetailsAmount.toLocaleString('ru-RU')} ₽
+        <section className="card head">
+          <div>
+            <span className="kick">Проект агентства</span>
+            <h1 className="big-title">{project.name}</h1>
+            <div className="chips">
+              <span className="chip">Ставка <b>{hourlyRate.toLocaleString('ru-RU')} ₽/ч</b></span>
+              <span className="chip">Работа <b>{project.clientType ? (clientTypeLabels[project.clientType] || project.clientType) : '—'}</b></span>
+              <span className="chip">Тип <b>{serviceLabels[project.serviceType] || project.serviceType}</b></span>
+              <span className={`chip ${unpaid ? 'chip--warn' : 'chip--ok'}`}>
+                Оплата <b>{statusLabels[project.status] || project.status}</b>
               </span>
             </div>
-          )}
-        </div>
-
-        <form onSubmit={handleAddDetail} className="mb-4 bg-[var(--surface-2)] rounded-lg p-4">
-          <div className="mb-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setAddBillingType('fixed')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                addBillingType === 'fixed'
-                  ? 'bg-[var(--primary)] text-white'
-                  : 'bg-[var(--surface)] text-[var(--muted-foreground)] border border-[var(--border)]'
-              }`}
-            >
-              Фикс
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddBillingType('hourly')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                addBillingType === 'hourly'
-                  ? 'bg-[var(--primary)] text-white'
-                  : 'bg-[var(--surface)] text-[var(--muted-foreground)] border border-[var(--border)]'
-              }`}
-            >
-              По времени
+          </div>
+          <div className="head-a">
+            {shareUrl ? (
+              <a className="btn btn--pri" href={shareUrl} target="_blank" rel="noreferrer">
+                <svg className="svgi" viewBox="0 0 24 24">
+                  <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+                  <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+                </svg>
+                Ссылка для клиента
+              </a>
+            ) : (
+              <button type="button" className="btn btn--pri" disabled>
+                Ссылка для клиента
+              </button>
+            )}
+            <button type="button" className="btn btn--line" onClick={exportEstimate}>
+              Экспорт сметы
             </button>
           </div>
-          <div className="grid grid-cols-12 gap-3 items-end">
-            <div className="col-span-6">
-              <label className="block text-xs font-medium text-[var(--text)] mb-1">Задача / услуга</label>
-              <input
-                name="title"
-                type="text"
-                placeholder="Например: Обложки для рилс"
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
-              />
+        </section>
+
+        <section className="card pad">
+          <div className="kpis">
+            <div className="kpi">
+              <div className="kpi-l">Время в работе</div>
+              <div className="kpi-v">{hourlySeconds > 0 ? formatAgencyDetailHours(hourlySeconds) : '—'}</div>
+              <div className="kpi-s">по {hourlyRate.toLocaleString('ru-RU')} ₽/ч</div>
             </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-[var(--text)] mb-1">Кол-во</label>
-              <input
-                name="quantity"
-                type="number"
-                step="0.01"
-                defaultValue="1"
-                disabled={addBillingType === 'hourly'}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm text-right disabled:cursor-not-allowed disabled:bg-[var(--surface)] disabled:opacity-40"
-              />
+            <div className="kpi">
+              <div className="kpi-l">Работы по факту</div>
+              <div className="kpi-v">{fixedTotal > 0 ? money(fixedTotal) : '—'}</div>
+              <div className="kpi-s">фикс-задачи</div>
             </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-[var(--text)] mb-1">Стоимость</label>
-              <input
-                name="unitPrice"
-                type="number"
-                step="0.01"
-                disabled={addBillingType === 'hourly'}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm text-right disabled:cursor-not-allowed disabled:bg-[var(--surface)] disabled:opacity-40"
-              />
+            <div className="kpi kpi--acc">
+              <div className="kpi-l">Итого по смете</div>
+              <div className="kpi-v">{money(effectiveTotalAmount)}</div>
+              <div className="kpi-s">{monthMeta.label.toLowerCase()}</div>
             </div>
-            <div className="col-span-2 flex justify-end">
+            <div className="kpi">
+              <div className="kpi-l">Оплачено</div>
+              <div className="kpi-v">{money(project.paidAmount)}</div>
+              <div className="kpi-s">к оплате {money(due)}</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="card pad">
+          <div className="headrow">
+            <h2 className="sec-title">Задачи месяца</h2>
+            <span className="sec-sub">{monthMeta.label}</span>
+          </div>
+          <form className="addbar" onSubmit={handleAddDetail}>
+            <div className="seg">
               <button
-                type="submit"
-                className="px-4 py-2 bg-[var(--primary)] text-white rounded-md text-sm font-medium hover:brightness-110"
+                type="button"
+                className={addBillingType === 'hourly' ? 'on' : undefined}
+                onClick={() => setAddBillingType('hourly')}
               >
-                Добавить
+                По времени
+              </button>
+              <button
+                type="button"
+                className={addBillingType === 'fixed' ? 'on' : undefined}
+                onClick={() => setAddBillingType('fixed')}
+              >
+                Фикс
               </button>
             </div>
-          </div>
-        </form>
+            <input className="inp inp--grow" name="title" placeholder="Название задачи" />
+            <input
+              className="inp inp--n"
+              name="quantity"
+              placeholder="Кол-во"
+              type="number"
+              min={1}
+              defaultValue={1}
+              style={{ display: addBillingType === 'fixed' ? undefined : 'none' }}
+            />
+            <input
+              className="inp inp--n"
+              name="unitPrice"
+              placeholder="Цена, ₽"
+              type="number"
+              min={0}
+              style={{ display: addBillingType === 'fixed' ? undefined : 'none' }}
+            />
+            <button type="submit" className="btn btn--dark btn--sm" style={{ height: 42, padding: '0 18px' }}>
+              Добавить
+            </button>
+          </form>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-[var(--border)]">
-            <thead className="bg-[var(--surface-2)]">
+          <table>
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Задача</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Кол-во / часы</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Стоимость</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Итого</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Действия</th>
+                <th>Задача</th>
+                <th className="right">Кол-во / часы</th>
+                <th className="right">Стоимость</th>
+                <th className="right">Итого</th>
+                <th className="right">Действия</th>
               </tr>
             </thead>
-            <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
-              {details.map((d) => {
-                const isHourly = d.billingType === 'hourly'
-                const liveSeconds = isHourly
-                  ? agencyDetailEffectiveSeconds(
-                      { trackedSeconds: d.trackedSeconds, timerStartedAt: d.timerStartedAt },
-                      nowMs
-                    )
-                  : 0
+            <tbody>
+              {lineMeta.map(({ d, isHourly, liveSeconds, lineTotal }) => {
                 const sessionSeconds = isHourly
                   ? agencyDetailSessionElapsedSeconds(d.timerStartedAt, nowMs)
                   : 0
                 const fixedSeconds = Math.max(0, Number(d.trackedSeconds) || 0)
-                const lineTotal = agencyDetailLineTotal(
-                  {
-                    billingType: d.billingType,
-                    quantity: d.quantity,
-                    unitPrice: d.unitPrice,
-                    trackedSeconds: liveSeconds,
-                  },
-                  hourlyRate
-                )
                 const previousSeconds = Math.max(0, Number(d.timerPreviousSeconds) || 0)
                 const running = Boolean(d.timerStartedAt)
                 return (
-                  <tr key={d.id} className={running ? 'bg-emerald-50/40' : undefined}>
-                    <td className="px-6 py-3 text-sm">
+                  <tr key={d.id}>
+                    <td>
                       <input
                         type="text"
                         defaultValue={d.title}
                         onBlur={(e) => handleUpdateDetail(d.id, 'title')(e.target.value)}
-                        className="w-full px-2 py-1 border border-transparent hover:border-[var(--border)] rounded-md text-sm"
+                        className="cell-inp t-name"
                       />
-                      {isHourly ? (
-                        <div className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">По времени</div>
-                      ) : null}
+                      <div className="sub">{isHourly ? 'По времени' : 'Фикс'}</div>
                     </td>
-                    <td className="px-6 py-3 text-sm">
+                    <td className="right">
                       {isHourly ? (
                         <HourlyClockCell
                           liveSeconds={liveSeconds}
@@ -887,60 +969,43 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                           onRestore={() => void handleSetDetailSeconds(d.id, previousSeconds)}
                         />
                       ) : (
-                        <div className="text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            defaultValue={d.quantity}
-                            onBlur={(e) => handleUpdateDetail(d.id, 'quantity')(e.target.value)}
-                            className="w-24 px-2 py-1 border border-transparent hover:border-[var(--border)] rounded-md text-sm text-right"
-                          />
-                        </div>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={d.quantity}
+                          onBlur={(e) => handleUpdateDetail(d.id, 'quantity')(e.target.value)}
+                          className="cell-inp cell-inp--n"
+                        />
                       )}
                     </td>
-                    <td className="px-6 py-3 text-sm text-right">
+                    <td className="right">
                       {isHourly ? (
-                        <span className="text-[var(--muted-foreground)]">—</span>
+                        <span className="dash" style={{ color: 'var(--ink-300)' }}>—</span>
                       ) : (
                         <input
                           type="number"
                           step="0.01"
                           defaultValue={d.unitPrice}
                           onBlur={(e) => handleUpdateDetail(d.id, 'unitPrice')(e.target.value)}
-                          className="w-28 px-2 py-1 border border-transparent hover:border-[var(--border)] rounded-md text-sm text-right"
+                          className="cell-inp cell-inp--n"
                         />
                       )}
                     </td>
-                    <td className="px-6 py-3 text-sm text-right font-medium">
-                      {lineTotal.toLocaleString('ru-RU')} ₽
+                    <td className="right">
+                      <span className="sum">{money(lineTotal)}</span>
                     </td>
-                    <td className="px-6 py-3 text-sm text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="right">
+                      <div className="acts">
                         {isHourly ? (
                           <button
                             type="button"
                             onClick={() => void handleDetailTimer(d.id, running ? 'stop' : 'start')}
-                            className={`inline-flex min-w-[108px] items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                              running
-                                ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
-                                : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                            }`}
+                            className={`btn btn--sm ${running ? 'btn--line' : 'btn--go'}`}
                           >
-                            {running ? (
-                              <>
-                                <span aria-hidden>❚❚</span> Пауза
-                              </>
-                            ) : (
-                              <>
-                                <span aria-hidden>▶</span> {fixedSeconds > 0 ? 'Продолжить' : 'Старт'}
-                              </>
-                            )}
+                            {running ? 'Пауза' : fixedSeconds > 0 ? 'Продолжить' : 'Старт'}
                           </button>
                         ) : null}
-                        <button
-                          onClick={() => handleDeleteDetail(d.id)}
-                          className="text-red-600 hover:text-red-900 text-xs"
-                        >
+                        <button type="button" onClick={() => handleDeleteDetail(d.id)} className="del">
                           Удалить
                         </button>
                       </div>
@@ -948,99 +1013,64 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                   </tr>
                 )
               })}
-              {details.length > 0 && (
-                <tr className="bg-[var(--primary-soft)]">
-                  <td className="px-6 py-3 text-sm font-semibold text-[var(--text)]">ИТОГО</td>
+              {details.length > 0 ? (
+                <tr className="totrow">
+                  <td>ИТОГО</td>
                   <td />
                   <td />
-                  <td className="px-6 py-3 text-sm font-bold text-right text-[var(--text)]">
-                    {totalDetailsAmount.toLocaleString('ru-RU')} ₽
-                  </td>
+                  <td className="right">{money(totalDetailsAmount)}</td>
                   <td />
                 </tr>
-              )}
-              {details.length === 0 && (
+              ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
-                    Детализация пока не добавлена
-                  </td>
+                  <td colSpan={5} className="empty">Детализация пока не добавлена</td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
 
-        <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <div className="text-sm font-semibold text-[var(--text)]">Стоимость часа проекта</div>
-          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-            Ставка используется для почасовых задач. В списке строк для клиента не показывается — только часы и итого.
-          </p>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
+          <div className="ratebar">
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--text)]">₽ / час</label>
+              <div className="kick">Стоимость часа</div>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={hourlyRateDraft}
                 onChange={(e) => setHourlyRateDraft(e.target.value)}
-                className="w-40 rounded-md border border-[var(--border)] px-3 py-2 text-sm text-right"
+                className="inp inp--n"
+                style={{ marginTop: 8, width: 140 }}
               />
             </div>
-            <button
-              type="button"
-              disabled={savingRate}
-              onClick={() => void handleSaveHourlyRate()}
-              className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-60"
-            >
+            <button type="button" disabled={savingRate} onClick={() => void handleSaveHourlyRate()} className="btn btn--line btn--sm">
               {savingRate ? 'Сохранение…' : 'Сохранить ставку'}
             </button>
+            <span className="sec-sub">В клиентской смете ставка и часы не показываются</span>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {variant === 'v2' ? (
-        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6 mb-6">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--text)]">Учёт времени</h2>
-              <p className="mt-1 max-w-[72ch] text-xs text-[var(--muted-foreground)]">
-                Сюда попадает время с личного таймера (Агентство → Production). В смету не добавляется автоматически —
-                отметьте галочку, если эта задача оплачивается по часам.
-              </p>
+        {variant === 'v2' ? (
+          <section className="card pad">
+            <div className="headrow">
+              <h2 className="sec-title">Учёт времени</h2>
+              <span className="sec-sub">Личный таймер · в смету только по галочке</span>
             </div>
-            {(Number(project.hourlyRateRub) || 0) <= 0 ? (
-              <span className="text-xs text-amber-700">Сначала укажите стоимость часа выше</span>
-            ) : null}
-          </div>
-          {estimateToggleError ? (
-            <p className="mb-3 text-sm text-red-600">{estimateToggleError}</p>
-          ) : null}
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[var(--border)]">
-              <thead className="bg-[var(--surface-2)]">
+            {hourlyRate <= 0 ? <p className="sub" style={{ marginTop: 10 }}>Сначала укажите стоимость часа выше</p> : null}
+            {estimateToggleError ? <p className="sub" style={{ marginTop: 10, color: 'var(--red)' }}>{estimateToggleError}</p> : null}
+            <table>
+              <thead>
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-                    Когда
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-                    Задача
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-                    Тип
-                  </th>
-                  <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-                    Время
-                  </th>
-                  <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-                    В смету
-                  </th>
+                  <th>Когда</th>
+                  <th>Задача</th>
+                  <th>Тип</th>
+                  <th className="right">Время</th>
+                  <th className="right">В смету</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border)] bg-[var(--surface)]">
+              <tbody>
                 {trackedTime.map((row) => (
                   <tr key={row.id}>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-[var(--muted-foreground)]">
+                    <td className="sub">
                       {new Date(row.trackedAt).toLocaleString('ru-RU', {
                         day: 'numeric',
                         month: 'short',
@@ -1048,224 +1078,108 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                         minute: '2-digit',
                       })}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text)]">{row.task || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[var(--muted-foreground)]">{row.activity || '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm tabular-nums text-[var(--text)]">
-                      {formatAgencyDetailHours(row.durationSeconds)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                    <td className="t-name">{row.task || '—'}</td>
+                    <td className="sub">{row.activity || '—'}</td>
+                    <td className="right tnum">{formatAgencyDetailHours(row.durationSeconds)}</td>
+                    <td className="right">
+                      <label className="sub" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={row.inEstimate}
-                          disabled={
-                            togglingEstimateId === row.id ||
-                            ((Number(project.hourlyRateRub) || 0) <= 0 && !row.inEstimate)
-                          }
+                          disabled={togglingEstimateId === row.id || (hourlyRate <= 0 && !row.inEstimate)}
                           onChange={(e) => void handleToggleTrackedInEstimate(row, e.target.checked)}
-                          className="h-4 w-4 rounded border-[var(--border)]"
                         />
-                        <span>{row.inEstimate ? 'в смете' : 'почасово'}</span>
+                        {row.inEstimate ? 'в смете' : 'почасово'}
                       </label>
                     </td>
                   </tr>
                 ))}
                 {!trackedTime.length ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-sm text-[var(--muted-foreground)]">
+                    <td colSpan={5} className="empty">
                       Записей пока нет. Запустите таймер на странице «Время / Экономика» с привязкой к этому проекту.
                     </td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text)]">{project.name}</h1>
-        {project.deadline && (
-          <p className="text-sm text-[var(--muted-foreground)] mt-1">Дедлайн: {formatDate(new Date(project.deadline))}</p>
-        )}
-        {project.source_lead_id ? (
-          <p className="text-sm text-[var(--muted-foreground)] mt-1">
-            Лид:{" "}
-            <Link href={`/sales/leads#lead-${project.source_lead_id}`} className="hover:underline">
-              открыть в воронке
-            </Link>
-          </p>
+          </section>
         ) : null}
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
-          <div className="text-sm text-[var(--muted-foreground)] mb-1">Сумма проекта</div>
-          <div className="text-xl font-bold text-[var(--text)]">
-            {effectiveTotalAmount.toLocaleString('ru-RU')} ₽
+        <section className="card pad">
+          <div className="headrow" style={{ marginBottom: 16 }}>
+            <h2 className="sec-title">О проекте</h2>
+            {project.deadline ? <span className="sec-sub">Дедлайн: {formatDate(new Date(project.deadline))}</span> : null}
           </div>
-          {details.length > 0 && effectiveTotalAmount !== project.totalAmount && (
-            <div className="mt-1 text-xs text-[var(--muted-foreground)]">
-              По детализации (ручное значение: {project.totalAmount.toLocaleString('ru-RU')} ₽)
-            </div>
-          )}
-        </div>
-        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
-          <div className="text-sm text-[var(--muted-foreground)] mb-1">Оплачено</div>
-          <div className="text-xl font-bold text-green-600">{project.paidAmount.toLocaleString('ru-RU')} ₽</div>
-        </div>
-        <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
-          <div className="text-sm text-[var(--muted-foreground)] mb-1">Расходы</div>
-          <div className="text-xl font-bold text-red-600">{totalExpenses.toLocaleString('ru-RU')} ₽</div>
-        </div>
-      </div>
-
-      <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6 mb-6">
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <div className="text-sm text-[var(--muted-foreground)]">Услуга</div>
-            <div className="font-medium">{serviceLabels[project.serviceType] || project.serviceType}</div>
-          </div>
-          <div>
-            <div className="text-sm text-[var(--muted-foreground)]">Направление</div>
-            <div className="font-medium">
-              {project.businessLine === "impulse"
-                ? "Импульс"
-                : project.businessLine === "qmagic"
-                  ? "Qmagic"
-                  : "Агентство"}
-            </div>
-          </div>
-          <div>
-            <div className="text-sm text-[var(--muted-foreground)]">Тип клиента</div>
-            <div className="font-medium">{project.clientType ? (clientTypeLabels[project.clientType] || project.clientType) : '—'}</div>
-          </div>
-          <div>
-            <div className="text-sm text-[var(--muted-foreground)]">Статус</div>
+          <div className="facts">
             <div>
-              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                project.status === 'paid' 
-                  ? 'bg-green-100 text-green-800'
-                  : project.status === 'prepaid'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                {statusLabels[project.status]}
-              </span>
+              <div className="fact-l">Направление</div>
+              <div className="fact-v">
+                {project.businessLine === 'impulse' ? 'Импульс' : project.businessLine === 'qmagic' ? 'Qmagic' : 'Агентство'}
+              </div>
             </div>
-          </div>
-          <div>
-            <div className="text-sm text-[var(--muted-foreground)]">Контакт заказчика</div>
-            <div className="font-medium">{project.clientContact || '—'}</div>
-          </div>
-          <div>
-            <div className="text-sm text-[var(--muted-foreground)]">Способ оплаты</div>
-            <div className="font-medium">
-              {project.paymentMethod ? paymentMethodLabels[project.paymentMethod] || project.paymentMethod : '—'}
+            <div>
+              <div className="fact-l">Способ оплаты</div>
+              <div className="fact-v">{project.paymentMethod ? paymentMethodLabels[project.paymentMethod] || project.paymentMethod : '—'}</div>
             </div>
-          </div>
-          <div>
-            <div className="text-sm text-[var(--muted-foreground)]">Прибыль</div>
-            <div className={`font-bold text-lg ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {profit.toLocaleString('ru-RU')} ₽
+            <div>
+              <div className="fact-l">Контакт заказчика</div>
+              <div className="fact-v">{project.clientContact || '—'}</div>
             </div>
+            <div>
+              <div className="fact-l">Прибыль</div>
+              <div className="fact-v" style={{ color: profit >= 0 ? 'var(--green)' : 'var(--red)' }}>{money(profit)}</div>
+            </div>
+            <div>
+              <div className="fact-l">Расходы</div>
+              <div className="fact-v">{money(totalExpenses)}</div>
+            </div>
+            {project.source_lead_id ? (
+              <div>
+                <div className="fact-l">Лид</div>
+                <div className="fact-v">
+                  <Link href={`/sales/leads#lead-${project.source_lead_id}`}>открыть в воронке</Link>
+                </div>
+              </div>
+            ) : null}
           </div>
-        </div>
-        {project.notes && (
-          <div className="mt-4 pt-4 border-t">
-            <div className="text-sm text-[var(--muted-foreground)] mb-1">Заметки</div>
-            <div className="text-sm">{project.notes}</div>
-          </div>
-        )}
-      </div>
+          {project.notes ? (
+            <p className="sec-sub" style={{ marginTop: 16 }}>{project.notes}</p>
+          ) : null}
+        </section>
 
-      <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-[var(--text)]">Расходы</h2>
-          <button
-            onClick={() => setShowExpenseForm(!showExpenseForm)}
-            className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
-          >
-            + Добавить расход
-          </button>
-        </div>
-
-        {showExpenseForm && (
-          <form onSubmit={handleAddExpense} className="mb-6 p-4 bg-[var(--surface-2)] rounded-lg">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text)] mb-1">Имя сотрудника *</label>
-                <input
-                  name="employeeName"
-                  type="text"
-                  required
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text)] mb-1">Роль *</label>
-                <select
-                  name="employeeRole"
-                  required
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
-                >
-                  <option value="designer">Дизайнер</option>
-                  <option value="pm">Проджект</option>
-                  <option value="copywriter">Копирайтер</option>
-                  <option value="assistant">Ассистент</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text)] mb-1">Сумма *</label>
-                <input
-                  name="amount"
-                  type="number"
-                  step="0.01"
-                  required
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text)] mb-1">Заметки</label>
-                <input
-                  name="notes"
-                  type="text"
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowExpenseForm(false)}
-                className="px-4 py-2 border border-[var(--border)] rounded-md text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-              >
-                Отмена
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-[var(--primary)] text-white rounded-md text-sm font-medium hover:brightness-110"
-              >
-                Добавить
-              </button>
-            </div>
-          </form>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-[var(--border)]">
-            <thead className="bg-[var(--surface-2)]">
+        <section className="card pad">
+          <div className="headrow">
+            <h2 className="sec-title">Расходы</h2>
+            <button type="button" onClick={() => setShowExpenseForm(!showExpenseForm)} className="btn btn--dark btn--sm">
+              {showExpenseForm ? 'Отмена' : '+ Добавить расход'}
+            </button>
+          </div>
+          {showExpenseForm ? (
+            <form onSubmit={handleAddExpense} className="exp-form" style={{ marginTop: 16 }}>
+              <input name="employeeName" type="text" required placeholder="Имя сотрудника" className="inp" />
+              <select name="employeeRole" required className="inp">
+                <option value="designer">Дизайнер</option>
+                <option value="pm">Проджект</option>
+                <option value="copywriter">Копирайтер</option>
+                <option value="assistant">Ассистент</option>
+              </select>
+              <input name="amount" type="number" step="0.01" required placeholder="Сумма" className="inp" />
+              <input name="notes" type="text" placeholder="Заметки" className="inp" />
+              <button type="submit" className="btn btn--pri btn--sm">Добавить</button>
+            </form>
+          ) : null}
+          <table>
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Сотрудник</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Роль</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Сумма</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Заметки</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Действия</th>
+                <th>Сотрудник</th>
+                <th>Роль</th>
+                <th className="right">Сумма</th>
+                <th>Заметки</th>
+                <th className="right">Действия</th>
               </tr>
             </thead>
-            <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
+            <tbody>
               {expenses.map((expense) => (
                 <ExpenseRow
                   key={expense.id}
@@ -1275,17 +1189,39 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                   onDelete={handleDeleteExpense}
                 />
               ))}
-              {expenses.length === 0 && (
+              {expenses.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
-                    Нет расходов
-                  </td>
+                  <td colSpan={5} className="empty">Нет расходов</td>
                 </tr>
-              )}
+              ) : null}
             </tbody>
           </table>
+        </section>
+
+        <section className="share" id="client-share">
+          <div>
+            <span className="kick">Клиентский доступ</span>
+            <h3>Ссылка для клиента</h3>
+            <p>Клиент видит услуги, суммы и историю по месяцам. Часы, ставка и внутренние заметки не показываются.</p>
+            <div className="linkbox">{shareUrl || 'Создаём ссылку…'}</div>
+          </div>
+          <div className="share-a">
+            <button type="button" className="btn btn--wh" disabled={!shareUrl} onClick={() => void copyShareLink()}>
+              Скопировать ссылку
+            </button>
+            {shareUrl ? (
+              <a className="btn btn--ghw" href={shareUrl} target="_blank" rel="noreferrer">
+                Открыть как клиент
+              </a>
+            ) : null}
+          </div>
+        </section>
+
+        <div className="foot">
+          ID проекта {project.id} · линия {lineLabel} · ставка {hourlyRate.toLocaleString('ru-RU')} ₽/час
         </div>
       </div>
+      <div className={`toast${toast ? ' on' : ''}`}>{toast}</div>
     </div>
   )
 }

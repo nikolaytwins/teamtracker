@@ -148,6 +148,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     (ins as Record<string, unknown>).created_at = newDate;
     (ins as Record<string, unknown>).updated_at = new Date().toISOString();
     (ins as Record<string, unknown>).hourly_rate_rub = Number(cur.hourlyRateRub) || 0;
+    if (cur.clientShareToken) {
+      (ins as Record<string, unknown>).client_share_token = String(cur.clientShareToken);
+    }
     const { error: e1 } = await this.sb.from("agency_project").insert(ins);
     if (e1) throw e1;
     const { data: exps, error: e2 } = await this.sb.from("agency_expense").select("*").eq("project_id", id);
@@ -1496,5 +1499,59 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     });
     if (error) throw error;
     return this.getLeadById(input.leadId);
+  }
+
+  async ensureClientShareToken(projectId: string): Promise<string | null> {
+    const project = await this.getProjectById(projectId);
+    if (!project) return null;
+    const existing = typeof project.clientShareToken === "string" ? project.clientShareToken.trim() : "";
+    if (existing) return existing;
+
+    const name = String(project.name ?? "").trim();
+    const contact = String(project.clientContact ?? "").trim();
+    const { generateClientShareToken } = await import("@/lib/agency/client-share");
+
+    let token: string | null = null;
+    if (name && contact) {
+      const { data: siblings, error: e1 } = await this.sb
+        .from("agency_project")
+        .select("id, client_share_token")
+        .eq("name", name)
+        .eq("client_contact", contact);
+      if (e1) throw e1;
+      token =
+        (siblings ?? [])
+          .map((row) => (row.client_share_token ? String(row.client_share_token).trim() : ""))
+          .find(Boolean) || null;
+      if (!token) token = generateClientShareToken();
+      const ids = (siblings ?? [])
+        .filter((row) => !row.client_share_token)
+        .map((row) => String(row.id));
+      if (!ids.includes(projectId)) ids.push(projectId);
+      const { error: e2 } = await this.sb
+        .from("agency_project")
+        .update({ client_share_token: token, updated_at: new Date().toISOString() })
+        .in("id", ids);
+      if (e2) throw e2;
+      return token;
+    }
+
+    token = generateClientShareToken();
+    const { error } = await this.sb
+      .from("agency_project")
+      .update({ client_share_token: token, updated_at: new Date().toISOString() })
+      .eq("id", projectId);
+    if (error) throw error;
+    return token;
+  }
+
+  async listProjectsByClientShareToken(token: string): Promise<Record<string, unknown>[]> {
+    const { data, error } = await this.sb
+      .from("agency_project")
+      .select("*")
+      .eq("client_share_token", token)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((row) => mapProjectRow(row as Record<string, unknown>));
   }
 }

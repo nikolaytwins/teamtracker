@@ -225,6 +225,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
   ): Promise<{ id: string; name: string; deadline: string | null }> {
     const db = openSqlite();
     try {
+      ensureAgencyProjectsColumns(db);
       const project = db.prepare("SELECT * FROM AgencyProject WHERE id = ?").get(id) as any;
       if (!project) throw new Error("not_found");
       const newProjectId = `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -249,6 +250,12 @@ export class SqliteAgencyRepo implements AgencyRepo {
         project.notes,
         newDate
       );
+      if (project.clientShareToken) {
+        db.prepare(`UPDATE AgencyProject SET clientShareToken = ? WHERE id = ?`).run(
+          project.clientShareToken,
+          newProjectId
+        );
+      }
       const expenses = db.prepare("SELECT * FROM AgencyExpense WHERE projectId = ?").all(id) as any[];
       for (const exp of expenses) {
         const newExpId = `agexp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -1608,5 +1615,62 @@ export class SqliteAgencyRepo implements AgencyRepo {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  async ensureClientShareToken(projectId: string): Promise<string | null> {
+    const db = openSqlite();
+    try {
+      ensureAgencyProjectsColumns(db);
+      const project = db.prepare("SELECT * FROM AgencyProject WHERE id = ?").get(projectId) as
+        | Record<string, unknown>
+        | undefined;
+      if (!project) return null;
+      const existing = String(project.clientShareToken ?? "").trim();
+      if (existing) return existing;
+
+      const { generateClientShareToken } = await import("@/lib/agency/client-share");
+      const name = String(project.name ?? "").trim();
+      const contact = String(project.clientContact ?? "").trim();
+      let token: string | null = null;
+      if (name && contact) {
+        const sibling = db
+          .prepare(
+            `SELECT clientShareToken FROM AgencyProject
+             WHERE name = ? AND clientContact = ?
+               AND clientShareToken IS NOT NULL AND TRIM(clientShareToken) != ''
+             LIMIT 1`
+          )
+          .get(name, contact) as { clientShareToken?: string } | undefined;
+        token = sibling?.clientShareToken?.trim() || null;
+      }
+      if (!token) token = generateClientShareToken();
+      if (name && contact) {
+        db.prepare(
+          `UPDATE AgencyProject SET clientShareToken = ?, updatedAt = datetime('now')
+           WHERE name = ? AND clientContact = ?
+             AND (clientShareToken IS NULL OR TRIM(clientShareToken) = '')`
+        ).run(token, name, contact);
+      }
+      db.prepare(
+        `UPDATE AgencyProject SET clientShareToken = ?, updatedAt = datetime('now') WHERE id = ?`
+      ).run(token, projectId);
+      return token;
+    } finally {
+      db.close();
+    }
+  }
+
+  async listProjectsByClientShareToken(token: string): Promise<Record<string, unknown>[]> {
+    const db = openSqlite();
+    try {
+      ensureAgencyProjectsColumns(db);
+      return db
+        .prepare(
+          `SELECT * FROM AgencyProject WHERE clientShareToken = ? ORDER BY createdAt ASC`
+        )
+        .all(token) as Record<string, unknown>[];
+    } finally {
+      db.close();
+    }
   }
 }

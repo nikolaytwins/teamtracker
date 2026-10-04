@@ -81,9 +81,10 @@ export async function middleware(request: NextRequest) {
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/logout" ||
     pathname === "/api/auth/me" ||
-    pathname === "/api/auth/register";
+    pathname === "/api/auth/register" ||
+    pathname.startsWith("/api/public/");
 
-  if (isPublicApi) {
+  if (isPublicApi || pathname.startsWith("/c/")) {
     return NextResponse.next();
   }
 

@@ -120,4 +120,9 @@ export function ensureAgencyProjectsColumns(db: Database.Database) {
   } catch {
     /* ignore */
   }
+  try {
+    db.exec(`ALTER TABLE AgencyProject ADD COLUMN clientShareToken TEXT`);
+  } catch {
+    /* column exists */
+  }
 }
