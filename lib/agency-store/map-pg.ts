@@ -85,6 +85,7 @@ export function mapDetailRow(r: Record<string, unknown>): Record<string, unknown
     billingType: r.billing_type === "hourly" ? "hourly" : "fixed",
     trackedSeconds: Number(r.tracked_seconds) || 0,
     timerStartedAt: r.timer_started_at ? String(r.timer_started_at) : null,
+    timerPreviousSeconds: Number(r.timer_previous_seconds) || 0,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

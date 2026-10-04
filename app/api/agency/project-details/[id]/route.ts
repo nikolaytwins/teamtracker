@@ -8,7 +8,7 @@ export async function PUT(
   try {
     const params = await context.params;
     const body = await request.json();
-    const { title, quantity, unitPrice, order, billingType, trackedSeconds } = body;
+    const { title, quantity, unitPrice, order, billingType, trackedSeconds, timerStartedAt } = body;
 
     const repo = getAgencyRepo();
     await repo.ensureProjectDetailTable();
@@ -34,11 +34,14 @@ export async function PUT(
     const extras: {
       billingType?: "fixed" | "hourly";
       trackedSeconds?: number;
+      timerStartedAt?: string | null;
     } = { billingType: nextBilling };
     if (trackedSeconds != null) {
       const n = typeof trackedSeconds === "number" ? trackedSeconds : parseFloat(String(trackedSeconds));
       if (!Number.isNaN(n)) extras.trackedSeconds = n;
     }
+    if (timerStartedAt === null) extras.timerStartedAt = null;
+    else if (typeof timerStartedAt === "string") extras.timerStartedAt = timerStartedAt;
 
     const detail = await repo.updateProjectDetailById(
       params.id,

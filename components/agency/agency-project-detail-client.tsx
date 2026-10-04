@@ -8,6 +8,7 @@ import {
   agencyDetailSessionElapsedSeconds,
   formatAgencyDetailClock,
   formatAgencyDetailHours,
+  parseAgencyDetailClock,
 } from '@/lib/agency/detail-line-total'
 
 import { useCallback, useEffect, useState } from 'react'
@@ -50,6 +51,7 @@ interface ProjectDetail {
   billingType?: 'fixed' | 'hourly'
   trackedSeconds?: number
   timerStartedAt?: string | null
+  timerPreviousSeconds?: number
 }
 
 interface TrackedTimeRow {
@@ -208,6 +210,100 @@ function ExpenseRow({
         </button>
       </td>
     </tr>
+  )
+}
+
+function HourlyClockCell({
+  liveSeconds,
+  running,
+  sessionSeconds,
+  fixedSeconds,
+  previousSeconds,
+  onCommit,
+  onRestore,
+}: {
+  liveSeconds: number
+  running: boolean
+  sessionSeconds: number
+  fixedSeconds: number
+  previousSeconds: number
+  onCommit: (seconds: number) => void
+  onRestore: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const startEdit = () => {
+    setDraft(formatAgencyDetailClock(liveSeconds))
+    setEditing(true)
+  }
+
+  const commit = () => {
+    const parsed = parseAgencyDetailClock(draft)
+    setEditing(false)
+    if (parsed == null) return
+    if (parsed === liveSeconds && !running) return
+    onCommit(parsed)
+  }
+
+  const showPrev = previousSeconds > 0 && previousSeconds !== liveSeconds
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {editing ? (
+        <input
+          type="text"
+          inputMode="numeric"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commit()
+            }
+            if (e.key === 'Escape') {
+              setEditing(false)
+            }
+          }}
+          aria-label="Время таймера"
+          className="w-[7.5rem] rounded-md border border-[var(--primary)] bg-[var(--surface)] px-1.5 py-0.5 text-right font-mono text-[18px] font-semibold tabular-nums leading-none"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={startEdit}
+          title="Изменить время"
+          className={`rounded-md px-1 py-0.5 font-mono text-[20px] font-semibold tabular-nums leading-none tracking-tight hover:bg-[var(--surface-2)] ${
+            running ? 'text-emerald-700' : 'text-[var(--text)]'
+          }`}
+        >
+          {formatAgencyDetailClock(liveSeconds)}
+        </button>
+      )}
+      {running ? (
+        <div className="text-[11px] text-emerald-700">
+          Идёт · сессия {formatAgencyDetailClock(sessionSeconds)}
+        </div>
+      ) : (
+        <div className="text-[11px] text-[var(--muted-foreground)]">
+          {fixedSeconds > 0
+            ? `На паузе · ${formatAgencyDetailHours(fixedSeconds)}`
+            : 'Ещё не запускали'}
+        </div>
+      )}
+      {showPrev ? (
+        <button
+          type="button"
+          onClick={onRestore}
+          title="Вернуть время до последнего старта"
+          className="text-[10px] leading-none text-[var(--muted-foreground)]/70 hover:text-[var(--muted-foreground)]"
+        >
+          было {formatAgencyDetailClock(previousSeconds)}
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -410,6 +506,37 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
       }
     } catch (error) {
       console.error('Error toggling timer:', error)
+    }
+  }
+
+  const handleSetDetailSeconds = async (detailId: string, seconds: number) => {
+    const current = details.find((d) => d.id === detailId)
+    if (!current) return
+    const next: ProjectDetail = {
+      ...current,
+      trackedSeconds: Math.max(0, Math.floor(seconds)),
+      timerStartedAt: null,
+    }
+    setDetails((prev) => prev.map((d) => (d.id === detailId ? next : d)))
+    setNowMs(Date.now())
+    try {
+      const res = await fetch(apiUrl(`${apiBase}/project-details/${detailId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      if (!res.ok) {
+        console.error('Failed to set timer seconds')
+        fetchData()
+        return
+      }
+      const json = await res.json().catch(() => null)
+      if (json?.detail) {
+        setDetails((prev) => prev.map((d) => (d.id === detailId ? { ...d, ...json.detail } : d)))
+      }
+    } catch (error) {
+      console.error('Error setting timer seconds:', error)
+      fetchData()
     }
   }
 
@@ -733,6 +860,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                   },
                   hourlyRate
                 )
+                const previousSeconds = Math.max(0, Number(d.timerPreviousSeconds) || 0)
                 const running = Boolean(d.timerStartedAt)
                 return (
                   <tr key={d.id} className={running ? 'bg-emerald-50/40' : undefined}>
@@ -749,26 +877,15 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                     </td>
                     <td className="px-6 py-3 text-sm">
                       {isHourly ? (
-                        <div className="flex flex-col items-end gap-1">
-                          <div
-                            className={`font-mono text-[20px] font-semibold tabular-nums leading-none tracking-tight ${
-                              running ? 'text-emerald-700' : 'text-[var(--text)]'
-                            }`}
-                          >
-                            {formatAgencyDetailClock(liveSeconds)}
-                          </div>
-                          {running ? (
-                            <div className="text-[11px] text-emerald-700">
-                              Идёт · сессия {formatAgencyDetailClock(sessionSeconds)}
-                            </div>
-                          ) : (
-                            <div className="text-[11px] text-[var(--muted-foreground)]">
-                              {fixedSeconds > 0
-                                ? `На паузе · ${formatAgencyDetailHours(fixedSeconds)}`
-                                : 'Ещё не запускали'}
-                            </div>
-                          )}
-                        </div>
+                        <HourlyClockCell
+                          liveSeconds={liveSeconds}
+                          running={running}
+                          sessionSeconds={sessionSeconds}
+                          fixedSeconds={fixedSeconds}
+                          previousSeconds={previousSeconds}
+                          onCommit={(sec) => void handleSetDetailSeconds(d.id, sec)}
+                          onRestore={() => void handleSetDetailSeconds(d.id, previousSeconds)}
+                        />
                       ) : (
                         <div className="text-right">
                           <input

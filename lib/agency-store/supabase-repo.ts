@@ -739,6 +739,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         billingType: "fixed" | "hourly";
         trackedSeconds: number;
         timerStartedAt: string | null;
+        timerPreviousSeconds: number;
         projectId?: string;
       }
     | undefined
@@ -755,6 +756,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       billingType: m.billingType === "hourly" ? "hourly" : "fixed",
       trackedSeconds: Number(m.trackedSeconds) || 0,
       timerStartedAt: m.timerStartedAt ? String(m.timerStartedAt) : null,
+      timerPreviousSeconds: Number(m.timerPreviousSeconds) || 0,
       projectId: m.projectId ? String(m.projectId) : undefined,
     };
   }
@@ -769,6 +771,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       billingType?: "fixed" | "hourly";
       trackedSeconds?: number;
       timerStartedAt?: string | null;
+      timerPreviousSeconds?: number;
     }
   ): Promise<Record<string, unknown> | undefined> {
     const patch: Record<string, unknown> = {
@@ -786,6 +789,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     }
     if (extras && "timerStartedAt" in extras) {
       patch.timer_started_at = extras.timerStartedAt;
+    }
+    if (typeof extras?.timerPreviousSeconds === "number") {
+      patch.timer_previous_seconds = Math.max(0, Math.floor(extras.timerPreviousSeconds));
     }
     const { error } = await this.sb.from("agency_project_detail").update(patch).eq("id", id);
     if (error) throw error;
@@ -820,7 +826,10 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         existing.quantity,
         existing.unitPrice,
         existing.order,
-        { timerStartedAt: now.toISOString() }
+        {
+          timerStartedAt: now.toISOString(),
+          timerPreviousSeconds: existing.trackedSeconds,
+        }
       );
     }
     if (!existing.timerStartedAt) {

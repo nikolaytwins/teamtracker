@@ -44,6 +44,7 @@ export type ProjectDetailRow = {
   billingType: AgencyDetailBillingType;
   trackedSeconds: number;
   timerStartedAt: string | null;
+  timerPreviousSeconds: number;
   projectId?: string;
 };
 
@@ -172,6 +173,7 @@ export interface AgencyRepo {
       billingType?: AgencyDetailBillingType;
       trackedSeconds?: number;
       timerStartedAt?: string | null;
+      timerPreviousSeconds?: number;
     }
   ): Promise<Record<string, unknown> | undefined>;
   deleteProjectDetailById(id: string): Promise<void>;

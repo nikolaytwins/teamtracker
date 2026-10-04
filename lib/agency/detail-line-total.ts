@@ -62,3 +62,16 @@ export function agencyDetailSessionElapsedSeconds(
   return Math.max(0, Math.floor((nowMs - started) / 1000));
 }
 
+/** `1:30`, `01:30:00`, `90:00` → секунды. Иначе null. */
+export function parseAgencyDetailClock(raw: string): number | null {
+  const v = raw.trim().replace(",", ".");
+  if (!v) return null;
+  const m = v.match(/^(\d{1,4}):(\d{1,2})(?::(\d{1,2}))?$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const mi = Number(m[2]);
+  const s = Number(m[3] || 0);
+  if (![h, mi, s].every(Number.isFinite) || mi > 59 || s > 59 || h < 0) return null;
+  return h * 3600 + mi * 60 + s;
+}
+

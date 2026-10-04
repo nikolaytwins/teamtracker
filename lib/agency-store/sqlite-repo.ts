@@ -46,6 +46,7 @@ function ensureDetailTable(db: Database.Database) {
       "billingType" TEXT NOT NULL DEFAULT 'fixed',
       "trackedSeconds" INTEGER NOT NULL DEFAULT 0,
       "timerStartedAt" TEXT,
+      "timerPreviousSeconds" INTEGER NOT NULL DEFAULT 0,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL,
       CONSTRAINT "AgencyProjectDetail_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "AgencyProject" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -63,6 +64,11 @@ function ensureDetailTable(db: Database.Database) {
   }
   try {
     db.exec(`ALTER TABLE AgencyProjectDetail ADD COLUMN timerStartedAt TEXT`);
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec(`ALTER TABLE AgencyProjectDetail ADD COLUMN timerPreviousSeconds INTEGER NOT NULL DEFAULT 0`);
   } catch {
     /* exists */
   }
@@ -881,8 +887,8 @@ export class SqliteAgencyRepo implements AgencyRepo {
       const billingType = input.billingType === "hourly" ? "hourly" : "fixed";
       db.prepare(
         `
-      INSERT INTO AgencyProjectDetail (id, projectId, title, quantity, unitPrice, "order", billingType, trackedSeconds, timerStartedAt, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, COALESCE(?, 0), ?, ?, NULL, datetime('now'), datetime('now'))
+      INSERT INTO AgencyProjectDetail (id, projectId, title, quantity, unitPrice, "order", billingType, trackedSeconds, timerStartedAt, timerPreviousSeconds, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, COALESCE(?, 0), ?, ?, NULL, 0, datetime('now'), datetime('now'))
     `
       ).run(
         input.id,
@@ -912,6 +918,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         billingType: "fixed" | "hourly";
         trackedSeconds: number;
         timerStartedAt: string | null;
+        timerPreviousSeconds: number;
         projectId?: string;
       }
     | undefined
@@ -931,6 +938,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         billingType: row.billingType === "hourly" ? "hourly" : "fixed",
         trackedSeconds: Number(row.trackedSeconds) || 0,
         timerStartedAt: row.timerStartedAt ? String(row.timerStartedAt) : null,
+        timerPreviousSeconds: Number(row.timerPreviousSeconds) || 0,
         projectId: row.projectId ? String(row.projectId) : undefined,
       };
     } finally {
@@ -948,6 +956,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
       billingType?: "fixed" | "hourly";
       trackedSeconds?: number;
       timerStartedAt?: string | null;
+      timerPreviousSeconds?: number;
     }
   ): Promise<Record<string, unknown> | undefined> {
     const db = openSqlite();
@@ -969,13 +978,27 @@ export class SqliteAgencyRepo implements AgencyRepo {
           : Number(existing.trackedSeconds) || 0;
       const timerStartedAt =
         extras && "timerStartedAt" in extras ? extras.timerStartedAt : (existing.timerStartedAt as string | null);
+      const timerPreviousSeconds =
+        typeof extras?.timerPreviousSeconds === "number"
+          ? Math.max(0, Math.floor(extras.timerPreviousSeconds))
+          : Number(existing.timerPreviousSeconds) || 0;
       db.prepare(
         `
       UPDATE AgencyProjectDetail
-      SET title = ?, quantity = ?, unitPrice = ?, "order" = ?, billingType = ?, trackedSeconds = ?, timerStartedAt = ?, updatedAt = datetime('now')
+      SET title = ?, quantity = ?, unitPrice = ?, "order" = ?, billingType = ?, trackedSeconds = ?, timerStartedAt = ?, timerPreviousSeconds = ?, updatedAt = datetime('now')
       WHERE id = ?
     `
-      ).run(title, quantity, unitPrice, order, billingType, trackedSeconds, timerStartedAt, id);
+      ).run(
+        title,
+        quantity,
+        unitPrice,
+        order,
+        billingType,
+        trackedSeconds,
+        timerStartedAt,
+        timerPreviousSeconds,
+        id
+      );
       return db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(id) as
         | Record<string, unknown>
         | undefined;
@@ -1014,7 +1037,10 @@ export class SqliteAgencyRepo implements AgencyRepo {
         existing.quantity,
         existing.unitPrice,
         existing.order,
-        { timerStartedAt: now.toISOString() }
+        {
+          timerStartedAt: now.toISOString(),
+          timerPreviousSeconds: existing.trackedSeconds,
+        }
       );
     }
     if (!existing.timerStartedAt) {
