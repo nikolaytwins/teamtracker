@@ -1,6 +1,6 @@
 "use client";
 
-import { IdeasTasksDrawer, IdeasTasksToast } from "@/components/v2/personal/ideas-tasks/ideas-tasks-overlay";
+import { IdeasTasksProjectSelect } from "@/components/v2/personal/ideas-tasks/ideas-tasks-project-select";
 import {
   dlInfoForTodo,
   formatDoneYmd,
@@ -13,7 +13,7 @@ import type { useWeekFocus } from "@/components/v2/personal/week-focus/use-week-
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import type { PersonalTodoInboxSection, PersonalTodoListPayload, PersonalTodoRow } from "@/lib/v2/personal/todo-types";
 import type { V2TaskPriority } from "@/lib/v2/types";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TaskFilter = "all" | "p1" | "p2" | "p3" | "" | string;
 type TaskSort = "prio" | "dl" | "new";
@@ -273,6 +273,33 @@ export function TasksInboxPanel({
 
   const inboxTasks = useMemo(() => active.filter((t) => t.inbox_section !== "later"), [active]);
   const laterTasks = useMemo(() => active.filter((t) => t.inbox_section === "later"), [active]);
+  const laterPurgeStarted = useRef(false);
+
+  useEffect(() => {
+    if (loading || !laterTasks.length || laterPurgeStarted.current) return;
+    const key = "tt-ideas-later-purge-20261004";
+    try {
+      if (window.localStorage.getItem(key)) return;
+    } catch {
+      return;
+    }
+    laterPurgeStarted.current = true;
+    const ids = laterTasks.map((t) => t.id);
+    void (async () => {
+      try {
+        await Promise.all(ids.map((id) => fetchJson(`/api/v2/personal/todos/${id}`, { method: "DELETE" })));
+        try {
+          window.localStorage.setItem(key, "1");
+        } catch {
+          /* ignore */
+        }
+        await load();
+        await refreshBootstrap();
+      } catch {
+        laterPurgeStarted.current = false;
+      }
+    })();
+  }, [loading, laterTasks, load, refreshBootstrap]);
 
   const filterOpts = useMemo(
     () => ({ filter, search, sort, inboxProjectId }),
@@ -504,14 +531,11 @@ export function TasksInboxPanel({
               <option value="2">средняя важность</option>
               <option value="3">не важно</option>
             </select>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Проект">
-              <option value="">без проекта</option>
-              {nonInboxProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <IdeasTasksProjectSelect
+              value={projectId}
+              projects={nonInboxProjects}
+              onChange={setProjectId}
+            />
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} aria-label="Дедлайн" />
             <button type="submit">Добавить</button>
           </form>
@@ -649,14 +673,11 @@ export function TasksInboxPanel({
           </div>
           <div className="fld">
             <label>Проект</label>
-            <select value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)}>
-              <option value="">без проекта</option>
-              {nonInboxProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <IdeasTasksProjectSelect
+              value={editProjectId}
+              projects={nonInboxProjects}
+              onChange={setEditProjectId}
+            />
           </div>
         </div>
         <div className="fld">

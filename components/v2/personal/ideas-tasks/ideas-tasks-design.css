@@ -20,3 +20,21 @@
   .ideas-tasks-v3 .fxs { grid-template-columns: 1fr; }
   .ideas-tasks-v3 .notes { grid-template-columns: 1fr; }
 }
+
+.ideas-tasks-v3 .qa .proj-create,
+.ideas-tasks-v3 .fld .proj-create{
+  display:inline-flex;align-items:center;gap:8px;height:52px;
+  border:1.5px solid var(--brand-500);border-radius:15px;background:#fff;padding:4px 6px 4px 12px;
+}
+.ideas-tasks-v3 .fld .proj-create{height:auto;min-height:48px;border-radius:14px;width:100%}
+.ideas-tasks-v3 .qa .proj-create input,
+.ideas-tasks-v3 .fld .proj-create input{
+  border:none;background:none;height:auto;min-width:140px;flex:1;padding:0;font:inherit;font-size:14.5px;box-shadow:none;
+}
+.ideas-tasks-v3 .qa .proj-create input:focus,
+.ideas-tasks-v3 .fld .proj-create input:focus{outline:none;box-shadow:none;border:none}
+.ideas-tasks-v3 .qa .proj-create button,
+.ideas-tasks-v3 .fld .proj-create button{
+  height:40px;padding:0 14px;border-radius:11px;border:none;background:var(--brand-600);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;
+}
+.ideas-tasks-v3 .qa .proj-create button:disabled{opacity:.4}
