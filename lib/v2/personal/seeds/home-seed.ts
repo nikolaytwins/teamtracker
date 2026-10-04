@@ -189,7 +189,7 @@ export const HOME_LINKS = {
   /** Время и экономика.html */
   time: "/v2/personal/time",
   /** Мои задачи v2.html */
-  tasks: "/v2/personal/ideas-tasks",
+  tasks: "/v2/agency/plan",
   /** Наблюдения.html */
   observations: "/v2/personal/observations",
 } as const;

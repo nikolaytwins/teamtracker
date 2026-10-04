@@ -26,15 +26,17 @@
 .plan-v3 .shell{display:block;min-height:0}
 .plan-v3 .main{min-width:0}
 .plan-v3 .page{padding:18px 28px 72px;gap:18px;max-width:1760px}
-.plan-v3 .hero-l{min-height:0;justify-content:flex-start;padding:22px 26px;gap:8px}
+.plan-v3 .hero-l{min-height:0;justify-content:flex-start;padding:18px 22px;gap:8px}
 .plan-v3 .hero-img{min-height:0;align-self:stretch}
-.plan-v3 .hero-h1{font-size:32px;letter-spacing:-.03em}
-.plan-v3 .status{margin-top:8px;padding:18px 22px}
-.plan-v3 .status-n{font-size:34px}
+.plan-v3 .hero-h1{font-size:28px;letter-spacing:-.03em}
+.plan-v3 .status{margin-top:4px;padding:10px 16px;border-radius:14px;box-shadow:none}
+.plan-v3 .status-main{margin-top:4px}
+.plan-v3 .status-n{font-size:22px;letter-spacing:-.03em}
 .plan-v3 .status-seg{margin-top:12px}
-.plan-v3 .hero-nums{margin-top:10px;gap:10px}
-.plan-v3 .hn{padding:14px 16px}
-.plan-v3 .hn-v{font-size:20px}
+.plan-v3 .hero-nums{display:none}
+.plan-v3 .hero .week-check{margin:4px 0 0;padding:10px 12px 8px;background:var(--ink-50)}
+.plan-v3 .hero .week-check-h{margin-bottom:8px}
+.plan-v3 .hero .week-check-hint{display:none}
 .plan-v3 .headrow{margin-bottom:0}
 @media(max-width:1200px){
   .plan-v3 .hero-l{padding:18px 20px}

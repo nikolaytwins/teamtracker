@@ -1,10 +1,12 @@
-import { IdeasTasksClient } from "@/components/v2/personal/ideas-tasks/ideas-tasks-client";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { appPath } from "@/lib/api-url";
 
-export default function PersonalIdeasTasksPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-[14px] text-[var(--v2-ink-400)]">Загрузка…</div>}>
-      <IdeasTasksClient />
-    </Suspense>
-  );
+export default async function PersonalIdeasTasksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
+  if (tab === "ideas") redirect(appPath("/v2/agency/plan?tab=ideas"));
+  redirect(appPath("/v2/agency/plan"));
 }

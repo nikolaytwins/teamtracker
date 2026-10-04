@@ -1,4 +1,5 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
+import { inboxCategoryFromRow } from "@/lib/v2/personal/inbox-categories";
 import { createPersonalTodo, updatePersonalTodo } from "@/lib/v2/personal/personal-todo-repo";
 import type { PersonalTodoRow } from "@/lib/v2/personal/todo-types";
 import { getTaskById, completeTask } from "@/lib/v2/tasks/task-repo";
@@ -121,6 +122,7 @@ export async function cloneProjectTaskToPersonal(
         completed_at: data.completed_at ? String(data.completed_at) : null,
         sort_order: Number(data.sort_order) || 0,
         inbox_section: data.inbox_section === "later" ? "later" : "inbox",
+        inbox_category: inboxCategoryFromRow(data),
       } satisfies PersonalTodoRow;
       return { task, personalTodo, link: existing, created: false };
     }

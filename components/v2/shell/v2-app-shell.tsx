@@ -64,11 +64,11 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/v2/home", label: "Главная", icon: "home" },
-  { href: "/v2/personal/ideas-tasks", label: "Идеи и задачи", icon: "tasks" },
+  // Скрыто: Идеи и задачи (/v2/personal/ideas-tasks — перенесено в «План и задачи»)
   // Скрыто: Календарь (/v2/personal/calendar — неактуален)
   // Скрыто: Доска, Проекты, Команда
   { href: "/v2/agency/overview", label: "Выручка", icon: "reports", agency: true },
-  { href: "/v2/agency/plan", label: "План", icon: "cal", agency: true },
+  { href: "/v2/agency/plan", label: "План и задачи", icon: "cal" },
   { href: "/v2/personal/finance", label: "Финансы", icon: "ruble" },
   // София — внизу меню, рядом с профилем (footerNav)
   // Скрыто: Финансы месяца (/v2/agency — итоги вынесены на главную)

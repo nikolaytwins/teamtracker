@@ -1,5 +1,11 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import {
+  inboxCategoryFromRow,
+  inboxSectionForCategory,
+  isInboxCategory,
+  type InboxCategoryId,
+} from "@/lib/v2/personal/inbox-categories";
+import {
   addDaysYmd,
   personalTodoTodayYmd,
   personalTodoWeekDates,
@@ -59,6 +65,7 @@ function mapTodo(r: Record<string, unknown>, project?: PersonalTodoProjectRow | 
     completed_at: r.completed_at ? String(r.completed_at) : null,
     sort_order: Number(r.sort_order) || 0,
     inbox_section: r.inbox_section === "later" ? "later" : "inbox",
+    inbox_category: inboxCategoryFromRow(r),
     project_name: project?.name ?? null,
     project_color: project?.color ?? null,
     subtask_count: r.subtask_count != null ? Number(r.subtask_count) : undefined,
@@ -246,6 +253,13 @@ export async function loadPersonalTodoList(
   const projects = await loadProjectsMap(userId);
   const today = personalTodoTodayYmd();
 
+  if (view === "board") {
+    const rows = await fetchOpenParentTodos(userId);
+    const todos = await enrichTodos(rows, projects);
+    const withSubtasks = await attachSubtasks(todos, projects);
+    return { view, todos: sortTodosForDisplay(withSubtasks) };
+  }
+
   if (view === "week") {
     const dates = personalTodoWeekDates(today, 7);
     const end = dates[dates.length - 1]!;
@@ -402,6 +416,7 @@ export async function createPersonalTodo(
     due_time?: string | null;
     scheduled_date?: string | null;
     inbox_section?: "inbox" | "later";
+    inbox_category?: InboxCategoryId;
   }
 ): Promise<PersonalTodoRow> {
   const sb = getV2Supabase();
@@ -454,7 +469,16 @@ export async function createPersonalTodo(
           : null,
     completed_at: null,
     sort_order: personalTodoSortOrder(),
-    inbox_section: input.inbox_section === "later" ? "later" : "inbox",
+    inbox_section: isInboxCategory(input.inbox_category)
+      ? inboxSectionForCategory(input.inbox_category)
+      : input.inbox_section === "later"
+        ? "later"
+        : "inbox",
+    inbox_category: isInboxCategory(input.inbox_category)
+      ? input.inbox_category
+      : input.inbox_section === "later"
+        ? "backlog"
+        : "work",
     deleted_at: null,
     created_at: now,
     updated_at: now,
@@ -499,8 +523,12 @@ export async function updatePersonalTodo(
   }
   if (patch.sort_order !== undefined) safe.sort_order = patch.sort_order;
   if (patch.completed_at !== undefined) safe.completed_at = patch.completed_at;
-  if (patch.inbox_section !== undefined) {
+  if (patch.inbox_category !== undefined && isInboxCategory(patch.inbox_category)) {
+    safe.inbox_category = patch.inbox_category;
+    safe.inbox_section = inboxSectionForCategory(patch.inbox_category);
+  } else if (patch.inbox_section !== undefined) {
     safe.inbox_section = patch.inbox_section === "later" ? "later" : "inbox";
+    safe.inbox_category = patch.inbox_section === "later" ? "backlog" : "work";
   }
 
   const { error } = await sb.from("v2_personal_todos").update(safe).eq("id", id).eq("user_id", userId);

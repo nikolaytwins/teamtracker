@@ -460,7 +460,7 @@ export function PlanScheduleBoard({
                   <span className="ch-w">{WD[dt.getDay()]}</span>
                   <span className="ch-mo">{MON[dt.getMonth()]}</span>
                 </span>
-                {d === todayKey ? <span className="ch-tag">Сегодня</span> : <span className="ch-sp" />}
+                <span className="ch-sp" />
                 <button
                   type="button"
                   className="ch-add"

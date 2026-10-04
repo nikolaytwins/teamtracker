@@ -16,7 +16,6 @@ import {
   dayModeMap,
   dmode,
   eventsOnDay,
-  findModeDate,
   freeHours,
   futureProjectHours,
   hoursLabel,
@@ -60,15 +59,17 @@ import {
   projectColor,
   toYmd,
 } from "@/lib/v2/agency/plan/plan-utils";
-import { formatRub } from "@/lib/v2/finance/meta";
 import type { DispatchWorkStatus } from "@/lib/v2/agency/dispatch/dispatch-work-status";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { WorkRulesTab } from "@/components/v2/agency/plan/work-rules-tab";
 import { PlanScheduleBoard } from "@/components/v2/agency/plan/plan-schedule-board";
+import { PlanInboxBoard } from "@/components/v2/agency/plan/plan-inbox-board";
+import { IdeasV3Panel } from "@/components/v2/personal/ideas-tasks/ideas-v3-panel";
+import "@/components/v2/personal/ideas-tasks/ideas-tasks-design.css";
 
-type PlanPageTab = "plan" | "rules";
+type PlanPageTab = "plan" | "ideas" | "rules";
 
 function PlanPageTabs({ tab, onTab }: { tab: PlanPageTab; onTab: (t: PlanPageTab) => void }) {
   return (
@@ -76,6 +77,9 @@ function PlanPageTabs({ tab, onTab }: { tab: PlanPageTab; onTab: (t: PlanPageTab
       <div className="seg">
         <button type="button" className={tab === "plan" ? "on" : ""} onClick={() => onTab("plan")}>
           План
+        </button>
+        <button type="button" className={tab === "ideas" ? "on" : ""} onClick={() => onTab("ideas")}>
+          Идеи
         </button>
         <button type="button" className={tab === "rules" ? "on" : ""} onClick={() => onTab("rules")}>
           Правила работы
@@ -229,9 +233,6 @@ function WeekChecklistBar({
           );
         })}
       </div>
-      <p className="week-check-hint">
-        Неназначенные чипы перетащите на день недели. Назначенные остаются отмеченными здесь.
-      </p>
     </div>
   );
 }
@@ -303,15 +304,17 @@ export function DispatchPlanClient() {
   const searchParams = useSearchParams();
   const pathname = usePathname() ?? "";
   const router = useRouter();
-  const [pageTab, setPageTab] = useState<PlanPageTab>(() =>
-    searchParams.get("tab") === "rules" ? "rules" : "plan"
-  );
+  const [pageTab, setPageTab] = useState<PlanPageTab>(() => {
+    const t = searchParams.get("tab");
+    if (t === "rules" || t === "ideas") return t;
+    return "plan";
+  });
 
   const setPlanTab = useCallback(
     (tab: PlanPageTab) => {
       setPageTab(tab);
       const params = new URLSearchParams(searchParams.toString());
-      if (tab === "rules") params.set("tab", "rules");
+      if (tab === "rules" || tab === "ideas") params.set("tab", tab);
       else params.delete("tab");
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -321,9 +324,24 @@ export function DispatchPlanClient() {
 
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (t === "rules") setPageTab("rules");
+    if (t === "rules" || t === "ideas") setPageTab(t);
     else if (t === "plan" || !t) setPageTab("plan");
   }, [searchParams]);
+
+  if (pageTab === "ideas") {
+    return (
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className="plan-v3" style={{ padding: "28px 36px 0", maxWidth: 1760, margin: "0 auto" }}>
+          <PlanPageTabs tab={pageTab} onTab={setPlanTab} />
+        </div>
+        <div className="ideas-tasks-v3">
+          <div className="page" style={{ paddingTop: 20 }}>
+            <IdeasV3Panel />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (pageTab === "rules") {
     return (
@@ -656,7 +674,7 @@ function DispatchPlanCalendar({
                   <div className="hero-top">
                     <span className="kick">Планирование</span>
                   </div>
-                  <h1 className="hero-h1">План</h1>
+                  <h1 className="hero-h1">План и задачи</h1>
                   <p className="sec-sub" style={{ marginTop: 8 }}>
                     {loading ? "Загрузка…" : "Нет данных"}
                   </p>
@@ -677,9 +695,6 @@ function DispatchPlanCalendar({
 
   const items = allItems(plan);
   const loadStatus = plan.loadStatus;
-  const stratDate = findModeDate(modes, "strategy", todayKey);
-  const creativeDate = findModeDate(modes, "creative", todayKey);
-
   const periodLabel =
     calMode === "month"
       ? `${monthName(anchor)} ${anchor.getFullYear()}`
@@ -690,7 +705,6 @@ function DispatchPlanCalendar({
   const weekChecklist = resolveWeekChecklist(checklistWeekKeys, items, modes);
   const weekChecklistOpen = weekChecklist.filter((row) => !row.filled).length;
 
-  const tasksToPlace = plan.backlog.filter((i) => i.kind === "task");
   const boardProjects = plan.projects.filter((p) => showHidden || !p.planHidden);
   const visibleProjects = boardProjects.filter((p) => showDone || p.dispatchWorkStatus !== "done");
   const hiddenCount = plan.projects.filter((p) => p.planHidden).length;
@@ -719,61 +733,28 @@ function DispatchPlanCalendar({
                   <span className="kick">Планирование</span>
                   <span className="sec-sub">Сегодня {fmtWeekday(today).toLowerCase()}</span>
                 </div>
-                <h1 className="hero-h1">План</h1>
-                <StatusBlock loadStatus={loadStatus} labels={plan.loadStatusLabels} finance={plan.loadStatusFinance} />
-                <div className="hero-nums">
-                  <HeroDayButton
-                    label="День стратегии"
-                    date={stratDate}
-                    emptyText="Не назначен"
-                    subAssigned="Защищённый день · один слот"
-                    subEmpty="Поставьте день в календаре"
-                    onClick={() => {
-                      if (stratDate) {
-                        setCalMode("week");
-                        setAnchor(mondayOf(stratDate));
-                        showToast(`День стратегии — ${fmtWeekday(stratDate)}`);
-                      } else setDrawer({ type: "create", createKind: "strategy" });
-                    }}
-                  />
-                  <HeroDayButton
-                    label="Творческий день"
-                    date={creativeDate}
-                    emptyText="Не назначен"
-                    subAssigned="Творческий день без клиентских слотов"
-                    subEmpty="Поставьте день в календаре"
-                    onClick={() => {
-                      if (creativeDate) {
-                        setCalMode("week");
-                        setAnchor(mondayOf(creativeDate));
-                        showToast(`Творческий день — ${fmtWeekday(creativeDate)}`);
-                      } else setDrawer({ type: "create", createKind: "creative" });
-                    }}
-                  />
-                </div>
+                <h1 className="hero-h1">План и задачи</h1>
+                <StatusBlock loadStatus={loadStatus} labels={plan.loadStatusLabels} />
+                <WeekChecklistBar
+                  rows={weekChecklist}
+                  openCount={weekChecklistOpen}
+                  weekLabel={`${fmtShort(checklistWeekDates[0]!)} – ${fmtShort(checklistWeekDates[6]!)}`}
+                  onDragStart={(id) => setDrag({ kind: "checklist", id })}
+                  onDragEnd={() => {
+                    setDrag(null);
+                    setDropIndex(null);
+                  }}
+                  onJump={(dateKey) => {
+                    setCalMode("week");
+                    setAnchor(mondayOf(parseYmd(dateKey)));
+                    showToast(`В расписании — ${fmtWeekday(parseYmd(dateKey))}`);
+                  }}
+                  onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
+                />
               </div>
               <div className="hero-img">
                 <Image src="/agency/plan-hero.jpg" alt="" fill sizes="(max-width: 1200px) 0vw, 40vw" priority />
               </div>
-            </section>
-
-            <section className="card pad">
-              <WeekChecklistBar
-                rows={weekChecklist}
-                openCount={weekChecklistOpen}
-                weekLabel={`${fmtShort(checklistWeekDates[0]!)} – ${fmtShort(checklistWeekDates[6]!)}`}
-                onDragStart={(id) => setDrag({ kind: "checklist", id })}
-                onDragEnd={() => {
-                  setDrag(null);
-                  setDropIndex(null);
-                }}
-                onJump={(dateKey) => {
-                  setCalMode("week");
-                  setAnchor(mondayOf(parseYmd(dateKey)));
-                  showToast(`В расписании — ${fmtWeekday(parseYmd(dateKey))}`);
-                }}
-                onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
-              />
             </section>
 
             <section className="card pad">
@@ -926,52 +907,10 @@ function DispatchPlanCalendar({
 
             <section className="card pad">
               <div className="headrow" style={{ marginBottom: 18 }}>
-                <h2 className="sec-title">Нужно разместить</h2>
-                <span className="sec-sub">
-                  {tasksToPlace.length
-                    ? `${pluralRu(tasksToPlace.length, "задача ждёт", "задачи ждут", "задач ждут")} места в календаре`
-                    : "всё размещено"}
-                </span>
+                <h2 className="sec-title">Задачи</h2>
+                <span className="sec-sub">По категориям: рабочие, стратегия, жизнь, творчество и бэклог</span>
               </div>
-              <div className="place">
-                {tasksToPlace.length === 0 ? (
-                  <p className="plc-note">
-                    Задач для размещения нет. Создайте подзадачу в проекте или через «Создать задачу» — затем
-                    перетащите её в календарь.
-                  </p>
-                ) : (
-                  tasksToPlace.map((item) => {
-                    const p = projectById(plan.projects, item.project_id);
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className="plc"
-                        draggable
-                        onDragStart={() => setDrag({ kind: "backlog", itemId: item.id })}
-                        onDragEnd={() => setDrag(null)}
-                        onClick={() => setDrawer({ type: "item", itemId: item.id })}
-                      >
-                        <span className="plc-h">
-                          <span className="dot" style={{ background: p?.color ?? "#71717A" }} />
-                          <span className="plc-n">{item.title}</span>
-                        </span>
-                        {item.planned_minutes ? (
-                          <span className="plc-v tnum">≈ {hoursLabel(item)}</span>
-                        ) : null}
-                        <span className="plc-f">
-                          <span>{p ? p.businessLineLabel : "Без проекта"}</span>
-                          <span style={{ marginLeft: "auto" }}>Перетащите в календарь</span>
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-              <p className="hint">
-                Сюда попадают задачи без даты — из backlog или после создания. Проекты сами по себе в календарь не
-                ставятся: сначала задача, потом слот в дне.
-              </p>
+              <PlanInboxBoard />
             </section>
 
             <section className="card pad">
@@ -1131,79 +1070,17 @@ function DispatchPlanCalendar({
 function StatusBlock({
   loadStatus,
   labels,
-  finance,
 }: {
   loadStatus: LoadStatus;
   labels: { title: string; headline: string; detail: string };
-  finance: PlanPayload["loadStatusFinance"];
 }) {
-  const toPassive = Math.max(0, finance.passiveMinRub - finance.reliableProfitRub);
-  const passivePct = Math.min(
-    100,
-    Math.round((Math.max(0, finance.reliableProfitRub) / Math.max(1, finance.passiveMinRub)) * 100)
-  );
-
   return (
     <div className={`status${loadStatus === "active" ? "" : ` status--${loadStatus}`}`}>
       <span className="kick">Статус загруженности</span>
       <div className="status-main">
         <span className="status-n">{labels.title}</span>
       </div>
-      <p className="status-s">
-        <b>{labels.headline}.</b> {labels.detail}
-      </p>
-      <div className="status-s" style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55, color: "#fff" }}>
-        <div>
-          <b>Надёжные поступления</b> {formatRub(finance.reliableRevenueRub)}
-          <span style={{ color: "rgba(255,255,255,0.82)", fontWeight: 400 }}>
-            {" "}
-            — агентство и импульс с галочкой «точно в месяце» и уже оплаченные
-          </span>
-        </div>
-        <div>
-          <b>− Расходы</b> {formatRub(finance.totalExpensesRub)}
-          <span style={{ color: "rgba(255,255,255,0.82)", fontWeight: 400 }}>
-            {" "}
-            (команда {formatRub(finance.teamExpensesRub)}
-            {finance.taxAmountRub > 0 ? ` + взносы ИП ${formatRub(finance.taxAmountRub)}` : ""})
-          </span>
-        </div>
-        <div>
-          <b>= Надёжная прибыль</b> {formatRub(finance.reliableProfitRub)}
-        </div>
-        <div style={{ marginTop: 6, color: "rgba(255,255,255,0.82)" }}>
-          Пассивный режим от {formatRub(finance.passiveMinRub)}
-          {finance.reliableProfitRub >= finance.passiveMinRub
-            ? ` — порог закрыт (${passivePct}%).`
-            : ` — сейчас ${passivePct}%, не хватает ${formatRub(toPassive)}.`}{" "}
-          Пауза от {formatRub(finance.pauseMinRub)}.
-        </div>
-      </div>
     </div>
-  );
-}
-
-function HeroDayButton({
-  label,
-  date,
-  emptyText,
-  subAssigned,
-  subEmpty,
-  onClick,
-}: {
-  label: string;
-  date: Date | null;
-  emptyText: string;
-  subAssigned: string;
-  subEmpty: string;
-  onClick: () => void;
-}) {
-  return (
-    <button type="button" className={`hn${date ? "" : " empty"}`} onClick={onClick}>
-      <span className="kick">{label}</span>
-      <span className="hn-v">{date ? fmtWeekday(date) : emptyText}</span>
-      <span className="hn-s">{date ? subAssigned : subEmpty}</span>
-    </button>
   );
 }
 

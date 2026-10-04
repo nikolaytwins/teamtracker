@@ -1,6 +1,15 @@
+import type { InboxCategoryId } from "@/lib/v2/personal/inbox-categories";
 import type { V2TaskPriority } from "@/lib/v2/types";
 
-export type PersonalTodoView = "inbox" | "today" | "upcoming" | "week" | "kanban" | "project" | "completed";
+export type PersonalTodoView =
+  | "inbox"
+  | "board"
+  | "today"
+  | "upcoming"
+  | "week"
+  | "kanban"
+  | "project"
+  | "completed";
 
 export type PersonalKanbanColumn = "unassigned" | "today" | "tomorrow" | "this_week" | "later";
 
@@ -31,6 +40,7 @@ export type PersonalTodoRow = {
   completed_at: string | null;
   sort_order: number;
   inbox_section: PersonalTodoInboxSection;
+  inbox_category: InboxCategoryId;
   project_name?: string | null;
   project_color?: string | null;
   subtask_count?: number;

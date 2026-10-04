@@ -302,7 +302,10 @@ export function V2ShellSidebar({
           } else if (item.href.startsWith("/v2/personal/finance")) {
             active = pathname?.startsWith(appPath("/v2/personal/finance")) ?? false;
           } else if (item.href === "/v2/agency/plan") {
-            active = pathname?.startsWith(appPath("/v2/agency/plan")) ?? false;
+            active =
+              (pathname?.startsWith(appPath("/v2/agency/plan")) ?? false) ||
+              (pathname?.startsWith(appPath("/v2/personal/ideas-tasks")) ?? false) ||
+              (pathname?.startsWith(appPath("/v2/personal/tasks")) ?? false);
           } else if (item.href === "/v2/agency/sofia") {
             active = pathname?.startsWith(appPath("/v2/agency/sofia")) ?? false;
           } else if (item.href === "/v2/agency/overview") {

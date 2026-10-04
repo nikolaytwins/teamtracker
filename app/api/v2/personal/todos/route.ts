@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireV2Personal } from "@/lib/v2/auth/require-v2-personal";
+import { isInboxCategory } from "@/lib/v2/personal/inbox-categories";
 import { createPersonalTodo, getPersonalTodoProject, loadPersonalTodoList } from "@/lib/v2/personal/personal-todo-repo";
 import type { PersonalTodoView } from "@/lib/v2/personal/todo-types";
 
-const VIEWS: PersonalTodoView[] = ["inbox", "today", "upcoming", "week", "kanban", "project", "completed"];
+const VIEWS: PersonalTodoView[] = ["inbox", "board", "today", "upcoming", "week", "kanban", "project", "completed"];
 
 export async function GET(request: NextRequest) {
   const auth = await requireV2Personal();
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
       due_time: body.due_time ?? null,
       scheduled_date: body.scheduled_date ?? null,
       inbox_section: body.inbox_section === "later" ? "later" : "inbox",
+      inbox_category: isInboxCategory(body.inbox_category) ? body.inbox_category : undefined,
     });
     return NextResponse.json({ todo });
   } catch (e) {
