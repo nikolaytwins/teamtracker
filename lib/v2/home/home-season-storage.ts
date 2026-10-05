@@ -2,6 +2,18 @@ import type { HomeMonth, HomeSeasonPriority, HomeSeasonTask } from "@/lib/v2/per
 
 const STORAGE_KEY = "v2-home-season-v1";
 
+export const SEASON_TASK_MIME = "application/x-home-season-task";
+
+export function encodeSeasonTaskDrag(id: string): string {
+  return `season:${id}`;
+}
+
+export function parseSeasonTaskDrag(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (raw.startsWith("season:")) return raw.slice("season:".length) || null;
+  return null;
+}
+
 /** Карточки сентября v1 — сняты при редизайне; убираем из «Прочее» и localStorage. */
 const LEGACY_SEP_TASK_IDS = new Set([
   "sep-webinar-time",

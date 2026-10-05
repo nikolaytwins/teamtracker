@@ -7,9 +7,12 @@ import {
   addSeasonTask,
   buildSeasonMonths,
   deleteSeasonTask,
+  encodeSeasonTaskDrag,
   moveSeasonTaskToMonth,
   moveSeasonTaskToPriority,
+  parseSeasonTaskDrag,
   readSeasonStorage,
+  SEASON_TASK_MIME,
   toggleSeasonTaskDone,
   updateSeasonTask,
   type SeasonStorageState,
@@ -26,6 +29,27 @@ import { HomeTaskCheckbox } from "@/components/v2/home/personal/home-task-checkb
 import { V2Icons } from "@/components/v2/ui/icons";
 
 const HERO_BLUE = "#2d5eef";
+
+/** Sync drag id so month tiles can accept drop before React re-renders. */
+let liveSeasonDragId: string | null = null;
+
+function readSeasonDragId(e: DragEvent): string | null {
+  return (
+    e.dataTransfer.getData(SEASON_TASK_MIME) ||
+    parseSeasonTaskDrag(e.dataTransfer.getData("text/plain")) ||
+    liveSeasonDragId
+  );
+}
+
+function isSeasonTaskDrag(e: DragEvent, dragTaskId: string | null): boolean {
+  const types = Array.from(e.dataTransfer.types);
+  return (
+    types.includes(SEASON_TASK_MIME) ||
+    types.includes("text/plain") ||
+    Boolean(dragTaskId) ||
+    Boolean(liveSeasonDragId)
+  );
+}
 
 const PRIORITY_GROUPS: {
   id: HomeSeasonPriority;
@@ -77,7 +101,7 @@ function TaskDocLinks({ task, done }: { task: HomeSeasonTask; done: boolean }) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className={`inline-flex w-fit items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[12.5px] font-semibold transition ${btnClass}`}
+          className={`no-drag inline-flex w-fit items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[12.5px] font-semibold transition ${btnClass}`}
         >
           <ExternalLinkIcon className="h-3.5 w-3.5 shrink-0" />
           {link.label}
@@ -182,11 +206,24 @@ function SeasonTaskCard({
 
   return (
     <div
-      className="group relative"
-      onDragOver={(e) => {
-        if (!isDragging || dragDisabled) return;
-        e.preventDefault();
-        e.stopPropagation();
+      className={`group relative select-none ${dragDisabled ? "" : "cursor-grab active:cursor-grabbing"} ${
+        isDragging ? "opacity-40" : ""
+      }`}
+      draggable={!dragDisabled}
+      onDragStart={(e) => {
+        if ((e.target as HTMLElement).closest(".no-drag")) {
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData(SEASON_TASK_MIME, task.id);
+        e.dataTransfer.setData("text/plain", encodeSeasonTaskDrag(task.id));
+        liveSeasonDragId = task.id;
+        onDragStart(e);
+      }}
+      onDragEnd={() => {
+        liveSeasonDragId = null;
+        onDragEnd();
       }}
     >
       <div
@@ -200,23 +237,30 @@ function SeasonTaskCard({
         <div className="flex items-start gap-3 px-4 py-3.5 pr-16">
           <button
             type="button"
-            draggable={!dragDisabled}
-            onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = "move";
-              e.dataTransfer.setData("text/plain", task.id);
-              onDragStart(e);
-            }}
-            onDragEnd={onDragEnd}
-            onClick={onToggleDone}
-            className="mt-0.5 shrink-0 cursor-grab active:cursor-grabbing"
+            className="no-drag mt-0.5 shrink-0"
             aria-label={task.done ? "Отметить не сделанным" : "Отметить сделанным"}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleDone();
+            }}
           >
             <HomeTaskCheckbox done={task.done} tone={task.done ? "on-blue" : "default"} />
           </button>
           <div className="min-w-0 flex-1">
-            <button
-              type="button"
+            <div
+              role={hasDetails ? "button" : undefined}
+              tabIndex={hasDetails ? 0 : undefined}
               onClick={hasDetails ? onToggleExpand : onToggleDone}
+              onKeyDown={
+                hasDetails
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onToggleExpand();
+                      }
+                    }
+                  : undefined
+              }
               className={`v2-tight flex w-full items-start gap-2.5 text-left text-[16px] font-semibold leading-snug tracking-[-0.018em] ${
                 task.done ? "text-white" : "text-[var(--v2-ink-900)]"
               }`}
@@ -229,7 +273,7 @@ function SeasonTaskCard({
                 />
               ) : null}
               <span className="min-w-0 flex-1 whitespace-pre-wrap">{task.text}</span>
-            </button>
+            </div>
           </div>
           {hasDetails ? (
             <button
@@ -237,7 +281,7 @@ function SeasonTaskCard({
               onClick={onToggleExpand}
               aria-expanded={expanded}
               aria-label={expanded ? "Свернуть" : "Подробнее"}
-              className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
+              className={`no-drag mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
                 task.done
                   ? "text-white/70 hover:bg-white/15 hover:text-white"
                   : "text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)]"
@@ -317,7 +361,7 @@ function SeasonTaskCard({
         title="Редактировать"
         aria-label="Редактировать карточку"
         onClick={onEdit}
-        className={`absolute right-10 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
+        className={`no-drag absolute right-10 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
           task.done
             ? "text-white/70 hover:bg-white/15 hover:text-white"
             : "text-[var(--v2-ink-400)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)]"
@@ -330,7 +374,7 @@ function SeasonTaskCard({
         title="Удалить"
         aria-label="Удалить задачу"
         onClick={onDelete}
-        className={`absolute right-2 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
+        className={`no-drag absolute right-2 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg opacity-0 transition group-hover:opacity-100 focus:opacity-100 ${
           task.done
             ? "text-white/70 hover:bg-white/15 hover:text-white"
             : "text-[var(--v2-ink-400)] hover:bg-red-50 hover:text-red-500"
@@ -501,14 +545,24 @@ export function HomeSeasonBand() {
     refreshStorage(moveSeasonTaskToPriority(taskId, monthId, priority, HOME_MONTHS));
     setDragTaskId(null);
     setDropPriorityKey(null);
+    liveSeasonDragId = null;
   };
 
-  const onDropToMonth = (monthId: string) => {
-    if (!dragTaskId) return;
-    refreshStorage(moveSeasonTaskToMonth(dragTaskId, monthId, HOME_MONTHS, true));
+  const onDropToMonth = (monthId: string, taskId?: string | null) => {
+    const id = taskId || dragTaskId || liveSeasonDragId;
+    if (!id) return;
+    const fromMonth = months.find((m) => m.tasks.some((t) => t.id === id));
+    if (fromMonth?.id === monthId) {
+      setDragTaskId(null);
+      setDropMonthId(null);
+      liveSeasonDragId = null;
+      return;
+    }
+    refreshStorage(moveSeasonTaskToMonth(id, monthId, HOME_MONTHS, true));
     setActiveId(monthId);
     setDragTaskId(null);
     setDropMonthId(null);
+    liveSeasonDragId = null;
   };
 
   return (
@@ -518,7 +572,7 @@ export function HomeSeasonBand() {
           Расписание сезона
         </h2>
         <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">
-          Клик — сделано. Стрелка — детали. Перетащите на другой месяц или между приоритетами.
+          Клик — сделано. Перетащите карточку на другой месяц сверху.
         </span>
         <Link
           href={appPath(HOME_LINKS.strategy)}
@@ -528,34 +582,56 @@ export function HomeSeasonBand() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        className={`grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4 ${
+          dragTaskId
+            ? "sticky top-2 z-20 rounded-[22px] bg-white/95 p-2 shadow-[var(--v2-shadow-soft)] ring-1 ring-[var(--v2-brand-200)] backdrop-blur-md"
+            : ""
+        }`}
+      >
         {months.map((m) => {
           const done = m.tasks.filter((t) => t.done).length;
           const isActive = m.id === activeId;
-          const isDrop = dropMonthId === m.id && dragTaskId;
+          const sourceMonth = dragTaskId
+            ? months.find((month) => month.tasks.some((t) => t.id === dragTaskId))
+            : null;
+          const canDropHere = Boolean(dragTaskId && sourceMonth && sourceMonth.id !== m.id);
+          const isDrop = dropMonthId === m.id && canDropHere;
           const isNow = m.id === currentId;
           return (
-            <button
+            <div
               key={m.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setActiveId(m.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setActiveId(m.id);
+                }
+              }}
               onDragOver={(e) => {
-                if (!dragTaskId) return;
+                if (!isSeasonTaskDrag(e, dragTaskId)) return;
                 e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
                 setDropMonthId(m.id);
               }}
-              onDragLeave={() => {
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
                 if (dropMonthId === m.id) setDropMonthId(null);
               }}
               onDrop={(e) => {
                 e.preventDefault();
-                onDropToMonth(m.id);
+                e.stopPropagation();
+                onDropToMonth(m.id, readSeasonDragId(e));
               }}
-              className={`flex flex-col rounded-[18px] p-5 text-left transition ${
+              className={`flex cursor-pointer flex-col rounded-[18px] p-5 text-left transition ${
                 isActive
                   ? "shadow-[0_0_0_2.5px_var(--v2-brand-600),var(--v2-shadow-soft)]"
                   : "bg-white shadow-[var(--v2-shadow-card)] hover:-translate-y-px hover:shadow-[var(--v2-shadow-soft)]"
-              } ${isDrop ? "ring-2 ring-[var(--v2-brand-400)] ring-offset-2" : ""}`}
+              } ${canDropHere ? "ring-2 ring-dashed ring-[var(--v2-brand-300)]" : ""} ${
+                isDrop ? "bg-[var(--v2-brand-50)] ring-2 ring-[var(--v2-brand-500)] ring-offset-2" : ""
+              }`}
             >
               <div className="flex items-center gap-2.5">
                 <span
@@ -586,7 +662,16 @@ export function HomeSeasonBand() {
                   {done} / {m.tasks.length}
                 </span>
               </div>
-            </button>
+              {isDrop ? (
+                <div className="v2-tight mt-3 rounded-xl bg-[var(--v2-brand-600)] px-3 py-2 text-center text-[12.5px] font-semibold text-white">
+                  Отпустите, чтобы перенести сюда
+                </div>
+              ) : canDropHere ? (
+                <div className="v2-tight mt-3 text-[12.5px] font-medium text-[var(--v2-brand-700)]">
+                  Перетащите карточку сюда
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </div>
@@ -596,6 +681,7 @@ export function HomeSeasonBand() {
         dragTaskId={dragTaskId}
         onDragStart={setDragTaskId}
         onDragEnd={() => {
+          liveSeasonDragId = null;
           setDragTaskId(null);
           setDropMonthId(null);
           setDropPriorityKey(null);
@@ -771,7 +857,7 @@ function MonthPanel({
           <div
             key={group.key}
             onDragOver={(e) => {
-              if (!dragTaskId || !usePriorityGroups) return;
+              if (!isSeasonTaskDrag(e, dragTaskId) || !usePriorityGroups) return;
               e.preventDefault();
               e.stopPropagation();
               onDropPriorityKeyChange(group.key);
@@ -782,10 +868,12 @@ function MonthPanel({
               }
             }}
             onDrop={(e) => {
-              if (!dragTaskId || !usePriorityGroups) return;
+              if (!usePriorityGroups) return;
+              const id = readSeasonDragId(e) || dragTaskId;
+              if (!id) return;
               e.preventDefault();
               e.stopPropagation();
-              onDropToPriority(month.id, dragTaskId, dropPriority);
+              onDropToPriority(month.id, id, dropPriority);
               onDragEnd();
             }}
             className={`rounded-2xl transition ${
@@ -812,7 +900,7 @@ function MonthPanel({
             <div
               className="grid grid-cols-1 gap-3 p-0.5 md:grid-cols-2"
               onDragOver={(e) => {
-                if (!dragTaskId || !usePriorityGroups) return;
+                if (!isSeasonTaskDrag(e, dragTaskId) || !usePriorityGroups) return;
                 e.preventDefault();
                 e.stopPropagation();
                 onDropPriorityKeyChange(group.key);
@@ -846,10 +934,13 @@ function MonthPanel({
                       onToggleDone={() => onToggle(task.id, !task.done)}
                       onEdit={() => startEdit(task)}
                       onDelete={() => onDelete(task.id)}
-                      onDragStart={() => onDragStart(task.id)}
+                      onDragStart={() => {
+                        liveSeasonDragId = task.id;
+                        window.requestAnimationFrame(() => onDragStart(task.id));
+                      }}
                       onDragEnd={onDragEnd}
                       dragDisabled={dragDisabled}
-                      isDragging={Boolean(dragTaskId)}
+                      isDragging={dragTaskId === task.id}
                     />
                   )
                 )
