@@ -3,6 +3,7 @@ import type {
   PlanItemRow,
   PlanPriority,
   PlanProjectView,
+  PlanWorkStatus,
 } from "@/lib/v2/agency/plan/plan-types";
 import { displayHoursFromMinutes, parseYmd, toYmd } from "@/lib/v2/agency/plan/plan-utils";
 import type { DispatchWorkStatus } from "@/lib/v2/agency/dispatch/dispatch-work-status";
@@ -23,6 +24,30 @@ export function normalizePlanPriority(value: unknown): PlanPriority {
   const n = Number(value);
   if (n === 1 || n === 2 || n === 3 || n === 4) return n;
   return 3;
+}
+
+export const PLAN_WORK_STATUSES: PlanWorkStatus[] = ["todo", "doing", "done"];
+
+export const PLAN_WORK_STATUS_UI: Record<PlanWorkStatus, { label: string; css: string }> = {
+  todo: { label: "К выполнению", css: "todo" },
+  doing: { label: "В работе", css: "doing" },
+  done: { label: "Готово", css: "done" },
+};
+
+export function normalizePlanWorkStatus(value: unknown, completedAt?: string | null): PlanWorkStatus {
+  if (completedAt) return "done";
+  if (value === "doing" || value === "todo" || value === "done") return value;
+  return "todo";
+}
+
+export function workStatusWrite(
+  status: PlanWorkStatus,
+  currentCompleted: string | null
+): { work_status: PlanWorkStatus; completed_at: string | null } {
+  if (status === "done") {
+    return { work_status: "done", completed_at: currentCompleted || new Date().toISOString() };
+  }
+  return { work_status: status, completed_at: null };
 }
 
 export function comparePlanItems(a: PlanItemRow, b: PlanItemRow): number {
@@ -285,4 +310,20 @@ export function resolveWeekChecklist(
 
 export function weekChecklistDef(id: WeekChecklistId): WeekChecklistDef {
   return WEEK_CHECKLIST.find((d) => d.id === id)!;
+}
+
+export const PLAN_CHECKLIST_MIME = "application/x-plan-checklist";
+
+export function isWeekChecklistId(id: string): id is WeekChecklistId {
+  return WEEK_CHECKLIST.some((d) => d.id === id);
+}
+
+export function encodeChecklistDrag(id: WeekChecklistId): string {
+  return `checklist:${id}`;
+}
+
+export function parseChecklistDrag(raw: string | null | undefined): WeekChecklistId | null {
+  if (!raw) return null;
+  const id = raw.startsWith("checklist:") ? raw.slice("checklist:".length) : raw;
+  return isWeekChecklistId(id) ? id : null;
 }

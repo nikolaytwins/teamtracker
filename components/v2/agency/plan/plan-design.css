@@ -100,6 +100,7 @@
   overflow-wrap:anywhere;word-break:break-word;
 }
 .plan-v3 .prio-sel{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.plan-v3 .prio-sel--3{grid-template-columns:1fr 1fr 1fr}
 .plan-v3 .prio-opt{
   display:flex;align-items:center;gap:8px;border:1px solid var(--ink-100);
   background:#fff;border-radius:12px;padding:10px 12px;cursor:pointer;
@@ -415,6 +416,7 @@
   background:#fff;color:var(--ink-800);box-shadow:0 1px 0 rgba(15,23,42,.04);
 }
 .plan-v3 .week-chip.is-open{
+  -webkit-user-drag:element;
   cursor:grab;
   --wc:#DC2626;
   border-color:color-mix(in srgb,#DC2626 38%,var(--ink-100));

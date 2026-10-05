@@ -54,6 +54,9 @@ function PlanInboxBoardInner() {
   const [editDest, setEditDest] = useState<InboxCategoryId>("work");
   const [editDeadline, setEditDeadline] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [cardMenu, setCardMenu] = useState<{ id: string; kind: "project" | "prio" } | null>(null);
+  const [titleEditId, setTitleEditId] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState("");
 
   const nonInboxProjects = useMemo(
     () => projects.filter((p) => !p.is_inbox && p.id !== inboxProjectId),
@@ -85,7 +88,9 @@ function PlanInboxBoardInner() {
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (!(e.target instanceof Element) || !e.target.closest(".dd")) setOpenDd(null);
+      if (!(e.target instanceof Element)) return;
+      if (!e.target.closest(".dd")) setOpenDd(null);
+      if (!e.target.closest(".cd-pop") && !e.target.closest(".tg--menu")) setCardMenu(null);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -226,14 +231,61 @@ function PlanInboxBoardInner() {
 
   async function deleteTask() {
     if (!selected) return;
+    await deleteTodo(selected);
+    setSelected(null);
+  }
+
+  async function patchTodo(todo: PersonalTodoRow, body: Record<string, unknown>, next?: Partial<PersonalTodoRow>, ok?: string) {
+    setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, ...next } : t)));
     try {
-      await fetchJson(`/api/v2/personal/todos/${selected.id}`, { method: "DELETE" });
-      setSelected(null);
+      await fetchJson(`/api/v2/personal/todos/${todo.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       await load();
+      if (ok) flash(ok);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось сохранить");
+      await load();
+    }
+  }
+
+  async function deleteTodo(todo: PersonalTodoRow) {
+    setTodos((prev) => prev.filter((t) => t.id !== todo.id));
+    try {
+      await fetchJson(`/api/v2/personal/todos/${todo.id}`, { method: "DELETE" });
       flash("Задача удалена");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось удалить");
+      await load();
     }
+  }
+
+  async function saveTitle(todo: PersonalTodoRow, raw: string) {
+    const next = raw.trim();
+    setTitleEditId(null);
+    if (!next || next === todo.title) return;
+    await patchTodo(todo, { title: next }, { title: next });
+  }
+
+  async function setTodoProject(todo: PersonalTodoRow, nextId: string) {
+    const proj = nonInboxProjects.find((p) => p.id === nextId);
+    setCardMenu(null);
+    await patchTodo(
+      todo,
+      { project_id: nextId || inboxProjectId },
+      { project_id: nextId || inboxProjectId, project_name: proj?.name ?? null }
+    );
+  }
+
+  async function setTodoPrio(todo: PersonalTodoRow, value: 0 | 1 | 2 | 3) {
+    setCardMenu(null);
+    await patchTodo(todo, { priority: priorityFromPick(value) }, { priority: priorityFromPick(value) });
+  }
+
+  async function setTodoDeadline(todo: PersonalTodoRow, ymd: string) {
+    await patchTodo(todo, { due_date: ymd || null }, { due_date: ymd || null });
   }
 
   const destMeta = categories.find((c) => c.id === dest) ?? categories[0]!;
@@ -247,6 +299,9 @@ function PlanInboxBoardInner() {
   return (
     <div className="plan-inbox">
       <form className="qa" onSubmit={(e) => void addFromForm(e)}>
+        <span className="qa-ic" aria-hidden>
+          +
+        </span>
         <input
           type="text"
           value={title}
@@ -406,6 +461,7 @@ function PlanInboxBoardInner() {
                 </div>
                 <span className="col-key">{list.length}</span>
               </div>
+              <div className={`col-list${cardMenu && list.some((t) => t.id === cardMenu.id) ? " is-menu" : ""}`}>
               {loading ? (
                 <div className="zero">Загрузка…</div>
               ) : list.length === 0 ? (
@@ -417,13 +473,19 @@ function PlanInboxBoardInner() {
                 list.map((todo) => {
                   const pn = taskPrioNum(todo.priority);
                   const dl = dlInfoForTodo(todo);
+                  const projectOpen = cardMenu?.id === todo.id && cardMenu.kind === "project";
+                  const prioOpen = cardMenu?.id === todo.id && cardMenu.kind === "prio";
+                  const hasProject = Boolean(todo.project_name && todo.project_id !== inboxProjectId);
                   return (
-                    <button
+                    <div
                       key={todo.id}
-                      type="button"
                       className={`cd${draggingId === todo.id ? " dragging" : ""}`}
-                      draggable
+                      draggable={titleEditId !== todo.id}
                       onDragStart={(e) => {
+                        if (titleEditId === todo.id) {
+                          e.preventDefault();
+                          return;
+                        }
                         setDraggingId(todo.id);
                         e.dataTransfer.setData("text/plain", todo.id);
                         e.dataTransfer.effectAllowed = "move";
@@ -432,33 +494,152 @@ function PlanInboxBoardInner() {
                         setDraggingId(null);
                         setDropCol(null);
                       }}
-                      onClick={() => openTask(todo)}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest("button, input, label, a, .cd-pop, .cd-t")) return;
+                        setCardMenu({ id: todo.id, kind: "project" });
+                      }}
                     >
-                      <span
+                      <button
+                        type="button"
                         className="ck"
+                        aria-label="Выполнить"
                         onClick={(e) => {
                           e.stopPropagation();
                           void finish(todo);
                         }}
                       >
                         ✓
-                      </span>
-                      <span className="cd-b">
-                        <span className="cd-t">{todo.title}</span>
+                      </button>
+                      <div className="cd-b">
+                        {titleEditId === todo.id ? (
+                          <input
+                            className="cd-t-in"
+                            value={titleDraft}
+                            autoFocus
+                            aria-label="Название задачи"
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setTitleDraft(e.target.value)}
+                            onBlur={() => void saveTitle(todo, titleDraft)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void saveTitle(todo, titleDraft);
+                              }
+                              if (e.key === "Escape") setTitleEditId(null);
+                            }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="cd-t"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTitleEditId(todo.id);
+                              setTitleDraft(todo.title);
+                            }}
+                          >
+                            {todo.title}
+                          </button>
+                        )}
                         <span className="cd-m">
-                          {pn === 1 ? <span className="tg tg--imp">важно</span> : null}
-                          {pn === 2 ? <span className="tg tg--p2">средне</span> : null}
-                          {pn === 3 ? <span className="tg tg--p3">не важно</span> : null}
-                          {todo.project_name && todo.project_id !== inboxProjectId ? (
-                            <span className="tg">{todo.project_name}</span>
-                          ) : null}
-                          {dl ? <span className={`tg${dl.cls === "soon" || dl.cls === "late" ? " tg--soon" : ""}`}>{dl.text}</span> : null}
+                          <button
+                            type="button"
+                            className={`tg tg--menu${pn === 1 ? " tg--imp" : pn === 2 ? " tg--p2" : pn === 3 ? " tg--p3" : " tg--ghost"}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCardMenu(prioOpen ? null : { id: todo.id, kind: "prio" });
+                            }}
+                          >
+                            {pn === 1 ? "важно" : pn === 2 ? "средне" : pn === 3 ? "не важно" : "важность"}
+                          </button>
+                          <button
+                            type="button"
+                            className={`tg tg--menu${hasProject ? "" : " tg--ghost"}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCardMenu(projectOpen ? null : { id: todo.id, kind: "project" });
+                            }}
+                          >
+                            {hasProject ? todo.project_name : "проект"}
+                          </button>
+                          <label
+                            className={`tg tg--date${dl ? (dl.cls === "soon" || dl.cls === "late" ? " tg--soon" : "") : " tg--ghost"}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {dl?.text ?? "срок"}
+                            <input
+                              type="date"
+                              value={todo.due_date ?? todo.scheduled_date ?? ""}
+                              onChange={(e) => void setTodoDeadline(todo, e.target.value)}
+                            />
+                          </label>
                         </span>
-                      </span>
-                    </button>
+                        {projectOpen ? (
+                          <div className="cd-pop" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" className={!hasProject ? "on" : ""} onClick={() => void setTodoProject(todo, "")}>
+                              Без проекта
+                            </button>
+                            {nonInboxProjects.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                className={todo.project_id === p.id ? "on" : ""}
+                                onClick={() => void setTodoProject(todo, p.id)}
+                              >
+                                {p.name}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        {prioOpen ? (
+                          <div className="cd-pop" onClick={(e) => e.stopPropagation()}>
+                            {PRIO_OPTS.map((p) => (
+                              <button
+                                key={p.v}
+                                type="button"
+                                className={pn === p.v ? "on" : ""}
+                                onClick={() => void setTodoPrio(todo, p.v)}
+                              >
+                                {p.c ? <span className="dot" style={{ background: p.c }} /> : null}
+                                {p.n}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="cd-act">
+                        <button
+                          type="button"
+                          className="cd-more"
+                          title="Подробнее"
+                          aria-label="Открыть карточку"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTask(todo);
+                          }}
+                        >
+                          ⋯
+                        </button>
+                        <button
+                          type="button"
+                          className="cd-del"
+                          title="Удалить"
+                          aria-label="Удалить задачу"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void deleteTodo(todo);
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden>
+                            <path d="M5 7h14M10 7V5h4v2m-1 14H8a1 1 0 0 1-1-1V7h10v13a1 1 0 0 1-1 1h-5z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                   );
                 })
               )}
+              </div>
               {colAdd === col.id ? (
                 <input
                   className="col-add-in"

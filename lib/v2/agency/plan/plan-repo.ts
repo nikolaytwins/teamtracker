@@ -1,7 +1,7 @@
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
 import { newV2Id } from "@/lib/v2/db/client";
-import type { PlanDayMode, PlanItemKind, PlanItemRow, PlanPriority } from "@/lib/v2/agency/plan/plan-types";
-import { normalizePlanPriority } from "@/lib/v2/agency/plan/plan-calendar-logic";
+import type { PlanDayMode, PlanItemKind, PlanItemRow, PlanPriority, PlanWorkStatus } from "@/lib/v2/agency/plan/plan-types";
+import { normalizePlanPriority, normalizePlanWorkStatus } from "@/lib/v2/agency/plan/plan-calendar-logic";
 import type { V2SessionContext } from "@/lib/v2/types";
 
 function mapItem(row: Record<string, unknown>): PlanItemRow {
@@ -17,6 +17,7 @@ function mapItem(row: Record<string, unknown>): PlanItemRow {
     sort_order: Number(row.sort_order) || 0,
     priority: normalizePlanPriority(row.priority),
     completed_at: row.completed_at ? String(row.completed_at) : null,
+    work_status: normalizePlanWorkStatus(row.work_status, row.completed_at ? String(row.completed_at) : null),
   };
 }
 
@@ -27,6 +28,8 @@ export async function listPlanItems(
 ): Promise<PlanItemRow[]> {
   const sb = createSupabaseServiceClient();
   const selectFull =
+    "id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order, priority, completed_at, work_status";
+  const selectNoStatus =
     "id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order, priority, completed_at";
   const selectNoPriority =
     "id, kind, project_id, title, plan_date, planned_minutes, event_time, duration_label, sort_order, completed_at";
@@ -45,6 +48,9 @@ export async function listPlanItems(
   };
 
   let { data, error } = await run(selectFull);
+  if (error && (error.code === "42703" || /work_status/i.test(error.message))) {
+    ({ data, error } = await run(selectNoStatus));
+  }
   if (error && (error.code === "42703" || /priority/i.test(error.message))) {
     ({ data, error } = await run(selectNoPriority));
   }
@@ -100,6 +106,7 @@ export type PlanItemInput = {
   sort_order?: number | null;
   priority?: PlanPriority | null;
   completed_at?: string | null;
+  work_status?: PlanWorkStatus | null;
 };
 
 async function nextSortOrder(
@@ -125,6 +132,7 @@ export async function createPlanItem(ctx: V2SessionContext, input: PlanItemInput
   const sort_order =
     input.sort_order != null ? Number(input.sort_order) : await nextSortOrder(ctx, input.plan_date);
   const priority = normalizePlanPriority(input.priority ?? 3);
+  const work_status = normalizePlanWorkStatus(input.work_status ?? "todo", input.completed_at ?? null);
   const row = {
     id,
     user_id: ctx.userId,
@@ -137,9 +145,22 @@ export async function createPlanItem(ctx: V2SessionContext, input: PlanItemInput
     duration_label: input.duration_label ?? null,
     sort_order,
     priority,
+    work_status,
   };
   const { data, error } = await sb.from("agency_plan_item").insert(row).select().single();
   if (error) {
+    if (error.code === "42703" || /work_status/i.test(error.message)) {
+      const { work_status: _dropStatus, ...withoutStatus } = row;
+      const retryStatus = await sb.from("agency_plan_item").insert(withoutStatus).select().single();
+      if (retryStatus.error && (retryStatus.error.code === "42703" || /priority/i.test(retryStatus.error.message))) {
+        const { priority: _drop, ...withoutPriority } = withoutStatus;
+        const retry = await sb.from("agency_plan_item").insert(withoutPriority).select().single();
+        if (retry.error) throw retry.error;
+        return mapItem(retry.data as unknown as Record<string, unknown>);
+      }
+      if (retryStatus.error) throw retryStatus.error;
+      return mapItem(retryStatus.data as unknown as Record<string, unknown>);
+    }
     // Миграция 080 ещё не применена
     if (error.code === "42703" || /priority/i.test(error.message)) {
       const { priority: _drop, ...withoutPriority } = row;
@@ -169,6 +190,15 @@ export async function updatePlanItem(
   if (patch.sort_order !== undefined) body.sort_order = patch.sort_order;
   if (patch.priority !== undefined) body.priority = normalizePlanPriority(patch.priority);
   if (patch.completed_at !== undefined) body.completed_at = patch.completed_at;
+  if (patch.work_status !== undefined) {
+    const status = normalizePlanWorkStatus(patch.work_status, patch.completed_at);
+    body.work_status = status;
+    if (patch.completed_at === undefined) {
+      body.completed_at = status === "done" ? new Date().toISOString() : null;
+    }
+  } else if (patch.completed_at !== undefined) {
+    body.work_status = patch.completed_at ? "done" : "todo";
+  }
 
   const { data, error } = await sb
     .from("agency_plan_item")
@@ -178,6 +208,18 @@ export async function updatePlanItem(
     .select()
     .single();
   if (error) {
+    if ((error.code === "42703" || /work_status/i.test(error.message)) && "work_status" in body) {
+      const { work_status: _dropStatus, ...withoutStatus } = body;
+      const retryStatus = await sb
+        .from("agency_plan_item")
+        .update(withoutStatus)
+        .eq("id", id)
+        .eq("user_id", ctx.userId)
+        .select()
+        .single();
+      if (retryStatus.error) throw retryStatus.error;
+      return mapItem(retryStatus.data as unknown as Record<string, unknown>);
+    }
     if ((error.code === "42703" || /priority/i.test(error.message)) && "priority" in body) {
       const { priority: _drop, ...withoutPriority } = body;
       const retry = await sb

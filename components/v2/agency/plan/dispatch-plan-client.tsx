@@ -23,14 +23,21 @@ import {
   KANBAN_BOARD_COLS,
   modeCssClass,
   normalizePlanPriority,
+  normalizePlanWorkStatus,
   PLAN_PRIORITIES,
   PLAN_PRIORITY_UI,
+  PLAN_WORK_STATUS_UI,
+  PLAN_WORK_STATUSES,
+  workStatusWrite,
   pluralRu,
   STATUS_UI,
   tasksOnDay,
   unplacedHours,
   capOf,
   dayHours,
+  encodeChecklistDrag,
+  parseChecklistDrag,
+  PLAN_CHECKLIST_MIME,
   resolveWeekChecklist,
   weekChecklistDef,
   type WeekChecklistId,
@@ -101,6 +108,9 @@ type DragState =
   | { kind: "checklist"; id: WeekChecklistId }
   | { kind: "backlog"; itemId: string }
   | { kind: "kanban"; projectId: string; fromStatus: DispatchWorkStatus };
+
+/** Sync drag payload so HTML5 drop does not wait on a React re-render. */
+let livePlanDrag: DragState | null = null;
 
 type DrawerState =
   | { type: "create"; createKind: CreateKind; day?: string }
@@ -220,7 +230,12 @@ function WeekChecklistBar({
               key={def.id}
               className={`week-chip week-chip--${def.css} is-open`}
               draggable
-              onDragStart={() => onDragStart(def.id)}
+              onDragStart={(e) => {
+                e.dataTransfer.setData(PLAN_CHECKLIST_MIME, def.id);
+                e.dataTransfer.setData("text/plain", encodeChecklistDrag(def.id));
+                e.dataTransfer.effectAllowed = "copy";
+                onDragStart(def.id);
+              }}
               onDragEnd={onDragEnd}
               title="Перетащите на день в календаре"
             >
@@ -487,8 +502,9 @@ function DispatchPlanCalendar({
       const item = allItems(plan).find((i) => i.id === id);
       if (!item) return;
       const nextCompleted = item.completed_at ? null : new Date().toISOString();
+      const nextStatus = nextCompleted ? ("done" as const) : ("todo" as const);
       const patchList = (list: PlanItemRow[]) =>
-        list.map((i) => (i.id === id ? { ...i, completed_at: nextCompleted } : i));
+        list.map((i) => (i.id === id ? { ...i, completed_at: nextCompleted, work_status: nextStatus } : i));
       setPlan((prev) =>
         prev
           ? {
@@ -499,7 +515,7 @@ function DispatchPlanCalendar({
           : prev
       );
       try {
-        await updatePlanItemApi(id, { completed_at: nextCompleted });
+        await updatePlanItemApi(id, { completed_at: nextCompleted, work_status: nextStatus });
       } catch (e) {
         await reload().catch(() => {});
         showToast(e instanceof Error ? e.message : "Не удалось обновить отметку");
@@ -508,30 +524,32 @@ function DispatchPlanCalendar({
     [plan, reload, showToast]
   );
 
-  const onDropDay = async (dateKey: string, insertAt: number | null = null) => {
-    if (!drag || !plan) return;
+  const onDropDay = async (dateKey: string, insertAt: number | null = null, overrideDrag?: DragState | null) => {
+    const active = overrideDrag ?? drag ?? livePlanDrag;
+    if (!active || !plan) return;
     setDropKey(null);
     setDropIndex(null);
-    if (drag.kind === "kanban") {
+    if (active.kind === "kanban") {
+      livePlanDrag = null;
       setDrag(null);
       return;
     }
     const snap = structuredClone(plan);
 
-    if (drag.kind === "mark") {
+    if (active.kind === "mark") {
       await mutate(
         async () => {
-          if (drag.from !== dateKey) await upsertDayModeApi(drag.from, null);
-          await upsertDayModeApi(dateKey, drag.mode);
+          if (active.from !== dateKey) await upsertDayModeApi(active.from, null);
+          await upsertDayModeApi(dateKey, active.mode);
         },
-        `${drag.mode === "strategy" ? "День стратегии" : drag.mode === "creative" ? "Творческий день" : "День отдыха"} → ${fmtWeekday(parseYmd(dateKey))}`,
+        `${active.mode === "strategy" ? "День стратегии" : active.mode === "creative" ? "Творческий день" : "День отдыха"} → ${fmtWeekday(parseYmd(dateKey))}`,
         snap
       );
       return;
     }
 
-    if (drag.kind === "checklist") {
-      const def = weekChecklistDef(drag.id);
+    if (active.kind === "checklist") {
+      const def = weekChecklistDef(active.id);
       if (def.kind === "mode") {
         await mutate(
           async () => {
@@ -563,8 +581,8 @@ function DispatchPlanCalendar({
       return;
     }
 
-    if (drag.kind === "move" || drag.kind === "backlog") {
-      const item = allItems(plan).find((i) => i.id === drag.itemId);
+    if (active.kind === "move" || active.kind === "backlog") {
+      const item = allItems(plan).find((i) => i.id === active.itemId);
       if (!item) {
         setDrag(null);
         return;
@@ -608,15 +626,15 @@ function DispatchPlanCalendar({
       return;
     }
 
-    if (drag.kind === "new") {
-      const proj = projectsMap.get(drag.projectId);
+    if (active.kind === "new") {
+      const proj = projectsMap.get(active.projectId);
       const u = proj ? unplacedHours(proj, allItems(plan), todayKey) : null;
       const h = Math.min(2, u ?? 2);
       await mutate(
         () =>
           createPlanItemApi({
             kind: "task",
-            project_id: drag.projectId,
+            project_id: active.projectId,
             title: "Работа по проекту",
             plan_date: dateKey,
             planned_minutes: planHoursToMinutes(h),
@@ -739,8 +757,12 @@ function DispatchPlanCalendar({
                   rows={weekChecklist}
                   openCount={weekChecklistOpen}
                   weekLabel={`${fmtShort(checklistWeekDates[0]!)} – ${fmtShort(checklistWeekDates[6]!)}`}
-                  onDragStart={(id) => setDrag({ kind: "checklist", id })}
+                  onDragStart={(id) => {
+                    livePlanDrag = { kind: "checklist", id };
+                    setDrag({ kind: "checklist", id });
+                  }}
                   onDragEnd={() => {
+                    livePlanDrag = null;
                     setDrag(null);
                     setDropIndex(null);
                   }}
@@ -816,8 +838,15 @@ function DispatchPlanCalendar({
                   <PlanScheduleBoard
                     items={items}
                     todayKey={todayKey}
-                    externalDragKind={drag?.kind ?? null}
-                    onExternalDrop={(day) => void onDropDay(day)}
+                    modes={modes}
+                    externalDragKind={drag?.kind ?? livePlanDrag?.kind ?? null}
+                    onExternalDrop={(day, payload) => {
+                      void onDropDay(
+                        day,
+                        null,
+                        payload ? { kind: "checklist", id: payload.id } : undefined
+                      );
+                    }}
                     onChanged={async () => {
                       await reload();
                     }}
@@ -1118,7 +1147,7 @@ function DayCell({
   dropIndex: number | null;
   onDragStart: (d: DragState) => void;
   onDragEnd: () => void;
-  onDrop: (k: string, insertAt?: number | null) => void;
+  onDrop: (k: string, insertAt?: number | null, overrideDrag?: DragState | null) => void;
   onDragOver: (k: string, insertAt?: number | null) => void;
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
@@ -1145,15 +1174,25 @@ function DayCell({
       className={`${compact ? "mcell" : "day"}${monthOut ? " out" : ""}${past ? " past" : ""}${cssMode ? ` ${cssMode}` : ""}${k === todayKey ? " today" : ""}${!past && free === 0 && cap > 0 ? " full" : ""}${dropKey === k ? " drop" : ""}`}
       data-k={k}
       onDragOver={(e) => {
-        if (!drag || drag.kind === "kanban") return;
+        const types = Array.from(e.dataTransfer.types);
+        const fromHint = types.includes(PLAN_CHECKLIST_MIME) || types.includes("text/plain");
+        if ((!drag || drag.kind === "kanban") && !fromHint && !livePlanDrag) return;
         e.preventDefault();
+        e.dataTransfer.dropEffect = canReorder ? "move" : "copy";
         if (canReorder) onDragOver(k, dayTasks.length);
         else onDragOver(k, null);
       }}
       onDragLeave={onDragLeave}
       onDrop={(e) => {
         e.preventDefault();
-        void onDrop(k, canReorder ? dropKey === k ? dropIndex : dayTasks.length : null);
+        const checklistId = parseChecklistDrag(
+          e.dataTransfer.getData(PLAN_CHECKLIST_MIME) || e.dataTransfer.getData("text/plain")
+        );
+        void onDrop(
+          k,
+          canReorder ? (dropKey === k ? dropIndex : dayTasks.length) : null,
+          checklistId ? { kind: "checklist", id: checklistId } : undefined
+        );
       }}
     >
       {compact ? (
@@ -1313,6 +1352,7 @@ function DayCell({
                       </span>
                       <span className="slot-m tnum">
                         <span className="slot-h">{hoursLabel(t)}</span>
+                        <span>{PLAN_WORK_STATUS_UI[normalizePlanWorkStatus(t.work_status, t.completed_at)].label}</span>
                         <span>{p ? p.clientLabel : "без проекта"}</span>
                       </span>
                     </button>
@@ -1412,7 +1452,7 @@ function MonthGrid({
   dropIndex: number | null;
   onDragStart: (d: DragState) => void;
   onDragEnd: () => void;
-  onDrop: (k: string, insertAt?: number | null) => void;
+  onDrop: (k: string, insertAt?: number | null, overrideDrag?: DragState | null) => void;
   onDragOver: (k: string, insertAt?: number | null) => void;
   onDragLeave: () => void;
   onOpenItem: (id: string) => void;
@@ -2086,9 +2126,10 @@ function ItemDrawer({
           onClick={() =>
             void mutate(
               () =>
-                updatePlanItemApi(item.id, {
-                  completed_at: item.completed_at ? null : new Date().toISOString(),
-                }),
+                updatePlanItemApi(
+                  item.id,
+                  workStatusWrite(item.completed_at ? "todo" : "done", item.completed_at)
+                ),
               item.completed_at ? `«${item.title}» снова в работе` : `«${item.title}» выполнен`,
               snap
             )
@@ -2109,6 +2150,29 @@ function ItemDrawer({
           </span>
           <span>{item.completed_at ? "Выполнено — нажмите, чтобы снять" : "Отметить выполненным"}</span>
         </button>
+        {isTask ? (
+          <div className="fld">
+            <label>Статус</label>
+            <div className="prio-sel prio-sel--3">
+              {PLAN_WORK_STATUSES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`prio-opt${normalizePlanWorkStatus(item.work_status, item.completed_at) === s ? " on" : ""}`}
+                  onClick={() =>
+                    void mutate(
+                      () => updatePlanItemApi(item.id, workStatusWrite(s, item.completed_at)),
+                      `Статус — ${PLAN_WORK_STATUS_UI[s].label}`,
+                      snap
+                    )
+                  }
+                >
+                  {PLAN_WORK_STATUS_UI[s].label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="fld">
           <label>Название</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />

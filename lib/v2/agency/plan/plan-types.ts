@@ -8,6 +8,8 @@ export type PlanItemKind = "task" | "call" | "personal";
 /** 1 критичный · 2 высокий · 3 обычный · 4 низкий */
 export type PlanPriority = 1 | 2 | 3 | 4;
 
+export type PlanWorkStatus = "todo" | "doing" | "done";
+
 export type LoadStatus = "active" | "passive" | "pause";
 
 export type PlanItemRow = {
@@ -22,6 +24,7 @@ export type PlanItemRow = {
   sort_order: number;
   priority: PlanPriority;
   completed_at: string | null;
+  work_status: PlanWorkStatus;
 };
 
 export type PlanDayModeRow = {

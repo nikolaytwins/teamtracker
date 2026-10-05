@@ -429,6 +429,7 @@ export function proposeDayWeekPlan(input: {
         sort_order: 0,
         priority: 3,
         completed_at: null,
+        work_status: "todo",
       });
     }
     if (e.type === "work") {
@@ -444,6 +445,7 @@ export function proposeDayWeekPlan(input: {
         sort_order: 0,
         priority: e.priority ?? 3,
         completed_at: null,
+        work_status: "todo",
       });
     }
   }

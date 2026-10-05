@@ -108,6 +108,7 @@ function mergeWithRules(
       sort_order: 0,
       priority: (it.priority as PlanItemRow["priority"]) || 3,
       completed_at: null,
+      work_status: "todo",
     }))
   );
 
@@ -164,6 +165,7 @@ export async function respondDayPlanViaOpenRouter(input: {
             sort_order: 0,
             priority: it.priority,
             completed_at: null,
+            work_status: "todo" as const,
           }) as PlanItemRow
       )
     ),

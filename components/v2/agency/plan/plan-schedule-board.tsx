@@ -6,9 +6,19 @@ import {
   deletePlanItemApi,
   updatePlanItemApi,
 } from "@/lib/v2/agency/plan/plan-api-client";
-import type { PlanItemRow } from "@/lib/v2/agency/plan/plan-types";
+import {
+  modeCssClass,
+  normalizePlanWorkStatus,
+  parseChecklistDrag,
+  PLAN_CHECKLIST_MIME,
+  PLAN_WORK_STATUS_UI,
+  PLAN_WORK_STATUSES,
+  workStatusWrite,
+  type WeekChecklistId,
+} from "@/lib/v2/agency/plan/plan-calendar-logic";
+import type { PlanDayMode, PlanItemRow, PlanWorkStatus } from "@/lib/v2/agency/plan/plan-types";
 import { addDays, toYmd } from "@/lib/v2/agency/plan/plan-utils";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
 const WD = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
 const MON = [
@@ -168,6 +178,7 @@ function addDaysIso(s: string, n: number) {
 export function PlanScheduleBoard({
   items,
   todayKey,
+  modes,
   onChanged,
   onToast,
   externalDragKind,
@@ -175,10 +186,11 @@ export function PlanScheduleBoard({
 }: {
   items: PlanItemRow[];
   todayKey: string;
+  modes?: Map<string, PlanDayMode>;
   onChanged: () => Promise<void>;
   onToast: (msg: string, undo?: () => void) => void;
   externalDragKind?: "checklist" | "mark" | "new" | "move" | "backlog" | "kanban" | null;
-  onExternalDrop?: (day: string) => void;
+  onExternalDrop?: (day: string, payload?: { kind: "checklist"; id: WeekChecklistId }) => void;
 }) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(4);
@@ -335,10 +347,28 @@ export function PlanScheduleBoard({
     }, "Добавлено");
   };
 
-  const onDrop = async (day: string) => {
-    if (externalDragKind === "checklist" || externalDragKind === "mark" || externalDragKind === "new" || externalDragKind === "move" || externalDragKind === "backlog") {
+  const patchStatus = (item: PlanItemRow, status: PlanWorkStatus) =>
+    run(
+      () => updatePlanItemApi(item.id, workStatusWrite(status, item.completed_at)),
+      status === "done" ? "Готово" : status === "doing" ? "В работе" : "К выполнению"
+    );
+
+  const toggleDone = (item: PlanItemRow) => patchStatus(item, item.completed_at ? "todo" : "done");
+
+  const onDrop = async (day: string, e?: DragEvent) => {
+    const checklistId = parseChecklistDrag(
+      e?.dataTransfer.getData(PLAN_CHECKLIST_MIME) || e?.dataTransfer.getData("text/plain")
+    );
+    if (
+      checklistId ||
+      externalDragKind === "checklist" ||
+      externalDragKind === "mark" ||
+      externalDragKind === "new" ||
+      externalDragKind === "move" ||
+      externalDragKind === "backlog"
+    ) {
       setDropDay(null);
-      onExternalDrop?.(day);
+      onExternalDrop?.(day, checklistId ? { kind: "checklist", id: checklistId } : undefined);
       return;
     }
     if (!dragId) return;
@@ -408,8 +438,14 @@ export function PlanScheduleBoard({
         onDragOver={(e) => {
           const c = (e.target as HTMLElement).closest(".col") as HTMLElement | null;
           if (!c) return;
-          if (!dragId && !externalDragKind) return;
+          const types = Array.from(e.dataTransfer.types);
+          const fromHint =
+            types.includes(PLAN_CHECKLIST_MIME) ||
+            types.includes("text/plain") ||
+            Boolean(externalDragKind);
+          if (!dragId && !fromHint) return;
           e.preventDefault();
+          e.dataTransfer.dropEffect = dragId ? "move" : "copy";
           setDropDay(c.dataset.day || null);
           const r = boardRef.current!.getBoundingClientRect();
           if (e.clientX > r.right - 60) boardRef.current!.scrollLeft += 12;
@@ -425,19 +461,24 @@ export function PlanScheduleBoard({
             .sort((a, b) => (a.event_time || "99").localeCompare(b.event_time || "99"));
           const tk = list
             .filter((i) => itemKind(i) === "task")
-            .sort((a, b) => Number(!!a.completed_at) - Number(!!b.completed_at));
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id));
           const wk = dt.getDay() % 6 === 0;
           const k = draft[d] || "task";
           const empty = !pr.length && !ev.length && !tk.length;
+          const dayMode = modes?.get(d) ?? null;
+          const modeCls = modeCssClass(dayMode);
+          const modeLabel =
+            dayMode === "strategy" ? "Стратегия" : dayMode === "creative" ? "Творческий" : dayMode === "rest" ? "Выходной" : "";
 
           return (
             <section
               key={d}
-              className={`col${wk ? " wknd" : ""}${d === todayKey ? " today" : ""}${d < todayKey ? " past" : ""}${dropDay === d ? " drop" : ""}`}
+              className={`col${wk ? " wknd" : ""}${d === todayKey ? " today" : ""}${d < todayKey ? " past" : ""}${dropDay === d ? " drop" : ""}${modeCls ? ` mode-${modeCls}` : ""}`}
               data-day={d}
               onDrop={(e) => {
                 e.preventDefault();
-                void onDrop(d);
+                e.stopPropagation();
+                void onDrop(d, e);
               }}
             >
               <div
@@ -459,6 +500,7 @@ export function PlanScheduleBoard({
                 <span className="ch-m">
                   <span className="ch-w">{WD[dt.getDay()]}</span>
                   <span className="ch-mo">{MON[dt.getMonth()]}</span>
+                  {modeLabel ? <span className={`ch-mode ch-mode--${modeCls}`}>{modeLabel}</span> : null}
                 </span>
                 <span className="ch-sp" />
                 <button
@@ -510,15 +552,8 @@ export function PlanScheduleBoard({
                           setDragId(null);
                           setDropDay(null);
                         }}
-                        onDone={() =>
-                          run(
-                            () =>
-                              updatePlanItemApi(i.id, {
-                                completed_at: i.completed_at ? null : new Date().toISOString(),
-                              }),
-                            i.completed_at ? "Снято" : "Готово"
-                          )
-                        }
+                        onDone={() => void toggleDone(i)}
+                        onStatus={(status) => void patchStatus(i, status)}
                         onNext={() =>
                           run(
                             () => updatePlanItemApi(i.id, { plan_date: addDaysIso(d, 1), completed_at: null }),
@@ -575,15 +610,7 @@ export function PlanScheduleBoard({
                           setDragId(null);
                           setDropDay(null);
                         }}
-                        onDone={() =>
-                          run(
-                            () =>
-                              updatePlanItemApi(i.id, {
-                                completed_at: i.completed_at ? null : new Date().toISOString(),
-                              }),
-                            i.completed_at ? "Снято" : "Готово"
-                          )
-                        }
+                        onDone={() => void toggleDone(i)}
                         onNext={() =>
                           run(
                             () => updatePlanItemApi(i.id, { plan_date: addDaysIso(d, 1), completed_at: null }),
@@ -622,15 +649,8 @@ export function PlanScheduleBoard({
                           setDragId(null);
                           setDropDay(null);
                         }}
-                        onDone={() =>
-                          run(
-                            () =>
-                              updatePlanItemApi(i.id, {
-                                completed_at: i.completed_at ? null : new Date().toISOString(),
-                              }),
-                            i.completed_at ? "Снято" : "Готово"
-                          )
-                        }
+                        onDone={() => void toggleDone(i)}
+                        onStatus={(status) => void patchStatus(i, status)}
                         onNext={() =>
                           run(
                             () => updatePlanItemApi(i.id, { plan_date: addDaysIso(d, 1), completed_at: null }),
@@ -746,6 +766,7 @@ function ItemCard({
   onDragStart,
   onDragEnd,
   onDone,
+  onStatus,
   onNext,
   onDel,
   onTogglePrio,
@@ -761,18 +782,35 @@ function ItemCard({
   onDragStart: () => void;
   onDragEnd: () => void;
   onDone: () => void;
+  onStatus?: (status: PlanWorkStatus) => void;
   onNext: () => void;
   onDel: () => void;
   onTogglePrio?: () => void;
 }) {
+  const [statusOpen, setStatusOpen] = useState(false);
+  useEffect(() => {
+    if (!statusOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!(e.target instanceof Element) || e.target.closest(".st-wrap")) return;
+      setStatusOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [statusOpen]);
   const done = !!item.completed_at;
+  const status = normalizePlanWorkStatus(item.work_status, item.completed_at);
+  const statusUi = PLAN_WORK_STATUS_UI[status];
   const cls =
-    kind === "prio" ? `it pr${done ? " done" : ""}` : kind === "event" ? `it ev${done ? " done" : ""}` : `it tk${done ? " done" : ""}`;
+    kind === "prio"
+      ? `it pr${done ? " done" : ""}${status === "doing" && !done ? " st-doing" : ""}`
+      : kind === "event"
+        ? `it ev${done ? " done" : ""}`
+        : `it tk${done ? " done" : ""} st-${status}`;
 
   return (
     <div
       className={cls}
-      draggable={!editing}
+      draggable={!editing && !statusOpen}
       onDragStart={(e) => {
         onDragStart();
         e.dataTransfer.effectAllowed = "move";
@@ -786,7 +824,9 @@ function ItemCard({
     >
       {kind === "prio" ? (
         <div className="it-k">
-          <Icon name="star" className="svgi" />
+          <button type="button" className={`ck${done ? " on" : ""}`} aria-label="Готово" onClick={() => void onDone()}>
+            <Icon name="check" />
+          </button>
           Главное
         </div>
       ) : null}
@@ -800,54 +840,87 @@ function ItemCard({
           <Icon name="check" />
         </button>
       ) : null}
-      {editing ? (
-        <div
-          className="it-t"
-          contentEditable
-          suppressContentEditableWarning
-          dangerouslySetInnerHTML={{ __html: editText.replace(/</g, "&lt;") }}
-          ref={(el) => {
-            if (!el || el.dataset.focused) return;
-            el.dataset.focused = "1";
-            el.focus();
-            const r = document.createRange();
-            r.selectNodeContents(el);
-            r.collapse(false);
-            const sel = getSelection();
-            sel?.removeAllRanges();
-            sel?.addRange(r);
-          }}
-          onBlur={(e) => {
-            const cancel = e.currentTarget.dataset.cancel === "1";
-            const v = e.currentTarget.textContent?.trim() || "";
-            if (!cancel) onEditSave(v);
-            else onEditCancel();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              (e.target as HTMLElement).blur();
-            }
-            if (e.key === "Escape") {
-              (e.target as HTMLElement).dataset.cancel = "1";
-              (e.target as HTMLElement).blur();
-            }
-          }}
-        />
-      ) : (
-        <div className="it-t" onClick={onEditStart}>
-          {fmtText(item.title)}
-        </div>
-      )}
+      <div className="it-b">
+        {editing ? (
+          <div
+            className="it-t"
+            contentEditable
+            suppressContentEditableWarning
+            dangerouslySetInnerHTML={{ __html: editText.replace(/</g, "&lt;") }}
+            ref={(el) => {
+              if (!el || el.dataset.focused) return;
+              el.dataset.focused = "1";
+              el.focus();
+              const r = document.createRange();
+              r.selectNodeContents(el);
+              r.collapse(false);
+              const sel = getSelection();
+              sel?.removeAllRanges();
+              sel?.addRange(r);
+            }}
+            onBlur={(e) => {
+              const cancel = e.currentTarget.dataset.cancel === "1";
+              const v = e.currentTarget.textContent?.trim() || "";
+              if (!cancel) onEditSave(v);
+              else onEditCancel();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                (e.target as HTMLElement).blur();
+              }
+              if (e.key === "Escape") {
+                (e.target as HTMLElement).dataset.cancel = "1";
+                (e.target as HTMLElement).blur();
+              }
+            }}
+          />
+        ) : (
+          <div className="it-t" onClick={onEditStart}>
+            {fmtText(item.title)}
+          </div>
+        )}
+        {onStatus ? (
+          <div className={`st-wrap${statusOpen ? " open" : ""}`}>
+            <button
+              type="button"
+              className={`st st--${statusUi.css}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setStatusOpen((v) => !v);
+              }}
+            >
+              {statusUi.label}
+            </button>
+            {statusOpen ? (
+              <div className="st-m" onClick={(e) => e.stopPropagation()}>
+                {PLAN_WORK_STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={s === status ? "on" : ""}
+                    onClick={() => {
+                      setStatusOpen(false);
+                      onStatus(s);
+                    }}
+                  >
+                    {PLAN_WORK_STATUS_UI[s].label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
       <div className="it-a">
         {kind !== "event" ? (
           <button
             type="button"
             className="ib"
             title={kind === "prio" ? "Убрать из главного" : "Сделать главным"}
-            onClick={() => (kind === "prio" ? void onDone() : onTogglePrio && void onTogglePrio())}
+            onClick={() => onTogglePrio && void onTogglePrio()}
           >
-            {kind === "prio" ? <Icon name="check" /> : <Icon name="star" />}
+            {kind === "prio" ? <Icon name="star" /> : <Icon name="star" />}
           </button>
         ) : (
           <button type="button" className="ib" title="Отметить" onClick={() => void onDone()}>

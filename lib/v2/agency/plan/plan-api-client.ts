@@ -1,5 +1,5 @@
 import { fetchJson } from "@/lib/v2/client/fetch-json";
-import type { PlanDayMode, PlanItemKind, PlanPayload, PlanItemRow, PlanPriority } from "@/lib/v2/agency/plan/plan-types";
+import type { PlanDayMode, PlanItemKind, PlanPayload, PlanItemRow, PlanPriority, PlanWorkStatus } from "@/lib/v2/agency/plan/plan-types";
 import type { DispatchWorkStatus } from "@/lib/v2/agency/dispatch/dispatch-work-status";
 
 export type PlanFetchResult = {
@@ -52,6 +52,7 @@ export async function updatePlanItemApi(
     sort_order: number | null;
     priority: PlanPriority | null;
     completed_at: string | null;
+    work_status: PlanWorkStatus | null;
   }>
 ) {
   const data = await fetchJson<{ item: PlanItemRow }>(`/api/v2/agency/plan/items/${id}`, {
