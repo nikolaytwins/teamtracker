@@ -74,7 +74,8 @@ export type SeasonTaskEdit = {
   text: string;
   href?: string;
   note?: string;
-  priority?: HomeSeasonPriority;
+  /** null — явно сброшенный приоритет (чтобы JSON не потерял ключ). */
+  priority?: HomeSeasonPriority | null;
 };
 
 export type SeasonStorageState = {
@@ -152,7 +153,7 @@ export function buildSeasonMonths(
       text: edit?.text ?? task.text,
       href: edit ? edit.href?.trim() || undefined : task.href,
       links: task.links,
-      priority: "priority" in (edit ?? {}) ? edit!.priority : task.priority,
+      priority: edit && "priority" in edit ? edit.priority ?? undefined : task.priority,
       note: edit && "note" in edit ? edit.note?.trim() || undefined : task.note,
       items: task.items,
       sections: task.sections,
@@ -172,7 +173,7 @@ export function buildSeasonMonths(
       text: custom.text,
       href: custom.href,
       note: custom.note,
-      priority: custom.priority,
+      priority: custom.priority ?? undefined,
       done: Boolean(storage.taskDone[custom.id]),
     });
     byMonth.set(monthId, list);
@@ -264,9 +265,11 @@ function setTaskPriority(
   seed: HomeMonth[]
 ): void {
   if (taskId.startsWith("custom-")) {
-    storage.customTasks = (storage.customTasks ?? []).map((task) =>
-      task.id === taskId ? { ...task, priority } : task
-    );
+    storage.customTasks = (storage.customTasks ?? []).map((task) => {
+      if (task.id !== taskId) return task;
+      const { priority: _drop, ...rest } = task;
+      return priority ? { ...rest, priority } : rest;
+    });
     return;
   }
 
@@ -277,7 +280,7 @@ function setTaskPriority(
     text: existing?.text ?? seedTask.text,
     ...(existing?.href ? { href: existing.href } : seedTask.href ? { href: seedTask.href } : {}),
     ...(existing && "note" in existing ? { note: existing.note } : {}),
-    priority,
+    priority: priority ?? null,
   };
 }
 
@@ -307,17 +310,49 @@ function reorderForPriority(
   storage.taskOrder[monthId] = order;
 }
 
+export function placeSeasonTask(
+  taskId: string,
+  monthId: string,
+  priority: HomeSeasonPriority | undefined,
+  beforeId: string | null,
+  seed: HomeMonth[]
+): SeasonStorageState {
+  const storage = readSeasonStorage();
+  storage.taskMonth[taskId] = monthId;
+  setTaskPriority(storage, taskId, priority, seed);
+
+  const built = buildSeasonMonths(seed, storage);
+  const month = built.find((m) => m.id === monthId);
+  if (!month) {
+    writeSeasonStorage(storage);
+    return storage;
+  }
+
+  const rest = month.tasks.filter((t) => t.id !== taskId);
+  const buckets = {
+    high: rest.filter((t) => t.priority === "high").map((t) => t.id),
+    medium: rest.filter((t) => t.priority === "medium").map((t) => t.id),
+    low: rest.filter((t) => t.priority === "low").map((t) => t.id),
+    other: rest.filter((t) => !t.priority).map((t) => t.id),
+  };
+  const key = priority ?? "other";
+  const list = buckets[key];
+  const idx = beforeId ? list.indexOf(beforeId) : -1;
+  if (idx >= 0) list.splice(idx, 0, taskId);
+  else list.push(taskId);
+
+  storage.taskOrder[monthId] = [...buckets.high, ...buckets.medium, ...buckets.low, ...buckets.other];
+  writeSeasonStorage(storage);
+  return storage;
+}
+
 export function moveSeasonTaskToPriority(
   taskId: string,
   monthId: string,
   priority: HomeSeasonPriority | undefined,
   seed: HomeMonth[]
 ): SeasonStorageState {
-  const storage = readSeasonStorage();
-  setTaskPriority(storage, taskId, priority, seed);
-  reorderForPriority(storage, monthId, taskId, priority, seed);
-  writeSeasonStorage(storage);
-  return storage;
+  return placeSeasonTask(taskId, monthId, priority, null, seed);
 }
 
 export function addSeasonTask(
@@ -381,7 +416,7 @@ export function updateSeasonTask(
       text,
       ...(href ? { href } : existing?.href ? { href: existing.href } : {}),
       ...(hasNote ? { note: note || undefined } : existing?.note !== undefined ? { note: existing.note } : {}),
-      ...(hasPriority ? { priority: input.priority } : existing?.priority !== undefined ? { priority: existing.priority } : {}),
+      ...(hasPriority ? { priority: input.priority ?? null } : existing && "priority" in existing ? { priority: existing.priority } : {}),
     };
     const seedMonth = seed.find((m) => m.tasks.some((t) => t.id === taskId));
     const monthId = storage.taskMonth[taskId] ?? seedMonth?.id;

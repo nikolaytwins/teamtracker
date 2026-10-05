@@ -9,8 +9,8 @@ import {
   deleteSeasonTask,
   encodeSeasonTaskDrag,
   moveSeasonTaskToMonth,
-  moveSeasonTaskToPriority,
   parseSeasonTaskDrag,
+  placeSeasonTask,
   readSeasonStorage,
   SEASON_TASK_MIME,
   toggleSeasonTaskDone,
@@ -180,10 +180,14 @@ function SeasonTaskCard({
   onToggleDone,
   onEdit,
   onDelete,
+  onPriorityChange,
   onDragStart,
   onDragEnd,
+  onDragOverCard,
+  onDropOnCard,
   dragDisabled,
   isDragging,
+  dropBefore,
 }: {
   task: TaskView;
   expanded: boolean;
@@ -191,11 +195,16 @@ function SeasonTaskCard({
   onToggleDone: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onPriorityChange: (priority?: HomeSeasonPriority) => void;
   onDragStart: (e: DragEvent) => void;
   onDragEnd: () => void;
+  onDragOverCard: () => void;
+  onDropOnCard: (e: DragEvent) => void;
   dragDisabled: boolean;
   isDragging: boolean;
+  dropBefore: boolean;
 }) {
+  const [prioOpen, setPrioOpen] = useState(false);
   const hasDetails =
     Boolean(task.note) ||
     Boolean(task.items?.length) ||
@@ -203,13 +212,30 @@ function SeasonTaskCard({
     Boolean(task.exclude?.length) ||
     Boolean(task.doneWhen);
   const priorityMeta = PRIORITY_GROUPS.find((g) => g.id === task.priority);
+  const prioLabel = priorityMeta
+    ? priorityMeta.id === "high"
+      ? "Высокий"
+      : priorityMeta.id === "medium"
+        ? "Средний"
+        : "Желательно"
+    : "Приоритет";
+
+  useEffect(() => {
+    if (!prioOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!(e.target instanceof Element) || e.target.closest(".prio-pop")) return;
+      setPrioOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [prioOpen]);
 
   return (
     <div
       className={`group relative select-none ${dragDisabled ? "" : "cursor-grab active:cursor-grabbing"} ${
         isDragging ? "opacity-40" : ""
       }`}
-      draggable={!dragDisabled}
+      draggable={!dragDisabled && !prioOpen}
       onDragStart={(e) => {
         if ((e.target as HTMLElement).closest(".no-drag")) {
           e.preventDefault();
@@ -225,7 +251,24 @@ function SeasonTaskCard({
         liveSeasonDragId = null;
         onDragEnd();
       }}
+      onDragOver={(e) => {
+        if (isDragging || dragDisabled) return;
+        if (!isSeasonTaskDrag(e, liveSeasonDragId)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+        onDragOverCard();
+      }}
+      onDrop={(e) => {
+        if (isDragging || dragDisabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDropOnCard(e);
+      }}
     >
+      {dropBefore ? (
+        <div className="absolute -top-1.5 left-3 right-3 z-10 h-1 rounded-full bg-[var(--v2-brand-500)]" aria-hidden />
+      ) : null}
       <div
         className={`overflow-hidden rounded-2xl transition ${
           task.done
@@ -250,7 +293,7 @@ function SeasonTaskCard({
             <div
               role={hasDetails ? "button" : undefined}
               tabIndex={hasDetails ? 0 : undefined}
-              onClick={hasDetails ? onToggleExpand : onToggleDone}
+              onClick={hasDetails ? onToggleExpand : undefined}
               onKeyDown={
                 hasDetails
                   ? (e) => {
@@ -265,14 +308,64 @@ function SeasonTaskCard({
                 task.done ? "text-white" : "text-[var(--v2-ink-900)]"
               }`}
             >
-              {priorityMeta && !task.done ? (
+              <span className="min-w-0 flex-1 whitespace-pre-wrap">{task.text}</span>
+            </div>
+            <div className="prio-pop relative mt-2">
+              <button
+                type="button"
+                className={`no-drag v2-tight inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11.5px] font-semibold transition ${
+                  task.done
+                    ? "bg-white/15 text-white hover:bg-white/25"
+                    : priorityMeta
+                      ? "bg-white ring-1 ring-[var(--v2-ink-200)] text-[var(--v2-ink-700)] hover:ring-[var(--v2-ink-300)]"
+                      : "bg-transparent text-[var(--v2-ink-400)] ring-1 ring-dashed ring-[var(--v2-ink-300)] hover:text-[var(--v2-ink-700)]"
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPrioOpen((v) => !v);
+                }}
+              >
                 <span
-                  className="mt-[7px] h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: priorityMeta.dot }}
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: priorityMeta?.dot ?? "#A1A1AA" }}
                   aria-hidden
                 />
+                {prioLabel}
+              </button>
+              {prioOpen ? (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-20 flex min-w-[200px] flex-col gap-0.5 rounded-2xl bg-white p-1.5 shadow-[0_0_0_1px_rgba(16,24,40,.06),0_16px_32px_-14px_rgba(16,24,40,.32)]">
+                  {PRIORITY_GROUPS.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      className={`no-drag flex items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-medium text-[var(--v2-ink-800)] hover:bg-[var(--v2-ink-50)] ${
+                        task.priority === g.id ? "bg-[var(--v2-brand-50)] font-semibold text-[var(--v2-brand-700)]" : ""
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPrioOpen(false);
+                        onPriorityChange(g.id);
+                      }}
+                    >
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: g.dot }} aria-hidden />
+                      {g.id === "high" ? "Высокий" : g.id === "medium" ? "Средний" : "Желательно"}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={`no-drag rounded-xl px-3 py-2 text-left text-[13px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)] ${
+                      !task.priority ? "bg-[var(--v2-ink-50)] font-semibold text-[var(--v2-ink-800)]" : ""
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPrioOpen(false);
+                      onPriorityChange(undefined);
+                    }}
+                  >
+                    Без приоритета
+                  </button>
+                </div>
               ) : null}
-              <span className="min-w-0 flex-1 whitespace-pre-wrap">{task.text}</span>
             </div>
           </div>
           {hasDetails ? (
@@ -541,8 +634,13 @@ export function HomeSeasonBand() {
     refreshStorage(updateSeasonTask(taskId, input, HOME_MONTHS));
   };
 
-  const onDropToPriority = (monthId: string, taskId: string, priority: HomeSeasonPriority | undefined) => {
-    refreshStorage(moveSeasonTaskToPriority(taskId, monthId, priority, HOME_MONTHS));
+  const onDropToPriority = (
+    monthId: string,
+    taskId: string,
+    priority: HomeSeasonPriority | undefined,
+    beforeId: string | null = null
+  ) => {
+    refreshStorage(placeSeasonTask(taskId, monthId, priority, beforeId, HOME_MONTHS));
     setDragTaskId(null);
     setDropPriorityKey(null);
     liveSeasonDragId = null;
@@ -572,7 +670,7 @@ export function HomeSeasonBand() {
           Расписание сезона
         </h2>
         <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">
-          Клик — сделано. Перетащите карточку на другой месяц сверху.
+          Клик по галочке — сделано. Приоритет на карточке или перетащите в другую группу / на другой месяц.
         </span>
         <Link
           href={appPath(HOME_LINKS.strategy)}
@@ -724,7 +822,12 @@ function MonthPanel({
     taskId: string,
     input: { text: string; href?: string; note?: string; priority?: HomeSeasonPriority }
   ) => void;
-  onDropToPriority: (monthId: string, taskId: string, priority: HomeSeasonPriority | undefined) => void;
+  onDropToPriority: (
+    monthId: string,
+    taskId: string,
+    priority: HomeSeasonPriority | undefined,
+    beforeId?: string | null
+  ) => void;
 }) {
   const done = month.tasks.filter((t) => t.done).length;
   const [adding, setAdding] = useState(false);
@@ -734,21 +837,20 @@ function MonthPanel({
   const [draftNote, setDraftNote] = useState("");
   const [draftHref, setDraftHref] = useState("");
   const [draftPriority, setDraftPriority] = useState<HomeSeasonPriority | undefined>(undefined);
+  const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
 
-  const usePriorityGroups = month.id === "sep";
   const taskGroups = useMemo((): PriorityTaskGroup[] => {
-    if (!usePriorityGroups) return [{ key: "all", label: "", tasks: month.tasks }];
     const grouped = groupTasksByPriority(month.tasks);
-    if (!dragTaskId) return grouped.filter((g) => g.tasks.length > 0);
     const byKey = new Map(grouped.map((g) => [g.key, g]));
     const result: PriorityTaskGroup[] = PRIORITY_GROUPS.map(
       (g) => byKey.get(g.id) ?? { key: g.id, label: g.label, emoji: g.emoji, tint: g.tint, bg: g.bg, tasks: [] }
     );
-    if (!result.some((g) => g.key === "other")) {
-      result.push(byKey.get("other") ?? { key: "other", label: "Прочее", tasks: [] });
+    const other = byKey.get("other");
+    if (other?.tasks.length || dragTaskId) {
+      result.push(other ?? { key: "other", label: "Прочее", tasks: [] });
     }
     return result;
-  }, [month.tasks, usePriorityGroups, dragTaskId]);
+  }, [month.tasks, dragTaskId]);
 
   function resetDraft() {
     setAdding(false);
@@ -782,6 +884,10 @@ function MonthPanel({
     setDraftPriority(task.priority);
   }
 
+  useEffect(() => {
+    if (!dragTaskId) setDropBeforeId(null);
+  }, [dragTaskId]);
+
   function submitAdd() {
     const text = draftText.trim();
     if (!text) return;
@@ -789,7 +895,7 @@ function MonthPanel({
       text,
       note: draftNote.trim() || undefined,
       href: draftHref.trim() || undefined,
-      ...(usePriorityGroups ? { priority: draftPriority } : {}),
+      priority: draftPriority,
     });
     resetDraft();
   }
@@ -802,7 +908,7 @@ function MonthPanel({
       text,
       note: draftNote.trim() || undefined,
       href: draftHref.trim() || undefined,
-      ...(usePriorityGroups ? { priority: draftPriority } : {}),
+      priority: draftPriority,
     });
     resetDraft();
   }
@@ -857,28 +963,30 @@ function MonthPanel({
           <div
             key={group.key}
             onDragOver={(e) => {
-              if (!isSeasonTaskDrag(e, dragTaskId) || !usePriorityGroups) return;
+              if (!isSeasonTaskDrag(e, dragTaskId)) return;
               e.preventDefault();
               e.stopPropagation();
+              setDropBeforeId(null);
               onDropPriorityKeyChange(group.key);
             }}
             onDragLeave={(e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                 onDropPriorityKeyChange(null);
+                setDropBeforeId(null);
               }
             }}
             onDrop={(e) => {
-              if (!usePriorityGroups) return;
               const id = readSeasonDragId(e) || dragTaskId;
               if (!id) return;
               e.preventDefault();
               e.stopPropagation();
-              onDropToPriority(month.id, id, dropPriority);
+              onDropToPriority(month.id, id, dropPriority, null);
+              setDropBeforeId(null);
               onDragEnd();
             }}
             className={`rounded-2xl transition ${
               isDropTarget ? "bg-[var(--v2-brand-50)] ring-2 ring-[var(--v2-brand-300)] ring-offset-2" : ""
-            } ${dragTaskId && usePriorityGroups ? "min-h-[88px]" : ""}`}
+            } ${dragTaskId ? "min-h-[88px]" : ""}`}
           >
             {group.label ? (
               <div className="mb-3 flex items-center gap-2 px-0.5">
@@ -900,9 +1008,10 @@ function MonthPanel({
             <div
               className="grid grid-cols-1 gap-3 p-0.5 md:grid-cols-2"
               onDragOver={(e) => {
-                if (!isSeasonTaskDrag(e, dragTaskId) || !usePriorityGroups) return;
+                if (!isSeasonTaskDrag(e, dragTaskId)) return;
                 e.preventDefault();
                 e.stopPropagation();
+                setDropBeforeId(null);
                 onDropPriorityKeyChange(group.key);
               }}
             >
@@ -915,7 +1024,7 @@ function MonthPanel({
                       draftNote={draftNote}
                       draftHref={draftHref}
                       draftPriority={draftPriority}
-                      showPriority={usePriorityGroups}
+                      showPriority
                       onTextChange={setDraftText}
                       onNoteChange={setDraftNote}
                       onHrefChange={setDraftHref}
@@ -934,23 +1043,49 @@ function MonthPanel({
                       onToggleDone={() => onToggle(task.id, !task.done)}
                       onEdit={() => startEdit(task)}
                       onDelete={() => onDelete(task.id)}
+                      onPriorityChange={(priority) => onDropToPriority(month.id, task.id, priority, null)}
                       onDragStart={() => {
                         liveSeasonDragId = task.id;
                         window.requestAnimationFrame(() => onDragStart(task.id));
                       }}
-                      onDragEnd={onDragEnd}
+                      onDragEnd={() => {
+                        setDropBeforeId(null);
+                        onDragEnd();
+                      }}
+                      onDragOverCard={() => {
+                        onDropPriorityKeyChange(group.key);
+                        setDropBeforeId((id) => (id === task.id ? id : task.id));
+                      }}
+                      onDropOnCard={(e) => {
+                        const id = readSeasonDragId(e) || dragTaskId;
+                        if (!id || id === task.id) return;
+                        onDropToPriority(month.id, id, dropPriority, task.id);
+                        setDropBeforeId(null);
+                        onDragEnd();
+                      }}
                       dragDisabled={dragDisabled}
                       isDragging={dragTaskId === task.id}
+                      dropBefore={dropBeforeId === task.id && dragTaskId !== task.id}
                     />
                   )
                 )
-              ) : dragTaskId && usePriorityGroups ? (
-                <div className="flex min-h-[72px] items-center justify-center rounded-2xl border-2 border-dashed border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)]/40 px-4 py-6 text-center">
-                  <span className="v2-tight text-[13px] font-medium text-[var(--v2-brand-700)]">
-                    Перетащите карточку сюда
+              ) : (
+                <div
+                  className={`flex min-h-[72px] items-center justify-center rounded-2xl border-2 border-dashed px-4 py-6 text-center md:col-span-2 ${
+                    isDropTarget
+                      ? "border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)]/70"
+                      : "border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/60"
+                  }`}
+                >
+                  <span
+                    className={`v2-tight text-[13px] font-medium ${
+                      isDropTarget ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-400)]"
+                    }`}
+                  >
+                    {dragTaskId ? "Отпустите, чтобы поставить сюда" : "Перетащите карточку сюда"}
                   </span>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
           );
@@ -962,7 +1097,7 @@ function MonthPanel({
             draftNote={draftNote}
             draftHref={draftHref}
             draftPriority={draftPriority}
-            showPriority={usePriorityGroups}
+            showPriority
             onTextChange={setDraftText}
             onNoteChange={setDraftNote}
             onHrefChange={setDraftHref}
