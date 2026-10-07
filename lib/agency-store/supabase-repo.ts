@@ -31,6 +31,20 @@ function visitAggregatesFromRows(rows: Array<{ visited_at: string }>) {
 
 export class SupabaseAgencyRepo implements AgencyRepo {
   private sb = createSupabaseServiceClient();
+  /** Optional detail columns that may lag behind code until migrations are applied. */
+  private detailOptionalColumns: Set<string> | null = null;
+
+  private async getDetailOptionalColumns(): Promise<Set<string>> {
+    if (this.detailOptionalColumns) return this.detailOptionalColumns;
+    const probes = ["timer_previous_seconds", "total_override_rub"] as const;
+    const available = new Set<string>();
+    for (const col of probes) {
+      const { error } = await this.sb.from("agency_project_detail").select(col).limit(1);
+      if (!error) available.add(col);
+    }
+    this.detailOptionalColumns = available;
+    return available;
+  }
 
   async listProjectsWithTotalExpenses(): Promise<Record<string, unknown>[]> {
     const { data: projects, error: e1 } = await this.sb
@@ -783,6 +797,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       totalOverrideRub?: number | null;
     }
   ): Promise<Record<string, unknown> | undefined> {
+    const optional = await this.getDetailOptionalColumns();
     const patch: Record<string, unknown> = {
       title,
       quantity,
@@ -799,10 +814,13 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     if (extras && "timerStartedAt" in extras) {
       patch.timer_started_at = extras.timerStartedAt;
     }
-    if (typeof extras?.timerPreviousSeconds === "number") {
+    if (
+      typeof extras?.timerPreviousSeconds === "number" &&
+      optional.has("timer_previous_seconds")
+    ) {
       patch.timer_previous_seconds = Math.max(0, Math.floor(extras.timerPreviousSeconds));
     }
-    if (extras && "totalOverrideRub" in extras) {
+    if (extras && "totalOverrideRub" in extras && optional.has("total_override_rub")) {
       patch.total_override_rub = extras.totalOverrideRub;
     }
     const { error } = await this.sb.from("agency_project_detail").update(patch).eq("id", id);
