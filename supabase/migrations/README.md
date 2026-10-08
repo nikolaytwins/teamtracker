@@ -107,8 +107,9 @@
 | 086 | `086_agency_detail_total_override.sql` | Детализация: total_override_rub — ручная сумма строки важнее формулы |
 | 087 | `087_personal_todo_inbox_category.sql` | План и задачи: категории канбана + inbox_category у личных задач |
 | 088 | `088_agency_plan_item_work_status.sql` | План: work_status (todo/doing/done) у слотов дня |
+| 089 | `089_v2_personal_hypotheses.sql` | Банк гипотез: карточки, приоритет, журнал проверок |
 
-**Следующий свободный номер:** `089`
+**Следующий свободный номер:** `090`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

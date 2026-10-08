@@ -81,6 +81,7 @@ const FOOTER_NAV: NavItem[] = [
 ];
 
 const PERSONAL_NAV: NavItem[] = [
+  { href: "/v2/personal/hypotheses", label: "Гипотезы", icon: "lab" },
   // Скрыто: Идеи (/v2/personal/ideas — вкладка в «Идеи и задачи»)
   // Скрыто: Дашборд (/v2/personal/dashboard — YouTube неактуален)
   { href: "/v2/personal/important", label: "Важное 2.0", icon: "starFill" },

@@ -117,6 +117,9 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
   const inIdeasTasks = pathname.startsWith(appPath("/v2/personal/ideas-tasks"));
   const inImportant = pathname.startsWith(appPath("/v2/personal/important"));
   const inMoscow = pathname.startsWith(appPath("/v2/personal/moscow"));
+  const inHypotheses =
+    pathname.startsWith("/v2/personal/hypotheses") ||
+    pathname.startsWith(appPath("/v2/personal/hypotheses"));
   if (
     inTasks ||
     inCalendar ||
@@ -125,7 +128,8 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     inSport ||
     inIdeasTasks ||
     inImportant ||
-    inMoscow
+    inMoscow ||
+    inHypotheses
   ) {
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }

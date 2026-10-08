@@ -384,6 +384,18 @@ export const V2Icons = {
       <path d="m5 12.5 5 5 9-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  lab: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path
+        d="M9 3h6M10 3v5.2L5.8 17.2A3.2 3.2 0 0 0 8.7 21h6.6a3.2 3.2 0 0 0 2.9-3.8L14 8.2V3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M8.2 14h7.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  ),
 };
 
 export const PRIORITY_META = {
