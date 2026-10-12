@@ -395,7 +395,7 @@ export const LIFE_SX_DOC: LifeMapDoc = {
   eyebrow: "Карта жизни · сексуальность",
   title: "Сексуальность",
   lead: "Я становлюсь уверенным, чувственным, любящим мужчиной.",
-  hero: "/home/scene-attraction.webp",
+  hero: "/life/hero-sexuality.jpg",
   privateText: true,
   chips: [
     { n: "01", t: "С Лерой" },
