@@ -1,42 +1,36 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyHypothesisMove, parseQuickHypothesis, type HypothesisPriority } from "./hypotheses-meta";
+import { applyStageChange, type HypothesisStage } from "./hypotheses-meta";
 
-function card(id: string, priority: HypothesisPriority, sort_order: number) {
-  return { id, priority, sort_order };
+function card(id: string, stage: HypothesisStage, sprint_id: string | null = null) {
+  return { id, stage, sprint_id };
 }
 
-test("quick line splits direction and hypothesis on a dash", () => {
-  assert.deepEqual(parseQuickHypothesis("  Qmagic — дизайнеры хотят один код  "), {
-    direction: "Qmagic",
-    title: "дизайнеры хотят один код",
-  });
-  assert.deepEqual(parseQuickHypothesis("Просто формулировка без направления"), {
-    direction: "",
-    title: "Просто формулировка без направления",
-  });
-  assert.equal(parseQuickHypothesis("   "), null);
-  const plain = parseQuickHypothesis("AI-native продукт без разделителя");
-  assert.equal(plain?.direction, "");
+test("blocks a fourth active hypothesis in the same sprint", () => {
+  const items = [card("a", "active", "s1"), card("b", "active", "s1"), card("c", "active", "s1"), card("d", "queue")];
+  const result = applyStageChange(items, "d", "active", "s1");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.error, /3/);
 });
 
-test("reorder inside a priority and across priorities", () => {
-  const items = [card("a", "medium", 0), card("b", "medium", 1), card("c", "medium", 2)];
-  const swapped = applyHypothesisMove(items, "c", "a");
-  assert.deepEqual(
-    swapped?.map((item) => item.id),
-    ["c", "a", "b"],
-  );
-  assert.deepEqual(
-    applyHypothesisMove(items, "b", "c")?.map((item) => item.id),
-    ["a", "c", "b"],
-  );
-  assert.equal(applyHypothesisMove(items, "b", "b"), null);
+test("keeps an already active card inside the limit", () => {
+  const items = [card("a", "active", "s1"), card("b", "active", "s1"), card("c", "active", "s1")];
+  const result = applyStageChange(items, "a", "active", "s1");
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.item.sprint_id, "s1");
+});
 
-  const lifted = applyHypothesisMove(items, "b", "prio:high");
-  assert.equal(lifted?.find((item) => item.id === "b")?.priority, "high");
-  assert.deepEqual(
-    lifted?.filter((item) => item.priority === "medium").map((item) => item.id),
-    ["a", "c"],
-  );
+test("clears the sprint when a card leaves the board", () => {
+  const result = applyStageChange([card("a", "active", "s1")], "a", "queue", "s1");
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.item.stage, "queue");
+    assert.equal(result.item.sprint_id, null);
+  }
+});
+
+test("done keeps the sprint the card was checked in", () => {
+  const result = applyStageChange([card("a", "active", "s0")], "a", "done", "s1");
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.item.sprint_id, "s0");
 });

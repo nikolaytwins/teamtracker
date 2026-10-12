@@ -17,7 +17,7 @@ export function hypothesesFail(error: unknown, fallback: string) {
   console.error(fallback, error);
   if (code === "42P01" || code === "PGRST205" || /does not exist|schema cache|v2_personal_hypothes/i.test(message)) {
     return NextResponse.json(
-      { error: "Банк гипотез ещё не создан в базе. Примени миграцию 089_v2_personal_hypotheses.sql." },
+      { error: "Банк гипотез ещё не создан в базе. Примени миграцию 089_v2_personal_hypotheses.sql в Supabase." },
       { status: 500 },
     );
   }

@@ -1,681 +1,50 @@
 "use client";
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
+import { appPath } from "@/lib/api-url";
 import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  pointerWithin,
-  rectIntersection,
-  useDraggable,
-  useDroppable,
-  useSensor,
-  useSensors,
-  type CollisionDetection,
-  type DragEndEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core";
-import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
-import {
-  HYPOTHESIS_OUTCOME_META,
-  HYPOTHESIS_OUTCOMES,
-  HYPOTHESIS_PRIORITIES,
-  HYPOTHESIS_STATUS_META,
-  HYPOTHESIS_STATUSES,
-  applyHypothesisMove,
-  parseQuickHypothesis,
-  priorityLaneId,
+  STAGE_LABEL,
+  VERDICT_META,
+  WIP_LIMIT,
+  currentSprintId,
+  projectColors,
   type Hypothesis,
-  type HypothesisNote,
-  type HypothesisOutcome,
-  type HypothesisPriority,
-  type HypothesisStatus,
-  type HypothesisWithNotes,
+  type HypothesisProject,
+  type HypothesisSprint,
+  type HypothesisStage,
+  type HypothesisVerdict,
 } from "@/lib/v2/personal/hypotheses-meta";
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import type { HypothesesBoard } from "@/lib/v2/personal/personal-hypotheses-repo";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-const collision: CollisionDetection = (args) => {
-  const hits = pointerWithin(args);
-  const card = hits.find((hit) => !String(hit.id).startsWith("prio:"));
-  if (card) return [card];
-  if (hits.length) return hits;
-  return rectIntersection(args);
+const STAGES: HypothesisStage[] = ["backlog", "queue", "active", "done"];
+const STAGE_HINT: Record<HypothesisStage, string> = {
+  backlog: "все спринты",
+  queue: "следующие к проверке",
+  active: "",
+  done: "",
 };
 
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function formatDay(iso: string) {
-  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(y, m - 1, d).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-}
-
-function sortNotes(notes: HypothesisNote[]) {
-  return [...notes].sort((a, b) => {
-    if (a.happened_on !== b.happened_on) return a.happened_on < b.happened_on ? 1 : -1;
-    return a.created_at < b.created_at ? 1 : -1;
-  });
-}
-
-function outcomeCounts(notes: HypothesisNote[]) {
-  const counts: Record<HypothesisOutcome, number> = { worked: 0, missed: 0, mixed: 0, note: 0 };
-  for (const note of notes) counts[note.outcome] += 1;
-  return counts;
-}
-
-function Grip() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
-      <circle cx="9" cy="7" r="1.15" />
-      <circle cx="15" cy="7" r="1.15" />
-      <circle cx="9" cy="12" r="1.15" />
-      <circle cx="15" cy="12" r="1.15" />
-      <circle cx="9" cy="17" r="1.15" />
-      <circle cx="15" cy="17" r="1.15" />
-    </svg>
-  );
-}
-
-function StatusPill({ status }: { status: HypothesisStatus }) {
-  const meta = HYPOTHESIS_STATUS_META[status];
-  return (
-    <span
-      className="v2-tight inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-[11.5px] font-semibold"
-      style={{ background: meta.soft, color: meta.ink }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.dot }} />
-      {meta.label}
-    </span>
-  );
-}
-
-function HypothesisGhost({ hypothesis }: { hypothesis: HypothesisWithNotes }) {
-  const priority = PRIORITY_META[hypothesis.priority];
-  return (
-    <div
-      className="rounded-2xl bg-white p-4 shadow-[var(--v2-shadow-pop)]"
-      style={{ borderLeft: `3px solid ${priority.dot}` }}
-    >
-      <div className="v2-tight text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-        {hypothesis.direction || "Без направления"}
-      </div>
-      <h3 className="v2-tight mt-1.5 line-clamp-3 text-[17px] font-semibold leading-[1.35] text-[var(--v2-ink-900)]">
-        {hypothesis.title}
-      </h3>
-    </div>
-  );
-}
-
-function HypothesisCard({
-  hypothesis,
-  canReorder,
-  flashing,
-  overlay,
-  onOpen,
-  suppressRef,
-}: {
-  hypothesis: HypothesisWithNotes;
-  canReorder: boolean;
-  flashing?: boolean;
-  overlay?: boolean;
-  onOpen?: () => void;
-  suppressRef?: MutableRefObject<boolean>;
-}) {
-  const draggable = useDraggable({ id: hypothesis.id, disabled: !canReorder || overlay });
-  const droppable = useDroppable({ id: hypothesis.id, disabled: !canReorder || overlay });
-  const setRef = (node: HTMLDivElement | null) => {
-    draggable.setNodeRef(node);
-    droppable.setNodeRef(node);
-  };
-  const counts = outcomeCounts(hypothesis.notes);
-  const hasJournal = hypothesis.notes.length > 0;
-  const priority = PRIORITY_META[hypothesis.priority];
-
-  return (
-    <div
-      ref={overlay ? undefined : setRef}
-      data-hyp={hypothesis.id}
-      tabIndex={0}
-      onClick={() => {
-        if (suppressRef?.current) return;
-        onOpen?.();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen?.();
-        }
-      }}
-      className={`rounded-2xl bg-white text-left shadow-[var(--v2-shadow-card)] transition ${
-        overlay
-          ? "shadow-[var(--v2-shadow-pop)]"
-          : "cursor-pointer hover:shadow-[var(--v2-shadow-cardHv)]"
-      } ${droppable.isOver && !draggable.isDragging ? "ring-2 ring-[var(--v2-brand-400)]" : ""} ${
-        flashing ? "ring-2 ring-[var(--v2-brand-400)]" : ""
-      } ${draggable.isDragging ? "opacity-40" : ""}`}
-      style={{ borderLeft: `3px solid ${priority.dot}` }}
-    >
-      <div className="flex gap-1 p-4 pr-5">
-        {canReorder && !overlay ? (
-          <div
-            className="mt-0.5 inline-flex h-8 w-7 shrink-0 cursor-grab items-center justify-center rounded-lg text-[var(--v2-ink-300)] touch-none hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-600)] active:cursor-grabbing"
-            aria-label="Перетащить"
-            {...draggable.attributes}
-            {...draggable.listeners}
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => event.stopPropagation()}
-          >
-            <Grip />
-          </div>
-        ) : (
-          <span className="w-1 shrink-0" />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="v2-tight text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-              {hypothesis.direction || "Без направления"}
-            </div>
-            <StatusPill status={hypothesis.status} />
-          </div>
-          <h3
-            className="v2-tight mt-1.5 text-[17px] font-semibold leading-[1.35] text-[var(--v2-ink-900)]"
-            style={{ textWrap: "pretty" }}
-          >
-            {hypothesis.title}
-          </h3>
-          {hypothesis.check_text ? (
-            <p className="v2-tight mt-3 line-clamp-2 text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">
-              <span className="font-semibold text-[var(--v2-ink-800)]">Проверить. </span>
-              {hypothesis.check_text}
-            </p>
-          ) : null}
-          {hypothesis.success_text ? (
-            <p className="v2-tight mt-1.5 line-clamp-2 text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">
-              <span className="font-semibold text-[var(--v2-ink-800)]">Успех. </span>
-              {hypothesis.success_text}
-            </p>
-          ) : null}
-          <div className="v2-tight mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--v2-ink-500)]">
-            {hasJournal ? (
-              <>
-                {counts.worked ? <span style={{ color: HYPOTHESIS_OUTCOME_META.worked.ink }}>Зашло {counts.worked}</span> : null}
-                {counts.missed ? <span style={{ color: HYPOTHESIS_OUTCOME_META.missed.ink }}>Не зашло {counts.missed}</span> : null}
-                {counts.mixed ? <span style={{ color: HYPOTHESIS_OUTCOME_META.mixed.ink }}>Смешанно {counts.mixed}</span> : null}
-                {counts.note ? <span>Заметок {counts.note}</span> : null}
-              </>
-            ) : (
-              <span>Пока без проверок</span>
-            )}
-            <span className="ml-auto text-[var(--v2-ink-400)]">Открыть</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PriorityLane({
-  priority,
-  hypotheses,
-  canReorder,
-  flashId,
-  onOpen,
-  suppressRef,
-}: {
-  priority: HypothesisPriority;
-  hypotheses: HypothesisWithNotes[];
-  canReorder: boolean;
-  flashId: string | null;
-  onOpen: (id: string) => void;
-  suppressRef: MutableRefObject<boolean>;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: priorityLaneId(priority), disabled: !canReorder });
-  const meta = PRIORITY_META[priority];
-  if (!hypotheses.length && !canReorder) return null;
-
-  return (
-    <section
-      ref={setNodeRef}
-      className={`rounded-3xl px-1.5 py-2 ${isOver ? "bg-[var(--v2-brand-50)]/80" : ""}`}
-    >
-      <div className="mb-2 flex items-center gap-2 px-2">
-        <span className="h-2 w-2 rounded-full" style={{ background: meta.dot }} />
-        <h2 className="v2-tight text-[13px] font-semibold text-[var(--v2-ink-800)]">{meta.label} приоритет</h2>
-        <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{hypotheses.length}</span>
-      </div>
-      {hypotheses.length ? (
-        <div className="flex flex-col gap-2.5">
-          {hypotheses.map((hypothesis) => (
-            <HypothesisCard
-              key={hypothesis.id}
-              hypothesis={hypothesis}
-              canReorder={canReorder}
-              flashing={flashId === hypothesis.id}
-              onOpen={() => onOpen(hypothesis.id)}
-              suppressRef={suppressRef}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="v2-tight rounded-2xl border border-dashed border-[var(--v2-ink-200)] px-4 py-3 text-[13px] text-[var(--v2-ink-400)]">
-          Перетащи сюда, чтобы поставить {meta.label.toLowerCase()} приоритет
-        </div>
-      )}
-    </section>
-  );
-}
-
-function HypothesisDrawer({
-  item,
-  onClose,
-  onPatch,
-  onCreateNote,
-  onUpdateNote,
-  onDeleteNote,
-  onDelete,
-}: {
-  item: HypothesisWithNotes;
-  onClose: () => void;
-  onPatch: (id: string, patch: Record<string, string>) => Promise<void>;
-  onCreateNote: (id: string, input: { body: string; outcome: HypothesisOutcome; happenedOn: string }) => Promise<void>;
-  onUpdateNote: (
-    id: string,
-    noteId: string,
-    patch: { body?: string; outcome?: HypothesisOutcome; happenedOn?: string },
-  ) => Promise<void>;
-  onDeleteNote: (id: string, noteId: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-}) {
-  const [direction, setDirection] = useState(item.direction);
-  const [title, setTitle] = useState(item.title);
-  const [check, setCheck] = useState(item.check_text);
-  const [success, setSuccess] = useState(item.success_text);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<HypothesisOutcome | null>(null);
-  const [noteBody, setNoteBody] = useState("");
-  const [happenedOn, setHappenedOn] = useState(todayISO());
-  const [noteSaving, setNoteSaving] = useState(false);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const commit = async () => {
-    const nextTitle = title.trim();
-    if (!nextTitle) {
-      setTitle(item.title);
-      setLocalError("Нужна формулировка");
-      return;
-    }
-    const patch: Record<string, string> = {};
-    if (nextTitle !== item.title) patch.title = nextTitle;
-    if (direction.trim() !== item.direction) patch.direction = direction.trim();
-    if (check.trim() !== item.check_text) patch.checkText = check.trim();
-    if (success.trim() !== item.success_text) patch.successText = success.trim();
-    if (!Object.keys(patch).length) return;
-    setSaving(true);
-    setSaved(false);
-    try {
-      await onPatch(item.id, patch);
-      setLocalError(null);
-      setSaved(true);
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Не удалось сохранить");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addNote = async () => {
-    const body = noteBody.trim();
-    if (!body || !outcome || noteSaving) return;
-    setNoteSaving(true);
-    setLocalError(null);
-    try {
-      await onCreateNote(item.id, { body, outcome, happenedOn });
-      setNoteBody("");
-    } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "Не удалось записать");
-    } finally {
-      setNoteSaving(false);
-    }
-  };
-
-  const fieldClass =
-    "v2-tight w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3.5 py-3 text-[14.5px] leading-relaxed text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)] focus:bg-white focus:shadow-[var(--v2-shadow-glow)]";
-
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/25">
-      <button type="button" className="absolute inset-0" aria-label="Закрыть" onClick={onClose} />
-      <aside className="relative flex h-full w-full max-w-[680px] flex-col bg-[#f7f8fb] shadow-[var(--v2-shadow-pop)]">
-        <div className="flex items-center gap-2 border-b border-[var(--v2-ink-100)] bg-white px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="v2-tight inline-flex h-8 items-center rounded-lg px-2 text-[13px] font-medium text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)]"
-          >
-            ← К банку
-          </button>
-          <span className="v2-tight ml-auto text-[12px] text-[var(--v2-ink-400)]">
-            {saving ? "Сохраняю…" : saved ? "Сохранено" : ""}
-          </span>
-          <select
-            value={item.priority}
-            onChange={(event) => {
-              void onPatch(item.id, { priority: event.target.value }).catch((error: unknown) => {
-                setLocalError(error instanceof Error ? error.message : "Не удалось сохранить");
-              });
-            }}
-            className="h-8 cursor-pointer rounded-lg px-2 text-[12.5px] font-semibold outline-none"
-            style={{
-              background: PRIORITY_META[item.priority].soft,
-              color: PRIORITY_META[item.priority].ink,
-            }}
-          >
-            {HYPOTHESIS_PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>
-                {PRIORITY_META[priority].label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={item.status}
-            onChange={(event) => {
-              void onPatch(item.id, { status: event.target.value }).catch((error: unknown) => {
-                setLocalError(error instanceof Error ? error.message : "Не удалось сохранить");
-              });
-            }}
-            className="h-8 cursor-pointer rounded-lg px-2 text-[12.5px] font-semibold outline-none"
-            style={{
-              background: HYPOTHESIS_STATUS_META[item.status].soft,
-              color: HYPOTHESIS_STATUS_META[item.status].ink,
-            }}
-          >
-            {HYPOTHESIS_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {HYPOTHESIS_STATUS_META[status].label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          {localError ? (
-            <div className="v2-tight mb-4 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[13px] text-rose-800">{localError}</div>
-          ) : null}
-
-          <label className="block">
-            <span className="v2-tight text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-              Направление
-            </span>
-            <input
-              value={direction}
-              onChange={(event) => setDirection(event.target.value)}
-              onBlur={() => void commit()}
-              placeholder="TwinLabs, Qmagic, курс…"
-              className="v2-tight mt-1.5 h-10 w-full rounded-xl bg-white px-3.5 text-[14px] text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)] outline-none placeholder:text-[var(--v2-ink-400)]"
-            />
-          </label>
-
-          <label className="mt-4 block">
-            <span className="v2-tight text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-              Гипотеза
-            </span>
-            <textarea
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              onBlur={() => void commit()}
-              rows={4}
-              className={`${fieldClass} mt-1.5 bg-white shadow-[var(--v2-shadow-card)]`}
-            />
-          </label>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="v2-tight text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-                Что проверить
-              </span>
-              <textarea
-                value={check}
-                onChange={(event) => setCheck(event.target.value)}
-                onBlur={() => void commit()}
-                rows={5}
-                placeholder="Один конкретный тест, без строительства всего"
-                className={`${fieldClass} mt-1.5`}
-              />
-            </label>
-            <label className="block">
-              <span className="v2-tight text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">
-                Успех
-              </span>
-              <textarea
-                value={success}
-                onChange={(event) => setSuccess(event.target.value)}
-                onBlur={() => void commit()}
-                rows={5}
-                placeholder="Какой ответ реальности считается достаточным"
-                className={`${fieldClass} mt-1.5`}
-              />
-            </label>
-          </div>
-
-          <section className="mt-8">
-            <h3 className="v2-tight text-[18px] font-semibold text-[var(--v2-ink-900)]">Журнал проверки</h3>
-            <p className="v2-tight mt-1 text-[13px] text-[var(--v2-ink-500)]">
-              Что тестировал, что зашло и что нет. Потом по этим отметкам можно смотреть аналитику.
-            </p>
-
-            <div className="mt-3 rounded-2xl bg-white p-3.5 shadow-[var(--v2-shadow-card)]">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {HYPOTHESIS_OUTCOMES.map((key) => {
-                  const meta = HYPOTHESIS_OUTCOME_META[key];
-                  const active = outcome === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setOutcome(key)}
-                      className="v2-tight h-8 rounded-lg px-2.5 text-[12.5px] font-semibold transition"
-                      style={{
-                        background: active ? meta.ink : meta.soft,
-                        color: active ? "white" : meta.ink,
-                      }}
-                    >
-                      {meta.label}
-                    </button>
-                  );
-                })}
-                <input
-                  type="date"
-                  value={happenedOn}
-                  onChange={(event) => setHappenedOn(event.target.value)}
-                  className="v2-tight ml-auto h-8 rounded-lg bg-[var(--v2-ink-50)] px-2 text-[12.5px] text-[var(--v2-ink-700)] outline-none"
-                />
-              </div>
-              <textarea
-                value={noteBody}
-                onChange={(event) => setNoteBody(event.target.value)}
-                rows={3}
-                placeholder="Что проверил, что зашло, что не зашло…"
-                className={`${fieldClass} mt-2.5`}
-              />
-              <div className="mt-2.5 flex justify-end">
-                <button
-                  type="button"
-                  disabled={!outcome || !noteBody.trim() || noteSaving}
-                  onClick={() => void addNote()}
-                  className="v2-tight inline-flex h-9 items-center rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[13px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-40"
-                >
-                  {noteSaving ? "Записываю…" : "Записать"}
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-col gap-2">
-              {item.notes.length ? (
-                item.notes.map((note) => (
-                  <NoteRow
-                    key={note.id}
-                    note={note}
-                    onUpdate={(patch) => onUpdateNote(item.id, note.id, patch)}
-                    onDelete={() => onDeleteNote(item.id, note.id)}
-                  />
-                ))
-              ) : (
-                <p className="v2-tight px-1 py-4 text-[13.5px] text-[var(--v2-ink-400)]">
-                  Пока пусто. Первая запись — это уже данные, а не ощущение.
-                </p>
-              )}
-            </div>
-          </section>
-
-          <button
-            type="button"
-            onClick={() => void onDelete(item.id)}
-            className="v2-tight mt-8 text-[12.5px] font-medium text-[var(--v2-ink-400)] hover:text-rose-600"
-          >
-            Удалить гипотезу
-          </button>
-        </div>
-      </aside>
-    </div>
-  );
-}
-
-function NoteRow({
-  note,
-  onUpdate,
-  onDelete,
-}: {
-  note: HypothesisNote;
-  onUpdate: (patch: { body?: string; outcome?: HypothesisOutcome; happenedOn?: string }) => Promise<void>;
-  onDelete: () => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [body, setBody] = useState(note.body);
-  const [busy, setBusy] = useState(false);
-  const meta = HYPOTHESIS_OUTCOME_META[note.outcome];
-
-  useEffect(() => setBody(note.body), [note.body]);
-
-  const saveBody = async () => {
-    const next = body.trim();
-    if (!next) {
-      setBody(note.body);
-      setEditing(false);
-      return;
-    }
-    if (next === note.body) {
-      setEditing(false);
-      return;
-    }
-    setBusy(true);
-    try {
-      await onUpdate({ body: next });
-      setEditing(false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <article className="rounded-2xl bg-white px-4 py-3.5 shadow-[var(--v2-shadow-card)]">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{formatDay(note.happened_on)}</span>
-        <select
-          value={note.outcome}
-          disabled={busy}
-          onChange={(event) => void onUpdate({ outcome: event.target.value as HypothesisOutcome })}
-          className="h-7 cursor-pointer rounded-md px-2 text-[12px] font-semibold outline-none"
-          style={{ background: meta.soft, color: meta.ink }}
-        >
-          {HYPOTHESIS_OUTCOMES.map((key) => (
-            <option key={key} value={key}>
-              {HYPOTHESIS_OUTCOME_META[key].label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => setEditing((value) => !value)}
-          className="v2-tight ml-auto text-[12px] text-[var(--v2-ink-400)] hover:text-[var(--v2-ink-800)]"
-        >
-          {editing ? "Отмена" : "Изменить"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (!confirm("Удалить запись?")) return;
-            void onDelete();
-          }}
-          className="v2-tight text-[12px] text-[var(--v2-ink-400)] hover:text-rose-600"
-        >
-          Удалить
-        </button>
-      </div>
-      {editing ? (
-        <div className="mt-2">
-          <textarea
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            rows={3}
-            className="v2-tight w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] outline-none"
-          />
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void saveBody()}
-            className="v2-tight mt-2 h-8 rounded-lg bg-[var(--v2-ink-900)] px-3 text-[12.5px] font-medium text-white disabled:opacity-40"
-          >
-            Сохранить
-          </button>
-        </div>
-      ) : (
-        <p className="v2-tight mt-2 whitespace-pre-wrap text-[14.5px] leading-relaxed text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
-          {note.body}
-        </p>
-      )}
-    </article>
-  );
+function replaceItem(items: Hypothesis[], next: Hypothesis) {
+  return items.map((item) => (item.id === next.id ? next : item));
 }
 
 export function HypothesesClient() {
-  const [items, setItems] = useState<HypothesisWithNotes[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [board, setBoard] = useState<HypothesesBoard | null>(null);
+  const [sel, setSel] = useState<string | null>(null);
+  const [view, setView] = useState<"board" | "proj">("board");
+  const [flt, setFlt] = useState("all");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<HypothesisStatus | "all">("all");
-  const [draft, setDraft] = useState("");
-  const [draftPriority, setDraftPriority] = useState<HypothesisPriority>("high");
-  const [adding, setAdding] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [flashId, setFlashId] = useState<string | null>(null);
-  const itemsRef = useRef(items);
-  const suppressRef = useRef(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  itemsRef.current = items;
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const hashDone = useRef(false);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const board = await fetchJson<{ hypotheses: HypothesisWithNotes[] }>("/api/v2/personal/hypotheses");
-      setItems(
-        board.hypotheses.map((hypothesis) => ({
-          ...hypothesis,
-          notes: sortNotes(hypothesis.notes ?? []),
-        })),
-      );
+      const data = await fetchJson<HypothesesBoard>("/api/v2/personal/hypotheses");
+      setBoard(data);
+      setSel((prev) => prev ?? currentSprintId(data.sprints));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить гипотезы");
     } finally {
@@ -688,309 +57,753 @@ export function HypothesesClient() {
   }, [load]);
 
   useEffect(() => {
-    if (!flashId) return;
-    document.querySelector(`[data-hyp="${flashId}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [flashId]);
-
-  const mergeHypothesis = useCallback((hypothesis: Hypothesis) => {
-    setItems((prev) => prev.map((item) => (item.id === hypothesis.id ? { ...item, ...hypothesis, notes: item.notes } : item)));
-  }, []);
-
-  const patchHypothesis = useCallback(
-    async (id: string, patch: Record<string, string>) => {
-      const { hypothesis } = await fetchJson<{ hypothesis: Hypothesis }>(`/api/v2/personal/hypotheses/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      mergeHypothesis(hypothesis);
-    },
-    [mergeHypothesis],
-  );
-
-  const addHypothesis = async () => {
-    const parsed = parseQuickHypothesis(draft);
-    if (!parsed || adding) return;
-    setAdding(true);
-    setError(null);
-    try {
-      const { hypothesis } = await fetchJson<{ hypothesis: Hypothesis }>("/api/v2/personal/hypotheses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: parsed.title,
-          direction: parsed.direction,
-          priority: draftPriority,
-        }),
-      });
-      setItems((prev) => [{ ...hypothesis, notes: [] }, ...prev.filter((item) => item.id !== hypothesis.id)]);
-      setDraft("");
-      setFlashId(hypothesis.id);
-      window.setTimeout(() => setFlashId((current) => (current === hypothesis.id ? null : current)), 1600);
-      inputRef.current?.focus();
-    } catch (addError) {
-      setError(addError instanceof Error ? addError.message : "Не удалось добавить гипотезу");
-    } finally {
-      setAdding(false);
+    if (!board || hashDone.current) return;
+    hashDone.current = true;
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    if (hash === "backlog") {
+      window.setTimeout(() => {
+        document.getElementById("board-anchor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 60);
+      return;
     }
-  };
+    if (board.hypotheses.some((item) => item.id === hash)) setOpenId(hash);
+  }, [board]);
 
-  const persistOrder = async (next: HypothesisWithNotes[]) => {
-    try {
-      await fetchJson("/api/v2/personal/hypotheses/reorder", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: next.map((item) => ({ id: item.id, priority: item.priority, sort_order: item.sort_order })),
-        }),
-      });
-    } catch (orderError) {
-      setError(orderError instanceof Error ? orderError.message : "Не удалось сохранить порядок");
-      await load();
-    }
-  };
+  const projects = board?.projects ?? [];
+  const sprints = board?.sprints ?? [];
+  const items = board?.hypotheses ?? [];
+  const sprint = sprints.find((item) => item.id === sel) ?? sprints[0] ?? null;
+  const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
-  const onDragStart = (event: DragStartEvent) => setActiveId(String(event.active.id));
+  const inFilter = (item: Hypothesis) => flt === "all" || item.project_id === flt;
+  const active = items.filter((item) => item.stage === "active" && item.sprint_id === sprint?.id);
+  const queue = items.filter((item) => item.stage === "queue");
+  const backlog = items.filter((item) => item.stage === "backlog");
+  const done = items.filter((item) => item.stage === "done" && item.sprint_id === sprint?.id);
+  const open = items.find((item) => item.id === openId) ?? null;
 
-  const onDragEnd = (event: DragEndEvent) => {
-    suppressRef.current = true;
-    window.setTimeout(() => {
-      suppressRef.current = false;
-    }, 80);
-    setActiveId(null);
-    const overId = event.over ? String(event.over.id) : "";
-    const next = applyHypothesisMove(itemsRef.current, String(event.active.id), overId);
-    if (!next) return;
-    setItems(next);
-    void persistOrder(next);
-  };
-
-  const createNote = async (id: string, input: { body: string; outcome: HypothesisOutcome; happenedOn: string }) => {
-    const { note } = await fetchJson<{ note: HypothesisNote }>(`/api/v2/personal/hypotheses/${id}/notes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, notes: sortNotes([note, ...item.notes.filter((row) => row.id !== note.id)]) } : item)),
-    );
-  };
-
-  const updateNote = async (
-    id: string,
-    noteId: string,
-    patch: { body?: string; outcome?: HypothesisOutcome; happenedOn?: string },
-  ) => {
-    const { note } = await fetchJson<{ note: HypothesisNote }>(`/api/v2/personal/hypotheses/${id}/notes/${noteId}`, {
+  const patchItem = async (id: string, patch: Record<string, unknown>) => {
+    const { hypothesis } = await fetchJson<{ hypothesis: Hypothesis }>(`/api/v2/personal/hypotheses/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, notes: sortNotes(item.notes.map((row) => (row.id === note.id ? note : row))) } : item,
-      ),
-    );
+    setBoard((prev) => (prev ? { ...prev, hypotheses: replaceItem(prev.hypotheses, hypothesis) } : prev));
+    return hypothesis;
   };
 
-  const deleteNote = async (id: string, noteId: string) => {
-    await fetchJson(`/api/v2/personal/hypotheses/${id}/notes/${noteId}`, { method: "DELETE" });
-    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, notes: item.notes.filter((row) => row.id !== noteId) } : item)));
+  const move = async (id: string, stage: HypothesisStage) => {
+    try {
+      await patchItem(id, { stage, sprintId: sprint?.id ?? null });
+      if (stage === "done") {
+        const item = items.find((row) => row.id === id);
+        if (item && !item.verdict) setOpenId(id);
+      }
+    } catch (moveError) {
+      window.alert(moveError instanceof Error ? moveError.message : "Не удалось перенести");
+    }
   };
 
-  const deleteHypothesis = async (id: string) => {
-    if (!confirm("Удалить гипотезу и журнал проверок?")) return;
+  const createItem = async (title: string, openAfter: boolean) => {
+    const projectId = flt !== "all" ? flt : (projects[0]?.id ?? null);
+    const { hypothesis } = await fetchJson<{ hypothesis: Hypothesis }>("/api/v2/personal/hypotheses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, projectId, stage: "backlog" }),
+    });
+    setBoard((prev) => (prev ? { ...prev, hypotheses: [...prev.hypotheses, hypothesis] } : prev));
+    if (openAfter) setOpenId(hypothesis.id);
+  };
+
+  const removeItem = async (id: string) => {
     await fetchJson(`/api/v2/personal/hypotheses/${id}`, { method: "DELETE" });
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    setBoard((prev) => (prev ? { ...prev, hypotheses: prev.hypotheses.filter((item) => item.id !== id) } : prev));
     setOpenId(null);
   };
 
-  const visible = useMemo(
-    () => (statusFilter === "all" ? items : items.filter((item) => item.status === statusFilter)),
-    [items, statusFilter],
-  );
-  const canReorder = statusFilter === "all" && !loading;
-  const open = items.find((item) => item.id === openId) ?? null;
-  const active = items.find((item) => item.id === activeId) ?? null;
+  const addSprint = async () => {
+    const { sprint: created } = await fetchJson<{ sprint: HypothesisSprint }>("/api/v2/personal/hypotheses/sprints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    setBoard((prev) => (prev ? { ...prev, sprints: [...prev.sprints, created] } : prev));
+    setSel(created.id);
+  };
 
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: items.length };
-    for (const status of HYPOTHESIS_STATUSES) counts[status] = items.filter((item) => item.status === status).length;
-    return counts;
-  }, [items]);
-
-  const journal = useMemo(() => {
-    const counts = outcomeCounts(items.flatMap((item) => item.notes));
-    return { ...counts, total: items.reduce((sum, item) => sum + item.notes.length, 0) };
-  }, [items]);
-
-  const grouped = (priority: HypothesisPriority) =>
-    visible
-      .filter((item) => item.priority === priority)
-      .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+  const takeNext = () => {
+    const next = queue[0];
+    if (next) void move(next.id, "active");
+    else {
+      setView("board");
+      setFlt("all");
+      document.getElementById("board-anchor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6">
-      <div className="mx-auto max-w-[980px]">
-        <div className="mb-6 max-w-[68ch]">
-          <h1 className="v2-tighter text-[42px] font-semibold leading-[1.02] text-[var(--v2-ink-900)]">Банк гипотез</h1>
-          <p className="v2-tight mt-2.5 text-[14.5px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
-            Каждая карточка — одна проверка. Зайди внутрь и запиши, что тестировал, что зашло и что нет.
-          </p>
-        </div>
-
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto flex max-w-[1720px] flex-col gap-6 px-9 pb-24 pt-7">
         {error ? (
-          <div className="v2-tight mb-4 flex items-center gap-3 rounded-xl bg-rose-50 px-4 py-2.5 text-[13px] text-rose-800">
-            <span className="flex-1">{error}</span>
-            <button type="button" className="font-semibold underline" onClick={() => void load()}>
-              Повторить
-            </button>
-          </div>
+          <div className="v2-tight rounded-xl bg-rose-50 px-4 py-2.5 text-[13px] text-rose-800">{error}</div>
         ) : null}
 
-        <form
-          className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl bg-white p-2 pl-4 shadow-[var(--v2-shadow-card)]"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void addHypothesis();
-          }}
-        >
-          <V2Icons.plus className="h-4 w-4 shrink-0 text-[var(--v2-ink-400)]" />
-          <input
-            ref={inputRef}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Новая гипотеза…  или  Направление — формулировка"
-            className="v2-tight h-10 min-w-[220px] flex-1 bg-transparent text-[14.5px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
-          />
-          <div className="flex items-center gap-1">
-            {HYPOTHESIS_PRIORITIES.map((priority) => {
-              const meta = PRIORITY_META[priority];
-              const activeChip = draftPriority === priority;
-              return (
+        <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,520px)]">
+          <div className="flex min-h-[380px] flex-col justify-center gap-[22px] px-[34px] py-[34px]">
+            <div>
+              <h1 className="v2-tight text-[40px] font-semibold leading-[1.1] tracking-[-0.036em]">Гипотезы</h1>
+              <p className="v2-tight mt-2.5 text-[15.5px] text-[var(--v2-ink-500)]">
+                Бэклог → очередь → спринт → вывод. В спринте не больше трёх гипотез одновременно.
+              </p>
+            </div>
+            <div className="grid max-w-[820px] grid-cols-2 gap-3 xl:grid-cols-4">
+              <Stat kicker="В работе" value={String(active.length)} extra={`/ ${WIP_LIMIT}`} main />
+              <Stat kicker="Очередь" value={String(queue.length)} />
+              <Stat kicker="Бэклог" value={String(backlog.length)} />
+              <Stat kicker="Проверено" value={String(done.length)} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => void createItem("", true)}
+                className="inline-flex h-11 items-center rounded-[13px] bg-[#2d5eef] px-[18px] text-[14.5px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(45,94,239,0.8)] hover:bg-[var(--v2-brand-700)]"
+              >
+                + Гипотеза
+              </button>
+              <select
+                aria-label="Спринт"
+                value={sprint?.id ?? ""}
+                onChange={(event) => {
+                  if (event.target.value === "__new") void addSprint();
+                  else setSel(event.target.value);
+                }}
+                className="h-11 cursor-pointer rounded-[13px] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] font-semibold text-[var(--v2-ink-700)] outline-none"
+              >
+                {sprints.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.range_label}
+                    {item.is_current ? " · сейчас" : ""}
+                  </option>
+                ))}
+                <option value="__new">+ Новый спринт</option>
+              </select>
+            </div>
+          </div>
+          <div className="relative hidden min-h-[380px] overflow-hidden lg:block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={appPath("/home/hypotheses-hero.png")}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover object-right"
+              style={{
+                maskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,.5) 14%, #000 36%)",
+                WebkitMaskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,.5) 14%, #000 36%)",
+              }}
+            />
+          </div>
+        </section>
+
+        <section className="v2-card px-[30px] py-7">
+          <div className="mb-[18px] flex flex-wrap items-baseline gap-3.5">
+            <h2 className="v2-tight text-[26px] font-semibold tracking-[-0.03em]">
+              В работе{sprint ? ` · ${sprint.name}` : ""}
+            </h2>
+            <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">{sprint?.range_label}</span>
+            <span className="ml-auto flex items-center gap-2.5 text-[13.5px] font-semibold text-[var(--v2-ink-500)]">
+              {Array.from({ length: WIP_LIMIT }, (_, index) => (
+                <i
+                  key={index}
+                  className={`block h-2 w-[26px] rounded-full ${index < active.length ? "bg-[#2d5eef]" : "bg-[var(--v2-ink-200)]"}`}
+                />
+              ))}
+              <span className="v2-tnum">
+                {active.length} / {WIP_LIMIT}
+              </span>
+            </span>
+          </div>
+          {loading ? (
+            <div className="h-40 animate-pulse rounded-[20px] bg-[var(--v2-ink-50)]" />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              {active.map((item) => (
+                <FocusCard key={item.id} item={item} project={projectById.get(item.project_id ?? "")} onOpen={() => setOpenId(item.id)} />
+              ))}
+              {Array.from({ length: Math.max(0, WIP_LIMIT - active.length) }, (_, index) => (
                 <button
-                  key={priority}
+                  key={index}
                   type="button"
-                  onClick={() => setDraftPriority(priority)}
-                  className="v2-tight h-8 rounded-lg px-2.5 text-[12px] font-semibold"
-                  style={{
-                    background: activeChip ? meta.soft : "transparent",
-                    color: activeChip ? meta.ink : "var(--v2-ink-400)",
-                  }}
+                  onClick={takeNext}
+                  className="flex min-h-[260px] flex-col items-center justify-center gap-1.5 rounded-[20px] bg-[var(--v2-ink-50)] px-5 text-center text-[15px] font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-brand-50)] hover:text-[#2d5eef]"
                 >
-                  {meta.label}
+                  {queue.length ? "+ Взять из очереди" : "Свободный слот"}
+                  <small className="block text-[13.5px] font-medium text-[var(--v2-ink-400)]">
+                    {queue.length ? `следующая: ${queue[0]?.title}` : "очередь пуста — добавь из бэклога"}
+                  </small>
                 </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <div id="board-anchor" className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex gap-0.5 rounded-[14px] bg-white p-1 shadow-[var(--v2-shadow-card)]">
+            {(
+              [
+                ["board", "Доска"],
+                ["proj", "По проектам"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                className={`rounded-[10px] px-4 py-2 text-[14px] font-semibold ${
+                  view === key ? "bg-[#2d5eef] text-white" : "text-[var(--v2-ink-500)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <FilterChip active={flt === "all"} label="Все проекты" count={items.length} onClick={() => setFlt("all")} />
+            {projects.map((project) => {
+              const colors = projectColors(project.hue);
+              const count = items.filter((item) => item.project_id === project.id).length;
+              return (
+                <FilterChip
+                  key={project.id}
+                  active={flt === project.id}
+                  label={project.name}
+                  count={count}
+                  dot={colors.c}
+                  onClick={() => setFlt(project.id)}
+                />
               );
             })}
           </div>
-          <button
-            type="submit"
-            disabled={!draft.trim() || adding}
-            className="v2-tight inline-flex h-10 items-center rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-40"
-          >
-            {adding ? "Добавляю…" : "Добавить"}
-          </button>
-        </form>
-        <p className="v2-tight mb-5 px-1 text-[12px] text-[var(--v2-ink-400)]">
-          Enter добавляет карточку. Перетащи её, чтобы сменить порядок или переложить в другой приоритет.
-        </p>
-
-        <div className="mb-5 flex flex-wrap items-center gap-1.5">
-          <FilterChip active={statusFilter === "all"} onClick={() => setStatusFilter("all")} label="Все" count={statusCounts.all ?? 0} />
-          {HYPOTHESIS_STATUSES.map((status) => (
-            <FilterChip
-              key={status}
-              active={statusFilter === status}
-              onClick={() => setStatusFilter(status)}
-              label={HYPOTHESIS_STATUS_META[status].label}
-              count={statusCounts[status] ?? 0}
-            />
-          ))}
-          <span className="v2-tight ml-auto text-[12.5px] text-[var(--v2-ink-500)]">
-            В журнале {journal.total}
-            {journal.total ? ` · зашло ${journal.worked} · не зашло ${journal.missed}` : ""}
-          </span>
         </div>
 
-        {!canReorder && !loading ? (
-          <p className="v2-tight mb-3 px-1 text-[12.5px] text-[var(--v2-ink-400)]">
-            Порядок меняется, когда выбраны все статусы.
-          </p>
-        ) : null}
-
-        {loading ? (
-          <div className="flex flex-col gap-3">
-            <div className="h-28 animate-pulse rounded-2xl bg-white/70" />
-            <div className="h-28 animate-pulse rounded-2xl bg-white/70" />
-            <div className="h-28 animate-pulse rounded-2xl bg-white/70" />
+        {view === "board" ? (
+          <div className="grid grid-cols-1 items-start gap-3.5 xl:grid-cols-4">
+            {STAGES.map((stage) => {
+              const column = items.filter((item) => {
+                if (item.stage !== stage || !inFilter(item)) return false;
+                if (stage === "active" || stage === "done") return item.sprint_id === sprint?.id;
+                return true;
+              });
+              return (
+                <div
+                  key={stage}
+                  className={`min-h-[240px] rounded-[20px] bg-white/50 p-3 ${stage === "active" ? "ring-0" : ""}`}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.currentTarget.classList.add("bg-[var(--v2-brand-50)]");
+                  }}
+                  onDragLeave={(event) => event.currentTarget.classList.remove("bg-[var(--v2-brand-50)]")}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    event.currentTarget.classList.remove("bg-[var(--v2-brand-50)]");
+                    const id = event.dataTransfer.getData("text/plain");
+                    if (id) void move(id, stage);
+                  }}
+                  id={stage === "backlog" ? "backlog" : undefined}
+                >
+                  <div className="flex items-center gap-2 px-1.5 pb-3 pt-1.5">
+                    <span className={`text-[15px] font-semibold tracking-[-0.015em] ${stage === "active" ? "text-[#2d5eef]" : ""}`}>
+                      {STAGE_LABEL[stage]}
+                    </span>
+                    <span className="v2-tnum text-[12.5px] font-semibold text-[var(--v2-ink-400)]">
+                      {column.length}
+                      {stage === "active" ? ` / ${WIP_LIMIT}` : ""}
+                    </span>
+                    <span className="ml-auto text-[12px] text-[var(--v2-ink-400)]">
+                      {stage === "active" || stage === "done" ? sprint?.name : STAGE_HINT[stage]}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {column.length ? (
+                      column.map((item) => (
+                        <BoardCard
+                          key={item.id}
+                          item={item}
+                          project={projectById.get(item.project_id ?? "")}
+                          onOpen={() => setOpenId(item.id)}
+                        />
+                      ))
+                    ) : (
+                      <div className="px-2.5 py-[22px] text-center text-[13.5px] text-[var(--v2-ink-400)]">Перетащи сюда</div>
+                    )}
+                  </div>
+                  {stage === "backlog" ? (
+                    <form
+                      className="mt-2 flex gap-1.5"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const input = event.currentTarget.elements.namedItem("q") as HTMLInputElement;
+                        const value = input.value.trim();
+                        if (!value) return;
+                        input.value = "";
+                        void createItem(value, false);
+                      }}
+                    >
+                      <input
+                        name="q"
+                        placeholder="Быстро в бэклог…"
+                        aria-label="Новая гипотеза"
+                        className="h-10 min-w-0 flex-1 rounded-xl bg-white px-3 text-[14px] outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+                      />
+                      <button type="submit" aria-label="Добавить" className="h-10 w-10 rounded-xl bg-[var(--v2-ink-900)] text-[18px] text-white">
+                        +
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={collision}
-            onDragStart={onDragStart}
-            onDragCancel={() => setActiveId(null)}
-            onDragEnd={onDragEnd}
-          >
-            <div className="flex flex-col gap-4">
-              {HYPOTHESIS_PRIORITIES.map((priority) => (
-                <PriorityLane
-                  key={priority}
-                  priority={priority}
-                  hypotheses={grouped(priority)}
-                  canReorder={canReorder}
-                  flashId={flashId}
-                  onOpen={setOpenId}
-                  suppressRef={suppressRef}
-                />
-              ))}
-            </div>
-            <DragOverlay>
-              {active ? <HypothesisGhost hypothesis={active} /> : null}
-            </DragOverlay>
-          </DndContext>
+          <div className="flex flex-col gap-3.5">
+            {projects
+              .filter((project) => flt === "all" || project.id === flt)
+              .map((project) => {
+                const colors = projectColors(project.hue);
+                const rows = items
+                  .filter((item) => item.project_id === project.id)
+                  .sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage));
+                const count = (stage: HypothesisStage) => rows.filter((item) => item.stage === stage).length;
+                return (
+                  <section key={project.id} className="v2-card px-6 py-[22px]" style={{ ["--c" as string]: colors.c }}>
+                    <div className="mb-3.5 flex flex-wrap items-center gap-3">
+                      <span className="h-3 w-3 rounded" style={{ background: colors.c }} />
+                      <h3 className="text-[20px] font-semibold tracking-[-0.025em]">{project.name}</h3>
+                      <div className="ml-auto flex gap-3.5 text-[13px] text-[var(--v2-ink-500)]">
+                        <span>
+                          в работе <b className="text-[var(--v2-ink-900)]">{count("active")}</b>
+                        </span>
+                        <span>
+                          очередь <b className="text-[var(--v2-ink-900)]">{count("queue")}</b>
+                        </span>
+                        <span>
+                          бэклог <b className="text-[var(--v2-ink-900)]">{count("backlog")}</b>
+                        </span>
+                        <span>
+                          проверено <b className="text-[var(--v2-ink-900)]">{count("done")}</b>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {rows.length ? (
+                        rows.map((item) => {
+                          const sprintName =
+                            item.sprint_id && (item.stage === "active" || item.stage === "done")
+                              ? sprints.find((row) => row.id === item.sprint_id)?.name
+                              : "";
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => setOpenId(item.id)}
+                              className="grid w-full grid-cols-1 items-center gap-3 rounded-[14px] bg-[var(--v2-ink-50)] px-4 py-3 text-left hover:bg-[var(--v2-ink-100)] lg:grid-cols-[200px_minmax(0,1.2fr)_minmax(0,1fr)_120px] lg:gap-[18px]"
+                            >
+                              <span
+                                className={`w-fit rounded-md px-2 py-1 text-[12px] font-semibold whitespace-nowrap ${
+                                  item.stage === "active" ? "bg-[#2d5eef] text-white" : "bg-white text-[var(--v2-ink-500)]"
+                                }`}
+                              >
+                                {STAGE_LABEL[item.stage]}
+                                {sprintName ? ` · ${sprintName}` : ""}
+                              </span>
+                              <b className="text-[15px] font-semibold tracking-[-0.015em]">{item.title || "Без названия"}</b>
+                              <span className="text-[13.5px] leading-snug text-[var(--v2-ink-500)]">
+                                {item.stage === "done" && item.result_text ? item.result_text : item.metric}
+                              </span>
+                              <span className="lg:justify-self-end">
+                                <VerdictBadge verdict={item.stage === "done" ? item.verdict : null} />
+                              </span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="py-4 text-center text-[13.5px] text-[var(--v2-ink-400)]">Гипотез пока нет</div>
+                      )}
+                    </div>
+                  </section>
+                );
+              })}
+          </div>
         )}
       </div>
 
       {open ? (
         <HypothesisDrawer
-          key={open.id}
           item={open}
+          projects={projects}
+          sprints={sprints}
+          activeCount={active.length}
           onClose={() => setOpenId(null)}
-          onPatch={patchHypothesis}
-          onCreateNote={createNote}
-          onUpdateNote={updateNote}
-          onDeleteNote={deleteNote}
-          onDelete={deleteHypothesis}
+          onPatch={patchItem}
+          onMove={move}
+          onDelete={removeItem}
         />
       ) : null}
     </div>
   );
 }
 
+function Stat({ kicker, value, extra, main }: { kicker: string; value: string; extra?: string; main?: boolean }) {
+  return (
+    <div className={`rounded-2xl px-[18px] py-4 text-left ${main ? "bg-[#2d5eef] text-white" : "bg-[var(--v2-ink-50)]"}`}>
+      <div className={`text-[11.5px] font-semibold tracking-[0.13em] uppercase ${main ? "text-white/65" : "text-[var(--v2-ink-400)]"}`}>
+        {kicker}
+      </div>
+      <b className="v2-tnum mt-2 block text-[30px] font-semibold tracking-[-0.03em]">
+        {value}
+        {extra ? <small className={`text-[16px] font-medium ${main ? "text-white/60" : "text-[var(--v2-ink-400)]"}`}>{extra}</small> : null}
+      </b>
+    </div>
+  );
+}
+
 function FilterChip({
   active,
-  onClick,
   label,
   count,
+  dot,
+  onClick,
 }: {
   active: boolean;
-  onClick: () => void;
   label: string;
   count: number;
+  dot?: string;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`v2-tight inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-medium transition ${
-        active
-          ? "bg-[var(--v2-ink-900)] text-white"
-          : "bg-white text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)] hover:text-[var(--v2-ink-900)]"
+      className={`inline-flex items-center gap-2 rounded-[11px] px-3 py-2 text-[14px] ${
+        active ? "bg-white font-semibold text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)]" : "bg-white/70 font-medium text-[var(--v2-ink-600)]"
       }`}
     >
-      {label}
-      <span className={`v2-tnum ${active ? "text-white/60" : "text-[var(--v2-ink-400)]"}`}>{count}</span>
+      {dot ? <i className="h-2 w-2 rounded-full" style={{ background: dot }} /> : null}
+      {label} <b className="v2-tnum text-[12px] font-semibold text-[var(--v2-ink-400)]">{count}</b>
     </button>
+  );
+}
+
+function ProjectChip({ project }: { project?: HypothesisProject }) {
+  if (!project) return null;
+  const colors = projectColors(project.hue);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-[12.5px] font-semibold whitespace-nowrap"
+      style={{ color: colors.c }}
+    >
+      <i className="h-[7px] w-[7px] rounded-full" style={{ background: colors.c }} />
+      {project.name}
+    </span>
+  );
+}
+
+function VerdictBadge({ verdict }: { verdict: HypothesisVerdict | null }) {
+  if (!verdict) return null;
+  const meta = VERDICT_META[verdict];
+  return (
+    <span className="rounded-md px-2 py-0.5 text-[11.5px] font-semibold whitespace-nowrap" style={{ color: meta.ink, background: meta.soft }}>
+      {meta.label}
+    </span>
+  );
+}
+
+function FocusCard({ item, project, onOpen }: { item: Hypothesis; project?: HypothesisProject; onOpen: () => void }) {
+  const colors = projectColors(project?.hue ?? 260);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex flex-col gap-3.5 rounded-[20px] p-6 text-left transition hover:-translate-y-0.5"
+      style={{ background: colors.s, boxShadow: `inset 0 0 0 1.5px color-mix(in oklch, ${colors.c} 18%, transparent)` }}
+    >
+      <div className="flex items-center gap-2.5">
+        <ProjectChip project={project} />
+        <span className="ml-auto text-[12px] font-semibold tracking-[0.1em] uppercase" style={{ color: colors.c }}>
+          в работе
+        </span>
+      </div>
+      <h3 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.03em]">{item.title}</h3>
+      <p className="text-[15px] leading-relaxed text-[var(--v2-ink-600)]">{item.body}</p>
+      <div className="mt-auto rounded-[14px] bg-white px-[15px] py-[13px]">
+        <span className="text-[11.5px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">Критерий проверки</span>
+        <b className="mt-1 block text-[15px] leading-snug font-semibold">{item.metric || "—"}</b>
+      </div>
+    </button>
+  );
+}
+
+function BoardCard({ item, project, onOpen }: { item: Hypothesis; project?: HypothesisProject; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData("text/plain", item.id);
+        event.currentTarget.classList.add("opacity-40");
+      }}
+      onDragEnd={(event) => event.currentTarget.classList.remove("opacity-40")}
+      onClick={onOpen}
+      className="block w-full cursor-grab rounded-[14px] bg-white px-[15px] py-3.5 text-left shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-soft)]"
+    >
+      <span className="flex items-center gap-2">
+        <ProjectChip project={project} />
+        <VerdictBadge verdict={item.stage === "done" ? item.verdict : null} />
+      </span>
+      <span className="mt-2 block text-[15px] leading-snug font-semibold tracking-[-0.015em]">{item.title || "Без названия"}</span>
+      {item.stage === "done" && item.result_text ? (
+        <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{item.result_text}</span>
+      ) : item.metric ? (
+        <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{item.metric}</span>
+      ) : null}
+    </button>
+  );
+}
+
+function HypothesisDrawer({
+  item,
+  projects,
+  sprints,
+  activeCount,
+  onClose,
+  onPatch,
+  onMove,
+  onDelete,
+}: {
+  item: Hypothesis;
+  projects: HypothesisProject[];
+  sprints: HypothesisSprint[];
+  activeCount: number;
+  onClose: () => void;
+  onPatch: (id: string, patch: Record<string, unknown>) => Promise<Hypothesis>;
+  onMove: (id: string, stage: HypothesisStage) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(item.title);
+  const [body, setBody] = useState(item.body);
+  const [metric, setMetric] = useState(item.metric);
+  const [result, setResult] = useState(item.result_text);
+  const draft = useRef({ title, body, metric, result });
+  const timer = useRef<number | null>(null);
+  draft.current = { title, body, metric, result };
+
+  useEffect(() => {
+    setTitle(item.title);
+    setBody(item.body);
+    setMetric(item.metric);
+    setResult(item.result_text);
+  }, [item.id]);
+
+  const flush = async () => {
+    if (timer.current) window.clearTimeout(timer.current);
+    const current = draft.current;
+    if (
+      current.title === item.title &&
+      current.body === item.body &&
+      current.metric === item.metric &&
+      current.result === item.result_text
+    ) {
+      return;
+    }
+    await onPatch(item.id, {
+      title: current.title,
+      body: current.body,
+      metric: current.metric,
+      resultText: current.result,
+    });
+  };
+
+  const schedule = () => {
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => void flush(), 400);
+  };
+
+  const close = async () => {
+    if (!draft.current.title.trim()) {
+      await onDelete(item.id);
+      return;
+    }
+    await flush();
+    onClose();
+  };
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") void close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const sprintName =
+    item.sprint_id && (item.stage === "active" || item.stage === "done")
+      ? sprints.find((sprint) => sprint.id === item.sprint_id)?.name
+      : "";
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <button type="button" className="absolute inset-0 bg-[rgba(10,12,20,0.28)]" aria-label="Закрыть" onClick={() => void close()} />
+      <aside className="absolute top-0 right-0 flex h-full w-[min(520px,100vw)] flex-col bg-white shadow-[-20px_0_60px_-20px_rgba(16,24,40,0.3)]">
+        <div className="flex items-center gap-2.5 border-b border-[var(--v2-ink-100)] px-6 py-5">
+          <span className="text-[11.5px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">
+            {STAGE_LABEL[item.stage]}
+            {sprintName ? ` · ${sprintName}` : ""}
+          </span>
+          <button type="button" onClick={() => void close()} className="ml-auto h-[38px] w-[38px] rounded-xl text-[20px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]" aria-label="Закрыть">
+            ×
+          </button>
+        </div>
+        <div className="flex flex-1 flex-col gap-[18px] overflow-y-auto px-6 py-[22px]">
+          <Field label="Название">
+            <input
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                schedule();
+              }}
+              placeholder="Коротко, что проверяю"
+              className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[20px] font-semibold tracking-[-0.02em] outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+            />
+          </Field>
+          <Field label="Проект">
+            <select
+              value={item.project_id ?? ""}
+              onChange={(event) => void onPatch(item.id, { projectId: event.target.value || null })}
+              className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] outline-none"
+            >
+              <option value="">Без проекта</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Гипотеза">
+            <textarea
+              value={body}
+              rows={3}
+              onChange={(event) => {
+                setBody(event.target.value);
+                schedule();
+              }}
+              placeholder="Если …, то …"
+              className="w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] leading-relaxed outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+            />
+          </Field>
+          <Field label="Критерий проверки">
+            <input
+              value={metric}
+              onChange={(event) => {
+                setMetric(event.target.value);
+                schedule();
+              }}
+              placeholder="Что должно случиться, чтобы считать подтверждённой"
+              className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+            />
+          </Field>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-semibold tracking-[0.11em] text-[var(--v2-ink-400)] uppercase">Статус</span>
+            <div className="flex flex-wrap gap-1.5">
+              {STAGES.map((stage) => (
+                <button
+                  key={stage}
+                  type="button"
+                  onClick={() => void onMove(item.id, stage)}
+                  className={`rounded-[11px] px-3 py-2 text-[14px] font-semibold ${
+                    item.stage === stage ? "bg-[var(--v2-ink-900)] text-white" : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)]"
+                  }`}
+                >
+                  {STAGE_LABEL[stage]}
+                </button>
+              ))}
+            </div>
+          </div>
+          {item.stage === "active" || item.stage === "done" ? (
+            <Field label="Спринт">
+              <select
+                value={item.sprint_id ?? ""}
+                onChange={(event) => void onPatch(item.id, { stage: item.stage, sprintId: event.target.value || null })}
+                className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] outline-none"
+              >
+                {sprints.map((sprint) => (
+                  <option key={sprint.id} value={sprint.id}>
+                    {sprint.name} · {sprint.range_label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          {item.stage === "done" ? (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[12px] font-semibold tracking-[0.11em] text-[var(--v2-ink-400)] uppercase">Вердикт</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(VERDICT_META) as HypothesisVerdict[]).map((verdict) => (
+                    <button
+                      key={verdict}
+                      type="button"
+                      onClick={() => void onPatch(item.id, { verdict })}
+                      className={`rounded-[11px] px-3 py-2 text-[14px] font-semibold ${
+                        item.verdict === verdict ? "bg-[var(--v2-ink-900)] text-white" : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)]"
+                      }`}
+                    >
+                      {VERDICT_META[verdict].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Field label="Вывод">
+                <textarea
+                  value={result}
+                  rows={3}
+                  onChange={(event) => {
+                    setResult(event.target.value);
+                    schedule();
+                  }}
+                  placeholder="Что узнал, что делаю дальше"
+                  className="w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] leading-relaxed outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+                />
+              </Field>
+            </>
+          ) : null}
+          {item.stage === "active" && activeCount > WIP_LIMIT ? (
+            <div className="rounded-[11px] bg-[#fef0c7] px-3 py-2.5 text-[13.5px] text-[#b54708]">
+              В спринте больше {WIP_LIMIT} гипотез.
+            </div>
+          ) : null}
+        </div>
+        <div className="flex gap-2.5 border-t border-[var(--v2-ink-100)] px-6 py-4">
+          <button type="button" onClick={() => void close()} className="inline-flex h-11 items-center rounded-[13px] bg-[#2d5eef] px-[18px] text-[14.5px] font-semibold text-white">
+            Готово
+          </button>
+          <button
+            type="button"
+            onClick={() => void onDelete(item.id)}
+            className="rounded-xl px-3 text-[14px] font-semibold text-[#b42318] hover:bg-[#fee4e2]"
+          >
+            Удалить
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[12px] font-semibold tracking-[0.11em] text-[var(--v2-ink-400)] uppercase">{label}</span>
+      {children}
+    </label>
   );
 }

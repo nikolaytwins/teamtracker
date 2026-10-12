@@ -13,11 +13,13 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     const body = await request.json();
     const hypothesis = await updatePersonalHypothesis(auth.ctx, id, {
       title: body.title,
-      direction: body.direction,
-      checkText: body.checkText ?? body.check_text,
-      successText: body.successText ?? body.success_text,
-      priority: body.priority,
-      status: body.status,
+      body: body.body,
+      metric: body.metric,
+      resultText: body.resultText ?? body.result_text,
+      verdict: body.verdict,
+      projectId: body.projectId === undefined ? undefined : body.projectId || null,
+      sprintId: body.sprintId === undefined ? undefined : body.sprintId || null,
+      stage: body.stage,
     });
     return NextResponse.json({ hypothesis });
   } catch (error) {

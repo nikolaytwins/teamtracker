@@ -513,6 +513,61 @@ function PriorityPicker({
   );
 }
 
+function SeasonQuickAdd({
+  value,
+  onChange,
+  onSubmit,
+  onCancel,
+  wide,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-h-[72px] flex-col justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)] px-4 py-3 ${
+        wide ? "md:col-span-2" : ""
+      }`}
+    >
+      <input
+        type="text"
+        value={value}
+        autoFocus
+        placeholder="Название карточки"
+        onChange={(e) => onChange(e.target.value)}
+        className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[15px] text-[var(--v2-ink-900)] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onSubmit();
+          }
+          if (e.key === "Escape") onCancel();
+        }}
+      />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!value.trim()}
+          className="v2-tight rounded-xl bg-[var(--v2-brand-600)] px-3.5 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[var(--v2-brand-700)] disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          Добавить
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="v2-tight rounded-xl px-3 py-1.5 text-[13px] font-semibold text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)]"
+        >
+          Отмена
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SeasonCardForm({
   draftText,
   draftNote,
@@ -830,7 +885,7 @@ function MonthPanel({
   ) => void;
 }) {
   const done = month.tasks.filter((t) => t.done).length;
-  const [adding, setAdding] = useState(false);
+  const [addingKey, setAddingKey] = useState<PriorityGroupKey | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
@@ -853,7 +908,7 @@ function MonthPanel({
   }, [month.tasks, dragTaskId]);
 
   function resetDraft() {
-    setAdding(false);
+    setAddingKey(null);
     setEditingId(null);
     setDraftText("");
     setDraftNote("");
@@ -866,17 +921,17 @@ function MonthPanel({
     setExpandedId(null);
   }, [month.id]);
 
-  function startAdd() {
+  function startAdd(key: PriorityGroupKey) {
     setEditingId(null);
     setDraftText("");
     setDraftNote("");
     setDraftHref("");
-    setDraftPriority(undefined);
-    setAdding(true);
+    setDraftPriority(key === "high" || key === "medium" || key === "low" ? key : undefined);
+    setAddingKey(key);
   }
 
   function startEdit(task: HomeSeasonTask) {
-    setAdding(false);
+    setAddingKey(null);
     setEditingId(task.id);
     setDraftText(task.text);
     setDraftNote(task.note ?? "");
@@ -895,7 +950,8 @@ function MonthPanel({
       text,
       note: draftNote.trim() || undefined,
       href: draftHref.trim() || undefined,
-      priority: draftPriority,
+      priority:
+        addingKey === "high" || addingKey === "medium" || addingKey === "low" ? addingKey : draftPriority,
     });
     resetDraft();
   }
@@ -913,7 +969,7 @@ function MonthPanel({
     resetDraft();
   }
 
-  const dragDisabled = Boolean(adding || editingId);
+  const dragDisabled = Boolean(addingKey || editingId);
 
   return (
     <div className="mt-4 rounded-[20px] bg-white p-7 shadow-[var(--v2-shadow-card)]">
@@ -927,16 +983,6 @@ function MonthPanel({
         <span className="v2-tnum v2-tight ml-auto text-[14px] font-semibold text-[var(--v2-ink-500)]">
           {done} из {month.tasks.length} сделано
         </span>
-        {!adding && !editingId ? (
-          <button
-            type="button"
-            onClick={startAdd}
-            className="v2-tight inline-flex items-center gap-1.5 rounded-xl border border-[var(--v2-brand-200)] bg-[var(--v2-brand-50)] px-3.5 py-2 text-[13.5px] font-semibold text-[var(--v2-brand-700)] transition hover:border-[var(--v2-brand-400)] hover:bg-[var(--v2-brand-100)]"
-          >
-            <V2Icons.plus className="h-3.5 w-3.5" />
-            Добавить карточку
-          </button>
-        ) : null}
       </div>
 
       {month.lead ? (
@@ -1002,6 +1048,15 @@ function MonthPanel({
                   <span className="v2-tight ml-auto text-[11.5px] font-medium text-[var(--v2-brand-700)]">
                     Отпустите здесь
                   </span>
+                ) : addingKey !== group.key && !editingId ? (
+                  <button
+                    type="button"
+                    onClick={() => startAdd(group.key === "all" ? "other" : group.key)}
+                    className="v2-tight ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-brand-700)]"
+                  >
+                    <V2Icons.plus className="h-3 w-3" />
+                    Добавить
+                  </button>
                 ) : null}
               </div>
             ) : null}
@@ -1015,107 +1070,89 @@ function MonthPanel({
                 onDropPriorityKeyChange(group.key);
               }}
             >
-              {group.tasks.length ? (
-                group.tasks.map((task) =>
-                  editingId === task.id ? (
-                    <SeasonCardForm
-                      key={task.id}
-                      draftText={draftText}
-                      draftNote={draftNote}
-                      draftHref={draftHref}
-                      draftPriority={draftPriority}
-                      showPriority
-                      onTextChange={setDraftText}
-                      onNoteChange={setDraftNote}
-                      onHrefChange={setDraftHref}
-                      onPriorityChange={setDraftPriority}
-                      onSubmit={submitEdit}
-                      onCancel={resetDraft}
-                      submitLabel="Сохранить изменения"
-                      autoFocus
-                    />
-                  ) : (
-                    <SeasonTaskCard
-                      key={task.id}
-                      task={task}
-                      expanded={expandedId === task.id}
-                      onToggleExpand={() => setExpandedId((id) => (id === task.id ? null : task.id))}
-                      onToggleDone={() => onToggle(task.id, !task.done)}
-                      onEdit={() => startEdit(task)}
-                      onDelete={() => onDelete(task.id)}
-                      onPriorityChange={(priority) => onDropToPriority(month.id, task.id, priority, null)}
-                      onDragStart={() => {
-                        liveSeasonDragId = task.id;
-                        window.requestAnimationFrame(() => onDragStart(task.id));
-                      }}
-                      onDragEnd={() => {
-                        setDropBeforeId(null);
-                        onDragEnd();
-                      }}
-                      onDragOverCard={() => {
-                        onDropPriorityKeyChange(group.key);
-                        setDropBeforeId((id) => (id === task.id ? id : task.id));
-                      }}
-                      onDropOnCard={(e) => {
-                        const id = readSeasonDragId(e) || dragTaskId;
-                        if (!id || id === task.id) return;
-                        onDropToPriority(month.id, id, dropPriority, task.id);
-                        setDropBeforeId(null);
-                        onDragEnd();
-                      }}
-                      dragDisabled={dragDisabled}
-                      isDragging={dragTaskId === task.id}
-                      dropBefore={dropBeforeId === task.id && dragTaskId !== task.id}
-                    />
-                  )
+              {group.tasks.map((task) =>
+                editingId === task.id ? (
+                  <SeasonCardForm
+                    key={task.id}
+                    draftText={draftText}
+                    draftNote={draftNote}
+                    draftHref={draftHref}
+                    draftPriority={draftPriority}
+                    showPriority
+                    onTextChange={setDraftText}
+                    onNoteChange={setDraftNote}
+                    onHrefChange={setDraftHref}
+                    onPriorityChange={setDraftPriority}
+                    onSubmit={submitEdit}
+                    onCancel={resetDraft}
+                    submitLabel="Сохранить изменения"
+                    autoFocus
+                  />
+                ) : (
+                  <SeasonTaskCard
+                    key={task.id}
+                    task={task}
+                    expanded={expandedId === task.id}
+                    onToggleExpand={() => setExpandedId((id) => (id === task.id ? null : task.id))}
+                    onToggleDone={() => onToggle(task.id, !task.done)}
+                    onEdit={() => startEdit(task)}
+                    onDelete={() => onDelete(task.id)}
+                    onPriorityChange={(priority) => onDropToPriority(month.id, task.id, priority, null)}
+                    onDragStart={() => {
+                      liveSeasonDragId = task.id;
+                      window.requestAnimationFrame(() => onDragStart(task.id));
+                    }}
+                    onDragEnd={() => {
+                      setDropBeforeId(null);
+                      onDragEnd();
+                    }}
+                    onDragOverCard={() => {
+                      onDropPriorityKeyChange(group.key);
+                      setDropBeforeId((id) => (id === task.id ? id : task.id));
+                    }}
+                    onDropOnCard={(e) => {
+                      const id = readSeasonDragId(e) || dragTaskId;
+                      if (!id || id === task.id) return;
+                      onDropToPriority(month.id, id, dropPriority, task.id);
+                      setDropBeforeId(null);
+                      onDragEnd();
+                    }}
+                    dragDisabled={dragDisabled}
+                    isDragging={dragTaskId === task.id}
+                    dropBefore={dropBeforeId === task.id && dragTaskId !== task.id}
+                  />
                 )
-              ) : (
-                <div
-                  className={`flex min-h-[72px] items-center justify-center rounded-2xl border-2 border-dashed px-4 py-6 text-center md:col-span-2 ${
+              )}
+              {addingKey === group.key ? (
+                <SeasonQuickAdd
+                  value={draftText}
+                  onChange={setDraftText}
+                  onSubmit={submitAdd}
+                  onCancel={resetDraft}
+                  wide={!group.tasks.length}
+                />
+              ) : !editingId ? (
+                <button
+                  type="button"
+                  onClick={() => startAdd(group.key === "all" ? "other" : group.key)}
+                  className={`flex min-h-[72px] items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-4 text-[var(--v2-ink-400)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)] ${
+                    group.tasks.length ? "" : "md:col-span-2"
+                  } ${
                     isDropTarget
-                      ? "border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)]/70"
+                      ? "border-[var(--v2-brand-300)] bg-[var(--v2-brand-50)]/70 text-[var(--v2-brand-700)]"
                       : "border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/60"
                   }`}
                 >
-                  <span
-                    className={`v2-tight text-[13px] font-medium ${
-                      isDropTarget ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-400)]"
-                    }`}
-                  >
-                    {dragTaskId ? "Отпустите, чтобы поставить сюда" : "Перетащите карточку сюда"}
+                  <V2Icons.plus className="h-4 w-4" />
+                  <span className="v2-tight text-[13.5px] font-semibold">
+                    {isDropTarget ? "Отпустите, чтобы поставить сюда" : "Добавить карточку"}
                   </span>
-                </div>
-              )}
+                </button>
+              ) : null}
             </div>
           </div>
           );
         })}
-
-        {adding ? (
-          <SeasonCardForm
-            draftText={draftText}
-            draftNote={draftNote}
-            draftHref={draftHref}
-            draftPriority={draftPriority}
-            showPriority
-            onTextChange={setDraftText}
-            onNoteChange={setDraftNote}
-            onHrefChange={setDraftHref}
-            onPriorityChange={setDraftPriority}
-            onSubmit={submitAdd}
-            onCancel={resetDraft}
-            autoFocus
-          />
-        ) : !editingId ? (
-          <button
-            type="button"
-            onClick={startAdd}
-            className="flex min-h-[72px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-[22px] py-4 text-[var(--v2-ink-500)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)] md:max-w-sm"
-          >
-            <V2Icons.plus className="h-5 w-5" />
-            <span className="v2-tight text-[14.5px] font-semibold">Добавить карточку</span>
-          </button>
-        ) : null}
       </div>
     </div>
   );

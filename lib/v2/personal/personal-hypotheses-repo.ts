@@ -1,15 +1,18 @@
 import { getV2Supabase, newV2Id, nowIso } from "@/lib/v2/db/client";
 import {
-  HYPOTHESIS_SEEDS,
-  isHypothesisOutcome,
-  isHypothesisPriority,
-  isHypothesisStatus,
+  DESIGN_HYPOTHESES,
+  DESIGN_PROJECTS,
+  DESIGN_SPRINTS,
+  LEGACY_EMPTY_PROJECTS,
+  applyStageChange,
+  currentSprintId,
+  isHypothesisStage,
+  isHypothesisVerdict,
   type Hypothesis,
-  type HypothesisNote,
-  type HypothesisOutcome,
-  type HypothesisPriority,
-  type HypothesisStatus,
-  type HypothesisWithNotes,
+  type HypothesisProject,
+  type HypothesisSprint,
+  type HypothesisStage,
+  type HypothesisVerdict,
 } from "@/lib/v2/personal/hypotheses-meta";
 import type { V2SessionContext } from "@/lib/v2/types";
 
@@ -28,13 +31,9 @@ export class PersonalHypothesesNotFoundError extends Error {
 }
 
 export type HypothesesBoard = {
-  hypotheses: HypothesisWithNotes[];
-};
-
-export type HypothesisReorderItem = {
-  id: string;
-  priority: HypothesisPriority;
-  sort_order: number;
+  projects: HypothesisProject[];
+  sprints: HypothesisSprint[];
+  hypotheses: Hypothesis[];
 };
 
 function uid(ctx: V2SessionContext) {
@@ -45,38 +44,67 @@ function clip(value: unknown, max: number): string {
   return String(value ?? "").trim().slice(0, max);
 }
 
-function mapHypothesis(row: Record<string, unknown>): Hypothesis {
-  const priority = String(row.priority || "medium");
-  const status = String(row.status || "testing");
+function mapProject(row: Record<string, unknown>): HypothesisProject {
   return {
     id: String(row.id),
-    direction: String(row.direction || ""),
+    name: String(row.name || ""),
+    hue: Number(row.hue) || 260,
+    sort_order: Number(row.sort_order) || 0,
+  };
+}
+
+function mapSprint(row: Record<string, unknown>): HypothesisSprint {
+  return {
+    id: String(row.id),
+    name: String(row.name || ""),
+    range_label: String(row.range_label || ""),
+    is_current: Boolean(row.is_current),
+    sort_order: Number(row.sort_order) || 0,
+  };
+}
+
+function mapHypothesis(row: Record<string, unknown>): Hypothesis {
+  const stage = String(row.stage || "backlog");
+  const verdict = row.verdict ? String(row.verdict) : null;
+  return {
+    id: String(row.id),
+    project_id: row.project_id ? String(row.project_id) : null,
+    sprint_id: row.sprint_id ? String(row.sprint_id) : null,
     title: String(row.title || ""),
-    check_text: String(row.check_text || ""),
-    success_text: String(row.success_text || ""),
-    priority: isHypothesisPriority(priority) ? priority : "medium",
-    status: isHypothesisStatus(status) ? status : "testing",
+    body: String(row.body || ""),
+    metric: String(row.metric || ""),
+    stage: isHypothesisStage(stage) ? stage : "backlog",
+    verdict: verdict && isHypothesisVerdict(verdict) ? verdict : null,
+    result_text: String(row.result_text || ""),
     sort_order: Number(row.sort_order) || 0,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
 }
 
-function mapNote(row: Record<string, unknown>): HypothesisNote {
-  const outcome = String(row.outcome || "note");
-  const happened = String(row.happened_on || "").slice(0, 10);
-  return {
-    id: String(row.id),
-    hypothesis_id: String(row.hypothesis_id),
-    body: String(row.body || ""),
-    outcome: isHypothesisOutcome(outcome) ? outcome : "note",
-    happened_on: happened,
-    created_at: String(row.created_at),
-    updated_at: String(row.updated_at),
-  };
+async function listProjects(userId: string): Promise<HypothesisProject[]> {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_hypothesis_projects")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(mapProject);
 }
 
-async function listHypothesisRows(userId: string): Promise<Hypothesis[]> {
+async function listSprints(userId: string): Promise<HypothesisSprint[]> {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_hypothesis_sprints")
+    .select("*")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(mapSprint);
+}
+
+async function listHypotheses(userId: string): Promise<Hypothesis[]> {
   const sb = getV2Supabase();
   const { data, error } = await sb
     .from("v2_personal_hypotheses")
@@ -87,70 +115,109 @@ async function listHypothesisRows(userId: string): Promise<Hypothesis[]> {
   return ((data ?? []) as Record<string, unknown>[]).map(mapHypothesis);
 }
 
-async function listNoteRows(userId: string): Promise<HypothesisNote[]> {
-  const sb = getV2Supabase();
-  const { data, error } = await sb
-    .from("v2_personal_hypothesis_notes")
-    .select("*")
-    .eq("user_id", userId)
-    .order("happened_on", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return ((data ?? []) as Record<string, unknown>[]).map(mapNote);
-}
-
-function attachNotes(hypotheses: Hypothesis[], notes: HypothesisNote[]): HypothesisWithNotes[] {
-  const byHyp = new Map<string, HypothesisNote[]>();
-  for (const note of notes) {
-    const list = byHyp.get(note.hypothesis_id) ?? [];
-    list.push(note);
-    byHyp.set(note.hypothesis_id, list);
-  }
-  return hypotheses.map((hypothesis) => ({
-    ...hypothesis,
-    notes: byHyp.get(hypothesis.id) ?? [],
-  }));
-}
-
-async function seedIfEmpty(userId: string) {
+async function ensureDesignBoard(userId: string) {
   const sb = getV2Supabase();
   const now = nowIso();
-  const { error: lockError } = await sb.from("v2_personal_hypothesis_settings").insert({
-    user_id: userId,
-    seeded_at: now,
-  });
-  if (lockError) {
-    const code = "code" in lockError ? String(lockError.code) : "";
-    if (code === "23505") return;
-    throw lockError;
+  let sprints = await listSprints(userId);
+  if (!sprints.length) {
+    const rows = DESIGN_SPRINTS.map((sprint, index) => ({
+      id: newV2Id(),
+      user_id: userId,
+      name: sprint.name,
+      range_label: sprint.range_label,
+      is_current: sprint.is_current,
+      sort_order: index,
+      created_at: now,
+      updated_at: now,
+    }));
+    const { error } = await sb.from("v2_personal_hypothesis_sprints").insert(rows);
+    if (error) throw error;
+    sprints = await listSprints(userId);
   }
-  const existing = await listHypothesisRows(userId);
-  if (existing.length > 0) return;
-  const rows = HYPOTHESIS_SEEDS.map((seed, index) => ({
-    id: newV2Id(),
-    user_id: userId,
-    direction: seed.direction,
-    title: seed.title,
-    check_text: seed.check_text,
-    success_text: seed.success_text,
-    priority: seed.priority,
-    status: "testing",
-    sort_order: index,
-    created_at: now,
-    updated_at: now,
-  }));
-  const { error } = await sb.from("v2_personal_hypotheses").insert(rows);
-  if (error) {
-    await sb.from("v2_personal_hypothesis_settings").delete().eq("user_id", userId);
-    throw error;
+
+  let projects = await listProjects(userId);
+  let hypotheses = await listHypotheses(userId);
+  if (!hypotheses.length) {
+    const drop = projects.filter((project) => LEGACY_EMPTY_PROJECTS.includes(project.name));
+    if (drop.length) {
+      const { error } = await sb
+        .from("v2_personal_hypothesis_projects")
+        .delete()
+        .eq("user_id", userId)
+        .in(
+          "id",
+          drop.map((project) => project.id),
+        );
+      if (error) throw error;
+      projects = projects.filter((project) => !LEGACY_EMPTY_PROJECTS.includes(project.name));
+    }
+    const missing = DESIGN_PROJECTS.filter((seed) => !projects.some((project) => project.name === seed.name));
+    if (missing.length) {
+      const rows = missing.map((seed) => ({
+        id: newV2Id(),
+        user_id: userId,
+        name: seed.name,
+        color: "#71717A",
+        hue: seed.hue,
+        sort_order: DESIGN_PROJECTS.findIndex((item) => item.key === seed.key),
+        created_at: now,
+        updated_at: now,
+      }));
+      const { error } = await sb.from("v2_personal_hypothesis_projects").insert(rows);
+      if (error) throw error;
+      projects = await listProjects(userId);
+    }
+    const byName = new Map(projects.map((project) => [project.name, project]));
+    const sprintByName = new Map(sprints.map((sprint) => [sprint.name, sprint]));
+    const rows = DESIGN_HYPOTHESES.map((seed, index) => {
+      const project = byName.get(DESIGN_PROJECTS.find((item) => item.key === seed.project)?.name ?? "");
+      const sprintSeed = DESIGN_SPRINTS.find((item) => item.key === seed.sprint);
+      const sprint = sprintSeed ? sprintByName.get(sprintSeed.name) : undefined;
+      return {
+        id: newV2Id(),
+        user_id: userId,
+        project_id: project?.id ?? null,
+        sprint_id: sprint?.id ?? null,
+        title: seed.title,
+        body: seed.body,
+        metric: seed.metric,
+        stage: seed.stage,
+        verdict: seed.verdict ?? null,
+        result_text: seed.result_text ?? "",
+        sort_order: index,
+        created_at: now,
+        updated_at: now,
+      };
+    });
+    const { error } = await sb.from("v2_personal_hypotheses").insert(rows);
+    if (error) throw error;
+    hypotheses = await listHypotheses(userId);
+  }
+
+  const current = currentSprintId(sprints);
+  const loose = hypotheses.filter((item) => (item.stage === "active" || item.stage === "done") && !item.sprint_id);
+  if (current && loose.length) {
+    await Promise.all(
+      loose.map((item) =>
+        sb
+          .from("v2_personal_hypotheses")
+          .update({ sprint_id: current, updated_at: now })
+          .eq("id", item.id)
+          .eq("user_id", userId),
+      ),
+    );
   }
 }
 
 export async function loadHypothesesBoard(ctx: V2SessionContext): Promise<HypothesesBoard> {
   const userId = uid(ctx);
-  await seedIfEmpty(userId);
-  const [hypotheses, notes] = await Promise.all([listHypothesisRows(userId), listNoteRows(userId)]);
-  return { hypotheses: attachNotes(hypotheses, notes) };
+  await ensureDesignBoard(userId);
+  const [projects, sprints, hypotheses] = await Promise.all([
+    listProjects(userId),
+    listSprints(userId),
+    listHypotheses(userId),
+  ]);
+  return { projects, sprints, hypotheses };
 }
 
 async function requireOwned(ctx: V2SessionContext, id: string): Promise<Hypothesis> {
@@ -166,41 +233,63 @@ async function requireOwned(ctx: V2SessionContext, id: string): Promise<Hypothes
   return mapHypothesis(data as Record<string, unknown>);
 }
 
+async function requireOwnedProject(ctx: V2SessionContext, id: string) {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_hypothesis_projects")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", uid(ctx))
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new PersonalHypothesesNotFoundError();
+  return mapProject(data as Record<string, unknown>);
+}
+
+async function requireOwnedSprint(ctx: V2SessionContext, id: string) {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_hypothesis_sprints")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", uid(ctx))
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new PersonalHypothesesNotFoundError();
+  return mapSprint(data as Record<string, unknown>);
+}
+
 export async function createPersonalHypothesis(
   ctx: V2SessionContext,
-  input: {
-    title?: string;
-    direction?: string;
-    checkText?: string;
-    successText?: string;
-    priority?: string;
-  },
+  input: { title?: string; projectId?: string | null; stage?: string },
 ): Promise<Hypothesis> {
-  const title = clip(input.title, 500);
-  if (!title) throw new PersonalHypothesesValidationError("Напиши формулировку гипотезы");
-  const priority = input.priority && isHypothesisPriority(input.priority) ? input.priority : "medium";
+  const title = clip(input.title, 300);
+  const stage: HypothesisStage =
+    input.stage && isHypothesisStage(input.stage) && input.stage !== "active" ? input.stage : "backlog";
   const userId = uid(ctx);
+  if (input.projectId) await requireOwnedProject(ctx, input.projectId);
   const sb = getV2Supabase();
   const { data: existing, error: existingError } = await sb
     .from("v2_personal_hypotheses")
     .select("sort_order")
     .eq("user_id", userId)
-    .eq("priority", priority)
-    .order("sort_order", { ascending: true })
+    .eq("stage", stage)
+    .order("sort_order", { ascending: false })
     .limit(1);
   if (existingError) throw existingError;
-  const nextSort = existing?.[0] ? Number(existing[0].sort_order) - 1 : 0;
   const now = nowIso();
   const row = {
     id: newV2Id(),
     user_id: userId,
-    direction: clip(input.direction, 160),
+    project_id: input.projectId || null,
+    sprint_id: null,
     title,
-    check_text: clip(input.checkText, 4000),
-    success_text: clip(input.successText, 4000),
-    priority,
-    status: "testing" as HypothesisStatus,
-    sort_order: nextSort,
+    body: "",
+    metric: "",
+    stage,
+    verdict: null,
+    result_text: "",
+    sort_order: existing?.[0] ? Number(existing[0].sort_order) + 1 : 0,
     created_at: now,
     updated_at: now,
   };
@@ -214,52 +303,51 @@ export async function updatePersonalHypothesis(
   id: string,
   input: {
     title?: string;
-    direction?: string;
-    checkText?: string;
-    successText?: string;
-    priority?: string;
-    status?: string;
+    body?: string;
+    metric?: string;
+    resultText?: string;
+    verdict?: string | null;
+    projectId?: string | null;
+    sprintId?: string | null;
+    stage?: string;
   },
 ): Promise<Hypothesis> {
   const current = await requireOwned(ctx, id);
   const sb = getV2Supabase();
+  const userId = uid(ctx);
   const patch: Record<string, unknown> = { updated_at: nowIso() };
-  if (input.title !== undefined) {
-    const title = clip(input.title, 500);
-    if (!title) throw new PersonalHypothesesValidationError("Напиши формулировку гипотезы");
-    patch.title = title;
+  if (input.title !== undefined) patch.title = clip(input.title, 300);
+  if (input.body !== undefined) patch.body = clip(input.body, 2000);
+  if (input.metric !== undefined) patch.metric = clip(input.metric, 500);
+  if (input.resultText !== undefined) patch.result_text = clip(input.resultText, 2000);
+  if (input.verdict !== undefined) {
+    if (input.verdict && !isHypothesisVerdict(input.verdict)) {
+      throw new PersonalHypothesesValidationError("Неизвестный вердикт");
+    }
+    patch.verdict = input.verdict || null;
   }
-  if (input.direction !== undefined) patch.direction = clip(input.direction, 160);
-  if (input.checkText !== undefined) patch.check_text = clip(input.checkText, 4000);
-  if (input.successText !== undefined) patch.success_text = clip(input.successText, 4000);
-  if (input.priority !== undefined) {
-    if (!isHypothesisPriority(input.priority)) {
-      throw new PersonalHypothesesValidationError("Неизвестный приоритет");
-    }
-    patch.priority = input.priority;
-    if (input.priority !== current.priority) {
-      const { data: top, error: topError } = await sb
-        .from("v2_personal_hypotheses")
-        .select("sort_order")
-        .eq("user_id", uid(ctx))
-        .eq("priority", input.priority)
-        .order("sort_order", { ascending: true })
-        .limit(1);
-      if (topError) throw topError;
-      patch.sort_order = top?.[0] ? Number(top[0].sort_order) - 1 : 0;
-    }
+  if (input.projectId !== undefined) {
+    if (input.projectId) await requireOwnedProject(ctx, input.projectId);
+    patch.project_id = input.projectId;
   }
-  if (input.status !== undefined) {
-    if (!isHypothesisStatus(input.status)) {
-      throw new PersonalHypothesesValidationError("Неизвестный статус");
-    }
-    patch.status = input.status;
+  if (input.stage !== undefined || input.sprintId !== undefined) {
+    const stage = input.stage ?? current.stage;
+    if (!isHypothesisStage(stage)) throw new PersonalHypothesesValidationError("Неизвестный статус");
+    const sprints = await listSprints(userId);
+    const sprintId =
+      input.sprintId !== undefined ? input.sprintId : (current.sprint_id ?? currentSprintId(sprints));
+    if (sprintId) await requireOwnedSprint(ctx, sprintId);
+    const all = await listHypotheses(userId);
+    const moved = applyStageChange(all, id, stage, sprintId);
+    if (!moved.ok) throw new PersonalHypothesesValidationError(moved.error);
+    patch.stage = moved.item.stage;
+    patch.sprint_id = moved.item.sprint_id;
   }
   const { data, error } = await sb
     .from("v2_personal_hypotheses")
     .update(patch)
     .eq("id", id)
-    .eq("user_id", uid(ctx))
+    .eq("user_id", userId)
     .select("*")
     .single();
   if (error) throw error;
@@ -273,131 +361,57 @@ export async function deletePersonalHypothesis(ctx: V2SessionContext, id: string
   if (error) throw error;
 }
 
-export async function reorderPersonalHypotheses(ctx: V2SessionContext, items: HypothesisReorderItem[]) {
-  const userId = uid(ctx);
-  const existing = await listHypothesisRows(userId);
-  if (items.length !== existing.length) {
-    throw new PersonalHypothesesValidationError("Список устарел, обнови страницу");
-  }
-  const known = new Set(existing.map((item) => item.id));
-  const seen = new Set<string>();
-  for (const item of items) {
-    if (!known.has(item.id) || seen.has(item.id)) {
-      throw new PersonalHypothesesValidationError("Список устарел, обнови страницу");
-    }
-    if (!isHypothesisPriority(item.priority) || !Number.isInteger(item.sort_order)) {
-      throw new PersonalHypothesesValidationError("Некорректный порядок");
-    }
-    seen.add(item.id);
-  }
-  const sb = getV2Supabase();
-  const now = nowIso();
-  const results = await Promise.all(
-    items.map((item) =>
-      sb
-        .from("v2_personal_hypotheses")
-        .update({ priority: item.priority, sort_order: item.sort_order, updated_at: now })
-        .eq("id", item.id)
-        .eq("user_id", userId),
-    ),
-  );
-  const failed = results.find((result) => result.error);
-  if (failed?.error) throw failed.error;
-}
-
-function parseDate(value: unknown): string {
-  const text = String(value ?? "").slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    throw new PersonalHypothesesValidationError("Укажи дату проверки");
-  }
-  return text;
-}
-
-export async function createHypothesisNote(
+export async function createHypothesisSprint(
   ctx: V2SessionContext,
-  hypothesisId: string,
-  input: { body?: string; outcome?: string; happenedOn?: string },
-): Promise<HypothesisNote> {
-  await requireOwned(ctx, hypothesisId);
-  const body = clip(input.body, 4000);
-  if (!body) throw new PersonalHypothesesValidationError("Напиши, что проверил");
-  if (!input.outcome || !isHypothesisOutcome(input.outcome)) {
-    throw new PersonalHypothesesValidationError("Отметь, зашло или нет");
-  }
-  const happenedOn = input.happenedOn ? parseDate(input.happenedOn) : new Date().toISOString().slice(0, 10);
+  input: { name?: string; rangeLabel?: string },
+): Promise<HypothesisSprint> {
+  const userId = uid(ctx);
+  const sprints = await listSprints(userId);
   const now = nowIso();
   const row = {
     id: newV2Id(),
-    hypothesis_id: hypothesisId,
-    user_id: uid(ctx),
-    body,
-    outcome: input.outcome as HypothesisOutcome,
-    happened_on: happenedOn,
+    user_id: userId,
+    name: clip(input.name, 80) || `Спринт ${sprints.length + 1}`,
+    range_label: clip(input.rangeLabel, 80) || "даты не заданы",
+    is_current: false,
+    sort_order: sprints.length,
     created_at: now,
     updated_at: now,
   };
   const sb = getV2Supabase();
-  const { data, error } = await sb.from("v2_personal_hypothesis_notes").insert(row).select("*").single();
+  const { data, error } = await sb.from("v2_personal_hypothesis_sprints").insert(row).select("*").single();
   if (error) throw error;
-  return mapNote(data as Record<string, unknown>);
+  return mapSprint(data as Record<string, unknown>);
 }
 
-async function requireOwnedNote(ctx: V2SessionContext, hypothesisId: string, noteId: string) {
-  await requireOwned(ctx, hypothesisId);
-  const sb = getV2Supabase();
-  const { data, error } = await sb
-    .from("v2_personal_hypothesis_notes")
-    .select("*")
-    .eq("id", noteId)
-    .eq("hypothesis_id", hypothesisId)
-    .eq("user_id", uid(ctx))
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new PersonalHypothesesNotFoundError();
-  return mapNote(data as Record<string, unknown>);
-}
-
-export async function updateHypothesisNote(
+export async function createHypothesisProject(
   ctx: V2SessionContext,
-  hypothesisId: string,
-  noteId: string,
-  input: { body?: string; outcome?: string; happenedOn?: string },
-): Promise<HypothesisNote> {
-  await requireOwnedNote(ctx, hypothesisId, noteId);
-  const patch: Record<string, unknown> = { updated_at: nowIso() };
-  if (input.body !== undefined) {
-    const body = clip(input.body, 4000);
-    if (!body) throw new PersonalHypothesesValidationError("Напиши, что проверил");
-    patch.body = body;
-  }
-  if (input.outcome !== undefined) {
-    if (!isHypothesisOutcome(input.outcome)) {
-      throw new PersonalHypothesesValidationError("Отметь, зашло или нет");
-    }
-    patch.outcome = input.outcome;
-  }
-  if (input.happenedOn !== undefined) patch.happened_on = parseDate(input.happenedOn);
+  input: { name?: string; hue?: number },
+): Promise<HypothesisProject> {
+  const name = clip(input.name, 80);
+  if (!name) throw new PersonalHypothesesValidationError("Напиши название проекта");
+  const userId = uid(ctx);
+  const projects = await listProjects(userId);
+  const now = nowIso();
+  const row = {
+    id: newV2Id(),
+    user_id: userId,
+    name,
+    color: "#71717A",
+    hue: Number.isFinite(input.hue) ? Math.round(Number(input.hue)) : 260,
+    sort_order: projects.length,
+    created_at: now,
+    updated_at: now,
+  };
   const sb = getV2Supabase();
-  const { data, error } = await sb
-    .from("v2_personal_hypothesis_notes")
-    .update(patch)
-    .eq("id", noteId)
-    .eq("hypothesis_id", hypothesisId)
-    .eq("user_id", uid(ctx))
-    .select("*")
-    .single();
+  const { data, error } = await sb.from("v2_personal_hypothesis_projects").insert(row).select("*").single();
   if (error) throw error;
-  return mapNote(data as Record<string, unknown>);
+  return mapProject(data as Record<string, unknown>);
 }
 
-export async function deleteHypothesisNote(ctx: V2SessionContext, hypothesisId: string, noteId: string) {
-  await requireOwnedNote(ctx, hypothesisId, noteId);
+export async function deleteHypothesisProject(ctx: V2SessionContext, id: string) {
+  await requireOwnedProject(ctx, id);
   const sb = getV2Supabase();
-  const { error } = await sb
-    .from("v2_personal_hypothesis_notes")
-    .delete()
-    .eq("id", noteId)
-    .eq("hypothesis_id", hypothesisId)
-    .eq("user_id", uid(ctx));
+  const { error } = await sb.from("v2_personal_hypothesis_projects").delete().eq("id", id).eq("user_id", uid(ctx));
   if (error) throw error;
 }

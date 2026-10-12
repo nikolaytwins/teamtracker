@@ -40,6 +40,8 @@ import type {
   PersonalIncomeHistoryRow,
   PersonalMonthSnapshotRow,
 } from "@/lib/v2/personal/types";
+import { HomeDynamicsChart } from "@/components/v2/home/personal/home-dynamics-chart";
+import { HomePersonalFinanceProvider } from "@/components/v2/home/personal/home-personal-finance-context";
 import { V2Icons } from "@/components/v2/ui/icons";
 import Image from "next/image";
 import Link from "next/link";
@@ -1812,6 +1814,9 @@ export function PersonalFinanceClient() {
 
             <div className="space-y-7">
               <PfHeroCards summary={summary} accounts={accounts} funds={funds ?? []} history={history} year={year} month={month} />
+              <HomePersonalFinanceProvider>
+                <HomeDynamicsChart />
+              </HomePersonalFinanceProvider>
               <PfHorizon2027
                 capitalNow={summary.netWorth}
                 avgMonthlyProfit={summary.avgProfit6m}

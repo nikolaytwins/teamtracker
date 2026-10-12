@@ -1,50 +1,45 @@
--- 089 — банк гипотез: карточки, приоритет, порядок, журнал проверок.
+-- 089 — банк гипотез: спринт недели, очередь, бэклог, проекты.
+
+CREATE TABLE IF NOT EXISTS v2_personal_hypothesis_projects (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#71717A',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_v2_personal_hypothesis_projects_user
+  ON v2_personal_hypothesis_projects (user_id, sort_order);
 
 CREATE TABLE IF NOT EXISTS v2_personal_hypotheses (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
-  direction TEXT NOT NULL DEFAULT '',
+  project_id TEXT REFERENCES v2_personal_hypothesis_projects (id) ON DELETE SET NULL,
   title TEXT NOT NULL,
-  check_text TEXT NOT NULL DEFAULT '',
-  success_text TEXT NOT NULL DEFAULT '',
-  priority TEXT NOT NULL DEFAULT 'medium',
-  status TEXT NOT NULL DEFAULT 'testing',
+  lane TEXT NOT NULL DEFAULT 'backlog',
+  week_slot INTEGER,
+  status TEXT NOT NULL DEFAULT 'queued',
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT v2_personal_hypotheses_priority_check CHECK (priority IN ('high', 'medium', 'low')),
-  CONSTRAINT v2_personal_hypotheses_status_check CHECK (status IN ('testing', 'confirmed', 'rejected', 'paused'))
+  CONSTRAINT v2_personal_hypotheses_lane_check CHECK (lane IN ('week', 'next', 'backlog')),
+  CONSTRAINT v2_personal_hypotheses_status_check CHECK (status IN ('queued', 'tested', 'worked')),
+  CONSTRAINT v2_personal_hypotheses_week_slot_check CHECK (week_slot IS NULL OR week_slot IN (1, 2, 3))
 );
 
-CREATE INDEX IF NOT EXISTS idx_v2_personal_hypotheses_user_sort
-  ON v2_personal_hypotheses (user_id, priority, sort_order);
+CREATE INDEX IF NOT EXISTS idx_v2_personal_hypotheses_user_lane
+  ON v2_personal_hypotheses (user_id, lane, sort_order);
 
-CREATE TABLE IF NOT EXISTS v2_personal_hypothesis_notes (
-  id TEXT PRIMARY KEY,
-  hypothesis_id TEXT NOT NULL REFERENCES v2_personal_hypotheses (id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL,
-  body TEXT NOT NULL,
-  outcome TEXT NOT NULL DEFAULT 'note',
-  happened_on DATE NOT NULL DEFAULT CURRENT_DATE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT v2_personal_hypothesis_notes_outcome_check CHECK (
-    outcome IN ('worked', 'missed', 'mixed', 'note')
-  )
-);
-
-CREATE INDEX IF NOT EXISTS idx_v2_personal_hypothesis_notes_hyp
-  ON v2_personal_hypothesis_notes (hypothesis_id, happened_on DESC, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_v2_personal_hypothesis_notes_user
-  ON v2_personal_hypothesis_notes (user_id, happened_on DESC);
-
-ALTER TABLE v2_personal_hypotheses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_personal_hypothesis_notes ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_v2_personal_hypotheses_user_project
+  ON v2_personal_hypotheses (user_id, project_id);
 
 CREATE TABLE IF NOT EXISTS v2_personal_hypothesis_settings (
   user_id TEXT PRIMARY KEY,
   seeded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE v2_personal_hypothesis_projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_personal_hypotheses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE v2_personal_hypothesis_settings ENABLE ROW LEVEL SECURITY;
