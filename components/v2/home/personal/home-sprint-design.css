@@ -44,8 +44,8 @@
 .hs .sec-sub { font-size: 14.5px; color: var(--ink-500); }
 
 .hs .mf { position: relative; overflow: hidden; min-height: 420px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
-.hs .mf-img { position: absolute; inset: 0; background-position: 28% 22%; background-size: cover; background-repeat: no-repeat; }
-.hs .mf-img::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(255, 255, 255, 0) 6%, rgba(255, 255, 255, 0.72) 22%, #fff 36%); }
+.hs .mf-img { position: absolute; inset: 0; background-position: 86% 28%; background-size: 125% auto; background-repeat: no-repeat; }
+.hs .mf-img::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(255, 255, 255, 0) 34%, rgba(255, 255, 255, 0.4) 46%, #fff 52%); }
 .hs .mf-r { position: relative; grid-column: 2; padding: 44px 48px 40px 8px; display: flex; flex-direction: column; justify-content: center; gap: 18px; }
 .hs .mf-tag { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .hs .mf-badge { font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 9px; background: var(--blue); color: #fff; letter-spacing: 0.02em; }
