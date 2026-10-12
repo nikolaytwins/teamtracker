@@ -354,6 +354,12 @@ export function V2ShellSidebar({
                 active = pathname?.startsWith(appPath("/v2/personal/time")) ?? false;
               } else if (item.href.startsWith("/v2/personal/dashboard")) {
                 active = pathname?.startsWith(appPath("/v2/personal/dashboard")) ?? false;
+              } else if (item.href === "/v2/personal/articles") {
+                active =
+                  (pathname?.startsWith(appPath("/v2/personal/articles")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/sexuality")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/manifestations")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/life-goals")) ?? false);
               } else if (item.href === "/v2/personal/manifest") {
                 // Блок Манифест: манифест + общая стратегия + бренд + мой код + база данных
                 const onManifestations = pathname?.startsWith(appPath("/v2/personal/manifestations")) ?? false;

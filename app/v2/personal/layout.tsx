@@ -17,12 +17,12 @@ const PERSONAL_TABS = [
   },
 ] as const;
 
-const LIFE_MAP_TABS = [
+const ARTICLE_TABS = [
   {
-    href: "/v2/personal/life-goals",
-    label: "Главные цели",
+    href: "/v2/personal/sexuality",
+    label: "Сексуальность",
     match: (p: string) =>
-      p.startsWith("/v2/personal/life-goals") || p.startsWith(appPath("/v2/personal/life-goals")),
+      p.startsWith("/v2/personal/sexuality") || p.startsWith(appPath("/v2/personal/sexuality")),
   },
   {
     href: "/v2/personal/manifestations",
@@ -31,10 +31,10 @@ const LIFE_MAP_TABS = [
       p.startsWith("/v2/personal/manifestations") || p.startsWith(appPath("/v2/personal/manifestations")),
   },
   {
-    href: "/v2/personal/sexuality",
-    label: "Сексуальность",
+    href: "/v2/personal/life-goals",
+    label: "Цели",
     match: (p: string) =>
-      p.startsWith("/v2/personal/sexuality") || p.startsWith(appPath("/v2/personal/sexuality")),
+      p.startsWith("/v2/personal/life-goals") || p.startsWith(appPath("/v2/personal/life-goals")),
   },
 ] as const;
 
@@ -146,7 +146,9 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     pathname.startsWith("/v2/personal/goals") || pathname.startsWith(appPath("/v2/personal/goals"));
   const inGame =
     pathname.startsWith("/v2/personal/game") || pathname.startsWith(appPath("/v2/personal/game"));
-  const inLifeMap =
+  const inArticles =
+    pathname.startsWith("/v2/personal/articles") ||
+    pathname.startsWith(appPath("/v2/personal/articles")) ||
     pathname.startsWith("/v2/personal/life-goals") ||
     pathname.startsWith(appPath("/v2/personal/life-goals")) ||
     pathname.startsWith("/v2/personal/manifestations") ||
@@ -174,8 +176,8 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     ? FINANCE_TABS
     : inDashboard
       ? DASHBOARD_TABS
-      : inLifeMap
-        ? LIFE_MAP_TABS
+      : inArticles
+        ? ARTICLE_TABS
         : inManifest
           ? MANIFEST_TABS
           : PERSONAL_TABS;

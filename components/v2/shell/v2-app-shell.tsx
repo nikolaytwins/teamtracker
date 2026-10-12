@@ -83,9 +83,7 @@ const FOOTER_NAV: NavItem[] = [
 const PERSONAL_NAV: NavItem[] = [
   { href: "/v2/personal/hypotheses", label: "Гипотезы", icon: "lab" },
   { href: "/v2/personal/goals", label: "Цели", icon: "tag" },
-  { href: "/v2/personal/life-goals", label: "Главные цели", icon: "spark" },
-  { href: "/v2/personal/manifestations", label: "Манифестации", icon: "wish" },
-  { href: "/v2/personal/sexuality", label: "Сексуальность", icon: "flame" },
+  { href: "/v2/personal/articles", label: "Статьи", icon: "spark" },
   { href: "/v2/personal/game", label: "Игра", icon: "star" },
   // Скрыто: Идеи (/v2/personal/ideas — вкладка в «Идеи и задачи»)
   // Скрыто: Дашборд (/v2/personal/dashboard — YouTube неактуален)
