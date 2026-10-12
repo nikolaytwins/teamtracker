@@ -17,6 +17,27 @@ const PERSONAL_TABS = [
   },
 ] as const;
 
+const LIFE_MAP_TABS = [
+  {
+    href: "/v2/personal/life-goals",
+    label: "Главные цели",
+    match: (p: string) =>
+      p.startsWith("/v2/personal/life-goals") || p.startsWith(appPath("/v2/personal/life-goals")),
+  },
+  {
+    href: "/v2/personal/manifestations",
+    label: "Манифестации",
+    match: (p: string) =>
+      p.startsWith("/v2/personal/manifestations") || p.startsWith(appPath("/v2/personal/manifestations")),
+  },
+  {
+    href: "/v2/personal/sexuality",
+    label: "Сексуальность",
+    match: (p: string) =>
+      p.startsWith("/v2/personal/sexuality") || p.startsWith(appPath("/v2/personal/sexuality")),
+  },
+] as const;
+
 const MANIFEST_TABS = [
   {
     href: "/v2/personal/manifest",
@@ -97,7 +118,8 @@ function isManifestBlockPath(pathname: string) {
     pathname === appPath("/v2/personal/strategy") ||
     pathname.startsWith(appPath("/v2/personal/strategy/"));
   return (
-    pathname.startsWith(appPath("/v2/personal/manifest")) ||
+    (pathname.startsWith(appPath("/v2/personal/manifest")) &&
+      !pathname.startsWith(appPath("/v2/personal/manifestations"))) ||
     pathname.startsWith(appPath("/v2/personal/life-strategy")) ||
     pathname.startsWith(appPath("/v2/personal/brand")) ||
     pathname.startsWith(appPath("/v2/personal/my-code")) ||
@@ -122,6 +144,15 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     pathname.startsWith(appPath("/v2/personal/hypotheses"));
   const inGoals =
     pathname.startsWith("/v2/personal/goals") || pathname.startsWith(appPath("/v2/personal/goals"));
+  const inGame =
+    pathname.startsWith("/v2/personal/game") || pathname.startsWith(appPath("/v2/personal/game"));
+  const inLifeMap =
+    pathname.startsWith("/v2/personal/life-goals") ||
+    pathname.startsWith(appPath("/v2/personal/life-goals")) ||
+    pathname.startsWith("/v2/personal/manifestations") ||
+    pathname.startsWith(appPath("/v2/personal/manifestations")) ||
+    pathname.startsWith("/v2/personal/sexuality") ||
+    pathname.startsWith(appPath("/v2/personal/sexuality"));
   if (
     inTasks ||
     inCalendar ||
@@ -132,7 +163,8 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     inImportant ||
     inMoscow ||
     inHypotheses ||
-    inGoals
+    inGoals ||
+    inGame
   ) {
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }
@@ -142,9 +174,11 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     ? FINANCE_TABS
     : inDashboard
       ? DASHBOARD_TABS
-      : inManifest
-        ? MANIFEST_TABS
-        : PERSONAL_TABS;
+      : inLifeMap
+        ? LIFE_MAP_TABS
+        : inManifest
+          ? MANIFEST_TABS
+          : PERSONAL_TABS;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
