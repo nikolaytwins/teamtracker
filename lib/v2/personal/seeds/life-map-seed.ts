@@ -112,7 +112,7 @@ export const LIFE_GOALS_DOC: LifeMapDoc = {
   eyebrow: "Карта жизни · цели",
   title: "Мои главные цели",
   lead: "Три направления, вокруг которых я собираю деньги, семью и энергию.",
-  hero: "/life/hero-goals.jpg",
+  hero: "/life/hero-goals.png",
   chips: [
     { n: "01", t: "Состоятельный создатель" },
     { n: "02", t: "Любовь, семья, сексуальность" },
@@ -283,7 +283,7 @@ export const LIFE_MF_DOC: LifeMapDoc = {
   eyebrow: "Карта жизни · манифестации",
   title: "Мои манифестации",
   lead: "Три образа жизни, в которой я уже живу.",
-  hero: "/life/hero-manifestations.jpg",
+  hero: "/life/hero-manifestations.png",
   privateText: true,
   chips: [
     { n: "01", t: "Состоятельный создатель" },
@@ -395,7 +395,7 @@ export const LIFE_SX_DOC: LifeMapDoc = {
   eyebrow: "Карта жизни · сексуальность",
   title: "Сексуальность",
   lead: "Я становлюсь уверенным, чувственным, любящим мужчиной.",
-  hero: "/life/hero-sexuality.jpg",
+  hero: "/life/hero-sexuality.png",
   privateText: true,
   chips: [
     { n: "01", t: "С Лерой" },

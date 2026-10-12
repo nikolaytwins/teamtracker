@@ -89,7 +89,7 @@ export function PersonalGameClient() {
       <main className="tt-gm-main">
         <div className="tt-gm-banner">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={appPath("/life/hero-game.jpg")} alt="" />
+          <img src={appPath("/life/hero-game.png")} alt="" />
         </div>
 
         <nav className="tt-gm-nav">
