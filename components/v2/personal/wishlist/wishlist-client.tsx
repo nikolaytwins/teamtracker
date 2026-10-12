@@ -685,37 +685,86 @@ function goalPhoto(title: string) {
 }
 
 function FoundationBody() {
-  const { dashboard } = useHomePersonalFinance();
+  const { dashboard, reload } = useHomePersonalFinance();
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const [target, setTarget] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editTarget, setEditTarget] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const allocated = allocateGoals(dashboard?.goals ?? [], cushionPool(dashboard?.funds ?? []));
-  const cards =
-    allocated.length > 0
-      ? allocated.map((goal) => ({
-          id: goal.id,
-          title: goal.title,
-          current: goal.filled,
-          target: goal.target_rub,
-          photo: goalPhoto(goal.title),
-        }))
-      : [
-          { id: "cushion", title: "Подушка безопасности", current: 0, target: 510_000, photo: "/home/goal-cushion.png" },
-          { id: "car", title: "Машина", current: 0, target: 0, photo: "/home/goal-car.png" },
-        ];
+
+  const addGoal = async () => {
+    const amount = parseMoney(target);
+    if (!title.trim()) {
+      setError("Напиши название цели");
+      return;
+    }
+    setError(null);
+    await fetchJson("/api/v2/personal/finance/goals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim(), target_rub: amount }),
+    });
+    setTitle("");
+    setTarget("");
+    setAdding(false);
+    await reload();
+  };
+
+  const saveGoal = async (id: string) => {
+    const nextTitle = editTitle.trim();
+    if (!nextTitle) {
+      setError("Напиши название цели");
+      return;
+    }
+    setError(null);
+    await fetchJson(`/api/v2/personal/finance/goals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: nextTitle, target_rub: parseMoney(editTarget) }),
+    });
+    setEditingId(null);
+    await reload();
+  };
+
+  const removeGoal = async (id: string) => {
+    setError(null);
+    await fetchJson(`/api/v2/personal/finance/goals/${id}`, { method: "DELETE" });
+    if (editingId === id) setEditingId(null);
+    await reload();
+  };
+
   return (
     <section>
-      <div className="mb-4 flex items-baseline gap-3.5">
+      <div className="mb-4 flex flex-wrap items-baseline gap-3.5">
         <h2 className="v2-tight text-[26px] font-semibold tracking-[-0.03em]">Фундамент</h2>
         <span className="text-[14.5px] text-[var(--v2-ink-500)]">сначала это, потом всё остальное</span>
+        <button
+          type="button"
+          onClick={() => {
+            setAdding(true);
+            setError(null);
+          }}
+          className="ml-auto inline-flex h-10 items-center rounded-[12px] bg-[#2d5eef] px-3.5 text-[14px] font-semibold text-white"
+        >
+          + Цель
+        </button>
       </div>
+      {error ? <div className="mb-3 rounded-xl bg-rose-50 px-4 py-2.5 text-[13px] text-rose-800">{error}</div> : null}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {cards.map((goal) => {
-          const pct = goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
-          const left = Math.max(goal.target - goal.current, 0);
+        {allocated.map((goal) => {
+          const pct = goal.target_rub > 0 ? Math.round((goal.filled / goal.target_rub) * 100) : 0;
+          const left = Math.max(goal.target_rub - goal.filled, 0);
+          const photo = goalPhoto(goal.title);
+          const editing = editingId === goal.id;
           return (
             <article key={goal.id} className="v2-card grid overflow-hidden md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)]">
               <div className="min-h-[190px] p-2.5">
-                {goal.photo ? (
+                {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={appPath(goal.photo)} alt="" className="h-full w-full rounded-[14px] object-cover" />
+                  <img src={appPath(photo)} alt="" className="h-full w-full rounded-[14px] object-cover" />
                 ) : (
                   <div className="flex h-full items-center justify-center rounded-[14px] bg-[#eef1f6] px-3 text-center text-[13px] text-[var(--v2-ink-400)]">
                     {goal.title}
@@ -723,24 +772,132 @@ function FoundationBody() {
                 )}
               </div>
               <div className="flex flex-col justify-center px-6 py-[22px] md:pr-6 md:pl-3.5">
-                <h3 className="text-[18px] font-semibold tracking-[-0.02em]">{goal.title}</h3>
-                <div className="mt-3 flex flex-wrap items-baseline gap-2">
-                  <span className="v2-tnum text-[32px] font-semibold tracking-[-0.035em]">{rub(goal.current)}</span>
-                  <span className="v2-tnum text-[14px] text-[var(--v2-ink-400)]">
-                    {goal.target > 0 ? `из ${rub(goal.target)}` : "сумма цели не задана"}
-                  </span>
+                <div className="flex items-start gap-2">
+                  {editing ? (
+                    <input
+                      value={editTitle}
+                      autoFocus
+                      aria-label="Название цели"
+                      onChange={(event) => setEditTitle(event.target.value)}
+                      className="min-w-0 flex-1 rounded-lg bg-[var(--v2-ink-50)] px-2.5 py-1.5 text-[18px] font-semibold outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+                    />
+                  ) : (
+                    <h3 className="min-w-0 flex-1 text-[18px] font-semibold tracking-[-0.02em]">{goal.title}</h3>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Изменить"
+                    title="Изменить"
+                    onClick={() => {
+                      setEditingId(goal.id);
+                      setEditTitle(goal.title);
+                      setEditTarget(moneyText(goal.target_rub));
+                      setError(null);
+                    }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[14px] text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Удалить"
+                    title="Удалить"
+                    onClick={() => void removeGoal(goal.id).catch((cause) => setError(cause instanceof Error ? cause.message : "Не удалось удалить"))}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[18px] text-[var(--v2-ink-400)] hover:bg-[#fee4e2] hover:text-[#b42318]"
+                  >
+                    ×
+                  </button>
                 </div>
+                {editing ? (
+                  <label className="mt-3 flex items-baseline gap-2">
+                    <span className="text-[14px] text-[var(--v2-ink-400)]">Сумма</span>
+                    <input
+                      inputMode="numeric"
+                      value={editTarget}
+                      aria-label="Сумма цели"
+                      onChange={(event) => setEditTarget(moneyText(parseMoney(event.target.value)))}
+                      className="v2-tnum w-40 rounded-lg bg-[var(--v2-ink-50)] px-2.5 py-1.5 text-[22px] font-semibold outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+                    />
+                    <span className="text-[14px] text-[var(--v2-ink-400)]">₽</span>
+                  </label>
+                ) : (
+                  <div className="mt-3 flex flex-wrap items-baseline gap-2">
+                    <span className="v2-tnum text-[32px] font-semibold tracking-[-0.035em]">{rub(goal.filled)}</span>
+                    <span className="v2-tnum text-[14px] text-[var(--v2-ink-400)]">
+                      {goal.target_rub > 0 ? `из ${rub(goal.target_rub)}` : "сумма цели не задана"}
+                    </span>
+                  </div>
+                )}
                 <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
                   <span className="block h-full rounded-full bg-gradient-to-r from-[var(--v2-brand-500)] to-[var(--v2-brand-700)]" style={{ width: `${Math.min(100, pct)}%` }} />
                 </div>
-                <div className="v2-tnum mt-2.5 flex justify-between text-[13.5px] text-[var(--v2-ink-500)]">
+                <div className="v2-tnum mt-2.5 flex items-center justify-between gap-3 text-[13.5px] text-[var(--v2-ink-500)]">
                   <b className="text-[15px] text-[var(--v2-ink-900)]">{pct}%</b>
-                  <span>{goal.target > 0 ? `осталось ${rub(left)}` : ""}</span>
+                  {editing ? (
+                    <span className="flex gap-2">
+                      <button type="button" onClick={() => setEditingId(null)} className="rounded-lg px-2.5 py-1 font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]">
+                        Отмена
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void saveGoal(goal.id).catch((cause) => setError(cause instanceof Error ? cause.message : "Не удалось сохранить"))}
+                        className="rounded-lg bg-[#2d5eef] px-2.5 py-1 font-semibold text-white"
+                      >
+                        Сохранить
+                      </button>
+                    </span>
+                  ) : (
+                    <span>{goal.target_rub > 0 ? `осталось ${rub(left)}` : ""}</span>
+                  )}
                 </div>
               </div>
             </article>
           );
         })}
+        {adding ? (
+          <article className="v2-card flex flex-col justify-center gap-3 px-6 py-6">
+            <input
+              autoFocus
+              value={title}
+              placeholder="Название цели"
+              aria-label="Название цели"
+              onChange={(event) => setTitle(event.target.value)}
+              className="rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[18px] font-semibold outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+            />
+            <label className="flex items-baseline gap-2">
+              <span className="text-[14px] text-[var(--v2-ink-400)]">Сумма</span>
+              <input
+                inputMode="numeric"
+                value={target}
+                placeholder="0"
+                aria-label="Сумма цели"
+                onChange={(event) => setTarget(moneyText(parseMoney(event.target.value)))}
+                className="v2-tnum w-40 rounded-xl bg-[var(--v2-ink-50)] px-3 py-2 text-[22px] font-semibold outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+              />
+              <span className="text-[14px] text-[var(--v2-ink-400)]">₽</span>
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void addGoal().catch((cause) => setError(cause instanceof Error ? cause.message : "Не удалось добавить"))}
+                className="rounded-xl bg-[#2d5eef] px-3.5 py-2 text-[14px] font-semibold text-white"
+              >
+                Добавить
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdding(false);
+                  setTitle("");
+                  setTarget("");
+                }}
+                className="rounded-xl px-3 py-2 text-[14px] font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+              >
+                Отмена
+              </button>
+            </div>
+          </article>
+        ) : null}
       </div>
     </section>
   );

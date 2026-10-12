@@ -227,7 +227,14 @@ export function HypothesesClient() {
           ) : (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
               {active.map((item) => (
-                <FocusCard key={item.id} item={item} project={projectById.get(item.project_id ?? "")} onOpen={() => setOpenId(item.id)} />
+                <FocusCard
+                  key={item.id}
+                  item={item}
+                  project={projectById.get(item.project_id ?? "")}
+                  onOpen={() => setOpenId(item.id)}
+                  onPatch={patchItem}
+                  onDelete={removeItem}
+                />
               ))}
               {Array.from({ length: Math.max(0, WIP_LIMIT - active.length) }, (_, index) => (
                 <button
@@ -330,6 +337,8 @@ export function HypothesesClient() {
                           item={item}
                           project={projectById.get(item.project_id ?? "")}
                           onOpen={() => setOpenId(item.id)}
+                          onPatch={patchItem}
+                          onDelete={removeItem}
                         />
                       ))
                     ) : (
@@ -401,11 +410,15 @@ export function HypothesesClient() {
                               ? sprints.find((row) => row.id === item.sprint_id)?.name
                               : "";
                           return (
-                            <button
+                            <div
                               key={item.id}
-                              type="button"
+                              role="button"
+                              tabIndex={0}
                               onClick={() => setOpenId(item.id)}
-                              className="grid w-full grid-cols-1 items-center gap-3 rounded-[14px] bg-[var(--v2-ink-50)] px-4 py-3 text-left hover:bg-[var(--v2-ink-100)] lg:grid-cols-[200px_minmax(0,1.2fr)_minmax(0,1fr)_120px] lg:gap-[18px]"
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") setOpenId(item.id);
+                              }}
+                              className="grid w-full cursor-pointer grid-cols-1 items-center gap-3 rounded-[14px] bg-[var(--v2-ink-50)] px-4 py-3 text-left hover:bg-[var(--v2-ink-100)] lg:grid-cols-[200px_minmax(0,1.2fr)_minmax(0,1fr)_auto] lg:gap-[18px]"
                             >
                               <span
                                 className={`w-fit rounded-md px-2 py-1 text-[12px] font-semibold whitespace-nowrap ${
@@ -415,14 +428,19 @@ export function HypothesesClient() {
                                 {STAGE_LABEL[item.stage]}
                                 {sprintName ? ` · ${sprintName}` : ""}
                               </span>
-                              <b className="text-[15px] font-semibold tracking-[-0.015em]">{item.title || "Без названия"}</b>
+                              <QuickTitle
+                                title={item.title}
+                                className="text-[15px] font-semibold tracking-[-0.015em]"
+                                onSave={(title) => patchItem(item.id, { title })}
+                              />
                               <span className="text-[13.5px] leading-snug text-[var(--v2-ink-500)]">
                                 {item.stage === "done" && item.result_text ? item.result_text : item.metric}
                               </span>
-                              <span className="lg:justify-self-end">
+                              <span className="flex items-center justify-end gap-2">
                                 <VerdictBadge verdict={item.stage === "done" ? item.verdict : null} />
+                                <QuickDelete onDelete={() => removeItem(item.id)} />
                               </span>
-                            </button>
+                            </div>
                           );
                         })
                       ) : (
@@ -517,13 +535,126 @@ function VerdictBadge({ verdict }: { verdict: HypothesisVerdict | null }) {
   );
 }
 
-function FocusCard({ item, project, onOpen }: { item: Hypothesis; project?: HypothesisProject; onOpen: () => void }) {
-  const colors = projectColors(project?.hue ?? 260);
+function stopCardEvent(event: { stopPropagation: () => void; preventDefault?: () => void }) {
+  event.stopPropagation();
+}
+
+function QuickDelete({ onDelete }: { onDelete: () => Promise<void> }) {
   return (
     <button
       type="button"
+      aria-label="Удалить"
+      title="Удалить"
+      draggable={false}
+      onMouseDown={stopCardEvent}
+      onClick={(event) => {
+        stopCardEvent(event);
+        void onDelete();
+      }}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[16px] text-[var(--v2-ink-400)] hover:bg-[#fee4e2] hover:text-[#b42318]"
+    >
+      ×
+    </button>
+  );
+}
+
+function QuickTitle({
+  title,
+  className,
+  onSave,
+}: {
+  title: string;
+  className: string;
+  onSave: (title: string) => Promise<unknown>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(title);
+
+  useEffect(() => {
+    if (!editing) setValue(title);
+  }, [title, editing]);
+
+  const save = async () => {
+    const next = value.trim();
+    setEditing(false);
+    if (!next || next === title) {
+      setValue(title);
+      return;
+    }
+    await onSave(next);
+  };
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={value}
+        aria-label="Название"
+        draggable={false}
+        onMouseDown={stopCardEvent}
+        onClick={stopCardEvent}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => void save()}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "Enter") {
+            event.preventDefault();
+            void save();
+          }
+          if (event.key === "Escape") {
+            setValue(title);
+            setEditing(false);
+          }
+        }}
+        className={`w-full rounded-lg bg-white px-2 py-1 outline-none ring-2 ring-[var(--v2-brand-500)] ${className}`}
+      />
+    );
+  }
+
+  return (
+    <span className="flex min-w-0 items-start gap-1">
+      <span className={`min-w-0 flex-1 ${className}`}>{title || "Без названия"}</span>
+      <button
+        type="button"
+        aria-label="Изменить"
+        title="Изменить"
+        draggable={false}
+        onMouseDown={stopCardEvent}
+        onClick={(event) => {
+          stopCardEvent(event);
+          setEditing(true);
+        }}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[13px] text-[var(--v2-ink-400)] hover:bg-white hover:text-[var(--v2-ink-900)]"
+      >
+        ✎
+      </button>
+    </span>
+  );
+}
+
+function FocusCard({
+  item,
+  project,
+  onOpen,
+  onPatch,
+  onDelete,
+}: {
+  item: Hypothesis;
+  project?: HypothesisProject;
+  onOpen: () => void;
+  onPatch: (id: string, patch: Record<string, unknown>) => Promise<Hypothesis>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const colors = projectColors(project?.hue ?? 260);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
-      className="flex flex-col gap-3.5 rounded-[20px] p-6 text-left transition hover:-translate-y-0.5"
+      onKeyDown={(event) => {
+        if (event.key === "Enter") onOpen();
+      }}
+      className="flex cursor-pointer flex-col gap-3.5 rounded-[20px] p-6 text-left transition hover:-translate-y-0.5"
       style={{ background: colors.s, boxShadow: `inset 0 0 0 1.5px color-mix(in oklch, ${colors.c} 18%, transparent)` }}
     >
       <div className="flex items-center gap-2.5">
@@ -531,21 +662,39 @@ function FocusCard({ item, project, onOpen }: { item: Hypothesis; project?: Hypo
         <span className="ml-auto text-[12px] font-semibold tracking-[0.1em] uppercase" style={{ color: colors.c }}>
           в работе
         </span>
+        <QuickDelete onDelete={() => onDelete(item.id)} />
       </div>
-      <h3 className="text-[24px] leading-[1.2] font-semibold tracking-[-0.03em]">{item.title}</h3>
+      <QuickTitle
+        title={item.title}
+        className="text-[24px] leading-[1.2] font-semibold tracking-[-0.03em]"
+        onSave={(title) => onPatch(item.id, { title })}
+      />
       <p className="text-[15px] leading-relaxed text-[var(--v2-ink-600)]">{item.body}</p>
       <div className="mt-auto rounded-[14px] bg-white px-[15px] py-[13px]">
         <span className="text-[11.5px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">Критерий проверки</span>
         <b className="mt-1 block text-[15px] leading-snug font-semibold">{item.metric || "—"}</b>
       </div>
-    </button>
+    </div>
   );
 }
 
-function BoardCard({ item, project, onOpen }: { item: Hypothesis; project?: HypothesisProject; onOpen: () => void }) {
+function BoardCard({
+  item,
+  project,
+  onOpen,
+  onPatch,
+  onDelete,
+}: {
+  item: Hypothesis;
+  project?: HypothesisProject;
+  onOpen: () => void;
+  onPatch: (id: string, patch: Record<string, unknown>) => Promise<Hypothesis>;
+  onDelete: (id: string) => Promise<void>;
+}) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       draggable
       onDragStart={(event) => {
         event.dataTransfer.setData("text/plain", item.id);
@@ -553,19 +702,31 @@ function BoardCard({ item, project, onOpen }: { item: Hypothesis; project?: Hypo
       }}
       onDragEnd={(event) => event.currentTarget.classList.remove("opacity-40")}
       onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") onOpen();
+      }}
       className="block w-full cursor-grab rounded-[14px] bg-white px-[15px] py-3.5 text-left shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-soft)]"
     >
       <span className="flex items-center gap-2">
         <ProjectChip project={project} />
         <VerdictBadge verdict={item.stage === "done" ? item.verdict : null} />
+        <span className="ml-auto">
+          <QuickDelete onDelete={() => onDelete(item.id)} />
+        </span>
       </span>
-      <span className="mt-2 block text-[15px] leading-snug font-semibold tracking-[-0.015em]">{item.title || "Без названия"}</span>
+      <span className="mt-2 block">
+        <QuickTitle
+          title={item.title}
+          className="text-[15px] leading-snug font-semibold tracking-[-0.015em]"
+          onSave={(title) => onPatch(item.id, { title })}
+        />
+      </span>
       {item.stage === "done" && item.result_text ? (
         <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{item.result_text}</span>
       ) : item.metric ? (
         <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{item.metric}</span>
       ) : null}
-    </button>
+    </div>
   );
 }
 

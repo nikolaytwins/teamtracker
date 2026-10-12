@@ -541,7 +541,7 @@ function Sexuality() {
       </div>
       <div className="sx-img">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={appPath("/home/loving.png")} alt="" style={{ objectPosition: "center 20%" }} />
+        <img src={appPath("/home/loving.png")} alt="" style={{ objectPosition: "32% 22%" }} />
       </div>
     </section>
   );
