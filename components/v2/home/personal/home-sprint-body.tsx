@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useHomePersonalFinance } from "@/components/v2/home/personal/home-personal-finance-context";
-import { allocateGoals, cushionPool } from "@/components/v2/personal/finance/personal-finance-system";
 import { appPath } from "@/lib/api-url";
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import {
@@ -16,6 +15,7 @@ import {
 } from "@/lib/v2/home/sprint-contours";
 import { currentSprintId, projectColors, type Hypothesis, type HypothesisProject } from "@/lib/v2/personal/hypotheses-meta";
 import type { HypothesesBoard } from "@/lib/v2/personal/personal-hypotheses-repo";
+import "./home-sprint-design.css";
 
 const INCOME_GOAL = 400_000;
 const HYP_HREF = "/v2/personal/hypotheses";
@@ -31,10 +31,10 @@ const STOPS = [
 ];
 
 const SCENES = [
-  { n: "01", title: "Финансовая свобода", text: "Я работаю над интересными продуктами, управляю процессами, получаю устойчивый доход. Мой день не полностью продан клиентам.", src: "/home/scene-finance.png" },
-  { n: "02", title: "Любовь и отношения", text: "Мы с Лерой любим друг друга, смеёмся, путешествуем, испытываем нежность и создаём красивые совместные воспоминания.", src: "/home/scene-love.png" },
-  { n: "03", title: "Сексуальность и притяжение", text: "Я уверенный, харизматичный, чувственный мужчина. В моей жизни есть взаимное желание, красота, новые знакомства и пространство для добровольных приключений.", src: "/home/scene-attraction.webp" },
-  { n: "04", title: "Социальная и красивая жизнь", text: "Я среди интересных людей, бываю в красивых местах, придумываю события, легко общаюсь, проявляю инициативу.", src: "/home/scene-social.png" },
+  { n: "01", title: "Финансовая свобода", text: "Я работаю над интересными продуктами, управляю процессами, получаю устойчивый доход. Мой день не полностью продан клиентам.", src: "/home/scene-finance.png", pos: "center 30%" },
+  { n: "02", title: "Любовь и отношения", text: "Мы с Лерой любим друг друга, смеёмся, путешествуем, испытываем нежность и создаём красивые совместные воспоминания.", src: "/home/scene-love.png", pos: "center 30%" },
+  { n: "03", title: "Сексуальность и притяжение", text: "Я уверенный, харизматичный, чувственный мужчина. В моей жизни есть взаимное желание, красота, новые знакомства и пространство для добровольных приключений.", src: "/home/scene-attraction.webp", pos: "center 30%" },
+  { n: "04", title: "Социальная и красивая жизнь", text: "Я среди интересных людей, бываю в красивых местах, придумываю события, легко общаюсь, проявляю инициативу.", src: "/home/scene-social.png", pos: "center 30%" },
 ];
 
 const CONTOUR_PHOTO: Record<string, string> = {
@@ -49,28 +49,13 @@ function rub(value: number) {
   return `${new Intl.NumberFormat("ru-RU").format(Math.round(value))} ₽`;
 }
 
-function Photo({ src, position = "center", fill = false }: { src: string; position?: string; fill?: boolean }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={appPath(src)}
-      alt=""
-      className={fill ? "absolute inset-0 h-full w-full object-cover" : "h-full w-full object-cover"}
-      style={{ objectPosition: position }}
-    />
-  );
-}
-
-function goalPhoto(title: string) {
-  const name = title.toLowerCase();
-  if (name.includes("подуш")) return "/home/goal-cushion.png";
-  if (name.includes("машин")) return "/home/goal-car.png";
-  return null;
+function tone(color: string, soft: string): CSSProperties {
+  return { ["--c" as string]: color, ["--cs" as string]: soft };
 }
 
 export function HomeSprintBody() {
   return (
-    <>
+    <div className="hs">
       <Manifesto />
       <Contours />
       <SprintHypotheses />
@@ -81,42 +66,31 @@ export function HomeSprintBody() {
       <StopList />
       <Codex />
       <Visualization />
-    </>
+    </div>
   );
 }
 
 function Manifesto() {
   const { day, total, pct } = sprintDayProgress();
   return (
-    <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(280px,420px)_minmax(0,1fr)]">
-      <div className="relative min-h-[280px]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={appPath("/home/manifesto.png")}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover object-[center_30%]"
-          style={{
-            maskImage: "linear-gradient(90deg, #000 70%, transparent)",
-            WebkitMaskImage: "linear-gradient(90deg, #000 70%, transparent)",
-          }}
-        />
-      </div>
-      <div className="flex flex-col justify-center gap-5 px-8 py-8">
-        <div className="flex items-center gap-3">
-          <span className="rounded-full bg-[#2d5eef] px-3 py-1 text-[12px] font-semibold tracking-[0.08em] text-white uppercase">Спринт</span>
-          <span className="text-[13px] font-semibold tracking-[0.13em] text-[var(--v2-ink-500)] uppercase">13 октября — 30 ноября</span>
+    <section className="card mf">
+      <div className="mf-img" style={{ backgroundImage: `url(${appPath("/home/manifesto.png")})` }} />
+      <div className="mf-r">
+        <div className="mf-tag">
+          <span className="mf-badge">Спринт</span>
+          <span className="kick">13 октября — 30 ноября</span>
         </div>
-        <h2 className="v2-tight text-[34px] leading-[1.15] font-semibold tracking-[-0.035em]">
-          Я перестаю прогнозировать желаемую жизнь. <span className="text-[#2d5eef]">Я начинаю её создавать.</span>
+        <h2 className="mf-h">
+          Я перестаю прогнозировать желаемую жизнь. <span>Я начинаю её создавать.</span>
         </h2>
-        <p className="v2-tight max-w-[640px] text-[16px] leading-relaxed text-[var(--v2-ink-600)]">
+        <p className="mf-p">
           Деньги, любовь, сексуальность, творчество, окружение и красивые впечатления — не альтернативы друг другу. Я постепенно выстраиваю жизнь, в которой всё это присутствует
         </p>
-        <div className="flex items-center gap-4">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
-            <span className="block h-full rounded-full bg-[#2d5eef]" style={{ width: `${pct}%` }} />
+        <div className="mf-prog">
+          <div className="bar">
+            <span style={{ width: `${pct}%` }} />
           </div>
-          <em className="v2-tnum text-[13.5px] font-medium text-[var(--v2-ink-500)] not-italic">
+          <em className="tnum">
             День {day} из {total} · Review 30 ноября
           </em>
         </div>
@@ -163,8 +137,12 @@ function Contours() {
 
   return (
     <section>
-      <SectionHead n="01" title="Мои три контура" sub="Конкретные задачи до 30 ноября. Клик — отметить." />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="sec-head">
+        <span className="sec-n">01</span>
+        <h2 className="sec-title">Мои три контура</h2>
+        <span className="sec-sub">Конкретные задачи до 30 ноября. Клик — отметить.</span>
+      </div>
+      <div className="ctrs">
         {SPRINT_CONTOURS.map((contour) => (
           <ContourCard key={contour.id} contour={contour} checks={checks} onSet={setKey} />
         ))}
@@ -184,29 +162,26 @@ function ContourCard({
 }) {
   const pct = contourProgress(contour, checks);
   return (
-    <article className="v2-card flex flex-col overflow-hidden">
-      <div className="h-[210px]">
-        <Photo src={CONTOUR_PHOTO[contour.id] ?? ""} position="center 30%" />
+    <article className="card ctr" style={tone(contour.color, contour.soft)}>
+      <div className="ctr-img">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={appPath(CONTOUR_PHOTO[contour.id] ?? "")} alt="" style={{ objectPosition: "center 30%" }} />
       </div>
-      <div className="flex flex-1 flex-col gap-3 px-5 py-5">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: contour.color }} />
-          <span className="text-[13px] font-semibold tracking-[0.08em] uppercase" style={{ color: contour.color }}>
-            {contour.name}
-          </span>
-          <span className="v2-tnum ml-auto text-[13px] font-semibold" style={{ color: contour.color }}>
-            {pct}%
-          </span>
+      <div className="ctr-b">
+        <div className="ctr-k">
+          <span className="ctr-dot" />
+          <span className="ctr-n">{contour.name}</span>
+          <span className="ctr-pc tnum">{pct}%</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
-          <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: contour.color }} />
+        <div className="ctr-bar">
+          <span style={{ width: `${pct}%` }} />
         </div>
-        <h3 className="v2-tight text-[22px] font-semibold tracking-[-0.03em]">{contour.title}</h3>
-        <p className="text-[14px] leading-snug text-[var(--v2-ink-500)]">{contour.with}</p>
-        <p className="text-[14.5px] leading-snug font-medium text-[var(--v2-ink-800)]">{contour.goal}</p>
-        <div className="mt-1 flex flex-col gap-2">
+        <h3 className="ctr-t">{contour.title}</h3>
+        <p className="ctr-with">{contour.with}</p>
+        <p className="ctr-goal">{contour.goal}</p>
+        <div className="tasks">
           {contour.items.map((item) => (
-            <ContourTask key={item.key} item={item} checks={checks} onSet={onSet} color={contour.color} />
+            <ContourTask key={item.key} item={item} checks={checks} onSet={onSet} />
           ))}
         </div>
       </div>
@@ -214,67 +189,86 @@ function ContourCard({
   );
 }
 
+function CheckButton({
+  done,
+  title,
+  note,
+  extra,
+  onClick,
+}: {
+  done: boolean;
+  title: string;
+  note?: string;
+  extra?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className={`tk${done ? " done" : ""}`} onClick={onClick}>
+      <span className="tk-box">✓</span>
+      <span className="tk-m">
+        <span className="tk-t">{title}</span>
+        {note ? <span className="tk-s">{note}</span> : null}
+      </span>
+      {extra ? <span className="grp-c tnum">{extra}</span> : null}
+    </button>
+  );
+}
+
 function ContourTask({
   item,
   checks,
   onSet,
-  color,
 }: {
   item: ContourItem;
   checks: SprintChecks;
   onSet: (key: string, value: boolean | number) => void;
-  color: string;
 }) {
   if (item.kind === "count") {
     const n = Math.min(item.max, Number(checks[item.key]) || 0);
     return (
-      <div className="rounded-[14px] bg-[var(--v2-ink-50)] px-3.5 py-3">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-[14.5px] font-semibold">{item.title}</div>
-            {item.note ? <div className="mt-0.5 text-[12.5px] text-[var(--v2-ink-400)]">{item.note}</div> : null}
-            <div className="mt-2 flex flex-wrap gap-1">
-              {Array.from({ length: item.max }, (_, index) => (
-                <i key={index} className="block h-1.5 w-3 rounded-full" style={{ background: index < n ? color : "var(--v2-ink-200)" }} />
-              ))}
-            </div>
+      <div className="cnt">
+        <div className="cnt-m">
+          <div className="cnt-t">{item.title}</div>
+          {item.note ? <div className="cnt-s">{item.note}</div> : null}
+          <div className="pips">
+            {Array.from({ length: item.max }, (_, index) => (
+              <i key={index} className={index < n ? "on" : undefined} />
+            ))}
           </div>
-          <span className="v2-tnum text-[15px] font-semibold">
-            {n}
-            <small className="text-[12px] font-medium text-[var(--v2-ink-400)]"> / {item.max}</small>
-          </span>
-          <span className="flex gap-1">
-            <button type="button" aria-label="минус" onClick={() => onSet(item.key, Math.max(0, n - 1))} className="h-8 w-8 rounded-lg bg-white text-[16px]">
-              −
-            </button>
-            <button type="button" aria-label="плюс" onClick={() => onSet(item.key, Math.min(item.max, n + 1))} className="h-8 w-8 rounded-lg bg-white text-[16px]">
-              +
-            </button>
-          </span>
         </div>
+        <span className="cnt-v tnum">
+          {n}
+          <small> / {item.max}</small>
+        </span>
+        <span className="stp">
+          <button type="button" aria-label="минус" onClick={() => onSet(item.key, Math.max(0, n - 1))}>
+            −
+          </button>
+          <button type="button" aria-label="плюс" onClick={() => onSet(item.key, Math.min(item.max, n + 1))}>
+            +
+          </button>
+        </span>
       </div>
     );
   }
   if (item.kind === "group") {
     const done = item.subs.filter((sub) => checks[sub.key]).length;
     return (
-      <div className="flex flex-col gap-1.5">
-        <CheckRow
+      <div className="grp">
+        <CheckButton
           done={Boolean(checks[item.key])}
           title={item.title}
           extra={`${done} / ${item.subs.length}`}
           onClick={() => onSet(item.key, !checks[item.key])}
-          color={color}
         />
-        <div className="flex flex-col gap-1.5 pl-3">
+        <div className="grp-subs">
           {item.subs.map((sub) => (
-            <CheckRow
+            <CheckButton
               key={sub.key}
               done={Boolean(checks[sub.key])}
               title={sub.title}
               note={sub.note}
               onClick={() => onSet(sub.key, !checks[sub.key])}
-              color={color}
             />
           ))}
         </div>
@@ -282,49 +276,12 @@ function ContourTask({
     );
   }
   return (
-    <CheckRow
+    <CheckButton
       done={Boolean(checks[item.key])}
       title={item.title}
       note={item.note}
       onClick={() => onSet(item.key, !checks[item.key])}
-      color={color}
     />
-  );
-}
-
-function CheckRow({
-  done,
-  title,
-  note,
-  extra,
-  onClick,
-  color,
-}: {
-  done: boolean;
-  title: string;
-  note?: string;
-  extra?: string;
-  onClick: () => void;
-  color: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-start gap-2.5 rounded-[12px] px-3 py-2.5 text-left ${done ? "bg-white" : "bg-[var(--v2-ink-50)]"}`}
-    >
-      <span
-        className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] text-[12px] text-white"
-        style={{ background: done ? color : "transparent", boxShadow: done ? "none" : "inset 0 0 0 1.5px var(--v2-ink-300)" }}
-      >
-        {done ? "✓" : ""}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className={`block text-[14.5px] font-medium ${done ? "text-[var(--v2-ink-400)] line-through" : ""}`}>{title}</span>
-        {note ? <span className="mt-0.5 block text-[12.5px] text-[var(--v2-ink-400)]">{note}</span> : null}
-      </span>
-      {extra ? <span className="v2-tnum text-[12.5px] font-semibold text-[var(--v2-ink-400)]">{extra}</span> : null}
-    </button>
   );
 }
 
@@ -343,59 +300,55 @@ function SprintHypotheses() {
   const backlog = (board?.hypotheses ?? []).filter((item) => item.stage === "backlog").length;
 
   return (
-    <section className="v2-card px-7 py-6">
-      <div className="mb-4 flex flex-wrap items-baseline gap-3.5">
-        <span className="text-[12px] font-semibold tracking-[0.14em] text-[var(--v2-ink-400)]">02</span>
-        <h2 className="v2-tight text-[26px] font-semibold tracking-[-0.03em]">Гипотезы спринта</h2>
-        <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">
-          {sprint ? `${sprint.name} · ${sprint.range_label}` : "Текущий спринт"}
-        </span>
-        <div className="ml-auto flex gap-2">
-          <Link href={`${appPath(HYP_HREF)}#backlog`} className="inline-flex h-10 items-center gap-2 rounded-[12px] bg-[var(--v2-ink-50)] px-3.5 text-[14px] font-semibold">
-            Бэклог <b className="v2-tnum text-[var(--v2-ink-400)]">{backlog}</b>
+    <section className="card pad">
+      <div className="sec-head">
+        <span className="sec-n">02</span>
+        <h2 className="sec-title">Гипотезы спринта</h2>
+        <span className="sec-sub">{sprint ? `${sprint.name} · ${sprint.range_label}` : ""}</span>
+        <div className="hy-btns">
+          <Link className="btn btn-w" href={`${appPath(HYP_HREF)}#backlog`}>
+            Бэклог <b className="tnum">{backlog}</b>
           </Link>
-          <Link href={appPath(HYP_HREF)} className="inline-flex h-10 items-center rounded-[12px] bg-[#2d5eef] px-3.5 text-[14px] font-semibold text-white">
+          <Link className="btn btn-b" href={appPath(HYP_HREF)}>
             Все гипотезы →
           </Link>
         </div>
       </div>
-      <div className="mb-3 text-[12px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">В работе · {active.length}</div>
-      {active.length ? (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-          {active.map((item) => (
-            <HomeHypothesisCard key={item.id} item={item} project={projects.get(item.project_id ?? "")} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-[14.5px] text-[var(--v2-ink-500)]">В спринте пока нет гипотез — возьми из очереди.</p>
-      )}
-      <div className="mt-5 mb-3 text-[12px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">В очереди · {queue.length}</div>
-      {queue.length ? (
-        <div className="flex flex-col gap-1.5">
-          {queue.slice(0, 6).map((item, index) => {
-            const project = projects.get(item.project_id ?? "");
-            const colors = projectColors(project?.hue ?? 260);
-            return (
-              <Link
-                key={item.id}
-                href={`${appPath(HYP_HREF)}#${item.id}`}
-                className="flex items-center gap-3 rounded-[14px] bg-[var(--v2-ink-50)] px-3.5 py-3 hover:bg-[var(--v2-ink-100)]"
-              >
-                <span className="v2-tnum w-6 text-[14px] font-semibold" style={{ color: colors.c }}>
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold">{item.title}</span>
-                  <span className="text-[13px] text-[var(--v2-ink-500)]">{project?.name}</span>
-                </span>
-                <span className="text-[var(--v2-ink-300)]">→</span>
-              </Link>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="text-[14.5px] text-[var(--v2-ink-500)]">Очередь пуста.</p>
-      )}
+      <div className="kick" style={{ marginBottom: 12 }}>
+        В работе · {active.length}
+      </div>
+      <div className="hy-act">
+        {active.length ? (
+          active.map((item) => <HomeHypothesisCard key={item.id} item={item} project={projects.get(item.project_id ?? "")} />)
+        ) : (
+          <div className="sec-sub">В спринте пока нет гипотез — возьми из очереди.</div>
+        )}
+      </div>
+      <div className="hy-q">
+        <div className="kick">В очереди · {queue.length}</div>
+        {queue.length ? (
+          <div className="hy-ql">
+            {queue.slice(0, 6).map((item, index) => {
+              const project = projects.get(item.project_id ?? "");
+              const colors = projectColors(project?.hue ?? 260);
+              return (
+                <Link key={item.id} className="qr" href={`${appPath(HYP_HREF)}#${item.id}`} style={tone(colors.c, colors.s)}>
+                  <span className="qr-n tnum">{index + 1}</span>
+                  <span className="qr-m">
+                    <span className="qr-t">{item.title}</span>
+                    <span className="qr-p">{project?.name}</span>
+                  </span>
+                  <span className="qr-go">→</span>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="sec-sub" style={{ marginTop: 12 }}>
+            Очередь пуста.
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -403,24 +356,16 @@ function SprintHypotheses() {
 function HomeHypothesisCard({ item, project }: { item: Hypothesis; project?: HypothesisProject }) {
   const colors = projectColors(project?.hue ?? 260);
   return (
-    <Link
-      href={`${appPath(HYP_HREF)}#${item.id}`}
-      className="flex flex-col gap-3 rounded-[18px] p-5"
-      style={{ background: colors.s }}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-[12.5px] font-semibold" style={{ color: colors.c }}>
-          {project?.name}
-        </span>
-        <span className="ml-auto text-[11.5px] font-semibold tracking-[0.1em] uppercase" style={{ color: colors.c }}>
-          в работе
-        </span>
+    <Link className="hc" href={`${appPath(HYP_HREF)}#${item.id}`} style={tone(colors.c, colors.s)}>
+      <div className="hc-top">
+        <span className="pchip">{project?.name}</span>
+        <span className="hc-st">в работе</span>
       </div>
-      <h3 className="text-[20px] leading-snug font-semibold tracking-[-0.02em]">{item.title}</h3>
-      <p className="text-[14.5px] leading-relaxed text-[var(--v2-ink-600)]">{item.body}</p>
-      <div className="mt-auto rounded-[12px] bg-white px-3.5 py-3">
-        <span className="text-[11px] font-semibold tracking-[0.12em] text-[var(--v2-ink-400)] uppercase">Критерий проверки</span>
-        <b className="mt-1 block text-[14.5px]">{item.metric || "—"}</b>
+      <h3 className="hc-t">{item.title}</h3>
+      <p className="hc-d">{item.body}</p>
+      <div className="hc-m">
+        <span className="kick">Критерий проверки</span>
+        <b>{item.metric || "—"}</b>
       </div>
     </Link>
   );
@@ -428,25 +373,29 @@ function HomeHypothesisCard({ item, project }: { item: Hypothesis; project?: Hyp
 
 function Priority() {
   const steps = [
-    { n: "1", text: "Оплачиваемые обязательства и продажи TwinLabs Plus", color: "oklch(0.56 0.19 262)", soft: "oklch(0.96 0.025 262)" },
-    { n: "2", text: "Качественное время с близкими", color: "oklch(0.56 0.19 10)", soft: "oklch(0.96 0.025 10)" },
-    { n: "3", text: "Блог и FoodTech", color: "oklch(0.56 0.19 300)", soft: "oklch(0.96 0.025 300)" },
+    { n: "1", text: "Оплачиваемые обязательства и продажи TwinLabs Plus", color: "var(--c1)", soft: "var(--c1s)" },
+    { n: "2", text: "Качественное время с близкими", color: "var(--c2)", soft: "var(--c2s)" },
+    { n: "3", text: "Блог и FoodTech", color: "var(--c3)", soft: "var(--c3s)" },
   ];
   return (
-    <section className="v2-card px-7 py-6">
-      <div className="mb-3 text-[12px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">Приоритет при конфликте задач</div>
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-        {steps.map((step, index) => (
-          <div key={step.n} className="flex flex-1 items-center gap-2">
-            <span className="flex flex-1 items-center gap-3 rounded-[16px] px-4 py-3.5" style={{ background: step.soft, color: step.color }}>
-              <b className="v2-tnum text-[18px]">{step.n}</b>
-              <span className="text-[15px] font-semibold text-[var(--v2-ink-900)]">{step.text}</span>
+    <section className="card pad prio">
+      <div>
+        <div className="kick" style={{ marginBottom: 12 }}>
+          Приоритет при конфликте задач
+        </div>
+        <div className="chain">
+          {steps.map((step, index) => (
+            <span key={step.n} style={{ display: "contents" }}>
+              <span className="ch" style={tone(step.color, step.soft)}>
+                <b>{step.n}</b>
+                {step.text}
+              </span>
+              {index < steps.length - 1 ? <span className="arr">→</span> : null}
             </span>
-            {index < steps.length - 1 ? <span className="hidden text-[var(--v2-ink-300)] lg:block">→</span> : null}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-      <p className="mt-4 text-[15px] text-[var(--v2-ink-600)]">Не пытаться выполнить контент-план ценой финансового провала и выгорания.</p>
+      <p className="prio-note">Не пытаться выполнить контент-план ценой финансового провала и выгорания.</p>
     </section>
   );
 }
@@ -457,49 +406,52 @@ function Reward() {
   const pct = Math.max(0, Math.min(100, Math.round((now / INCOME_GOAL) * 100)));
   const left = Math.max(0, INCOME_GOAL - now);
   return (
-    <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.3fr)_minmax(240px,380px)]">
-      <div className="flex flex-col gap-5 px-7 py-7">
-        <h2 className="v2-tight text-[26px] font-semibold tracking-[-0.03em]">Награда за финансовый результат</h2>
-        <div>
-          <div className="text-[12px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">Цель · личный доход за месяц</div>
-          <div className="v2-tnum mt-1 text-[40px] font-semibold tracking-[-0.04em]">{rub(INCOME_GOAL)}</div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
-            <span className="block h-full rounded-full bg-[#2d5eef]" style={{ width: `${pct}%` }} />
+    <section className="card rw">
+      <div className="rw-l">
+        <div className="sec-head" style={{ marginBottom: 0 }}>
+          <h2 className="sec-title">Награда за финансовый результат</h2>
+        </div>
+        <div className="rw-goal">
+          <span className="kick">Цель · личный доход за месяц</span>
+          <div className="rw-num tnum">{rub(INCOME_GOAL)}</div>
+          <div className="rw-bar">
+            <span style={{ width: `${pct}%` }} />
           </div>
-          <div className="v2-tnum mt-2 flex justify-between text-[14px] text-[var(--v2-ink-500)]">
+          <div className="rw-foot tnum">
             <span>
-              Сейчас <b className="text-[var(--v2-ink-900)]">{rub(now)}</b> · {pct}%
+              Сейчас <b>{rub(now)}</b> · {pct}%
             </span>
             <span>осталось {rub(left)}</span>
           </div>
         </div>
         <div>
-          <div className="text-[12px] font-semibold tracking-[0.13em] uppercase" style={{ color: "oklch(0.56 0.19 10)" }}>
+          <div className="kick" style={{ color: "var(--c2)" }}>
             Особенное свидание с Лерой
           </div>
-          <p className="mt-2 text-[15.5px] leading-relaxed text-[var(--v2-ink-700)]">
-            <b className="font-semibold">Первый вариант</b> — стриптиз-клуб, чтобы вместе посмотреть шоу, если ей самой интересно.
+          <p className="rw-p" style={{ marginTop: 8 }}>
+            <b style={{ fontWeight: 600 }}>Первый вариант</b> — стриптиз-клуб, чтобы вместе посмотреть шоу, если ей самой интересно.
           </p>
         </div>
         <div>
-          <div className="mb-2.5 text-[12px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">Альтернативы</div>
-          <div className="flex flex-wrap gap-2">
+          <div className="kick" style={{ marginBottom: 10 }}>
+            Альтернативы
+          </div>
+          <div className="chips">
             {["Красивый отель", "Кабаре", "Необычное романтическое впечатление", "Другой совместно выбранный формат"].map((chip) => (
-              <span key={chip} className="rounded-full bg-[var(--v2-ink-50)] px-3 py-1.5 text-[14px] font-medium">
+              <span key={chip} className="chip">
                 {chip}
               </span>
             ))}
           </div>
         </div>
-        <p className="text-[14.5px] leading-relaxed text-[var(--v2-ink-500)]">
+        <p className="rw-note">
           Награда должна укладываться в бюджет после обязательных расходов. Сама идея красивой жизни не отменяется, если денежная цель не достигнута.
         </p>
       </div>
-      <div className="grid h-full min-h-[520px] grid-cols-2 grid-rows-2">
+      <div className="rw-img">
         {REWARD_COLLAGE.map((src) => (
-          <div key={src} className="relative min-h-0 overflow-hidden">
-            <Photo src={src} position="center 15%" fill />
-          </div>
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={src} src={appPath(src)} alt="" style={{ objectPosition: "center 15%" }} />
         ))}
       </div>
     </section>
@@ -507,58 +459,58 @@ function Reward() {
 }
 
 function Goals() {
-  const { dashboard } = useHomePersonalFinance();
-  const allocated = allocateGoals(dashboard?.goals ?? [], cushionPool(dashboard?.funds ?? []));
-  const cards =
-    allocated.length > 0
-      ? allocated.map((goal) => ({
-          id: goal.id,
-          title: goal.title,
-          current: goal.filled,
-          target: goal.target_rub,
-          photo: goalPhoto(goal.title),
-        }))
-      : [
-          { id: "cushion", title: "Подушка безопасности", current: 0, target: 510_000, photo: "/home/goal-cushion.png" },
-          { id: "car", title: "Машина", current: 0, target: 0, photo: "/home/goal-car.png" },
-        ];
   return (
-    <section className="v2-card px-7 py-6">
-      <div className="mb-4 flex flex-wrap items-baseline gap-3.5">
-        <h2 className="v2-tight text-[26px] font-semibold tracking-[-0.03em]">Цели</h2>
-        <span className="text-[14.5px] text-[var(--v2-ink-500)]">Общие, без срока</span>
-        <Link href={appPath("/v2/personal/finance")} className="ml-auto inline-flex h-10 items-center rounded-[12px] bg-[var(--v2-ink-50)] px-3.5 text-[14px] font-semibold">
-          Все цели →
-        </Link>
+    <section className="card pad">
+      <div className="sec-head">
+        <h2 className="sec-title">Цели</h2>
+        <span className="sec-sub">Общие, без срока</span>
+        <div className="hy-btns">
+          <Link className="btn btn-w" href={appPath("/v2/personal/goals")}>
+            Все цели →
+          </Link>
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {cards.map((goal) => {
-          const pct = goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
-          const left = Math.max(goal.target - goal.current, 0);
-          return (
-            <div key={goal.id} className="overflow-hidden rounded-[18px] bg-[var(--v2-ink-50)]">
-              <div className="h-[190px]">
-                {goal.photo ? <Photo src={goal.photo} position="center 35%" /> : null}
-              </div>
-              <div className="px-5 py-4">
-                <h3 className="text-[18px] font-semibold">{goal.title}</h3>
-                <div className="mt-2 flex items-baseline gap-2">
-                  <span className="v2-tnum text-[22px] font-semibold">{rub(goal.current)}</span>
-                  <span className="v2-tnum text-[14px] text-[var(--v2-ink-500)]">
-                    {goal.target > 0 ? `из ${rub(goal.target)}` : "сумма цели не задана"}
-                  </span>
-                </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
-                  <span className="block h-full rounded-full bg-[#2d5eef]" style={{ width: `${Math.min(100, pct)}%` }} />
-                </div>
-                <div className="v2-tnum mt-2 flex justify-between text-[13px] text-[var(--v2-ink-500)]">
-                  <b className="text-[var(--v2-ink-900)]">{pct}%</b>
-                  <span>{goal.target > 0 ? `осталось ${rub(left)}` : ""}</span>
-                </div>
-              </div>
+      <div className="gl">
+        <article className="gc">
+          <div className="gc-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={appPath("/home/goal-cushion.png")} alt="" style={{ objectPosition: "center 35%" }} />
+          </div>
+          <div className="gc-b">
+            <h3 className="gc-n">Подушка безопасности</h3>
+            <div className="gc-v">
+              <span className="gc-cur tnum">331 000 ₽</span>
+              <span className="gc-tg tnum">из 510 000 ₽</span>
             </div>
-          );
-        })}
+            <div className="gc-bar">
+              <span style={{ width: "65%" }} />
+            </div>
+            <div className="gc-foot tnum">
+              <b>65%</b>
+              <span>осталось 179 000 ₽</span>
+            </div>
+          </div>
+        </article>
+        <article className="gc">
+          <div className="gc-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={appPath("/home/goal-car.png")} alt="" style={{ objectPosition: "center 35%" }} />
+          </div>
+          <div className="gc-b">
+            <h3 className="gc-n">Машина</h3>
+            <div className="gc-v">
+              <span className="gc-cur tnum">0 ₽</span>
+              <span className="gc-tg">сумма цели не задана</span>
+            </div>
+            <div className="gc-bar">
+              <span style={{ width: "0%" }} />
+            </div>
+            <div className="gc-foot tnum">
+              <b>0%</b>
+              <span />
+            </div>
+          </div>
+        </article>
       </div>
     </section>
   );
@@ -572,23 +524,24 @@ function Sexuality() {
     { title: "С окружением", text: "Хожу на интересные мероприятия, знакомлюсь, общаюсь с людьми и создаю насыщенную социальную жизнь." },
   ];
   return (
-    <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.4fr)_minmax(220px,320px)]">
-      <div className="px-7 py-7">
-        <div className="mb-3 text-[12px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">Сексуальность</div>
-        <h2 className="v2-tight mb-5 max-w-[720px] text-[28px] leading-snug font-semibold tracking-[-0.03em]">
-          Я становлюсь уверенным, чувственным, любящим мужчиной.
-        </h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+    <section className="card pad sx-wrap">
+      <div>
+        <div className="kick" style={{ marginBottom: 12 }}>
+          Сексуальность
+        </div>
+        <h2 className="sx-h">Я становлюсь уверенным, чувственным, любящим мужчиной.</h2>
+        <div className="sx">
           {cards.map((card) => (
-            <div key={card.title} className="rounded-[16px] bg-[var(--v2-ink-50)] px-4 py-4">
-              <h3 className="text-[16px] font-semibold">{card.title}</h3>
-              <p className="mt-1.5 text-[14.5px] leading-relaxed text-[var(--v2-ink-600)]">{card.text}</p>
+            <div key={card.title} className="sx-c">
+              <h3>{card.title}</h3>
+              <p>{card.text}</p>
             </div>
           ))}
         </div>
       </div>
-      <div className="relative min-h-[360px]">
-        <Photo src="/home/loving.png" position="center 20%" fill />
+      <div className="sx-img">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={appPath("/home/loving.png")} alt="" style={{ objectPosition: "center 20%" }} />
       </div>
     </section>
   );
@@ -596,17 +549,17 @@ function Sexuality() {
 
 function StopList() {
   return (
-    <section className="rounded-[22px] bg-[#fff5f5] px-7 py-6" style={{ boxShadow: "inset 4px 0 0 #dc2626" }}>
-      <div className="mb-4 flex flex-wrap items-baseline gap-3">
-        <span className="text-[12px] font-semibold tracking-[0.13em] text-[#dc2626] uppercase">Стоп-лист</span>
-        <h2 className="v2-tight text-[26px] font-semibold tracking-[-0.03em] text-[#7f1d1d]">Что я НЕ делаю до конца ноября</h2>
+    <section className="stop">
+      <div className="sec-head">
+        <span className="kick" style={{ color: "#dc2626" }}>
+          Стоп-лист
+        </span>
+        <h2 className="sec-title">Что я НЕ делаю до конца ноября</h2>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="stop-l">
         {STOPS.map((text, index) => (
-          <div key={text} className="flex items-start gap-3 text-[15.5px] leading-snug text-[#7f1d1d]">
-            <i className="v2-tnum mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#dc2626] text-[12px] font-semibold text-white not-italic">
-              {index + 1}
-            </i>
+          <div key={text} className="stop-i">
+            <i>{index + 1}</i>
             {text}
           </div>
         ))}
@@ -617,30 +570,27 @@ function StopList() {
 
 function Codex() {
   return (
-    <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,420px)]">
-      <div className="flex flex-col gap-5 px-8 py-8">
-        <span className="text-[12px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">Личный кодекс</span>
+    <section className="cx">
+      <div className="cx-l">
+        <span className="kick">Личный кодекс</span>
         <div>
-          <h2 className="v2-tight text-[28px] leading-snug font-semibold tracking-[-0.03em]">Я привлекательный, уверенный и чувственный мужчина.</h2>
-          <p className="mt-3 text-[15.5px] leading-relaxed text-[var(--v2-ink-600)]">
+          <h2 className="cx-q">Я привлекательный, уверенный и чувственный мужчина.</h2>
+          <p className="cx-p">
             Мне нравится женская красота и взаимное притяжение. Я открыт новому, свободно общаюсь, наслаждаюсь флиртом и собственной сексуальностью. Я позволяю желанным событиям развиваться естественно, с взаимным интересом, честностью и уважением к границам.
           </p>
-          <p className="mt-3 text-[15.5px] leading-relaxed text-[var(--v2-ink-600)]">
+          <p className="cx-p">
             Я не отказываюсь от своих желаний. Я перестаю жить в ожидании их исполнения и начинаю создавать для них реальную основу.
           </p>
         </div>
-        <div className="h-px bg-[var(--v2-ink-100)]" />
+        <div className="cx-sep" />
         <div>
-          <h2 className="v2-tight text-[28px] leading-snug font-semibold tracking-[-0.03em]">Я — автор своей реальности.</h2>
-          <p className="mt-3 text-[15.5px] leading-relaxed text-[var(--v2-ink-600)]">
+          <h2 className="cx-q">Я — автор своей реальности.</h2>
+          <p className="cx-p">
             Я выбираю желаемую жизнь, создаю условия для её воплощения и отпускаю необходимость контролировать весь маршрут.
           </p>
         </div>
       </div>
-      <div className="relative min-h-[320px]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <Photo src="/home/codex.png" position="center 25%" fill />
-      </div>
+      <div className="cx-img" style={{ backgroundImage: `url(${appPath("/home/codex.png")})` }} />
     </section>
   );
 }
@@ -648,36 +598,28 @@ function Codex() {
 function Visualization() {
   return (
     <section>
-      <SectionHead title="Что именно визуализировать" sub="Четыре постоянные сцены" />
-      <p className="mb-4 text-[15.5px] text-[var(--v2-ink-600)]">
-        Представлять их от первого лица, как будто это твой обычный образ жизни, а не далёкая награда.
-      </p>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="sec-head">
+        <h2 className="sec-title">Что именно визуализировать</h2>
+        <span className="sec-sub">Четыре постоянные сцены</span>
+      </div>
+      <p className="vz-intro">Представлять их от первого лица, как будто это твой обычный образ жизни, а не далёкая награда.</p>
+      <div className="vz">
         {SCENES.map((scene) => (
-          <article key={scene.n} className="v2-card overflow-hidden">
-            <div className="h-[220px]">
-              <Photo src={scene.src} position="center 30%" />
+          <article key={scene.n} className="vz-c">
+            <div className="vz-img">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={appPath(scene.src)} alt="" style={{ objectPosition: scene.pos }} />
             </div>
-            <div className="flex gap-3 px-5 py-4">
-              <span className="v2-tnum text-[13px] font-semibold text-[var(--v2-ink-400)]">{scene.n}</span>
+            <div className="vz-b">
+              <span className="vz-n">{scene.n}</span>
               <div>
-                <h3 className="text-[17px] font-semibold">{scene.title}</h3>
-                <p className="mt-1 text-[14.5px] leading-relaxed text-[var(--v2-ink-600)]">{scene.text}</p>
+                <h3 className="vz-t">{scene.title}</h3>
+                <p className="vz-p">{scene.text}</p>
               </div>
             </div>
           </article>
         ))}
       </div>
     </section>
-  );
-}
-
-function SectionHead({ n, title, sub }: { n?: string; title: string; sub?: string }) {
-  return (
-    <div className="mb-4 flex flex-wrap items-baseline gap-3.5">
-      {n ? <span className="text-[12px] font-semibold tracking-[0.14em] text-[var(--v2-ink-400)]">{n}</span> : null}
-      <h2 className="v2-tight text-[26px] font-semibold tracking-[-0.03em]">{title}</h2>
-      {sub ? <span className="text-[14.5px] text-[var(--v2-ink-500)]">{sub}</span> : null}
-    </div>
   );
 }

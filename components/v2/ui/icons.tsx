@@ -384,6 +384,17 @@ export const V2Icons = {
       <path d="m5 12.5 5 5 9-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  tag: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <path
+        d="M4.5 12.2 11.8 4.8A2 2 0 0 1 13.2 4H19a1 1 0 0 1 1 1v5.8a2 2 0 0 1-.6 1.4l-7.4 7.4a2 2 0 0 1-2.8 0l-5.7-5.7a2 2 0 0 1 0-2.7Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="15.5" cy="8.5" r="1.15" fill="currentColor" />
+    </svg>
+  ),
   lab: (p: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>
       <path
