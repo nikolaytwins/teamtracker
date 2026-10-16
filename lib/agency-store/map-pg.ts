@@ -1,5 +1,6 @@
 /** Приводим строки из Supabase (snake_case) к форме, ожидаемой текущим UI/API (camelCase). */
 
+import { agencyDetailManualTotalRub } from "@/lib/agency/detail-line-total";
 import type { AgencyProjectTrackedTimeRow } from "@/lib/agency/tracked-time-types";
 
 export function mapProjectRow(r: Record<string, unknown>): Record<string, unknown> {
@@ -76,6 +77,13 @@ export function mapGeneralExpenseRow(r: Record<string, unknown>): Record<string,
 }
 
 export function mapDetailRow(r: Record<string, unknown>): Record<string, unknown> {
+  const billingType = r.billing_type === "hourly" ? "hourly" : "fixed";
+  const totalOverrideSeconds =
+    r.total_override_seconds == null ||
+    r.total_override_seconds === "" ||
+    !Number.isFinite(Number(r.total_override_seconds))
+      ? null
+      : Math.max(0, Math.floor(Number(r.total_override_seconds)));
   return {
     id: r.id,
     projectId: r.project_id,
@@ -83,20 +91,17 @@ export function mapDetailRow(r: Record<string, unknown>): Record<string, unknown
     quantity: r.quantity,
     unitPrice: r.unit_price,
     order: r.sort_order,
-    billingType: r.billing_type === "hourly" ? "hourly" : "fixed",
+    billingType,
     trackedSeconds: Number(r.tracked_seconds) || 0,
     timerStartedAt: r.timer_started_at ? String(r.timer_started_at) : null,
     timerPreviousSeconds: Number(r.timer_previous_seconds) || 0,
-    totalOverrideRub:
-      r.total_override_rub == null || r.total_override_rub === "" || !Number.isFinite(Number(r.total_override_rub))
-        ? null
-        : Number(r.total_override_rub),
-    totalOverrideSeconds:
-      r.total_override_seconds == null ||
-      r.total_override_seconds === "" ||
-      !Number.isFinite(Number(r.total_override_seconds))
-        ? null
-        : Math.max(0, Math.floor(Number(r.total_override_seconds))),
+    totalOverrideRub: agencyDetailManualTotalRub({
+      billingType,
+      unitPrice: r.unit_price == null || r.unit_price === "" ? null : Number(r.unit_price),
+      totalOverrideRub: r.total_override_rub,
+      totalOverrideSeconds,
+    }),
+    totalOverrideSeconds,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

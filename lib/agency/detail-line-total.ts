@@ -32,6 +32,25 @@ export function readTotalOverrideSeconds(value: unknown): number | null {
 }
 
 /**
+ * Ручная сумма строки.
+ * Если колонки `total_override_rub` нет, почасовая правка хранится в `unit_price`,
+ * а секунды на этот момент — в `total_override_seconds`.
+ */
+export function agencyDetailManualTotalRub(detail: {
+  billingType?: string | null;
+  unitPrice?: number | null;
+  totalOverrideRub?: unknown;
+  totalOverrideSeconds?: unknown;
+}): number | null {
+  const direct = readTotalOverrideRub(detail.totalOverrideRub);
+  if (direct != null) return direct;
+  if (detail.billingType !== "hourly") return null;
+  if (readTotalOverrideSeconds(detail.totalOverrideSeconds) == null) return null;
+  const unit = Number(detail.unitPrice);
+  return Number.isFinite(unit) ? unit : null;
+}
+
+/**
  * Сумма строки.
  * Фикс: ручная сумма, иначе qty×price.
  * По времени: ручная сумма плюс ставка за секунды после этой правки.

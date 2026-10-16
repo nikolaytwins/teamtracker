@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agencyDetailLineTotal } from "./detail-line-total";
+import { mapDetailRow } from "../agency-store/map-pg";
+import { agencyDetailLineTotal, agencyDetailManualTotalRub } from "./detail-line-total";
 
 test("hourly total without a manual edit is hours times rate", () => {
   assert.equal(
@@ -16,6 +17,58 @@ test("manual hourly total stays until newer time is tracked", () => {
       4000
     ),
     999
+  );
+});
+
+test("hourly manual total can live in unit price when the rub column is missing", () => {
+  assert.equal(
+    agencyDetailManualTotalRub({
+      billingType: "hourly",
+      unitPrice: 12000,
+      totalOverrideRub: null,
+      totalOverrideSeconds: 3600,
+    }),
+    12000
+  );
+  assert.equal(
+    agencyDetailManualTotalRub({
+      billingType: "hourly",
+      unitPrice: 12000,
+      totalOverrideRub: null,
+      totalOverrideSeconds: null,
+    }),
+    null
+  );
+  assert.equal(
+    agencyDetailManualTotalRub({
+      billingType: "hourly",
+      unitPrice: 1,
+      totalOverrideRub: 9000,
+      totalOverrideSeconds: 10,
+    }),
+    9000
+  );
+});
+
+test("a stored hourly row without the rub column still bills the manual total", () => {
+  const row = mapDetailRow({
+    billing_type: "hourly",
+    unit_price: 7000,
+    total_override_seconds: 100,
+    tracked_seconds: 4600,
+  });
+  assert.equal(row.totalOverrideRub, 7000);
+  assert.equal(
+    agencyDetailLineTotal(
+      {
+        billingType: String(row.billingType),
+        trackedSeconds: Number(row.trackedSeconds),
+        totalOverrideRub: row.totalOverrideRub as number,
+        totalOverrideSeconds: row.totalOverrideSeconds as number,
+      },
+      3600
+    ),
+    11500
   );
 });
 

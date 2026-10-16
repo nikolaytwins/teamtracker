@@ -33,16 +33,20 @@ export class SupabaseAgencyRepo implements AgencyRepo {
   private sb = createSupabaseServiceClient();
   /** Optional detail columns that may lag behind code until migrations are applied. */
   private detailOptionalColumns: Set<string> | null = null;
+  private detailOptionalColumnsAt = 0;
 
   private async getDetailOptionalColumns(): Promise<Set<string>> {
-    if (this.detailOptionalColumns) return this.detailOptionalColumns;
     const probes = ["timer_previous_seconds", "total_override_rub", "total_override_seconds"] as const;
+    const cached = this.detailOptionalColumns;
+    const complete = cached != null && probes.every((col) => cached.has(col));
+    if (cached && (complete || Date.now() - this.detailOptionalColumnsAt < 15_000)) return cached;
     const available = new Set<string>();
     for (const col of probes) {
       const { error } = await this.sb.from("agency_project_detail").select(col).limit(1);
       if (!error) available.add(col);
     }
     this.detailOptionalColumns = available;
+    this.detailOptionalColumnsAt = Date.now();
     return available;
   }
 
@@ -828,6 +832,17 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     }
     if (extras && "totalOverrideRub" in extras && optional.has("total_override_rub")) {
       patch.total_override_rub = extras.totalOverrideRub;
+    } else if (
+      extras &&
+      "totalOverrideRub" in extras &&
+      !optional.has("total_override_rub") &&
+      extras.billingType === "hourly"
+    ) {
+      // Колонки суммы нет (миграция 086 не применена). Для почасовой строки цена не
+      // показывается, поэтому ручная сумма лежит в unit_price, якорь — в секундах.
+      const amount = extras.totalOverrideRub;
+      patch.unit_price =
+        amount == null || !Number.isFinite(Number(amount)) ? 0 : Number(amount);
     }
     if (extras && "totalOverrideSeconds" in extras && optional.has("total_override_seconds")) {
       patch.total_override_seconds =
