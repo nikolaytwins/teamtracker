@@ -64,7 +64,7 @@ export function PersonalFinanceSystemGuide() {
         <section className="overflow-hidden rounded-3xl bg-[var(--v2-ink-900)] p-7 text-white shadow-[var(--v2-shadow-pop)] sm:p-9">
           <Kicker light>Правило месяца</Kicker>
           <p className="v2-tighter mt-3 max-w-[820px] text-[25px] font-light leading-snug sm:text-[31px]">
-            Откладываю зарплату, выбираю режим жизни — экономный или нормальный. Из всего сверх 200 000 ₽: 80% сохраняю, 20% добавляю к свободным деньгам.
+            Откладываю зарплату, выбираю режим жизни — экономный или нормальный. При профиците сверх 200 000 ₽: 20% на удовольствия и кайфы, 80% откладываю.
           </p>
           <div className="mt-7 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl bg-white/[0.07] p-5">
@@ -194,12 +194,12 @@ export function PersonalFinanceSystemGuide() {
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl bg-white/[0.1] p-6">
               <p className="v2-tnum text-[46px] font-semibold leading-none">80%</p>
-              <p className="mt-3 text-[16px] font-medium">В подушку / капитал</p>
+              <p className="mt-3 text-[16px] font-medium">Откладываю</p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-white/55">Сначала заполняю подушку, затем увеличиваю капитал.</p>
             </div>
             <div className="rounded-2xl bg-white p-6 text-[var(--v2-ink-900)]">
               <p className="v2-tnum text-[46px] font-semibold leading-none text-[var(--v2-brand-700)]">20%</p>
-              <p className="mt-3 text-[16px] font-medium">В свободные деньги</p>
+              <p className="mt-3 text-[16px] font-medium">На удовольствия и кайфы</p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--v2-ink-500)]">Можно жить чуть свободнее, не превращая весь рост дохода в расходы.</p>
             </div>
           </div>
@@ -211,7 +211,7 @@ export function PersonalFinanceSystemGuide() {
             ].map(([income, capital, free]) => (
               <div key={income} className="rounded-xl border border-white/15 px-4 py-3">
                 <p className="v2-tnum text-[14px] font-semibold">{income}</p>
-                <p className="mt-1 text-[11.5px] text-white/55">{capital} в капитал · {free} свободно</p>
+                <p className="mt-1 text-[11.5px] text-white/55">{capital} откладываю · {free} на удовольствия и кайфы</p>
               </div>
             ))}
           </div>

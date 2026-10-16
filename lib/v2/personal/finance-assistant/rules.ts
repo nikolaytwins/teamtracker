@@ -19,7 +19,7 @@ export const FINANCE_RULES_TEXT = [
   "Обязательные платежи жизни: 93 000 ₽ (аренда 59к + подписки ≈27к + метро 7к).",
   "Экономный месяц 170 000 ₽: платежи 93к + свободные 77к. Целевые фонды не пополняю.",
   "Нормальный месяц от 200 000 ₽: платежи 93к + свободные 87к + одежда 5к + подарки 10к + сюрпризы Лере 5к.",
-  "Всё сверх 200 000 ₽: 80% в подушку/капитал, 20% дополнительно в свободные деньги.",
+  "При профиците сверх 200 000 ₽: 20% на удовольствия и кайфы, 80% откладываю в подушку/капитал.",
   "Если доступно меньше 170к — уменьшаю пополнение свободных денег на недостающую сумму.",
   "Горизонт до 1 октября 2027: стабильные 400 000 ₽/мес и капитал 1,8–2,4 млн ₽.",
 ] as const;
@@ -81,11 +81,11 @@ export function allocateAvailableIncome(availableRaw: number): FinanceAllocation
     const toCushion = Math.round(surplus * surplusToCushionShare);
     lines = [
       line("payments", "Обязательные платежи", paymentsRub, null, "аренда, подписки, метро"),
-      line("free", "Свободные деньги", normalFreeRub + extraFree, null, extraFree > 0 ? `87к + 20% сверх 200к (${rub(extraFree)})` : "месячный лимит"),
+      line("free", "Свободные деньги", normalFreeRub + extraFree, null, extraFree > 0 ? `87к + 20% профицита на удовольствия и кайфы (${rub(extraFree)})` : "месячный лимит"),
       line("clothing", "Одежда", clothingRub, "clothing"),
       line("gifts", "Подарки", giftsRub, "gifts"),
       line("lera", "Сюрпризы Лере", leraRub, "lera"),
-      line("cushion", "Подушка / капитал", toCushion, "cushion", toCushion > 0 ? "80% сверх 200к" : "подушка уже в базе месяца"),
+      line("cushion", "Подушка / капитал", toCushion, "cushion", toCushion > 0 ? "80% профицита откладываю" : "подушка уже в базе месяца"),
     ];
   }
 
@@ -95,7 +95,7 @@ export function allocateAvailableIncome(availableRaw: number): FinanceAllocation
       ? `При ${rub(available)} сначала закрываю платежи, свободные уменьшаю до ${rub(lines.find((l) => l.key === "free")?.amount_rub ?? 0)}. Целевые фонды не трогаю.`
       : mode === "economy"
         ? `При ${rub(available)} — экономный режим: 93к платежи + 77к свободные. Остаток ${rub(lines.find((l) => l.key === "cushion")?.amount_rub ?? 0)} — в подушку.`
-        : `При ${rub(available)} — нормальный режим. База 200к на жизнь и фонды; сверх 200к делю 80/20.`;
+        : `При ${rub(available)} — нормальный режим. База 200к на жизнь и фонды; профицит: 20% на удовольствия и кайфы, 80% откладываю.`;
 
   return {
     available_rub: available,
