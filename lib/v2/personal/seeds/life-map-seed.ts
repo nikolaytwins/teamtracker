@@ -502,6 +502,67 @@ export const LIFE_SX_DOC: LifeMapDoc = {
   ],
 };
 
+export type LifeArticleCard = {
+  href: string;
+  label: string;
+  title: string;
+  lead: string;
+  hero?: string;
+  cover?: string;
+};
+
+export const LIFE_ARTICLES: LifeArticleCard[] = [
+  {
+    href: "/v2/personal/sexuality",
+    label: LIFE_SX_DOC.label,
+    title: LIFE_SX_DOC.title,
+    lead: LIFE_SX_DOC.lead,
+    hero: LIFE_SX_DOC.hero,
+  },
+  {
+    href: "/v2/personal/manifestations",
+    label: LIFE_MF_DOC.label,
+    title: LIFE_MF_DOC.title,
+    lead: LIFE_MF_DOC.lead,
+    hero: LIFE_MF_DOC.hero,
+  },
+  {
+    href: "/v2/personal/life-goals",
+    label: LIFE_GOALS_DOC.label,
+    title: LIFE_GOALS_DOC.title,
+    lead: LIFE_GOALS_DOC.lead,
+    hero: LIFE_GOALS_DOC.hero,
+  },
+  {
+    href: "/v2/personal/game",
+    label: "Игра",
+    title: "Я перестаю прогнозировать желаемую жизнь",
+    lead: "Я не отказываюсь от мечты. Я перестаю требовать гарантии её исполнения и каждый день создаю для неё реальные условия.",
+    hero: "/life/hero-game.png",
+  },
+  {
+    href: "/v2/personal/important",
+    label: "Важное 2.0",
+    title: "Из ручного труда — в системы и капитал",
+    lead: "Я больше не строю жизнь вокруг роли «хорошего специалиста». Я выбираю путь создателя и владельца систем.",
+    cover: "Стратегия 2026",
+  },
+  {
+    href: "/v2/personal/moscow",
+    label: "Москва",
+    title: "Как закрепиться в Москве",
+    lead: "Материальная база, чтобы не предавать большое будущее. Сердце задаёт направление — реальность задаёт темп.",
+    cover: "Переходный период",
+  },
+  {
+    href: "/v2/personal/manifest",
+    label: "Манифест",
+    title: "Манифест новой жизни",
+    lead: "Я больше не жду, когда новая жизнь выберет меня. Я становлюсь человеком, способным её построить.",
+    hero: "/wishes/ai-industry-hero.png",
+  },
+];
+
 export function lifeMapChapters(doc: LifeMapDoc) {
   return doc.blocks.filter((b): b is Extract<LifeMapBlock, { type: "h2" }> => b.type === "h2");
 }

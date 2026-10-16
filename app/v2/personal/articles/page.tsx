@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
-import { appPath } from "@/lib/api-url";
+import { LifeMapIndex } from "@/components/v2/personal/life-map/life-map-index";
 
 export default function PersonalArticlesPage() {
-  redirect(appPath("/v2/personal/sexuality"));
+  return <LifeMapIndex />;
 }

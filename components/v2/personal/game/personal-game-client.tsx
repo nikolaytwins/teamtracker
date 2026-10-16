@@ -1,6 +1,7 @@
 "use client";
 
 import { Unbounded } from "next/font/google";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { appPath } from "@/lib/api-url";
 import "./game-article.css";
@@ -87,9 +88,14 @@ export function PersonalGameClient() {
   return (
     <div className={`tt-gm-page tt-gm ${unbounded.variable}`}>
       <main className="tt-gm-main">
-        <div className="tt-gm-banner">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={appPath("/life/hero-game.png")} alt="" />
+        <div className="tt-gm-top">
+          <Link href={appPath("/v2/personal/articles")} className="tt-gm-back">
+            ← Все статьи
+          </Link>
+          <div className="tt-gm-banner">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={appPath("/life/hero-game.png")} alt="" />
+          </div>
         </div>
 
         <nav className="tt-gm-nav">

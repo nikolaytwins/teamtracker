@@ -24,6 +24,24 @@
   gap: 88px;
 }
 
+.tt-gm-top {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tt-gm-back {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--gm-faint);
+  text-decoration: none;
+}
+
+.tt-gm-back:hover {
+  color: var(--gm-accent);
+}
+
 .tt-gm-banner {
   border-radius: 28px;
   overflow: hidden;

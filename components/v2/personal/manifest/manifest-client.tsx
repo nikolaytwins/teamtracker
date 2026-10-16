@@ -9,6 +9,7 @@ import type {
 } from "@/lib/v2/personal/manifest-shared";
 import type { MyCodeDoc, MyCodePattern, MyCodeRule } from "@/lib/v2/personal/seeds/mycode-seed";
 import { seedMyCodeDoc } from "@/lib/v2/personal/seeds/mycode-seed";
+import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
 const HERO_BLUE = "#2d5eef";
@@ -431,6 +432,12 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex max-w-[1720px] flex-col gap-7 px-9 pb-24 pt-7">
         <div className="flex flex-col gap-5">
+          <Link
+            href={appPath("/v2/personal/articles")}
+            className="text-[13px] font-medium text-[var(--v2-ink-400)] transition hover:text-[var(--v2-brand-700)]"
+          >
+            ← Все статьи
+          </Link>
           <section className="v2-card px-8 py-8">
             <Kicker>Еженедельный код · личный план</Kicker>
             <h1 className="v2-tight mt-1 text-[40px] font-semibold leading-[1.08] tracking-[-0.036em] text-[var(--v2-ink-900)]">

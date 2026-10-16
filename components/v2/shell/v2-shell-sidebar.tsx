@@ -359,17 +359,12 @@ export function V2ShellSidebar({
                   (pathname?.startsWith(appPath("/v2/personal/articles")) ?? false) ||
                   (pathname?.startsWith(appPath("/v2/personal/sexuality")) ?? false) ||
                   (pathname?.startsWith(appPath("/v2/personal/manifestations")) ?? false) ||
-                  (pathname?.startsWith(appPath("/v2/personal/life-goals")) ?? false);
-              } else if (item.href === "/v2/personal/manifest") {
-                // Блок Манифест: манифест + общая стратегия + бренд + мой код + база данных
-                const onManifestations = pathname?.startsWith(appPath("/v2/personal/manifestations")) ?? false;
-                active =
-                  (!onManifestations && (pathname?.startsWith(appPath("/v2/personal/manifest")) ?? false)) ||
-                  (pathname?.startsWith(appPath("/v2/personal/life-strategy")) ?? false) ||
-                  (pathname?.startsWith(appPath("/v2/personal/brand")) ?? false) ||
-                  (pathname?.startsWith(appPath("/v2/personal/my-code")) ?? false) ||
-                  pathname === appPath("/v2/personal/strategy") ||
-                  (pathname?.startsWith(appPath("/v2/personal/strategy/")) ?? false);
+                  (pathname?.startsWith(appPath("/v2/personal/life-goals")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/game")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/important")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/moscow")) ?? false) ||
+                  pathname === appPath("/v2/personal/manifest") ||
+                  (pathname?.startsWith(`${appPath("/v2/personal/manifest")}/`) ?? false);
               } else if (item.href.startsWith("/v2/personal/calendar")) {
                 active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
               }

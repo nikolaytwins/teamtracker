@@ -24,6 +24,18 @@
     padding: 36px 28px 96px;
   }
 }
+.moscow-page .msk-back {
+  display: inline-flex;
+  margin: 0 4px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--msk-muted);
+  text-decoration: none;
+}
+.moscow-page .msk-back:hover {
+  color: var(--msk-accent);
+}
 .moscow-page .msk-hero {
   position: relative;
   overflow: hidden;

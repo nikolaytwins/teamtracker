@@ -84,15 +84,11 @@ const PERSONAL_NAV: NavItem[] = [
   { href: "/v2/personal/hypotheses", label: "Гипотезы", icon: "lab" },
   { href: "/v2/personal/goals", label: "Цели", icon: "tag" },
   { href: "/v2/personal/articles", label: "Статьи", icon: "spark" },
-  { href: "/v2/personal/game", label: "Игра", icon: "star" },
   // Скрыто: Идеи (/v2/personal/ideas — вкладка в «Идеи и задачи»)
   // Скрыто: Дашборд (/v2/personal/dashboard — YouTube неактуален)
-  { href: "/v2/personal/important", label: "Важное 2.0", icon: "starFill" },
-  { href: "/v2/personal/moscow", label: "Москва", icon: "home" },
   { href: "/v2/personal/sport", label: "Спорт", icon: "sport" },
   { href: "/v2/personal/wishes", label: "Желания", icon: "wish" },
   { href: "/v2/personal/observations", label: "Дневник", icon: "eye" },
-  { href: "/v2/personal/manifest", label: "Манифест", icon: "flag" },
 ];
 
 export function V2AppShell({ children }: { children: React.ReactNode }) {

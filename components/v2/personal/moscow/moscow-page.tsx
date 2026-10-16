@@ -1,8 +1,10 @@
 "use client";
 
 import "./moscow-design.css";
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { appPath } from "@/lib/api-url";
 
 function preserveSourceLineBreaks(md: string) {
   return md.replace(/([^\n])\n(?!\n)/g, "$1  \n");
@@ -12,6 +14,9 @@ export function MoscowPage({ title, body }: { title: string; body: string }) {
   return (
     <div className="moscow-page flex min-h-0 flex-1 flex-col">
       <div className="msk-shell">
+        <Link href={appPath("/v2/personal/articles")} className="msk-back">
+          ← Все статьи
+        </Link>
         <header className="msk-hero">
           <div className="msk-hero-inner">
             <span className="msk-kick">Москва · переходный период</span>

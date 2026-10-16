@@ -1,6 +1,7 @@
 "use client";
 
 import { Unbounded } from "next/font/google";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/api-url";
 import {
@@ -208,6 +209,9 @@ export function LifeMapArticle({ doc }: { doc: LifeMapDoc }) {
   return (
     <div className={`tt-lm-page tt-lm ${unbounded.variable}`}>
       <div className="tt-lm-wrap">
+        <Link href={appPath("/v2/personal/articles")} className="tt-lm-back">
+          ← Все статьи
+        </Link>
         <div className="tt-lm-banner">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={appPath(doc.hero)} alt="" />

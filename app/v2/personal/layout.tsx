@@ -19,6 +19,11 @@ const PERSONAL_TABS = [
 
 const ARTICLE_TABS = [
   {
+    href: "/v2/personal/articles",
+    label: "Все",
+    match: (p: string) => p === "/v2/personal/articles" || p === appPath("/v2/personal/articles"),
+  },
+  {
     href: "/v2/personal/sexuality",
     label: "Сексуальность",
     match: (p: string) =>
@@ -36,7 +41,38 @@ const ARTICLE_TABS = [
     match: (p: string) =>
       p.startsWith("/v2/personal/life-goals") || p.startsWith(appPath("/v2/personal/life-goals")),
   },
+  {
+    href: "/v2/personal/game",
+    label: "Игра",
+    match: (p: string) => p.startsWith("/v2/personal/game") || p.startsWith(appPath("/v2/personal/game")),
+  },
+  {
+    href: "/v2/personal/important",
+    label: "Важное 2.0",
+    match: (p: string) =>
+      p.startsWith("/v2/personal/important") || p.startsWith(appPath("/v2/personal/important")),
+  },
+  {
+    href: "/v2/personal/moscow",
+    label: "Москва",
+    match: (p: string) => p.startsWith("/v2/personal/moscow") || p.startsWith(appPath("/v2/personal/moscow")),
+  },
+  {
+    href: "/v2/personal/manifest",
+    label: "Манифест",
+    match: (p: string) => isManifestArticle(p),
+  },
 ] as const;
+
+function isManifestArticle(pathname: string) {
+  const prefixed = appPath("/v2/personal/manifest");
+  return (
+    pathname === "/v2/personal/manifest" ||
+    pathname.startsWith("/v2/personal/manifest/") ||
+    pathname === prefixed ||
+    pathname.startsWith(`${prefixed}/`)
+  );
+}
 
 const MANIFEST_TABS = [
   {
@@ -119,7 +155,8 @@ function isManifestBlockPath(pathname: string) {
     pathname.startsWith(appPath("/v2/personal/strategy/"));
   return (
     (pathname.startsWith(appPath("/v2/personal/manifest")) &&
-      !pathname.startsWith(appPath("/v2/personal/manifestations"))) ||
+      !pathname.startsWith(appPath("/v2/personal/manifestations")) &&
+      !isManifestArticle(pathname)) ||
     pathname.startsWith(appPath("/v2/personal/life-strategy")) ||
     pathname.startsWith(appPath("/v2/personal/brand")) ||
     pathname.startsWith(appPath("/v2/personal/my-code")) ||
@@ -137,15 +174,11 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
   const inObservations = pathname.startsWith(appPath("/v2/personal/observations"));
   const inSport = pathname.startsWith(appPath("/v2/personal/sport"));
   const inIdeasTasks = pathname.startsWith(appPath("/v2/personal/ideas-tasks"));
-  const inImportant = pathname.startsWith(appPath("/v2/personal/important"));
-  const inMoscow = pathname.startsWith(appPath("/v2/personal/moscow"));
   const inHypotheses =
     pathname.startsWith("/v2/personal/hypotheses") ||
     pathname.startsWith(appPath("/v2/personal/hypotheses"));
   const inGoals =
     pathname.startsWith("/v2/personal/goals") || pathname.startsWith(appPath("/v2/personal/goals"));
-  const inGame =
-    pathname.startsWith("/v2/personal/game") || pathname.startsWith(appPath("/v2/personal/game"));
   const inArticles =
     pathname.startsWith("/v2/personal/articles") ||
     pathname.startsWith(appPath("/v2/personal/articles")) ||
@@ -154,7 +187,14 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     pathname.startsWith("/v2/personal/manifestations") ||
     pathname.startsWith(appPath("/v2/personal/manifestations")) ||
     pathname.startsWith("/v2/personal/sexuality") ||
-    pathname.startsWith(appPath("/v2/personal/sexuality"));
+    pathname.startsWith(appPath("/v2/personal/sexuality")) ||
+    pathname.startsWith("/v2/personal/game") ||
+    pathname.startsWith(appPath("/v2/personal/game")) ||
+    pathname.startsWith("/v2/personal/important") ||
+    pathname.startsWith(appPath("/v2/personal/important")) ||
+    pathname.startsWith("/v2/personal/moscow") ||
+    pathname.startsWith(appPath("/v2/personal/moscow")) ||
+    isManifestArticle(pathname);
   if (
     inTasks ||
     inCalendar ||
@@ -162,11 +202,8 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     inObservations ||
     inSport ||
     inIdeasTasks ||
-    inImportant ||
-    inMoscow ||
     inHypotheses ||
-    inGoals ||
-    inGame
+    inGoals
   ) {
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }

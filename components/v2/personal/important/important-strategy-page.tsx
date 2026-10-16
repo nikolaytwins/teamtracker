@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { appPath } from "@/lib/api-url";
 
 const assets = [
   {
@@ -178,6 +180,12 @@ export function ImportantStrategyPage() {
       <header className="relative overflow-hidden border-b border-[var(--v2-ink-100)] bg-white">
         <div className="v2-dotgrid pointer-events-none absolute inset-0 opacity-70" />
         <div className="relative mx-auto max-w-[1180px] px-6 py-12 lg:px-10 lg:py-16">
+          <Link
+            href={appPath("/v2/personal/articles")}
+            className="mb-6 inline-flex text-[13px] font-medium text-[var(--v2-ink-400)] transition hover:text-[var(--v2-brand-700)]"
+          >
+            ← Все статьи
+          </Link>
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--v2-brand-50)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-brand-700)]">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--v2-brand-500)]" />
