@@ -6,6 +6,8 @@ export type AgencyDetailLineInput = {
   unitPrice?: number | null;
   trackedSeconds?: number | null;
   totalOverrideRub?: number | null;
+  /** Секунды на момент ручной суммы. Дальше таймер прибавляет только новое время. */
+  totalOverrideSeconds?: number | null;
 };
 
 export function readTotalOverrideRub(value: unknown): number | null {
@@ -22,21 +24,38 @@ export function parseAgencyDetailMoney(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Сумма строки: ручная правка важнее формулы (фикс = qty×price, hourly = часы×ставка). */
+export function readTotalOverrideSeconds(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.floor(n);
+}
+
+/**
+ * Сумма строки.
+ * Фикс: ручная сумма, иначе qty×price.
+ * По времени: ручная сумма плюс ставка за секунды после этой правки.
+ * Без якоря секунд ручная сумма остаётся как есть — старые строки не прыгают.
+ */
 export function agencyDetailLineTotal(
   detail: AgencyDetailLineInput,
   hourlyRateRub: number,
   opts?: { liveElapsedSeconds?: number }
 ): number {
   const override = readTotalOverrideRub(detail.totalOverrideRub);
-  if (override != null) return override;
   const billing = detail.billingType === "hourly" ? "hourly" : "fixed";
   if (billing === "hourly") {
     const tracked = Math.max(0, Number(detail.trackedSeconds) || 0);
     const live = Math.max(0, opts?.liveElapsedSeconds ?? 0);
-    const hours = (tracked + live) / 3600;
-    return hours * (Number(hourlyRateRub) || 0);
+    const seconds = tracked + live;
+    if (override != null) {
+      const anchor = readTotalOverrideSeconds(detail.totalOverrideSeconds);
+      const extra = anchor == null ? 0 : Math.max(0, seconds - anchor);
+      return override + (extra / 3600) * (Number(hourlyRateRub) || 0);
+    }
+    return (seconds / 3600) * (Number(hourlyRateRub) || 0);
   }
+  if (override != null) return override;
   return (Number(detail.quantity) || 0) * (Number(detail.unitPrice) || 0);
 }
 

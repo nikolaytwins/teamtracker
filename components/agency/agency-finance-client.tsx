@@ -104,6 +104,7 @@ interface ProjectDetailRow {
   billingType?: string
   trackedSeconds?: number
   totalOverrideRub?: number | null
+  totalOverrideSeconds?: number | null
 }
 
 function adjacentMonth(year: number, month: number, delta: -1 | 1): { year: number; month: number } {
@@ -314,6 +315,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
                         unitPrice: row.unitPrice,
                         trackedSeconds: row.trackedSeconds,
                         totalOverrideRub: row.totalOverrideRub,
+                        totalOverrideSeconds: row.totalOverrideSeconds,
                       },
                       rate
                     ),

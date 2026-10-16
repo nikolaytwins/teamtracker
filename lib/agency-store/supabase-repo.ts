@@ -36,7 +36,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
 
   private async getDetailOptionalColumns(): Promise<Set<string>> {
     if (this.detailOptionalColumns) return this.detailOptionalColumns;
-    const probes = ["timer_previous_seconds", "total_override_rub"] as const;
+    const probes = ["timer_previous_seconds", "total_override_rub", "total_override_seconds"] as const;
     const available = new Set<string>();
     for (const col of probes) {
       const { error } = await this.sb.from("agency_project_detail").select(col).limit(1);
@@ -758,6 +758,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         timerStartedAt: string | null;
         timerPreviousSeconds: number;
         totalOverrideRub: number | null;
+        totalOverrideSeconds: number | null;
         projectId?: string;
       }
     | undefined
@@ -779,6 +780,10 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         m.totalOverrideRub == null || !Number.isFinite(Number(m.totalOverrideRub))
           ? null
           : Number(m.totalOverrideRub),
+      totalOverrideSeconds:
+        m.totalOverrideSeconds == null || !Number.isFinite(Number(m.totalOverrideSeconds))
+          ? null
+          : Math.max(0, Math.floor(Number(m.totalOverrideSeconds))),
       projectId: m.projectId ? String(m.projectId) : undefined,
     };
   }
@@ -795,6 +800,7 @@ export class SupabaseAgencyRepo implements AgencyRepo {
       timerStartedAt?: string | null;
       timerPreviousSeconds?: number;
       totalOverrideRub?: number | null;
+      totalOverrideSeconds?: number | null;
     }
   ): Promise<Record<string, unknown> | undefined> {
     const optional = await this.getDetailOptionalColumns();
@@ -822,6 +828,12 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     }
     if (extras && "totalOverrideRub" in extras && optional.has("total_override_rub")) {
       patch.total_override_rub = extras.totalOverrideRub;
+    }
+    if (extras && "totalOverrideSeconds" in extras && optional.has("total_override_seconds")) {
+      patch.total_override_seconds =
+        extras.totalOverrideSeconds == null
+          ? null
+          : Math.max(0, Math.floor(extras.totalOverrideSeconds));
     }
     const { error } = await this.sb.from("agency_project_detail").update(patch).eq("id", id);
     if (error) throw error;
@@ -859,6 +871,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
         {
           timerStartedAt: now.toISOString(),
           timerPreviousSeconds: existing.trackedSeconds,
+          ...(existing.totalOverrideRub != null && existing.totalOverrideSeconds == null
+            ? { totalOverrideSeconds: existing.trackedSeconds }
+            : {}),
         }
       );
     }

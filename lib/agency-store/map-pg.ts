@@ -91,6 +91,12 @@ export function mapDetailRow(r: Record<string, unknown>): Record<string, unknown
       r.total_override_rub == null || r.total_override_rub === "" || !Number.isFinite(Number(r.total_override_rub))
         ? null
         : Number(r.total_override_rub),
+    totalOverrideSeconds:
+      r.total_override_seconds == null ||
+      r.total_override_seconds === "" ||
+      !Number.isFinite(Number(r.total_override_seconds))
+        ? null
+        : Math.max(0, Math.floor(Number(r.total_override_seconds))),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

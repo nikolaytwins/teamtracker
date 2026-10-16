@@ -47,6 +47,7 @@ export type ClientShareDetailInput = {
   trackedSeconds?: number | null;
   timerStartedAt?: string | null;
   totalOverrideRub?: number | null;
+  totalOverrideSeconds?: number | null;
   order?: number | null;
 };
 
@@ -97,6 +98,7 @@ export function publicLineFromDetail(
       unitPrice: detail.unitPrice,
       trackedSeconds: liveSeconds,
       totalOverrideRub: detail.totalOverrideRub,
+      totalOverrideSeconds: detail.totalOverrideSeconds,
     },
     hourlyRateRub
   );

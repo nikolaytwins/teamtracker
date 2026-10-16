@@ -77,6 +77,11 @@ function ensureDetailTable(db: Database.Database) {
   } catch {
     /* exists */
   }
+  try {
+    db.exec(`ALTER TABLE AgencyProjectDetail ADD COLUMN totalOverrideSeconds INTEGER`);
+  } catch {
+    /* exists */
+  }
 }
 
 export class SqliteAgencyRepo implements AgencyRepo {
@@ -932,6 +937,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         timerStartedAt: string | null;
         timerPreviousSeconds: number;
         totalOverrideRub: number | null;
+        totalOverrideSeconds: number | null;
         projectId?: string;
       }
     | undefined
@@ -956,6 +962,10 @@ export class SqliteAgencyRepo implements AgencyRepo {
           row.totalOverrideRub == null || !Number.isFinite(Number(row.totalOverrideRub))
             ? null
             : Number(row.totalOverrideRub),
+        totalOverrideSeconds:
+          row.totalOverrideSeconds == null || !Number.isFinite(Number(row.totalOverrideSeconds))
+            ? null
+            : Math.max(0, Math.floor(Number(row.totalOverrideSeconds))),
         projectId: row.projectId ? String(row.projectId) : undefined,
       };
     } finally {
@@ -975,6 +985,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
       timerStartedAt?: string | null;
       timerPreviousSeconds?: number;
       totalOverrideRub?: number | null;
+      totalOverrideSeconds?: number | null;
     }
   ): Promise<Record<string, unknown> | undefined> {
     const db = openSqlite();
@@ -1006,10 +1017,18 @@ export class SqliteAgencyRepo implements AgencyRepo {
           : existing.totalOverrideRub == null || !Number.isFinite(Number(existing.totalOverrideRub))
             ? null
             : Number(existing.totalOverrideRub);
+      const totalOverrideSeconds =
+        extras && "totalOverrideSeconds" in extras
+          ? extras.totalOverrideSeconds == null
+            ? null
+            : Math.max(0, Math.floor(extras.totalOverrideSeconds))
+          : existing.totalOverrideSeconds == null || !Number.isFinite(Number(existing.totalOverrideSeconds))
+            ? null
+            : Math.max(0, Math.floor(Number(existing.totalOverrideSeconds)));
       db.prepare(
         `
       UPDATE AgencyProjectDetail
-      SET title = ?, quantity = ?, unitPrice = ?, "order" = ?, billingType = ?, trackedSeconds = ?, timerStartedAt = ?, timerPreviousSeconds = ?, totalOverrideRub = ?, updatedAt = datetime('now')
+      SET title = ?, quantity = ?, unitPrice = ?, "order" = ?, billingType = ?, trackedSeconds = ?, timerStartedAt = ?, timerPreviousSeconds = ?, totalOverrideRub = ?, totalOverrideSeconds = ?, updatedAt = datetime('now')
       WHERE id = ?
     `
       ).run(
@@ -1022,6 +1041,7 @@ export class SqliteAgencyRepo implements AgencyRepo {
         timerStartedAt,
         timerPreviousSeconds,
         totalOverrideRub,
+        totalOverrideSeconds,
         id
       );
       return db.prepare("SELECT * FROM AgencyProjectDetail WHERE id = ?").get(id) as
@@ -1065,6 +1085,9 @@ export class SqliteAgencyRepo implements AgencyRepo {
         {
           timerStartedAt: now.toISOString(),
           timerPreviousSeconds: existing.trackedSeconds,
+          ...(existing.totalOverrideRub != null && existing.totalOverrideSeconds == null
+            ? { totalOverrideSeconds: existing.trackedSeconds }
+            : {}),
         }
       );
     }

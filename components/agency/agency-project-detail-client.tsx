@@ -56,6 +56,7 @@ interface ProjectDetail {
   timerStartedAt?: string | null
   timerPreviousSeconds?: number
   totalOverrideRub?: number | null
+  totalOverrideSeconds?: number | null
 }
 
 function money(n: number): string {
@@ -480,6 +481,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
           order: updated.order,
           billingType: updated.billingType ?? 'fixed',
           totalOverrideRub: updated.totalOverrideRub ?? null,
+          totalOverrideSeconds: updated.totalOverrideSeconds ?? null,
         }),
       })
       if (!res.ok) {
@@ -524,7 +526,15 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   const handleUpdateLineTotal = (detailId: string, nextTotal: number | null) => {
     const current = details.find((d) => d.id === detailId)
     if (!current) return
-    const updated: ProjectDetail = { ...current, totalOverrideRub: nextTotal }
+    const anchor =
+      nextTotal == null || current.billingType !== 'hourly'
+        ? null
+        : agencyDetailEffectiveSeconds(current, Date.now())
+    const updated: ProjectDetail = {
+      ...current,
+      totalOverrideRub: nextTotal,
+      totalOverrideSeconds: anchor,
+    }
     setDetails((prev) => prev.map((d) => (d.id === detailId ? updated : d)))
     void persistDetailPatch(detailId, updated)
   }
@@ -778,6 +788,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
             unitPrice: d.unitPrice,
             trackedSeconds: liveSeconds,
             totalOverrideRub: d.totalOverrideRub,
+            totalOverrideSeconds: d.totalOverrideSeconds,
           },
           hourlyRate
         )
@@ -840,6 +851,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
         unitPrice: d.unitPrice,
         trackedSeconds: liveSeconds,
         totalOverrideRub: d.totalOverrideRub,
+        totalOverrideSeconds: d.totalOverrideSeconds,
       },
       hourlyRate
     )

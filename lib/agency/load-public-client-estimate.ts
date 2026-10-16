@@ -31,6 +31,10 @@ export async function loadPublicClientEstimate(
         row.totalOverrideRub == null || !Number.isFinite(Number(row.totalOverrideRub))
           ? null
           : Number(row.totalOverrideRub),
+      totalOverrideSeconds:
+        row.totalOverrideSeconds == null || !Number.isFinite(Number(row.totalOverrideSeconds))
+          ? null
+          : Math.max(0, Math.floor(Number(row.totalOverrideSeconds))),
       order: Number(row.order) || 0,
     }));
   }

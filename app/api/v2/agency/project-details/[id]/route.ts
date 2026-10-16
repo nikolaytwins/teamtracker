@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgencyRepoV2, isSupabaseAgencyConfigured } from "@/lib/agency-store";
 import { agencyV2NotConfiguredResponse } from "@/lib/agency-api/v2-repo";
+import { agencyDetailEffectiveSeconds } from "@/lib/agency/detail-line-total";
 
 export async function PUT(
   request: NextRequest,
@@ -39,6 +40,7 @@ export async function PUT(
       trackedSeconds?: number;
       timerStartedAt?: string | null;
       totalOverrideRub?: number | null;
+      totalOverrideSeconds?: number | null;
     } = { billingType: nextBilling };
     if (trackedSeconds != null) {
       const n = typeof trackedSeconds === "number" ? trackedSeconds : parseFloat(String(trackedSeconds));
@@ -48,12 +50,20 @@ export async function PUT(
     else if (typeof timerStartedAt === "string") extras.timerStartedAt = timerStartedAt;
     if (totalOverrideRub === null || totalOverrideRub === "") {
       extras.totalOverrideRub = null;
+      extras.totalOverrideSeconds = null;
     } else if (totalOverrideRub != null) {
       const n =
         typeof totalOverrideRub === "number"
           ? totalOverrideRub
           : parseFloat(String(totalOverrideRub).replace(/\s/g, "").replace(",", "."));
-      if (!Number.isNaN(n)) extras.totalOverrideRub = n;
+      if (!Number.isNaN(n)) {
+        extras.totalOverrideRub = n;
+        const prev = existing.totalOverrideRub;
+        if (prev == null || Number(prev) !== n) {
+          extras.totalOverrideSeconds =
+            nextBilling === "hourly" ? agencyDetailEffectiveSeconds(existing, Date.now()) : null;
+        }
+      }
     }
 
     const detail = await repo.updateProjectDetailById(
