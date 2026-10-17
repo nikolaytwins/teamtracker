@@ -107,8 +107,8 @@ export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
     project: "qm",
     stage: "active",
     sprint: "s1",
-    title: "Мини-запуск Qmagic",
-    body: "",
+    title: "Qmagic — проверить одну продуктовую гипотезу",
+    body: "Пользователям нужен инструмент, который позволяет быстро создавать или редактировать дизайн через ИИ, в том числе внутри Figma.",
     metric: "",
   },
   {

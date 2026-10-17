@@ -65,6 +65,12 @@ export const TWINLABS_HYPOTHESIS_PRIORITY = "высокий";
 
 const TWINLABS_HYPOTHESIS_ALIASES = ["Запуск подписки Твинлабс:Плюс + найм"];
 
+export const QMAGIC_HYPOTHESIS_TITLE = "Qmagic — проверить одну продуктовую гипотезу";
+export const QMAGIC_HYPOTHESIS_BODY =
+  "Пользователям нужен инструмент, который позволяет быстро создавать или редактировать дизайн через ИИ, в том числе внутри Figma.";
+
+const QMAGIC_HYPOTHESIS_ALIASES = ["Мини-запуск Qmagic"];
+
 export type HypothesisPageProfile = {
   body: string;
   criterion: string;
@@ -93,6 +99,13 @@ export function hypothesisPage(title: string): HypothesisPageProfile | null {
       criterion: TWINLABS_HYPOTHESIS_CRITERION,
       priority: TWINLABS_HYPOTHESIS_PRIORITY,
       workspace: twinlabsHypothesisWorkspace,
+    };
+  }
+  if (value === QMAGIC_HYPOTHESIS_TITLE || QMAGIC_HYPOTHESIS_ALIASES.includes(value)) {
+    return {
+      body: QMAGIC_HYPOTHESIS_BODY,
+      criterion: "",
+      workspace: qmagicHypothesisWorkspace,
     };
   }
   return null;
@@ -220,6 +233,33 @@ export function twinlabsHypothesisWorkspace(): HypothesisWorkspace {
           task("tw-base", "Собрать базу 20–30 продюсеров, онлайн-школ и экспертов.", 30),
           task("tw-send", "Отправить 20–30 персональных предложений, в том числе через партнёров.", 30),
           task("tw-reactivate", "Точечно реактивировать постоянников"),
+        ],
+      },
+    ],
+    files: [],
+    notes: [],
+    ideas: [],
+  };
+}
+
+export function qmagicHypothesisWorkspace(): HypothesisWorkspace {
+  return {
+    stages: [
+      {
+        id: "qm-important",
+        title: "Что важно о сервисе",
+        note: "Удобство использования. Пользователь не должен думать, какое ИИ использовать и какую модель. Он пишет простое сообщение, а система сама запускает необходимый воркфлоу.\n\nСистема помнит особенности бренда и что нравится, а что не нравится заказчику.\n\nОна усилена моими дизайнерскими навыками, создан сильный дизайн-скилл.",
+        tasks: [],
+      },
+      {
+        id: "qm-tasks",
+        title: "Задачи",
+        note: "",
+        tasks: [
+          task("qm-concept", "Определить концепт МВП"),
+          task("qm-audience", "Выбрать главную целевую аудиторию и главную задачу"),
+          task("qm-mvp", "Создать МВП"),
+          task("qm-test", "Протестировать"),
         ],
       },
     ],
