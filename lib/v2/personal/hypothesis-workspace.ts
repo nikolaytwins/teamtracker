@@ -71,6 +71,12 @@ export const QMAGIC_HYPOTHESIS_BODY =
 
 const QMAGIC_HYPOTHESIS_ALIASES = ["Мини-запуск Qmagic"];
 
+export const MEDIA_HYPOTHESIS_TITLE = "Личная медийка — начать строить долгосрочный актив";
+export const MEDIA_HYPOTHESIS_BODY =
+  "Твой реальный путь из дизайнера в создателя ИИ-продуктов и предпринимателя может привлечь аудиторию, которая в будущем станет источником клиентов, партнёрств и покупателей собственных продуктов.";
+
+const MEDIA_HYPOTHESIS_ALIASES = ["Запуск контента в соц.сетях"];
+
 export type HypothesisPageProfile = {
   body: string;
   criterion: string;
@@ -106,6 +112,13 @@ export function hypothesisPage(title: string): HypothesisPageProfile | null {
       body: QMAGIC_HYPOTHESIS_BODY,
       criterion: "",
       workspace: qmagicHypothesisWorkspace,
+    };
+  }
+  if (value === MEDIA_HYPOTHESIS_TITLE || MEDIA_HYPOTHESIS_ALIASES.includes(value)) {
+    return {
+      body: MEDIA_HYPOTHESIS_BODY,
+      criterion: "",
+      workspace: mediaHypothesisWorkspace,
     };
   }
   return null;
@@ -260,6 +273,48 @@ export function qmagicHypothesisWorkspace(): HypothesisWorkspace {
           task("qm-audience", "Выбрать главную целевую аудиторию и главную задачу"),
           task("qm-mvp", "Создать МВП"),
           task("qm-test", "Протестировать"),
+        ],
+      },
+    ],
+    files: [],
+    notes: [],
+    ideas: [],
+  };
+}
+
+export function mediaHypothesisWorkspace(): HypothesisWorkspace {
+  return {
+    stages: [
+      {
+        id: "md-cadence",
+        title: "Как выпускаем",
+        note: "2 ютуб-ролика в месяц.\n1 карусель в неделю.\n2 рилса в неделю.",
+        tasks: [],
+      },
+      {
+        id: "md-youtube",
+        title: "Ютуб",
+        note: "",
+        tasks: [
+          task("md-yt-scripts", "Написать сценарии ютуб"),
+          task("md-yt-shoot", "Снять ролики ютуб"),
+          task("md-yt-edit", "Смонтировать ролики"),
+          task("md-yt-publish", "Выложить"),
+        ],
+      },
+      {
+        id: "md-insta",
+        title: "Инста",
+        note: "",
+        tasks: [
+          task("md-ig-plan", "Придумать контент-план"),
+          task("md-ig-scripts", "Написать сценарии роликов"),
+          task("md-ig-shoot", "Снять ролики"),
+          task("md-ig-publish", "Выложить ролики"),
+          task("md-ig-carousel-plan", "Придумать контент-план каруселей"),
+          task("md-ig-carousel-script", "Написать сценарий каруселей"),
+          task("md-ig-carousel-design", "Задизайнить карусели"),
+          task("md-ig-carousel-publish", "Выложить карусели"),
         ],
       },
     ],
