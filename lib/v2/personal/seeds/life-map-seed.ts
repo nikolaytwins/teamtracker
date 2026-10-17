@@ -561,6 +561,20 @@ export const LIFE_ARTICLES: LifeArticleCard[] = [
     lead: "Я больше не жду, когда новая жизнь выберет меня. Я становлюсь человеком, способным её построить.",
     hero: "/wishes/ai-industry-hero.png",
   },
+  {
+    href: "/v2/personal/articles/rostov-content-plan",
+    label: "Колбаса",
+    title: "Контент-план: 30 роликов",
+    lead: "Найти рабочую механику, снять свои ролики и смотреть на заказы, а не на чужие просмотры.",
+    cover: "Ростовские колбасы",
+  },
+  {
+    href: "/v2/personal/articles/rostov-ugc",
+    label: "Колбаса",
+    title: "UGC-креаторы и интеграции",
+    lead: "Кого проверить в Люберцах, что покупать в первом ролике и как считать заказы.",
+    cover: "UGC",
+  },
 ];
 
 export function lifeMapChapters(doc: LifeMapDoc) {

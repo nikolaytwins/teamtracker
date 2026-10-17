@@ -14,6 +14,10 @@ import {
   type HypothesisStage,
   type HypothesisVerdict,
 } from "@/lib/v2/personal/hypotheses-meta";
+import {
+  sanitizeHypothesisWorkspace,
+  type HypothesisWorkspace,
+} from "@/lib/v2/personal/hypothesis-workspace";
 import type { V2SessionContext } from "@/lib/v2/types";
 
 export class PersonalHypothesesValidationError extends Error {
@@ -414,4 +418,61 @@ export async function deleteHypothesisProject(ctx: V2SessionContext, id: string)
   const sb = getV2Supabase();
   const { error } = await sb.from("v2_personal_hypothesis_projects").delete().eq("id", id).eq("user_id", uid(ctx));
   if (error) throw error;
+}
+
+function missingWorkspaceColumn(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  return error.code === "42703" || error.code === "PGRST204" || /workspace/i.test(error.message || "");
+}
+
+export async function loadHypothesisPage(ctx: V2SessionContext, id: string): Promise<{
+  hypothesis: Hypothesis;
+  project: HypothesisProject | null;
+  sprint: HypothesisSprint | null;
+  workspace: HypothesisWorkspace | null;
+  persisted: boolean;
+}> {
+  const hypothesis = await requireOwned(ctx, id);
+  const sb = getV2Supabase();
+  const userId = uid(ctx);
+  const [project, sprint, probe] = await Promise.all([
+    hypothesis.project_id
+      ? sb.from("v2_personal_hypothesis_projects").select("*").eq("id", hypothesis.project_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    hypothesis.sprint_id
+      ? sb.from("v2_personal_hypothesis_sprints").select("*").eq("id", hypothesis.sprint_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    sb.from("v2_personal_hypotheses").select("workspace").eq("id", id).eq("user_id", userId).maybeSingle(),
+  ]);
+  if (project.error) throw project.error;
+  if (sprint.error) throw sprint.error;
+  const persisted = !missingWorkspaceColumn(probe.error);
+  if (probe.error && persisted) throw probe.error;
+  const stored = probe.data?.workspace;
+  const workspace = stored && typeof stored === "object" ? sanitizeHypothesisWorkspace(stored) : null;
+  return {
+    hypothesis,
+    project: project.data ? mapProject(project.data as Record<string, unknown>) : null,
+    sprint: sprint.data ? mapSprint(sprint.data as Record<string, unknown>) : null,
+    workspace,
+    persisted,
+  };
+}
+
+export async function saveHypothesisWorkspace(
+  ctx: V2SessionContext,
+  id: string,
+  input: unknown,
+): Promise<{ workspace: HypothesisWorkspace; persisted: boolean }> {
+  await requireOwned(ctx, id);
+  const workspace = sanitizeHypothesisWorkspace(input);
+  const sb = getV2Supabase();
+  const { error } = await sb
+    .from("v2_personal_hypotheses")
+    .update({ workspace, updated_at: nowIso() })
+    .eq("id", id)
+    .eq("user_id", uid(ctx));
+  if (missingWorkspaceColumn(error)) return { workspace, persisted: false };
+  if (error) throw error;
+  return { workspace, persisted: true };
 }

@@ -2,6 +2,8 @@
 
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { appPath } from "@/lib/api-url";
+import { useRouter } from "next/navigation";
+import { isRostovHypothesis } from "@/lib/v2/personal/hypothesis-workspace";
 import {
   STAGE_LABEL,
   VERDICT_META,
@@ -32,6 +34,7 @@ function replaceItem(items: Hypothesis[], next: Hypothesis) {
 }
 
 export function HypothesesClient() {
+  const router = useRouter();
   const [board, setBoard] = useState<HypothesesBoard | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [view, setView] = useState<"board" | "proj">("board");
@@ -40,6 +43,13 @@ export function HypothesesClient() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const hashDone = useRef(false);
+  const openHypothesis = useCallback((item: Hypothesis) => {
+    if (isRostovHypothesis(item.title)) {
+      router.push(appPath(`/v2/personal/hypotheses/${item.id}`));
+      return;
+    }
+    setOpenId(item.id);
+  }, [router]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -100,7 +110,7 @@ export function HypothesesClient() {
       await patchItem(id, { stage, sprintId: sprint?.id ?? null });
       if (stage === "done") {
         const item = items.find((row) => row.id === id);
-        if (item && !item.verdict) setOpenId(id);
+        if (item && !item.verdict) openHypothesis(item);
       }
     } catch (moveError) {
       window.alert(moveError instanceof Error ? moveError.message : "Не удалось перенести");
@@ -233,7 +243,7 @@ export function HypothesesClient() {
                   key={item.id}
                   item={item}
                   project={projectById.get(item.project_id ?? "")}
-                  onOpen={() => setOpenId(item.id)}
+                  onOpen={() => openHypothesis(item)}
                   onPatch={patchItem}
                   onDelete={removeItem}
                 />
@@ -338,7 +348,7 @@ export function HypothesesClient() {
                           key={item.id}
                           item={item}
                           project={projectById.get(item.project_id ?? "")}
-                          onOpen={() => setOpenId(item.id)}
+                          onOpen={() => openHypothesis(item)}
                           onPatch={patchItem}
                           onDelete={removeItem}
                         />
@@ -416,9 +426,9 @@ export function HypothesesClient() {
                               key={item.id}
                               role="button"
                               tabIndex={0}
-                              onClick={() => setOpenId(item.id)}
+                              onClick={() => openHypothesis(item)}
                               onKeyDown={(event) => {
-                                if (event.key === "Enter") setOpenId(item.id);
+                                if (event.key === "Enter") openHypothesis(item);
                               }}
                               className="grid w-full cursor-pointer grid-cols-1 items-center gap-3 rounded-[14px] bg-[var(--v2-ink-50)] px-4 py-3 text-left hover:bg-[var(--v2-ink-100)] lg:grid-cols-[200px_minmax(0,1.2fr)_minmax(0,1fr)_auto] lg:gap-[18px]"
                             >

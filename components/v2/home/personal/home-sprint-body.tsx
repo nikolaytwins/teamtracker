@@ -20,6 +20,7 @@ import {
   type Hypothesis,
   type HypothesisProject,
 } from "@/lib/v2/personal/hypotheses-meta";
+import { isRostovHypothesis } from "@/lib/v2/personal/hypothesis-workspace";
 import type { HypothesesBoard } from "@/lib/v2/personal/personal-hypotheses-repo";
 import "./home-sprint-design.css";
 
@@ -364,7 +365,15 @@ function HomeHypothesisCard({ item, project }: { item: Hypothesis; project?: Hyp
   const main = item.metric === PRIMARY_HYPOTHESIS_TAG;
   const chip = main ? PRIMARY_HYPOTHESIS_TAG : project?.name;
   return (
-    <Link className="hc" href={`${appPath(HYP_HREF)}#${item.id}`} style={tone(colors.c, colors.s)}>
+    <Link
+      className="hc"
+      href={
+        isRostovHypothesis(item.title)
+          ? appPath(`/v2/personal/hypotheses/${item.id}`)
+          : `${appPath(HYP_HREF)}#${item.id}`
+      }
+      style={tone(colors.c, colors.s)}
+    >
       <div className="hc-top">
         {chip ? <span className="pchip">{chip}</span> : null}
         <span className="hc-st">в работе</span>

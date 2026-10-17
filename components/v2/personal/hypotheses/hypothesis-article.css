@@ -1,0 +1,147 @@
+.hy-art {
+  --lm-ink: #15132b;
+  --lm-muted: #4a4864;
+  --lm-faint: #86849c;
+  --lm-line: rgba(21, 19, 43, 0.1);
+  --lm-accent: #6a4fdc;
+  --lm-note: #f4ecdb;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  color: var(--lm-ink);
+  background: #f6f4fb;
+}
+
+.hy-art-wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 16px 40px 96px;
+}
+
+.hy-art-back {
+  display: inline-flex;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lm-muted);
+  text-decoration: none;
+}
+
+.hy-art-back:hover {
+  color: var(--lm-ink);
+}
+
+.hy-art-doc {
+  background: #fff;
+  border-radius: 40px;
+  padding: clamp(28px, 5vw, 72px);
+}
+
+.hy-art-doc h1 {
+  max-width: 820px;
+  margin: 0 auto;
+  font-family: var(--font-unbounded), var(--font-inter), sans-serif;
+  font-weight: 800;
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.hy-art-prose {
+  max-width: 820px;
+  margin: 36px auto 0;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--lm-ink);
+}
+
+.hy-art-prose h2 {
+  margin: 48px 0 16px;
+  font-family: var(--font-unbounded), var(--font-inter), sans-serif;
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.hy-art-prose h3 {
+  margin: 32px 0 12px;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.hy-art-prose p,
+.hy-art-prose ul,
+.hy-art-prose ol,
+.hy-art-prose blockquote,
+.hy-art-prose table {
+  margin: 14px 0;
+}
+
+.hy-art-prose ul,
+.hy-art-prose ol {
+  padding-left: 1.3em;
+}
+
+.hy-art-prose li + li {
+  margin-top: 6px;
+}
+
+.hy-art-prose blockquote {
+  margin-left: 0;
+  padding: 16px 18px;
+  border-left: 3px solid var(--lm-accent);
+  background: var(--lm-note);
+  border-radius: 0 16px 16px 0;
+  color: var(--lm-muted);
+}
+
+.hy-art-prose a {
+  color: var(--lm-accent);
+}
+
+.hy-art-prose strong {
+  font-weight: 650;
+}
+
+.hy-art-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+.hy-art-prose th,
+.hy-art-prose td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--lm-line);
+  vertical-align: top;
+  text-align: left;
+}
+
+.hy-art-prose th {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lm-faint);
+}
+
+.hy-art-prose tr:last-child td {
+  border-bottom: none;
+}
+
+@media (max-width: 800px) {
+  .hy-art-wrap {
+    padding: 12px 16px 72px;
+  }
+
+  .hy-art-doc {
+    border-radius: 24px;
+    padding: 24px 18px 40px;
+  }
+
+  .hy-art-prose table {
+    display: block;
+    overflow-x: auto;
+  }
+}

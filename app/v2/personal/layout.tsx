@@ -62,6 +62,20 @@ const ARTICLE_TABS = [
     label: "Манифест",
     match: (p: string) => isManifestArticle(p),
   },
+  {
+    href: "/v2/personal/articles/rostov-content-plan",
+    label: "Контент-план",
+    match: (p: string) =>
+      p.startsWith("/v2/personal/articles/rostov-content-plan") ||
+      p.startsWith(appPath("/v2/personal/articles/rostov-content-plan")),
+  },
+  {
+    href: "/v2/personal/articles/rostov-ugc",
+    label: "UGC",
+    match: (p: string) =>
+      p.startsWith("/v2/personal/articles/rostov-ugc") ||
+      p.startsWith(appPath("/v2/personal/articles/rostov-ugc")),
+  },
 ] as const;
 
 function isManifestArticle(pathname: string) {
