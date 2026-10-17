@@ -44,11 +44,7 @@ export function HypothesesClient() {
   const [loading, setLoading] = useState(true);
   const hashDone = useRef(false);
   const openHypothesis = useCallback((item: Hypothesis) => {
-    if (hypothesisPage(item.title)) {
-      router.push(appPath(`/v2/personal/hypotheses/${item.id}`));
-      return;
-    }
-    setOpenId(item.id);
+    router.push(appPath(`/v2/personal/hypotheses/${item.id}`));
   }, [router]);
 
   const load = useCallback(async () => {

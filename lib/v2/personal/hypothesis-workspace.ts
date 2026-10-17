@@ -81,7 +81,6 @@ export type HypothesisPageProfile = {
   body: string;
   criterion: string;
   priority?: string;
-  hero?: string;
   workspace: () => HypothesisWorkspace;
 };
 
@@ -117,7 +116,6 @@ export function hypothesisPage(title: string): HypothesisPageProfile | null {
     return {
       body: ROSTOV_HYPOTHESIS_BODY,
       criterion: ROSTOV_HYPOTHESIS_CRITERION,
-      hero: "/hypotheses/sofia-rules.png",
       workspace: rostovHypothesisWorkspace,
     };
   }

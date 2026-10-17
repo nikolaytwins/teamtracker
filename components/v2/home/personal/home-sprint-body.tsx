@@ -339,7 +339,7 @@ function SprintHypotheses() {
               const project = projects.get(item.project_id ?? "");
               const colors = projectColors(project?.hue ?? 260);
               return (
-                <Link key={item.id} className="qr" href={`${appPath(HYP_HREF)}#${item.id}`} style={tone(colors.c, colors.s)}>
+                <Link key={item.id} className="qr" href={appPath(`/v2/personal/hypotheses/${item.id}`)} style={tone(colors.c, colors.s)}>
                   <span className="qr-n tnum">{index + 1}</span>
                   <span className="qr-m">
                     <span className="qr-t">{item.title}</span>
@@ -370,11 +370,7 @@ function HomeHypothesisCard({ item, project }: { item: Hypothesis; project?: Hyp
   return (
     <Link
       className="hc"
-      href={
-        hypothesisPage(item.title)
-          ? appPath(`/v2/personal/hypotheses/${item.id}`)
-          : `${appPath(HYP_HREF)}#${item.id}`
-      }
+      href={appPath(`/v2/personal/hypotheses/${item.id}`)}
       style={tone(colors.c, colors.s)}
     >
       <div className="hc-top">

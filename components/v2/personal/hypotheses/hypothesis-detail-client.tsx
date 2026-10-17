@@ -234,7 +234,7 @@ export function HypothesisDetailClient() {
   return (
     <div className={`hypd min-h-0 flex-1 overflow-y-auto ${inter.variable}`}>
       <div className="page">
-        <section className={`card hero${profile?.hero ? "" : " solo"}`}>
+        <section className="card hero">
           <div className="hero-l">
             <Link className="back" href={appPath("/v2/personal/hypotheses")}>
               ← Все гипотезы
@@ -282,12 +282,10 @@ export function HypothesisDetailClient() {
               </Link>
             </div>
           </div>
-          {profile?.hero ? (
-            <div className="hero-img">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={appPath(profile.hero)} alt="" />
-            </div>
-          ) : null}
+          <div className="hero-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={appPath("/hypotheses/sofia-rules.png")} alt="" />
+          </div>
         </section>
 
         <div className="grid">
