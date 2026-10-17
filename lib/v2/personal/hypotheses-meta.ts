@@ -111,6 +111,13 @@ export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
     body: "",
     metric: "",
   },
+  {
+    project: "tw",
+    stage: "queue",
+    title: "Курс по ИИ креатору",
+    body: "",
+    metric: "",
+  },
 ];
 
 export const LEGACY_EMPTY_PROJECTS = ["Импульс", "AI-сервисы"];
