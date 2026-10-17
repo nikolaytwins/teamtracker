@@ -168,6 +168,11 @@
 .hs .hc-top { display: flex; align-items: center; gap: 10px; }
 .hs .pchip { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--c); background: #fff; border-radius: 9px; padding: 5px 10px; }
 .hs .pchip::before { content: ""; width: 7px; height: 7px; border-radius: 99px; background: var(--c); }
+.hs .rank { display: inline-flex; align-items: center; border-radius: 9px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; white-space: nowrap; background: #fff; }
+.hs .rank.main { color: #2d5eef; }
+.hs .rank.two { color: #b54708; }
+.hs .rank.three { color: #7c3aed; }
+.hs .rank.side { color: #52525b; }
 .hs .hc-st { margin-left: auto; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--c); }
 .hs .hc-t { font-size: 24px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }
 .hs .hc-d { font-size: 15px; line-height: 1.55; color: var(--ink-600); }

@@ -28,6 +28,10 @@
 .hypd .stp{font-size:12px;font-weight:600;padding:5px 10px;border-radius:9px;background:var(--ink-100);color:var(--ink-600);white-space:nowrap}
 .hypd .stp.active{background:var(--blue);color:#fff}
 .hypd .stp.high{background:#fff4e5;color:#b54708}
+.hypd .stp.rank.main{background:#eef2ff;color:#2d5eef}
+.hypd .stp.rank.two{background:#fff4e5;color:#b54708}
+.hypd .stp.rank.three{background:#f4e8ff;color:#7c3aed}
+.hypd .stp.rank.side{background:var(--ink-100);color:var(--ink-600)}
 .hypd .back{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--ink-500)}.hypd .back:hover{color:var(--ink-900)}
 /* hero */
 .hypd .hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,460px);overflow:hidden}

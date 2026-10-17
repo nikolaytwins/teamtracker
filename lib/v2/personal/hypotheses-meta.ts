@@ -85,7 +85,7 @@ export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
     sprint: "s1",
     title: "Запуск Ростовских колбас через контент",
     body: "Если проверить рилсы, UGC и партнерскую программу, то хотя бы один канал даст первый доход.",
-    metric: PRIMARY_HYPOTHESIS_TAG,
+    metric: "Первый доход или ≥ 1 партнёр",
   },
   {
     project: "tw",

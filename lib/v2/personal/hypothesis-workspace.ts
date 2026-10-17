@@ -89,6 +89,28 @@ function task(id: string, title: string, goal: number | null = null, detail = ""
   return { id, title, detail, done: false, goal, n: 0 };
 }
 
+export type HypothesisRankTone = "main" | "two" | "three" | "side";
+
+export type HypothesisRank = { label: string; tone: HypothesisRankTone };
+
+export function hypothesisRank(title: string): HypothesisRank | null {
+  const value = title.trim();
+  if (value === ROSTOV_HYPOTHESIS_TITLE) return { label: "Главный тест", tone: "main" };
+  if (
+    value === TWINLABS_HYPOTHESIS_TITLE ||
+    TWINLABS_HYPOTHESIS_ALIASES.includes(value) ||
+    value === MEDIA_HYPOTHESIS_TITLE ||
+    MEDIA_HYPOTHESIS_ALIASES.includes(value)
+  ) {
+    return { label: "Тест №2", tone: "two" };
+  }
+  if (value === "ИИ-сервисы для блогеров") return { label: "Приоритетный тест (№3)", tone: "three" };
+  if (value === QMAGIC_HYPOTHESIS_TITLE || QMAGIC_HYPOTHESIS_ALIASES.includes(value) || value === "Холодные предложения сайтов") {
+    return { label: "Вторично", tone: "side" };
+  }
+  return null;
+}
+
 export function hypothesisPage(title: string): HypothesisPageProfile | null {
   const value = title.trim();
   if (value === ROSTOV_HYPOTHESIS_TITLE) {

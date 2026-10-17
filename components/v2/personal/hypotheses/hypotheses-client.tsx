@@ -3,7 +3,7 @@
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { appPath } from "@/lib/api-url";
 import { useRouter } from "next/navigation";
-import { hypothesisPage } from "@/lib/v2/personal/hypothesis-workspace";
+import { hypothesisPage, hypothesisRank, type HypothesisRank } from "@/lib/v2/personal/hypothesis-workspace";
 import {
   STAGE_LABEL,
   VERDICT_META,
@@ -445,8 +445,9 @@ export function HypothesesClient() {
                                 className="text-[15px] font-semibold tracking-[-0.015em]"
                                 onSave={(title) => patchItem(item.id, { title })}
                               />
-                              <span className="text-[13.5px] leading-snug text-[var(--v2-ink-500)]">
-                                {item.stage === "done" && item.result_text ? item.result_text : item.metric}
+                              <span className="flex flex-wrap items-center gap-2 text-[13.5px] leading-snug text-[var(--v2-ink-500)]">
+                                <RankBadge title={item.title} />
+                                {item.stage === "done" && item.result_text ? item.result_text : criterionText(item)}
                               </span>
                               <span className="flex items-center justify-end gap-2">
                                 <VerdictBadge verdict={item.stage === "done" ? item.verdict : null} />
@@ -644,6 +645,28 @@ function QuickTitle({
   );
 }
 
+const RANK_TONE: Record<HypothesisRank["tone"], string> = {
+  main: "bg-[#eef2ff] text-[#2d5eef]",
+  two: "bg-[#fff4e5] text-[#b54708]",
+  three: "bg-[#f4e8ff] text-[#7c3aed]",
+  side: "bg-[var(--v2-ink-100)] text-[var(--v2-ink-500)]",
+};
+
+function criterionText(item: Hypothesis) {
+  if (!item.metric || item.metric === PRIMARY_HYPOTHESIS_TAG) return hypothesisPage(item.title)?.criterion || "";
+  return item.metric;
+}
+
+function RankBadge({ title }: { title: string }) {
+  const rank = hypothesisRank(title);
+  if (!rank) return null;
+  return (
+    <span className={`rounded-md px-2 py-0.5 text-[11.5px] font-semibold whitespace-nowrap ${RANK_TONE[rank.tone]}`}>
+      {rank.label}
+    </span>
+  );
+}
+
 function FocusCard({
   item,
   project,
@@ -669,8 +692,9 @@ function FocusCard({
       className="flex cursor-pointer flex-col gap-3.5 rounded-[20px] p-6 text-left transition hover:-translate-y-0.5"
       style={{ background: colors.s, boxShadow: `inset 0 0 0 1.5px color-mix(in oklch, ${colors.c} 18%, transparent)` }}
     >
-      <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
         <ProjectChip project={project} />
+        <RankBadge title={item.title} />
         <span className="ml-auto text-[12px] font-semibold tracking-[0.1em] uppercase" style={{ color: colors.c }}>
           в работе
         </span>
@@ -684,7 +708,7 @@ function FocusCard({
       <p className="text-[15px] leading-relaxed text-[var(--v2-ink-600)]">{item.body}</p>
       <div className="mt-auto rounded-[14px] bg-white px-[15px] py-[13px]">
         <span className="text-[11.5px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">Критерий проверки</span>
-        <b className="mt-1 block text-[15px] leading-snug font-semibold">{item.metric || "—"}</b>
+        <b className="mt-1 block text-[15px] leading-snug font-semibold">{criterionText(item) || "—"}</b>
       </div>
     </div>
   );
@@ -719,13 +743,9 @@ function BoardCard({
       }}
       className="block w-full cursor-grab rounded-[14px] bg-white px-[15px] py-3.5 text-left shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-soft)]"
     >
-      <span className="flex items-center gap-2">
+      <span className="flex flex-wrap items-center gap-2">
         <ProjectChip project={project} />
-        {item.metric === PRIMARY_HYPOTHESIS_TAG ? (
-          <span className="rounded-md bg-[#eef2ff] px-2 py-0.5 text-[11.5px] font-semibold whitespace-nowrap text-[#2d5eef]">
-            {PRIMARY_HYPOTHESIS_TAG}
-          </span>
-        ) : null}
+        <RankBadge title={item.title} />
         <VerdictBadge verdict={item.stage === "done" ? item.verdict : null} />
         <span className="ml-auto">
           <QuickDelete onDelete={() => onDelete(item.id)} />
@@ -740,8 +760,8 @@ function BoardCard({
       </span>
       {item.stage === "done" && item.result_text ? (
         <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{item.result_text}</span>
-      ) : item.metric && item.metric !== PRIMARY_HYPOTHESIS_TAG ? (
-        <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{item.metric}</span>
+      ) : criterionText(item) ? (
+        <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{criterionText(item)}</span>
       ) : null}
     </div>
   );

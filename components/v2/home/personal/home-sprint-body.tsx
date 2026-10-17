@@ -20,7 +20,7 @@ import {
   type Hypothesis,
   type HypothesisProject,
 } from "@/lib/v2/personal/hypotheses-meta";
-import { hypothesisPage } from "@/lib/v2/personal/hypothesis-workspace";
+import { hypothesisPage, hypothesisRank } from "@/lib/v2/personal/hypothesis-workspace";
 import type { HypothesesBoard } from "@/lib/v2/personal/personal-hypotheses-repo";
 import "./home-sprint-design.css";
 
@@ -362,8 +362,11 @@ function SprintHypotheses() {
 
 function HomeHypothesisCard({ item, project }: { item: Hypothesis; project?: HypothesisProject }) {
   const colors = projectColors(project?.hue ?? 260);
-  const main = item.metric === PRIMARY_HYPOTHESIS_TAG;
-  const chip = main ? PRIMARY_HYPOTHESIS_TAG : project?.name;
+  const rank = hypothesisRank(item.title);
+  const criterion =
+    !item.metric || item.metric === PRIMARY_HYPOTHESIS_TAG
+      ? hypothesisPage(item.title)?.criterion || ""
+      : item.metric;
   return (
     <Link
       className="hc"
@@ -375,15 +378,16 @@ function HomeHypothesisCard({ item, project }: { item: Hypothesis; project?: Hyp
       style={tone(colors.c, colors.s)}
     >
       <div className="hc-top">
-        {chip ? <span className="pchip">{chip}</span> : null}
+        {project?.name ? <span className="pchip">{project.name}</span> : null}
+        {rank ? <span className={`rank ${rank.tone}`}>{rank.label}</span> : null}
         <span className="hc-st">в работе</span>
       </div>
       <h3 className="hc-t">{item.title}</h3>
       {item.body ? <p className="hc-d">{item.body}</p> : null}
-      {item.metric && !main ? (
+      {criterion ? (
         <div className="hc-m">
           <span className="kick">Критерий проверки</span>
-          <b>{item.metric}</b>
+          <b>{criterion}</b>
         </div>
       ) : null}
     </Link>

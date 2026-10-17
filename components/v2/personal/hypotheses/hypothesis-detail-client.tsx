@@ -17,6 +17,7 @@ import {
 import {
   emptyHypothesisWorkspace,
   hypothesisPage,
+  hypothesisRank,
   parseTaskDraft,
   type HypothesisIdea,
   type HypothesisNote,
@@ -199,6 +200,7 @@ export function HypothesisDetailClient() {
 
   const hypothesis = page.hypothesis;
   const profile = hypothesisPage(hypothesis.title);
+  const rank = hypothesisRank(hypothesis.title);
   const colors = projectColors(page.project?.hue ?? 260);
   const shown = workspace;
   const live = stats(shown);
@@ -235,6 +237,7 @@ export function HypothesisDetailClient() {
                     {page.project.name}
                   </span>
                 ) : null}
+                {rank ? <span className={`stp rank ${rank.tone}`}>{rank.label}</span> : null}
                 {profile?.priority ? <span className="stp high">Приоритет · {profile.priority}</span> : null}
                 <span className={`stp ${hypothesis.stage}`}>
                   {STAGE_LABEL[hypothesis.stage]}
