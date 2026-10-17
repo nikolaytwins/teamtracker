@@ -85,6 +85,15 @@ function stats(workspace: HypothesisWorkspace) {
   return { all, done, pct: all ? Math.round((done / all) * 100) : 0 };
 }
 
+function writeEditable(node: HTMLElement, value: string) {
+  const lines = value.replace(/\r\n/g, "\n").split("\n");
+  node.replaceChildren();
+  lines.forEach((line, index) => {
+    if (index > 0) node.appendChild(document.createElement("br"));
+    if (line) node.appendChild(document.createTextNode(line));
+  });
+}
+
 function Editable({
   value,
   className,
@@ -98,14 +107,14 @@ function Editable({
   onChange: (value: string) => void;
   enterBlur?: boolean;
 }) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const node = ref.current;
     if (!node || document.activeElement === node) return;
-    if (node.innerText.replace(/\n$/, "") !== value) node.innerText = value;
+    if (node.innerText.replace(/\n$/, "") !== value) writeEditable(node, value);
   }, [value]);
   return (
-    <span
+    <div
       ref={ref}
       className={className}
       contentEditable
