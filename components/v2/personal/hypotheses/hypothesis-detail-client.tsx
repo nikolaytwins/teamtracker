@@ -24,6 +24,7 @@ import {
   type HypothesisNoteTag,
   type HypothesisStage,
   type HypothesisTask,
+  type HypothesisEconBlock,
   type HypothesisWorkspace,
 } from "@/lib/v2/personal/hypothesis-workspace";
 import "./hypothesis-detail.css";
@@ -290,6 +291,51 @@ export function HypothesisDetailClient() {
 
         <div className="grid">
           <div className="colm">
+            {shown.copies.length ? (
+              <section className="card sec">
+                <div className="blocks">
+                  {shown.copies.map((block) => (
+                    <div key={block.id} className="blk">
+                      <Editable
+                        className="sec-t"
+                        value={block.title}
+                        placeholder="Заголовок"
+                        enterBlur
+                        onChange={(title) =>
+                          update((draft) => {
+                            const row = draft.copies.find((item) => item.id === block.id);
+                            if (row) row.title = title;
+                          }, false)
+                        }
+                      />
+                      <Editable
+                        className="copy"
+                        value={block.text}
+                        placeholder="Текст"
+                        onChange={(text) =>
+                          update((draft) => {
+                            const row = draft.copies.find((item) => item.id === block.id);
+                            if (row) row.text = text;
+                          }, false)
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="stg-add"
+                  onClick={() =>
+                    update((draft) => {
+                      draft.copies.push({ id: uid(), title: "", text: "" });
+                    })
+                  }
+                >
+                  + Блок
+                </button>
+              </section>
+            ) : null}
+            {shown.econ ? <EconCard econ={shown.econ} /> : null}
             <section className="card sec">
               <div className="sec-h">
                 <h2 className="sec-t">План</h2>
@@ -597,6 +643,48 @@ export function HypothesisDetailClient() {
         </div>
       </div>
     </div>
+  );
+}
+
+function EconCard({ econ }: { econ: HypothesisEconBlock }) {
+  return (
+    <section className="card sec">
+      <div className="sec-h">
+        <h2 className="sec-t">{econ.title}</h2>
+      </div>
+      {econ.kicker ? <p className="sec-sub econ-k">{econ.kicker}</p> : null}
+      <div className="econ-pair">
+        {econ.launch.map((item) => (
+          <div key={item.label}>
+            <span>{item.label}</span>
+            <b className="tnum">{item.value}</b>
+          </div>
+        ))}
+      </div>
+      <div className="econ-rest">
+        <div>
+          <b>{econ.launchRest.title}</b>
+          <div className="econ-note">{econ.launchRest.note}</div>
+        </div>
+        <b className="tnum econ-sum">{econ.launchRest.value}</b>
+      </div>
+      <div className="econ-pair">
+        {econ.month.map((item) => (
+          <div key={item.label}>
+            <span>{item.label}</span>
+            <b className="tnum">{item.value}</b>
+          </div>
+        ))}
+      </div>
+      <div className="econ-rest">
+        <div>
+          <b>{econ.monthRest.title}</b>
+          <div className="econ-note">{econ.monthRest.note}</div>
+        </div>
+        <b className="tnum econ-sum">{econ.monthRest.value}</b>
+      </div>
+      {econ.footnote ? <p className="econ-foot">{econ.footnote}</p> : null}
+    </section>
   );
 }
 

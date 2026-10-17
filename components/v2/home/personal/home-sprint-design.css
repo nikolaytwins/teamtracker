@@ -172,6 +172,7 @@
 .hs .rank.main { color: #2d5eef; }
 .hs .rank.two { color: #b54708; }
 .hs .rank.three { color: #7c3aed; }
+.hs .rank.four { color: #0e7490; }
 .hs .rank.side { color: #52525b; }
 .hs .hc-st { margin-left: auto; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--c); }
 .hs .hc-t { font-size: 24px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }

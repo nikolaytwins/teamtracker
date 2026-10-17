@@ -645,6 +645,7 @@ const RANK_TONE: Record<HypothesisRank["tone"], string> = {
   main: "bg-[#eef2ff] text-[#2d5eef]",
   two: "bg-[#fff4e5] text-[#b54708]",
   three: "bg-[#f4e8ff] text-[#7c3aed]",
+  four: "bg-[#ecfeff] text-[#0e7490]",
   side: "bg-[var(--v2-ink-100)] text-[var(--v2-ink-500)]",
 };
 

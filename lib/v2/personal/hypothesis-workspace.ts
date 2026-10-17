@@ -35,11 +35,30 @@ export type HypothesisNote = {
 
 export type HypothesisIdea = { id: string; text: string; archived: boolean };
 
+export type HypothesisCopyBlock = { id: string; title: string; text: string };
+
+export type HypothesisMoney = { label: string; value: string };
+
+export type HypothesisEconRest = { title: string; note: string; value: string };
+
+export type HypothesisEconBlock = {
+  id: string;
+  title: string;
+  kicker: string;
+  launch: [HypothesisMoney, HypothesisMoney];
+  launchRest: HypothesisEconRest;
+  month: [HypothesisMoney, HypothesisMoney];
+  monthRest: HypothesisEconRest;
+  footnote: string;
+};
+
 export type HypothesisWorkspace = {
   stages: HypothesisStage[];
   files: HypothesisFile[];
   notes: HypothesisNote[];
   ideas: HypothesisIdea[];
+  copies: HypothesisCopyBlock[];
+  econ: HypothesisEconBlock | null;
 };
 
 const TAGS = new Set<HypothesisNoteTag>(["win", "fail", "obs"]);
@@ -54,7 +73,7 @@ function id(value: unknown, fallback: string) {
 }
 
 export function emptyHypothesisWorkspace(): HypothesisWorkspace {
-  return { stages: [], files: [], notes: [], ideas: [] };
+  return { stages: [], files: [], notes: [], ideas: [], copies: [], econ: null };
 }
 
 export const TWINLABS_HYPOTHESIS_TITLE = "TwinLabs Plus — запустить продажи дизайн-поддержки";
@@ -77,6 +96,11 @@ export const MEDIA_HYPOTHESIS_BODY =
 
 const MEDIA_HYPOTHESIS_ALIASES = ["Запуск контента в соц.сетях"];
 
+export const ADS_HYPOTHESIS_TITLE = "Запустить услугу продвижения сайтов";
+export const ADS_HYPOTHESIS_BODY =
+  "Мне нужен директолог-партнёр на субподряде с оплатой за клиентский проект.";
+export const ADS_HYPOTHESIS_CRITERION = "Директолог-партнёр и сообщения старым клиентам";
+
 export type HypothesisPageProfile = {
   body: string;
   criterion: string;
@@ -88,22 +112,23 @@ function task(id: string, title: string, goal: number | null = null, detail = ""
   return { id, title, detail, done: false, goal, n: 0 };
 }
 
-export type HypothesisRankTone = "main" | "two" | "three" | "side";
+export type HypothesisRankTone = "main" | "two" | "three" | "four" | "side";
 
 export type HypothesisRank = { label: string; tone: HypothesisRankTone };
 
 export function hypothesisRank(title: string): HypothesisRank | null {
   const value = title.trim();
   if (value === ROSTOV_HYPOTHESIS_TITLE) return { label: "Главный тест", tone: "main" };
+  if (value === ADS_HYPOTHESIS_TITLE) return { label: "Тест №2", tone: "two" };
   if (
     value === TWINLABS_HYPOTHESIS_TITLE ||
     TWINLABS_HYPOTHESIS_ALIASES.includes(value) ||
     value === MEDIA_HYPOTHESIS_TITLE ||
     MEDIA_HYPOTHESIS_ALIASES.includes(value)
   ) {
-    return { label: "Тест №2", tone: "two" };
+    return { label: "Тест №3", tone: "three" };
   }
-  if (value === "ИИ-сервисы для блогеров") return { label: "Приоритетный тест (№3)", tone: "three" };
+  if (value === "ИИ-сервисы для блогеров") return { label: "Приоритетный тест (№4)", tone: "four" };
   if (value === QMAGIC_HYPOTHESIS_TITLE || QMAGIC_HYPOTHESIS_ALIASES.includes(value) || value === "Холодные предложения сайтов") {
     return { label: "Вторично", tone: "side" };
   }
@@ -139,6 +164,13 @@ export function hypothesisPage(title: string): HypothesisPageProfile | null {
       body: MEDIA_HYPOTHESIS_BODY,
       criterion: "",
       workspace: mediaHypothesisWorkspace,
+    };
+  }
+  if (value === ADS_HYPOTHESIS_TITLE) {
+    return {
+      body: ADS_HYPOTHESIS_BODY,
+      criterion: ADS_HYPOTHESIS_CRITERION,
+      workspace: adsHypothesisWorkspace,
     };
   }
   return null;
@@ -235,6 +267,8 @@ export function rostovHypothesisWorkspace(): HypothesisWorkspace {
     ],
     notes: [],
     ideas: [],
+    copies: [],
+    econ: null,
   };
 }
 
@@ -272,6 +306,8 @@ export function twinlabsHypothesisWorkspace(): HypothesisWorkspace {
     files: [],
     notes: [],
     ideas: [],
+    copies: [],
+    econ: null,
   };
 }
 
@@ -299,6 +335,8 @@ export function qmagicHypothesisWorkspace(): HypothesisWorkspace {
     files: [],
     notes: [],
     ideas: [],
+    copies: [],
+    econ: null,
   };
 }
 
@@ -341,6 +379,79 @@ export function mediaHypothesisWorkspace(): HypothesisWorkspace {
     files: [],
     notes: [],
     ideas: [],
+    copies: [],
+    econ: null,
+  };
+}
+
+export function adsHypothesisWorkspace(): HypothesisWorkspace {
+  return {
+    stages: [
+      {
+        id: "ads-tasks",
+        title: "Задачи",
+        note: "",
+        tasks: [
+          task("ads-partners", "Найти директологов и договориться с партнёрами"),
+          task("ads-clients", "Прописать всем старым клиентам"),
+        ],
+      },
+    ],
+    files: [],
+    notes: [],
+    ideas: [],
+    copies: [
+      {
+        id: "ads-roles",
+        title: "Как делим работу",
+        text: "Я продаю услугу, общаюсь с клиентом, занимаюсь сайтом и упаковкой. Специалист настраивает и оптимизирует рекламу.",
+      },
+      {
+        id: "ads-usp",
+        title: "УТП для партнёра",
+        text: "У меня большая база клиентов, буду всем писать, хочу маркетинговое агентство строить. Вам буду заказы отдавать и платить за проект.",
+      },
+      {
+        id: "ads-clients-copy",
+        title: "Что писать заказчикам",
+        text: "Всем прописать, спросить, чем занимаются и какие результаты, и сказать, что теперь занимаемся и рекламой.",
+      },
+      {
+        id: "ads-where",
+        title: "Где искать",
+        text: "В каталоге сертифицированных специалистов Яндекса, профильных Telegram-сообществах директологов и по рекомендациям владельцев небольших агентств.",
+      },
+      {
+        id: "ads-check",
+        title: "Что обязательно проверить",
+        text: "2–3 реальных кейса с расходами, заявками и результатами, а не только скриншоты охватов.",
+      },
+    ],
+    econ: {
+      id: "ads-econ",
+      title: "Пример экономики одного клиента",
+      kicker: "Целевые цены для переговоров, не гарантированные рыночные ставки",
+      launch: [
+        { label: "Клиент платит за запуск", value: "40 000 ₽" },
+        { label: "Директологу за запуск", value: "20 000 ₽" },
+      ],
+      launchRest: {
+        title: "Остаток TwinLabs",
+        note: "До налогов, продаж и других затрат",
+        value: "20 000 ₽",
+      },
+      month: [
+        { label: "Ведение клиенту / мес.", value: "35 000 ₽" },
+        { label: "Директологу / мес.", value: "20 000 ₽" },
+      ],
+      monthRest: {
+        title: "Остаток TwinLabs в месяц",
+        note: "До прочих расходов",
+        value: "15 000 ₽",
+      },
+      footnote:
+        "Рекламный бюджет клиента оплачивается отдельно. Первый пилот нужен в том числе для проверки, оправдывают ли эти 15 тыс. ₽ твою работу и ответственность.",
+    },
   };
 }
 
@@ -350,6 +461,7 @@ export function sanitizeHypothesisWorkspace(input: unknown): HypothesisWorkspace
   const files = Array.isArray(raw.files) ? raw.files.slice(0, 40) : [];
   const notes = Array.isArray(raw.notes) ? raw.notes.slice(0, 200) : [];
   const ideas = Array.isArray(raw.ideas) ? raw.ideas.slice(0, 200) : [];
+  const copies = Array.isArray(raw.copies) ? raw.copies.slice(0, 40) : [];
   return {
     stages: stages.map((stage, stageIndex) => {
       const row = stage && typeof stage === "object" ? (stage as Record<string, unknown>) : {};
@@ -397,6 +509,45 @@ export function sanitizeHypothesisWorkspace(input: unknown): HypothesisWorkspace
         archived: Boolean(row.archived),
       };
     }).filter((idea) => idea.text.trim()),
+    copies: copies
+      .map((block, index) => {
+        const row = block && typeof block === "object" ? (block as Record<string, unknown>) : {};
+        return {
+          id: id(row.id, `cp-${index}`),
+          title: text(row.title, 200),
+          text: text(row.text, 4000),
+        };
+      })
+      .filter((block) => block.title.trim() || block.text.trim()),
+    econ: sanitizeEcon(raw.econ),
+  };
+}
+
+function money(value: unknown): HypothesisMoney {
+  const row = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return { label: text(row.label, 120), value: text(row.value, 40) };
+}
+
+function econRest(value: unknown): HypothesisEconRest {
+  const row = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return { title: text(row.title, 160), note: text(row.note, 240), value: text(row.value, 40) };
+}
+
+function sanitizeEcon(value: unknown): HypothesisEconBlock | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const launch = Array.isArray(row.launch) ? row.launch : [];
+  const month = Array.isArray(row.month) ? row.month : [];
+  if (launch.length < 2 || month.length < 2) return null;
+  return {
+    id: id(row.id, "econ"),
+    title: text(row.title, 200),
+    kicker: text(row.kicker, 300),
+    launch: [money(launch[0]), money(launch[1])],
+    launchRest: econRest(row.launchRest),
+    month: [money(month[0]), money(month[1])],
+    monthRest: econRest(row.monthRest),
+    footnote: text(row.footnote, 800),
   };
 }
 
