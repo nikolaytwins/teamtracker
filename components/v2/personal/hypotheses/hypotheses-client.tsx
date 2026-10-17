@@ -18,7 +18,8 @@ import {
 import type { HypothesesBoard } from "@/lib/v2/personal/personal-hypotheses-repo";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-const STAGES: HypothesisStage[] = ["backlog", "queue", "active", "done"];
+const BOARD_COLUMNS: HypothesisStage[] = ["active", "queue", "backlog"];
+const STAGES: HypothesisStage[] = [...BOARD_COLUMNS, "done"];
 const STAGE_HINT: Record<HypothesisStage, string> = {
   backlog: "все спринты",
   queue: "следующие к проверке",
@@ -155,7 +156,7 @@ export function HypothesesClient() {
             <div>
               <h1 className="v2-tight text-[40px] font-semibold leading-[1.1] tracking-[-0.036em]">Гипотезы</h1>
               <p className="v2-tight mt-2.5 text-[15.5px] text-[var(--v2-ink-500)]">
-                Бэклог → очередь → спринт → вывод. В спринте не больше {WIP_LIMIT} гипотез одновременно.
+                В работе, очередь и бэклог. В спринте не больше {WIP_LIMIT} гипотез одновременно.
               </p>
             </div>
             <div className="grid max-w-[820px] grid-cols-2 gap-3 xl:grid-cols-4">
@@ -294,8 +295,8 @@ export function HypothesesClient() {
         </div>
 
         {view === "board" ? (
-          <div className="grid grid-cols-1 items-start gap-3.5 xl:grid-cols-4">
-            {STAGES.map((stage) => {
+          <div className="grid grid-cols-1 items-start gap-3.5 xl:grid-cols-3">
+            {BOARD_COLUMNS.map((stage) => {
               const column = items.filter((item) => {
                 if (item.stage !== stage || !inFilter(item)) return false;
                 if (stage === "active" || stage === "done") return item.sprint_id === sprint?.id;
