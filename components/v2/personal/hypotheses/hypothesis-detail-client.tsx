@@ -16,6 +16,7 @@ import {
 } from "@/lib/v2/personal/hypotheses-meta";
 import {
   emptyHypothesisWorkspace,
+  hypothesisHero,
   hypothesisPage,
   hypothesisRank,
   parseTaskDraft,
@@ -211,6 +212,7 @@ export function HypothesisDetailClient() {
   const hypothesis = page.hypothesis;
   const profile = hypothesisPage(hypothesis.title);
   const rank = hypothesisRank(hypothesis.title);
+  const hero = hypothesisHero(hypothesis.title);
   const colors = projectColors(page.project?.hue ?? 260);
   const shown = workspace;
   const live = stats(shown);
@@ -285,7 +287,11 @@ export function HypothesisDetailClient() {
           </div>
           <div className="hero-img">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={appPath("/hypotheses/sofia-rules.png")} alt="" />
+            <img
+              src={appPath(hero.src)}
+              alt=""
+              style={{ objectPosition: hero.pos }}
+            />
           </div>
         </section>
 

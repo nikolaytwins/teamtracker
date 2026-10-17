@@ -1,5 +1,6 @@
-import { PersonalWishesClient } from "@/components/v2/personal/wishes/personal-wishes-client";
+import { appPath } from "@/lib/api-url";
+import { redirect } from "next/navigation";
 
 export default function PersonalWishesPage() {
-  return <PersonalWishesClient />;
+  redirect(appPath("/v2/personal/goals?tab=wishes"));
 }

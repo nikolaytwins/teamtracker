@@ -2151,6 +2151,22 @@ const DEFAULT_FINANCE_FUNDS: Array<{
     accent: "#F472B6",
     sort_order: 4,
   },
+  {
+    fund_key: "wishes",
+    name: "Фонд желаний",
+    monthly_hint: "желательные и дополнительные цели",
+    icon_key: "target",
+    accent: "#12957c",
+    sort_order: 5,
+  },
+  {
+    fund_key: "estate",
+    name: "Фонд недвижимости",
+    monthly_hint: "накопления на недвижимость",
+    icon_key: "coin",
+    accent: "#8b63d1",
+    sort_order: 6,
+  },
 ];
 
 const OBSOLETE_FUND_KEYS = ["life", "apartment", "moscow", "china", "ai", "rent_deposit"] as const;

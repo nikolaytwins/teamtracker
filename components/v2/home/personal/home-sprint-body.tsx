@@ -21,6 +21,17 @@ import {
   type HypothesisProject,
 } from "@/lib/v2/personal/hypotheses-meta";
 import { hypothesisPage, hypothesisRank } from "@/lib/v2/personal/hypothesis-workspace";
+import {
+  FUND_DB,
+  FUND_KEYS,
+  GOAL_PHOTO,
+  GOAL_PHOTO_POS,
+  GOALS_BOARD_LS_KEY,
+  defaultGoalsBoard,
+  lifeGoalProgress,
+  sanitizeGoalsBoard,
+  type GoalsBoard,
+} from "@/lib/v2/personal/goals-board";
 import type { HypothesesBoard } from "@/lib/v2/personal/personal-hypotheses-repo";
 import "./home-sprint-design.css";
 
@@ -478,6 +489,44 @@ function Reward() {
 }
 
 function Goals() {
+  const { dashboard } = useHomePersonalFinance();
+  const [board, setBoard] = useState<GoalsBoard | null>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    void fetchJson<{ board: GoalsBoard | null }>("/api/v2/personal/goals-board")
+      .then((remote) => {
+        if (cancel) return;
+        if (remote.board) {
+          setBoard(sanitizeGoalsBoard(remote.board));
+          return;
+        }
+        try {
+          const raw = localStorage.getItem(GOALS_BOARD_LS_KEY);
+          setBoard(raw ? sanitizeGoalsBoard(JSON.parse(raw)) : defaultGoalsBoard());
+        } catch {
+          setBoard(defaultGoalsBoard());
+        }
+      })
+      .catch(() => {
+        if (!cancel) setBoard(defaultGoalsBoard());
+      });
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  const balances = useMemo(() => {
+    const next = { cush: 0, wish: 0, est: 0 };
+    for (const key of FUND_KEYS) {
+      const row = dashboard?.funds?.find((fund) => fund.fund_key === FUND_DB[key]);
+      if (row) next[key] = row.amount_rub || 0;
+    }
+    return next;
+  }, [dashboard]);
+
+  const shown = board ?? defaultGoalsBoard();
+
   return (
     <section className="card pad">
       <div className="sec-head">
@@ -490,46 +539,50 @@ function Goals() {
         </div>
       </div>
       <div className="gl">
-        <article className="gc">
-          <div className="gc-img">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={appPath("/home/goal-cushion.png")} alt="" style={{ objectPosition: "center 35%" }} />
-          </div>
-          <div className="gc-b">
-            <h3 className="gc-n">Подушка безопасности</h3>
-            <div className="gc-v">
-              <span className="gc-cur tnum">331 000 ₽</span>
-              <span className="gc-tg tnum">из 510 000 ₽</span>
-            </div>
-            <div className="gc-bar">
-              <span style={{ width: "65%" }} />
-            </div>
-            <div className="gc-foot tnum">
-              <b>65%</b>
-              <span>осталось 179 000 ₽</span>
-            </div>
-          </div>
-        </article>
-        <article className="gc">
-          <div className="gc-img">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={appPath("/home/goal-car.png")} alt="" style={{ objectPosition: "center 35%" }} />
-          </div>
-          <div className="gc-b">
-            <h3 className="gc-n">Машина</h3>
-            <div className="gc-v">
-              <span className="gc-cur tnum">0 ₽</span>
-              <span className="gc-tg">сумма цели не задана</span>
-            </div>
-            <div className="gc-bar">
-              <span style={{ width: "0%" }} />
-            </div>
-            <div className="gc-foot tnum">
-              <b>0%</b>
-              <span />
-            </div>
-          </div>
-        </article>
+        {shown.goals.map((goal) => {
+          const progress = lifeGoalProgress(goal, shown, balances);
+          const shownHave = progress.shared ? Math.min(progress.have, progress.target) : progress.have;
+          const photo = goal.fund === "cush" ? "/home/goal-cushion.png" : GOAL_PHOTO[goal.id];
+          const pos = goal.fund === "cush" ? "center 35%" : GOAL_PHOTO_POS[goal.id];
+          return (
+            <Link key={goal.id} className="gc" href={appPath("/v2/personal/goals")}>
+              <div className="gc-img">
+                {photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={appPath(photo)} alt="" style={{ objectPosition: pos ?? "center" }} />
+                ) : (
+                  <div className="gc-ph" />
+                )}
+              </div>
+              <div className="gc-b">
+                <h3 className="gc-n">{goal.t || "Без названия"}</h3>
+                <div className="gc-v">
+                  <span className="gc-cur tnum">{rub(shownHave)}</span>
+                  <span className="gc-tg tnum">{progress.target ? `из ${rub(progress.target)}` : "сумма цели не задана"}</span>
+                </div>
+                <div className="gc-bar">
+                  <span style={{ width: `${progress.pct}%` }} />
+                </div>
+                <div className="gc-foot tnum">
+                  <b>{progress.pct}%</b>
+                  <span>
+                    {progress.shared
+                      ? progress.left
+                        ? `в фонде не хватает ${rub(progress.left)}`
+                        : progress.target
+                          ? "в фонде хватает"
+                          : ""
+                      : progress.left
+                        ? `осталось ${rub(progress.left)}`
+                        : progress.target
+                          ? "собрано"
+                          : ""}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );

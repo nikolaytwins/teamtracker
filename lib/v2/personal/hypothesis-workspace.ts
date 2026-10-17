@@ -116,6 +116,19 @@ export type HypothesisRankTone = "main" | "two" | "three" | "four" | "side";
 
 export type HypothesisRank = { label: string; tone: HypothesisRankTone };
 
+export function hypothesisHero(title: string): { src: string; pos: string } {
+  const value = title.trim();
+  if (value === ROSTOV_HYPOTHESIS_TITLE) return { src: "/hypotheses/rostov-hero.jpg", pos: "42% 24%" };
+  if (value === ADS_HYPOTHESIS_TITLE) return { src: "/hypotheses/ads-hero.jpg", pos: "62% 18%" };
+  if (value === MEDIA_HYPOTHESIS_TITLE || MEDIA_HYPOTHESIS_ALIASES.includes(value)) {
+    return { src: "/hypotheses/media-hero.jpg", pos: "66% 16%" };
+  }
+  if (value === TWINLABS_HYPOTHESIS_TITLE || TWINLABS_HYPOTHESIS_ALIASES.includes(value)) {
+    return { src: "/hypotheses/twinlabs-hero.jpg", pos: "60% 20%" };
+  }
+  return { src: "/hypotheses/sofia-rules.png", pos: "50% 18%" };
+}
+
 export function hypothesisRank(title: string): HypothesisRank | null {
   const value = title.trim();
   if (value === ROSTOV_HYPOTHESIS_TITLE) return { label: "Главный тест", tone: "main" };

@@ -10,11 +10,6 @@ const PERSONAL_TABS = [
     label: "Идеи",
     match: (p: string) => p.startsWith(appPath("/v2/personal/ideas")),
   },
-  {
-    href: "/v2/personal/wishes",
-    label: "Желания",
-    match: (p: string) => p.startsWith(appPath("/v2/personal/wishes")),
-  },
 ] as const;
 
 const ARTICLE_TABS = [

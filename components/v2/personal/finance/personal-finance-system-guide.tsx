@@ -1,3 +1,5 @@
+import { GoalsFinanceMount } from "@/components/v2/personal/goals/goals-client";
+import { appPath } from "@/lib/api-url";
 import type { ReactNode } from "react";
 
 const fixedPayments = [
@@ -45,18 +47,32 @@ export function PersonalFinanceSystemGuide() {
   return (
     <div className="min-h-full overflow-y-auto">
       <header className="relative overflow-hidden border-b border-[var(--v2-ink-100)] bg-white">
-        <div className="v2-dotgrid pointer-events-none absolute inset-0 opacity-60" />
-        <div className="relative mx-auto max-w-[1050px] px-6 py-10 lg:px-10 lg:py-14">
-          <span className="inline-flex items-center gap-2 rounded-full bg-[var(--v2-brand-50)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-brand-700)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--v2-brand-500)]" />
-            Финансовая система
-          </span>
-          <h1 className="v2-tighter mt-5 max-w-[820px] text-[42px] font-light leading-[1.04] text-[var(--v2-ink-900)] sm:text-[54px]">
-            Одно простое решение<br />на каждый месяц
-          </h1>
-          <p className="v2-tight mt-4 max-w-[650px] text-[17px] leading-relaxed text-[var(--v2-ink-600)]">
-            Сначала зарплата и жизнь. Всё сверх нормального бюджета автоматически превращается в накопления.
-          </p>
+        <div className="relative mx-auto grid min-h-[440px] max-w-[1180px] lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,460px)]">
+          <div className="relative z-10 flex flex-col justify-center px-6 py-10 lg:px-10 lg:py-14">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--v2-brand-50)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-brand-700)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--v2-brand-500)]" />
+              Финансовая система
+            </span>
+            <h1 className="v2-tighter mt-5 max-w-[640px] text-[42px] font-light leading-[1.04] text-[var(--v2-ink-900)] sm:text-[54px]">
+              Одно простое решение<br />на каждый месяц
+            </h1>
+            <p className="v2-tight mt-4 max-w-[520px] text-[17px] leading-relaxed text-[var(--v2-ink-600)]">
+              Сначала зарплата и жизнь. Всё сверх нормального бюджета автоматически превращается в накопления.
+            </p>
+          </div>
+          <div className="pointer-events-none relative hidden min-h-[440px] lg:block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={appPath("/finance/sofia-system.jpg")}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{
+                objectPosition: "68% 16%",
+                WebkitMaskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,.5) 14%, #000 34%)",
+                maskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,.5) 14%, #000 34%)",
+              }}
+            />
+          </div>
         </div>
       </header>
 
@@ -223,6 +239,7 @@ export function PersonalFinanceSystemGuide() {
             50 тысяч на зарплату → 170 или 200 тысяч на жизнь → всё сверх 200 делю 80 / 20.
           </p>
         </section>
+        <GoalsFinanceMount />
       </main>
     </div>
   );
