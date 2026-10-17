@@ -4,6 +4,7 @@ import {
   DESIGN_PROJECTS,
   DESIGN_SPRINTS,
   LEGACY_EMPTY_PROJECTS,
+  WIP_LIMIT,
   applyStageChange,
   currentSprintId,
   isHypothesisStage,
@@ -265,14 +266,32 @@ async function requireOwnedSprint(ctx: V2SessionContext, id: string) {
 
 export async function createPersonalHypothesis(
   ctx: V2SessionContext,
-  input: { title?: string; projectId?: string | null; stage?: string },
+  input: { title?: string; projectId?: string | null; stage?: string; sprintId?: string | null },
 ): Promise<Hypothesis> {
   const title = clip(input.title, 300);
   const stage: HypothesisStage =
-    input.stage && isHypothesisStage(input.stage) && input.stage !== "active" ? input.stage : "backlog";
+    input.stage && isHypothesisStage(input.stage) && input.stage !== "done" ? input.stage : "backlog";
   const userId = uid(ctx);
   if (input.projectId) await requireOwnedProject(ctx, input.projectId);
   const sb = getV2Supabase();
+  let sprintId: string | null = null;
+  if (stage === "active") {
+    if (!input.sprintId) throw new PersonalHypothesesValidationError("Выбери спринт");
+    await requireOwnedSprint(ctx, input.sprintId);
+    const { count, error: countError } = await sb
+      .from("v2_personal_hypotheses")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("stage", "active")
+      .eq("sprint_id", input.sprintId);
+    if (countError) throw countError;
+    if ((count ?? 0) >= WIP_LIMIT) {
+      throw new PersonalHypothesesValidationError(
+        `В спринте уже ${WIP_LIMIT} гипотез. Заверши одну или верни в очередь.`,
+      );
+    }
+    sprintId = input.sprintId;
+  }
   const { data: existing, error: existingError } = await sb
     .from("v2_personal_hypotheses")
     .select("sort_order")
@@ -286,7 +305,7 @@ export async function createPersonalHypothesis(
     id: newV2Id(),
     user_id: userId,
     project_id: input.projectId || null,
-    sprint_id: null,
+    sprint_id: sprintId,
     title,
     body: "",
     metric: "",

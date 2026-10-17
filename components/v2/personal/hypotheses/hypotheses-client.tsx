@@ -113,15 +113,24 @@ export function HypothesesClient() {
     }
   };
 
-  const createItem = async (title: string, openAfter: boolean) => {
+  const createItem = async (title: string, stage: HypothesisStage = "backlog", openAfter = false) => {
     const projectId = flt !== "all" ? flt : (projects[0]?.id ?? null);
-    const { hypothesis } = await fetchJson<{ hypothesis: Hypothesis }>("/api/v2/personal/hypotheses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, projectId, stage: "backlog" }),
-    });
-    setBoard((prev) => (prev ? { ...prev, hypotheses: [...prev.hypotheses, hypothesis] } : prev));
-    if (openAfter) setOpenId(hypothesis.id);
+    try {
+      const { hypothesis } = await fetchJson<{ hypothesis: Hypothesis }>("/api/v2/personal/hypotheses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          projectId,
+          stage,
+          sprintId: stage === "active" ? sprint?.id ?? null : null,
+        }),
+      });
+      setBoard((prev) => (prev ? { ...prev, hypotheses: [...prev.hypotheses, hypothesis] } : prev));
+      if (openAfter) setOpenId(hypothesis.id);
+    } catch (createError) {
+      window.alert(createError instanceof Error ? createError.message : "Не удалось добавить");
+    }
   };
 
   const removeItem = async (id: string) => {
@@ -174,7 +183,7 @@ export function HypothesesClient() {
             <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => void createItem("", true)}
+                onClick={() => void createItem("", "backlog", true)}
                 className="inline-flex h-11 items-center rounded-[13px] bg-[#2d5eef] px-[18px] text-[14.5px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(45,94,239,0.8)] hover:bg-[var(--v2-brand-700)]"
               >
                 + Гипотеза
@@ -353,29 +362,29 @@ export function HypothesesClient() {
                       <div className="px-2.5 py-[22px] text-center text-[13.5px] text-[var(--v2-ink-400)]">Перетащи сюда</div>
                     )}
                   </div>
-                  {stage === "backlog" ? (
-                    <form
-                      className="mt-2 flex gap-1.5"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        const input = event.currentTarget.elements.namedItem("q") as HTMLInputElement;
-                        const value = input.value.trim();
-                        if (!value) return;
-                        input.value = "";
-                        void createItem(value, false);
-                      }}
-                    >
-                      <input
-                        name="q"
-                        placeholder="Быстро в бэклог…"
-                        aria-label="Новая гипотеза"
-                        className="h-10 min-w-0 flex-1 rounded-xl bg-white px-3 text-[14px] outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]"
-                      />
-                      <button type="submit" aria-label="Добавить" className="h-10 w-10 rounded-xl bg-[var(--v2-ink-900)] text-[18px] text-white">
-                        +
-                      </button>
-                    </form>
-                  ) : null}
+                  <form
+                    className="mt-2 flex gap-1.5"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const input = event.currentTarget.elements.namedItem("q") as HTMLInputElement;
+                      const value = input.value.trim();
+                      if (!value) return;
+                      input.value = "";
+                      void createItem(value, stage, false);
+                    }}
+                  >
+                    <input
+                      name="q"
+                      placeholder={
+                        stage === "active" ? "Быстро в работу…" : stage === "queue" ? "Быстро в очередь…" : "Быстро в бэклог…"
+                      }
+                      aria-label="Новая гипотеза"
+                      className="h-10 min-w-0 flex-1 rounded-xl bg-white px-3 text-[14px] outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+                    />
+                    <button type="submit" aria-label="Добавить" className="h-10 w-10 rounded-xl bg-[var(--v2-ink-900)] text-[18px] text-white">
+                      +
+                    </button>
+                  </form>
                 </div>
               );
             })}

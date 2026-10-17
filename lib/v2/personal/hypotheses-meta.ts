@@ -138,6 +138,13 @@ export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
   {
     project: "tw",
     stage: "queue",
+    title: "Услуги продвижения через рилсы",
+    body: "",
+    metric: "",
+  },
+  {
+    project: "tw",
+    stage: "queue",
     title: "Курс по ИИ креатору",
     body: "",
     metric: "",

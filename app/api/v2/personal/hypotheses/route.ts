@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       title: body.title,
       projectId: body.projectId === undefined ? undefined : body.projectId || null,
       stage: body.stage,
+      sprintId: body.sprintId ?? null,
     });
     return NextResponse.json({ hypothesis });
   } catch (error) {
