@@ -1,4 +1,4 @@
-export const WIP_LIMIT = 4;
+export const WIP_LIMIT = 6;
 
 export const PRIMARY_HYPOTHESIS_TAG = "Главная гипотеза";
 
@@ -109,6 +109,22 @@ export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
     sprint: "s1",
     title: "Мини-запуск Qmagic",
     body: "",
+    metric: "",
+  },
+  {
+    project: "tw",
+    stage: "active",
+    sprint: "s1",
+    title: "Холодные предложения сайтов",
+    body: "Попробовать запустить холодную рассылку по компаниям, у которых нет сайта или он плохой. Полностью автоматизированно, через вайбкодинг.",
+    metric: "",
+  },
+  {
+    project: "tw",
+    stage: "active",
+    sprint: "s1",
+    title: "ИИ-сервисы для блогеров",
+    body: "Зайти с КП для блогеров по разработке сервисов (например, ИИ-астролог), либо с кабинетом обучения.",
     metric: "",
   },
   {
