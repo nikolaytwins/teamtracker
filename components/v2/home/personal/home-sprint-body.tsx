@@ -13,7 +13,13 @@ import {
   type SprintChecks,
   type SprintContour,
 } from "@/lib/v2/home/sprint-contours";
-import { currentSprintId, projectColors, type Hypothesis, type HypothesisProject } from "@/lib/v2/personal/hypotheses-meta";
+import {
+  currentSprintId,
+  PRIMARY_HYPOTHESIS_TAG,
+  projectColors,
+  type Hypothesis,
+  type HypothesisProject,
+} from "@/lib/v2/personal/hypotheses-meta";
 import type { HypothesesBoard } from "@/lib/v2/personal/personal-hypotheses-repo";
 import "./home-sprint-design.css";
 
@@ -315,7 +321,7 @@ function SprintHypotheses() {
         </div>
       </div>
       <div className="kick" style={{ marginBottom: 12 }}>
-        В работе · {active.length}
+        В работе{sprint?.name ? ` · ${sprint.name}` : ""}
       </div>
       <div className="hy-act">
         {active.length ? (
@@ -355,18 +361,22 @@ function SprintHypotheses() {
 
 function HomeHypothesisCard({ item, project }: { item: Hypothesis; project?: HypothesisProject }) {
   const colors = projectColors(project?.hue ?? 260);
+  const main = item.metric === PRIMARY_HYPOTHESIS_TAG;
+  const chip = main ? PRIMARY_HYPOTHESIS_TAG : project?.name;
   return (
     <Link className="hc" href={`${appPath(HYP_HREF)}#${item.id}`} style={tone(colors.c, colors.s)}>
       <div className="hc-top">
-        <span className="pchip">{project?.name}</span>
+        {chip ? <span className="pchip">{chip}</span> : null}
         <span className="hc-st">в работе</span>
       </div>
       <h3 className="hc-t">{item.title}</h3>
-      <p className="hc-d">{item.body}</p>
-      <div className="hc-m">
-        <span className="kick">Критерий проверки</span>
-        <b>{item.metric || "—"}</b>
-      </div>
+      {item.body ? <p className="hc-d">{item.body}</p> : null}
+      {item.metric && !main ? (
+        <div className="hc-m">
+          <span className="kick">Критерий проверки</span>
+          <b>{item.metric}</b>
+        </div>
+      ) : null}
     </Link>
   );
 }

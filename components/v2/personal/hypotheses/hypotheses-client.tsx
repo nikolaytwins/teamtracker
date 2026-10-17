@@ -5,6 +5,7 @@ import { appPath } from "@/lib/api-url";
 import {
   STAGE_LABEL,
   VERDICT_META,
+  PRIMARY_HYPOTHESIS_TAG,
   WIP_LIMIT,
   currentSprintId,
   projectColors,
@@ -154,7 +155,7 @@ export function HypothesesClient() {
             <div>
               <h1 className="v2-tight text-[40px] font-semibold leading-[1.1] tracking-[-0.036em]">Гипотезы</h1>
               <p className="v2-tight mt-2.5 text-[15.5px] text-[var(--v2-ink-500)]">
-                Бэклог → очередь → спринт → вывод. В спринте не больше трёх гипотез одновременно.
+                Бэклог → очередь → спринт → вывод. В спринте не больше {WIP_LIMIT} гипотез одновременно.
               </p>
             </div>
             <div className="grid max-w-[820px] grid-cols-2 gap-3 xl:grid-cols-4">
@@ -709,6 +710,11 @@ function BoardCard({
     >
       <span className="flex items-center gap-2">
         <ProjectChip project={project} />
+        {item.metric === PRIMARY_HYPOTHESIS_TAG ? (
+          <span className="rounded-md bg-[#eef2ff] px-2 py-0.5 text-[11.5px] font-semibold whitespace-nowrap text-[#2d5eef]">
+            {PRIMARY_HYPOTHESIS_TAG}
+          </span>
+        ) : null}
         <VerdictBadge verdict={item.stage === "done" ? item.verdict : null} />
         <span className="ml-auto">
           <QuickDelete onDelete={() => onDelete(item.id)} />
@@ -723,7 +729,7 @@ function BoardCard({
       </span>
       {item.stage === "done" && item.result_text ? (
         <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{item.result_text}</span>
-      ) : item.metric ? (
+      ) : item.metric && item.metric !== PRIMARY_HYPOTHESIS_TAG ? (
         <span className="mt-1 block text-[13px] leading-snug text-[var(--v2-ink-500)]">{item.metric}</span>
       ) : null}
     </div>

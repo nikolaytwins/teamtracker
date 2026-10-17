@@ -1,4 +1,6 @@
-export const WIP_LIMIT = 3;
+export const WIP_LIMIT = 4;
+
+export const PRIMARY_HYPOTHESIS_TAG = "Главная гипотеза";
 
 export const HYPOTHESIS_STAGES = ["backlog", "queue", "active", "done"] as const;
 export type HypothesisStage = (typeof HYPOTHESIS_STAGES)[number];
@@ -61,7 +63,7 @@ export const DESIGN_PROJECTS: HypothesisProjectSeed[] = [
 
 export const DESIGN_SPRINTS: Array<{ key: string; name: string; range_label: string; is_current: boolean }> = [
   { key: "s0", name: "Сезон исследований", range_label: "15 авг — 12 окт", is_current: false },
-  { key: "s1", name: "Спринт 13.10", range_label: "13 окт — 30 ноя", is_current: true },
+  { key: "s1", name: "Спринт Ноябрь", range_label: "13 окт — 30 ноя", is_current: true },
   { key: "s2", name: "Декабрь", range_label: "1 — 31 дек", is_current: false },
 ];
 
@@ -78,28 +80,36 @@ export type HypothesisSeed = {
 
 export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
   {
+    project: "ft",
+    stage: "active",
+    sprint: "s1",
+    title: "Запуск Ростовских колбас через контент",
+    body: "",
+    metric: PRIMARY_HYPOTHESIS_TAG,
+  },
+  {
     project: "tw",
     stage: "active",
     sprint: "s1",
-    title: "Тёплая база купит TwinLabs Plus",
-    body: "Если упаковать работы в презентацию и разослать тёплым знакомым, то появятся первые продажи без рекламы.",
-    metric: "≥ 2 продажи из рассылки по тёплой базе",
+    title: "Запуск подписки Твинлабс:Плюс + найм",
+    body: "",
+    metric: "",
   },
   {
     project: "br",
     stage: "active",
     sprint: "s1",
-    title: "Реалити-ролики дают больше подписок",
-    body: "Если выложить 2 массовых и 2 реалити-ролика, то реалити соберут больше подписок на просмотр.",
-    metric: "Подписки на 1000 просмотров: реалити vs массовые",
+    title: "Запуск контента в соц.сетях",
+    body: "",
+    metric: "",
   },
   {
-    project: "ft",
+    project: "qm",
     stage: "active",
     sprint: "s1",
-    title: "FoodTech можно монетизировать через контент",
-    body: "Если проверить рилсы, UGC и партнерскую программу, то хотя бы один канал даст первый доход.",
-    metric: "Первый доход или ≥ 1 партнёр",
+    title: "Мини-запуск Qmagic",
+    body: "",
+    metric: "",
   },
   {
     project: "tw",

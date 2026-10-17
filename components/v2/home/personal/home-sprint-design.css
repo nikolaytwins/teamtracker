@@ -162,7 +162,7 @@
 .hs .btn-w b { font-size: 12.5px; background: var(--ink-100); border-radius: 7px; padding: 2px 7px; }
 .hs .btn-b { background: var(--blue); color: #fff; }
 .hs .btn-b:hover { color: #fff; background: var(--brand-700); }
-.hs .hy-act { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.hs .hy-act { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .hs .hc { display: flex; flex-direction: column; gap: 14px; background: var(--cs); border-radius: 20px; padding: 24px; color: inherit; box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--c) 18%, transparent); transition: transform 0.15s; }
 .hs .hc:hover { transform: translateY(-2px); color: inherit; }
 .hs .hc-top { display: flex; align-items: center; gap: 10px; }
