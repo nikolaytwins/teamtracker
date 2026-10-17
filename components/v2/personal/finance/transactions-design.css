@@ -12,11 +12,6 @@
 .transactions-v3 a { color: var(--brand-700); text-decoration: none; }
 .transactions-v3 a:hover { color: var(--brand-600); }
 
-:root{--ink-900:#0a0a0b;--ink-800:#18181b;--ink-700:#27272a;--ink-600:#52525b;--ink-500:#71717a;--ink-400:#a1a1aa;--ink-300:#d4d4d8;--ink-200:#e4e4e7;--ink-100:#f4f4f5;--ink-50:#fafafa;--brand-50:#eff4ff;--brand-300:#93b4fd;--brand-500:#3b6ff7;--brand-600:#2a56eb;--brand-700:#2244d8;--blue:#2d5eef;--green:#0e9f6e;--green-bg:#e8f7f0;--red:#b42318;--red-bg:#fee4e2;--amber-bg:#fef3c7;--amber:#92400e;--shadow-card:0 1px 2px rgba(16,24,40,.04),0 10px 30px -14px rgba(16,24,40,.10);--shadow-soft:0 1px 2px rgba(16,24,40,.03),0 16px 44px -18px rgba(30,52,120,.14);--shadow-glow:0 0 0 4px rgba(59,111,247,.1),0 6px 22px -8px rgba(59,111,247,.45)}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Inter,system-ui,sans-serif;background:linear-gradient(180deg,#f6f8fc 0%,#eef2f9 100%);color:var(--ink-900);-webkit-font-smoothing:antialiased;font-size:15px}
-a{color:var(--brand-700);text-decoration:none}a:hover{color:var(--brand-600)}
-button{font:inherit;color:inherit}
 .transactions-v3 .tnum{font-variant-numeric:tabular-nums}
 .transactions-v3 .page{padding:28px 36px 120px;display:flex;flex-direction:column;gap:22px;max-width:1720px}
 .transactions-v3 .card{background:#fff;border-radius:20px;box-shadow:var(--shadow-card)}
@@ -53,7 +48,8 @@ button{font:inherit;color:inherit}
 .transactions-v3 .kpi-n{font-size:13.5px;line-height:1.4;margin-top:auto}
 .transactions-v3 .kpi--main .kpi-n{color:rgba(255,255,255,.72)}
 .transactions-v3 .kpi--soft .kpi-n{color:var(--ink-500)}
-.transactions-v3 .pos{color:var(--green)}.neg{color:var(--red)}
+.transactions-v3 .pos{color:var(--green)}
+.transactions-v3 .neg{color:var(--red)}
 /* ---------- ГРАФИКИ ---------- */
 .transactions-v3 .charts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
 .transactions-v3 .avg-row{display:flex;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--ink-100)}
@@ -112,7 +108,7 @@ button{font:inherit;color:inherit}
 .transactions-v3 .addbox{background:var(--ink-50);border-radius:18px;padding:18px 20px;margin-bottom:18px}
 .transactions-v3 .qa{display:flex;gap:10px;flex-wrap:wrap}
 .transactions-v3 .qa input[type=text]{flex:1;min-width:220px;height:52px;border-radius:15px;border:1.5px solid var(--ink-200);background:#fff;padding:0 18px;font:inherit;font-size:16px}
-.transactions-v3 .qa input[type=text]:focus,.qa input[type=number]:focus{outline:none;border-color:var(--brand-500);box-shadow:var(--shadow-glow)}
+.transactions-v3 .qa input[type=text]:focus,.transactions-v3 .qa input[type=number]:focus{outline:none;border-color:var(--brand-500);box-shadow:var(--shadow-glow)}
 .transactions-v3 .qa select,.qa input[type=date],.qa input[type=number]{height:52px;border-radius:15px;border:1.5px solid var(--ink-200);background:#fff;font:inherit;font-size:14.5px;color:var(--ink-600);padding:0 14px}
 .transactions-v3 .qa input[type=number]{width:180px}
 .transactions-v3 .qa select{flex:1;min-width:200px}
@@ -163,9 +159,9 @@ button{font:inherit;color:inherit}
 .transactions-v3 .dr-f{padding:18px 28px;border-top:1px solid var(--ink-100);display:flex;gap:10px;flex-wrap:wrap}
 .transactions-v3 .fld{display:flex;flex-direction:column;gap:8px}
 .transactions-v3 .fld label{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-400)}
-.transactions-v3 .fld input,.fld select,.fld textarea{border:1.5px solid var(--ink-200);border-radius:14px;background:#fff;font:inherit;padding:13px 15px;font-size:15.5px;color:var(--ink-900)}
+.transactions-v3 .fld input,.transactions-v3 .fld select,.transactions-v3 .fld textarea{border:1.5px solid var(--ink-200);border-radius:14px;background:#fff;font:inherit;padding:13px 15px;font-size:15.5px;color:var(--ink-900)}
 .transactions-v3 .fld textarea{min-height:90px;resize:vertical;line-height:1.5}
-.transactions-v3 .fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--brand-500)}
+.transactions-v3 .fld input:focus,.transactions-v3 .fld select:focus,.transactions-v3 .fld textarea:focus{outline:none;border-color:var(--brand-500)}
 .transactions-v3 .fld2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .transactions-v3 .dr-act{border:1.5px solid var(--ink-200);background:#fff;border-radius:14px;padding:13px 15px;font-size:14.5px;font-weight:500;text-align:left;cursor:pointer;color:var(--ink-700)}
 .transactions-v3 .dr-act:hover{border-color:var(--brand-500);color:var(--brand-700)}

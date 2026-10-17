@@ -680,7 +680,7 @@ function PfForecastCard({
               Ожидаемые расходы · {PERSONAL_MONTH_NAMES[month - 1]} {year}
             </h3>
             <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
-              Для расчёта «прибыль − расходы». Разовые траты из вкладки «Прогноз» сюда не входят.
+              Для расчёта «прибыль − расходы». Разовые траты сюда не входят.
             </p>
 
             <label className="mt-4 block text-[12px] font-medium text-[var(--v2-ink-600)]">
