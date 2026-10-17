@@ -57,8 +57,45 @@ export function emptyHypothesisWorkspace(): HypothesisWorkspace {
   return { stages: [], files: [], notes: [], ideas: [] };
 }
 
-export function isRostovHypothesis(title: string) {
-  return title.trim() === ROSTOV_HYPOTHESIS_TITLE;
+export const TWINLABS_HYPOTHESIS_TITLE = "TwinLabs Plus — запустить продажи дизайн-поддержки";
+export const TWINLABS_HYPOTHESIS_BODY =
+  "Онлайн-школам, продюсерам и экспертам выгодно передать регулярные дизайн-задачи одной внешней команде вместо поиска отдельных исполнителей.";
+export const TWINLABS_HYPOTHESIS_CRITERION = "1–2 платных пилота";
+export const TWINLABS_HYPOTHESIS_PRIORITY = "высокий";
+
+const TWINLABS_HYPOTHESIS_ALIASES = ["Запуск подписки Твинлабс:Плюс + найм"];
+
+export type HypothesisPageProfile = {
+  body: string;
+  criterion: string;
+  priority?: string;
+  hero?: string;
+  workspace: () => HypothesisWorkspace;
+};
+
+function task(id: string, title: string, goal: number | null = null, detail = ""): HypothesisTask {
+  return { id, title, detail, done: false, goal, n: 0 };
+}
+
+export function hypothesisPage(title: string): HypothesisPageProfile | null {
+  const value = title.trim();
+  if (value === ROSTOV_HYPOTHESIS_TITLE) {
+    return {
+      body: ROSTOV_HYPOTHESIS_BODY,
+      criterion: ROSTOV_HYPOTHESIS_CRITERION,
+      hero: "/hypotheses/sofia-rules.png",
+      workspace: rostovHypothesisWorkspace,
+    };
+  }
+  if (value === TWINLABS_HYPOTHESIS_TITLE || TWINLABS_HYPOTHESIS_ALIASES.includes(value)) {
+    return {
+      body: TWINLABS_HYPOTHESIS_BODY,
+      criterion: TWINLABS_HYPOTHESIS_CRITERION,
+      priority: TWINLABS_HYPOTHESIS_PRIORITY,
+      workspace: twinlabsHypothesisWorkspace,
+    };
+  }
+  return null;
 }
 
 export function rostovHypothesisWorkspace(): HypothesisWorkspace {
@@ -150,6 +187,43 @@ export function rostovHypothesisWorkspace(): HypothesisWorkspace {
       { name: "Контент-план", href: ROSTOV_CONTENT_PLAN_HREF },
       { name: "UGC-креаторы", href: ROSTOV_UGC_HREF },
     ],
+    notes: [],
+    ideas: [],
+  };
+}
+
+export function twinlabsHypothesisWorkspace(): HypothesisWorkspace {
+  return {
+    stages: [
+      {
+        id: "tw-offer",
+        title: "Определиться с предложением",
+        note: "Сейчас оффер слабый и непонятный.\nКлиент не понимает, почему постоянная поддержка лучше разовых заказов.",
+        tasks: [],
+      },
+      {
+        id: "tw-pack",
+        title: "Подготовить упаковку",
+        note: "",
+        tasks: [
+          task("tw-works", "Собрать лучшие работы"),
+          task("tw-kp", "Собрать короткое КП с преимуществами, кейсами, процессом и примерами стоимости."),
+          task("tw-showreel", "Сделать портфолио/шоурил с лучшими работами и примерами быстрого выполнения задач."),
+          task("tw-templates", "Подготовить шаблоны персонализированных сообщений."),
+        ],
+      },
+      {
+        id: "tw-sales",
+        title: "Запустить продажи",
+        note: "",
+        tasks: [
+          task("tw-base", "Собрать базу 20–30 продюсеров, онлайн-школ и экспертов.", 30),
+          task("tw-send", "Отправить 20–30 персональных предложений, в том числе через партнёров.", 30),
+          task("tw-reactivate", "Точечно реактивировать постоянников"),
+        ],
+      },
+    ],
+    files: [],
     notes: [],
     ideas: [],
   };

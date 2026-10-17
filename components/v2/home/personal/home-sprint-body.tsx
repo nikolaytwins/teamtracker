@@ -20,7 +20,7 @@ import {
   type Hypothesis,
   type HypothesisProject,
 } from "@/lib/v2/personal/hypotheses-meta";
-import { isRostovHypothesis } from "@/lib/v2/personal/hypothesis-workspace";
+import { hypothesisPage } from "@/lib/v2/personal/hypothesis-workspace";
 import type { HypothesesBoard } from "@/lib/v2/personal/personal-hypotheses-repo";
 import "./home-sprint-design.css";
 
@@ -368,7 +368,7 @@ function HomeHypothesisCard({ item, project }: { item: Hypothesis; project?: Hyp
     <Link
       className="hc"
       href={
-        isRostovHypothesis(item.title)
+        hypothesisPage(item.title)
           ? appPath(`/v2/personal/hypotheses/${item.id}`)
           : `${appPath(HYP_HREF)}#${item.id}`
       }

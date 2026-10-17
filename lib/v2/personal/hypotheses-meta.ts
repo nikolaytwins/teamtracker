@@ -91,9 +91,9 @@ export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
     project: "tw",
     stage: "active",
     sprint: "s1",
-    title: "Запуск подписки Твинлабс:Плюс + найм",
-    body: "",
-    metric: "",
+    title: "TwinLabs Plus — запустить продажи дизайн-поддержки",
+    body: "Онлайн-школам, продюсерам и экспертам выгодно передать регулярные дизайн-задачи одной внешней команде вместо поиска отдельных исполнителей.",
+    metric: "1–2 платных пилота",
   },
   {
     project: "br",

@@ -16,11 +16,8 @@ import {
 } from "@/lib/v2/personal/hypotheses-meta";
 import {
   emptyHypothesisWorkspace,
-  isRostovHypothesis,
-  rostovHypothesisWorkspace,
+  hypothesisPage,
   parseTaskDraft,
-  ROSTOV_HYPOTHESIS_BODY,
-  ROSTOV_HYPOTHESIS_CRITERION,
   type HypothesisIdea,
   type HypothesisNote,
   type HypothesisNoteTag,
@@ -162,7 +159,7 @@ export function HypothesisDetailClient() {
         persisted.current = data.persisted;
         const local = readLocal(id);
         const remote = data.workspace;
-        const seed = isRostovHypothesis(data.hypothesis.title) ? rostovHypothesisWorkspace() : emptyHypothesisWorkspace();
+        const seed = hypothesisPage(data.hypothesis.title)?.workspace() ?? emptyHypothesisWorkspace();
         const next = remote ?? local ?? seed;
         workspaceRef.current = next;
         setWorkspace(next);
@@ -201,17 +198,15 @@ export function HypothesisDetailClient() {
   }
 
   const hypothesis = page.hypothesis;
-  const rostov = isRostovHypothesis(hypothesis.title);
+  const profile = hypothesisPage(hypothesis.title);
   const colors = projectColors(page.project?.hue ?? 260);
   const shown = workspace;
   const live = stats(shown);
-  const description = hypothesis.body.trim() || (rostov ? ROSTOV_HYPOTHESIS_BODY : "");
+  const description = hypothesis.body.trim() || profile?.body || "";
   const criterion =
     hypothesis.metric && hypothesis.metric !== PRIMARY_HYPOTHESIS_TAG
       ? hypothesis.metric
-      : rostov
-        ? ROSTOV_HYPOTHESIS_CRITERION
-        : hypothesis.metric || "—";
+      : profile?.criterion || hypothesis.metric || "—";
   const sprintName =
     page.sprint && (hypothesis.stage === "active" || hypothesis.stage === "done") ? page.sprint.name : "";
 
@@ -228,7 +223,7 @@ export function HypothesisDetailClient() {
   return (
     <div className={`hypd min-h-0 flex-1 overflow-y-auto ${inter.variable}`}>
       <div className="page">
-        <section className="card hero">
+        <section className={`card hero${profile?.hero ? "" : " solo"}`}>
           <div className="hero-l">
             <Link className="back" href={appPath("/v2/personal/hypotheses")}>
               ← Все гипотезы
@@ -240,6 +235,7 @@ export function HypothesisDetailClient() {
                     {page.project.name}
                   </span>
                 ) : null}
+                {profile?.priority ? <span className="stp high">Приоритет · {profile.priority}</span> : null}
                 <span className={`stp ${hypothesis.stage}`}>
                   {STAGE_LABEL[hypothesis.stage]}
                   {sprintName ? ` · ${sprintName}` : ""}
@@ -274,10 +270,12 @@ export function HypothesisDetailClient() {
               </Link>
             </div>
           </div>
-          <div className="hero-img">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={appPath("/hypotheses/sofia-rules.png")} alt="" />
-          </div>
+          {profile?.hero ? (
+            <div className="hero-img">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={appPath(profile.hero)} alt="" />
+            </div>
+          ) : null}
         </section>
 
         <div className="grid">

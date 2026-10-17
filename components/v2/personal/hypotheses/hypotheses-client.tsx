@@ -3,7 +3,7 @@
 import { fetchJson } from "@/lib/v2/client/fetch-json";
 import { appPath } from "@/lib/api-url";
 import { useRouter } from "next/navigation";
-import { isRostovHypothesis } from "@/lib/v2/personal/hypothesis-workspace";
+import { hypothesisPage } from "@/lib/v2/personal/hypothesis-workspace";
 import {
   STAGE_LABEL,
   VERDICT_META,
@@ -44,7 +44,7 @@ export function HypothesesClient() {
   const [loading, setLoading] = useState(true);
   const hashDone = useRef(false);
   const openHypothesis = useCallback((item: Hypothesis) => {
-    if (isRostovHypothesis(item.title)) {
+    if (hypothesisPage(item.title)) {
       router.push(appPath(`/v2/personal/hypotheses/${item.id}`));
       return;
     }
