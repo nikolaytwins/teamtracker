@@ -19,6 +19,7 @@ import {
   hypothesisHero,
   hypothesisPage,
   hypothesisRank,
+  qmagicPageBrief,
   parseTaskDraft,
   type HypothesisIdea,
   type HypothesisNote,
@@ -213,6 +214,7 @@ export function HypothesisDetailClient() {
   const profile = hypothesisPage(hypothesis.title);
   const rank = hypothesisRank(hypothesis.title);
   const hero = hypothesisHero(hypothesis.title);
+  const brief = qmagicPageBrief(hypothesis.title);
   const colors = projectColors(page.project?.hue ?? 260);
   const shown = workspace;
   const live = stats(shown);
@@ -297,6 +299,18 @@ export function HypothesisDetailClient() {
 
         <div className="grid">
           <div className="colm">
+            {brief ? (
+              <section className="card sec">
+                <div className="blocks">
+                  {brief.map((block) => (
+                    <div key={block.title} className="blk">
+                      <h2 className="sec-t">{block.title}</h2>
+                      <p className="copy">{block.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
             {shown.copies.length ? (
               <section className="card sec">
                 <div className="blocks">
