@@ -71,7 +71,7 @@ function SpBanner({
 
   return (
     <SpCard className="grid overflow-hidden lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.95fr)]">
-      <div className="relative z-10 flex min-h-[300px] flex-col justify-center gap-5 px-7 py-7 sm:min-h-[340px] sm:px-8 sm:py-8 lg:min-h-[380px]">
+      <div className="relative z-10 flex flex-col justify-center gap-4 px-4 py-5 sm:gap-5 sm:px-8 sm:py-8 lg:min-h-[380px]">
         <div>
           <SpKick className="text-[var(--v2-brand-600)]">Спорт · {weekLabel}</SpKick>
           <h1 className="v2-tighter v2-tnum mt-3 text-[26px] font-semibold leading-[1.15] tracking-tight text-[var(--v2-ink-900)] sm:text-[32px]">
@@ -81,7 +81,7 @@ function SpBanner({
             <p className="mt-2 max-w-[34rem] text-[14.5px] leading-relaxed text-[var(--v2-ink-500)]">{verdict.sub}</p>
           ) : null}
         </div>
-        <div className="grid max-w-[640px] grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid max-w-[640px] grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           <SpKpi label="Средний вес" value={n1(cur?.w)} unit="кг" delta={d("w")} good="up" />
           <SpKpi label="Жир" value={n1(cur?.f)} unit="кг" delta={d("f")} good="down" dec={2} />
           <SpKpi label="Безжировая" value={n1(cur?.l)} unit="кг" delta={d("l")} good="up" />
@@ -120,7 +120,7 @@ function SpGoal({ cur }: { cur: ReturnType<typeof spAvg> }) {
   const dW = cur?.w != null ? SP_GOAL.lTarget + SP_GOAL.fTarget - cur.w : null;
 
   return (
-    <div className="grid gap-4" style={{ gridTemplateColumns: "minmax(240px,300px) minmax(0,1fr)" }}>
+    <div className="grid gap-4 md:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
       <SpCard className="flex flex-col p-5">
         <SpKick className="text-[var(--v2-brand-600)]">Цель</SpKick>
         <div className="mt-3 flex items-baseline gap-1.5 whitespace-nowrap">
@@ -172,7 +172,7 @@ function SpGoal({ cur }: { cur: ReturnType<typeof spAvg> }) {
         <div className="mb-3 flex items-center gap-2 px-1">
           <SpKick>Референсы</SpKick>
         </div>
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))" }}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(190px,1fr))] sm:gap-3">
           {SP_REFS.map((src, i) => (
             <div key={src} className="overflow-hidden rounded-xl bg-[var(--v2-ink-50)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -292,21 +292,21 @@ export function PersonalSportClient() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex h-12 shrink-0 items-end gap-1 px-8">
+      <div className="flex h-12 shrink-0 items-end gap-1 px-8 max-lg:h-auto max-lg:overflow-x-auto max-lg:px-3 max-lg:pb-1 max-lg:pt-3 max-lg:[scrollbar-width:none] sm:max-lg:px-6 [&::-webkit-scrollbar]:hidden">
         {TABS.map(([k, t]) => (
           <button
             key={k}
             type="button"
             onClick={() => patch((d) => ({ ...d, view: k }))}
-            className={`v2-tight inline-flex h-8 items-center rounded-lg px-3.5 text-[13px] transition ${doc.view === k ? "bg-white font-medium text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)]" : "text-[var(--v2-ink-500)] hover:bg-white/70 hover:text-[var(--v2-ink-900)]"}`}
+            className={`v2-tight inline-flex h-8 items-center rounded-lg px-3.5 text-[13px] transition max-lg:h-10 max-lg:shrink-0 max-lg:text-[14px] ${doc.view === k ? "bg-white font-medium text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)]" : "text-[var(--v2-ink-500)] hover:bg-white/70 hover:text-[var(--v2-ink-900)]"}`}
           >
             {t}
           </button>
         ))}
-        {saving ? <span className="ml-auto text-[12px] text-[var(--v2-ink-400)]">Сохранение…</span> : null}
+        {saving ? <span className="ml-auto text-[12px] text-[var(--v2-ink-400)] max-lg:shrink-0 max-lg:self-center max-lg:pl-2">Сохранение…</span> : null}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-9 px-8 pb-16 pt-2 max-w-[1400px]">
+      <div className="flex min-w-0 flex-1 flex-col gap-9 px-8 pb-16 pt-2 max-w-[1400px] max-lg:gap-6 max-lg:px-3 max-lg:pb-8 sm:max-lg:px-6">
         <SpBanner
           cur={cur}
           prev={prev}

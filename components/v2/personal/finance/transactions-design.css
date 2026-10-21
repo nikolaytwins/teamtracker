@@ -194,3 +194,78 @@
 }
 .transactions-v3 .kpi--main .kpi-v { color: #fff; }
 .transactions-v3 .ml-auto { margin-left: auto; }
+.transactions-v3 .qa input.qa-amt{flex:none;min-width:0;height:52px;width:180px;border-radius:15px;border:1.5px solid var(--ink-200);background:#fff;font:inherit;font-size:14.5px;color:var(--ink-600);padding:0 14px}
+.transactions-v3 .qa input.qa-amt:focus{outline:none;border-color:var(--brand-500);box-shadow:var(--shadow-glow)}
+@media (hover:none){
+  .transactions-v3 .tip:hover::after,.transactions-v3 .bar:hover::after{display:none}
+  .transactions-v3 .tx:hover{background:var(--ink-50)}
+  .transactions-v3 .cb:hover{background:none}
+  .transactions-v3 .cb.on:hover{background:var(--brand-50)}
+}
+@media(max-width:1023px){
+  .transactions-v3 .page{padding:20px 20px 40px;gap:16px}
+  .transactions-v3 .pad{padding:20px}
+}
+@media(max-width:640px){
+  .transactions-v3 .page{padding:12px 12px 32px;gap:12px}
+  .transactions-v3 .card{border-radius:16px}
+  .transactions-v3 .pad{padding:16px 14px}
+  .transactions-v3 .sec-head{gap:8px;margin-bottom:12px}
+  .transactions-v3 .sec-title{font-size:17px}
+  .transactions-v3 .sec-sub{font-size:13px}
+  .transactions-v3 .hero-l{padding:16px 14px;min-height:0;gap:10px}
+  .transactions-v3 .hero-top{gap:8px}
+  .transactions-v3 .hero-top .ml-auto{width:100%;margin-left:0}
+  .transactions-v3 .hero-top .ml-auto .btn{flex:1}
+  .transactions-v3 .hero-h1{font-size:26px}
+  .transactions-v3 .wk-nav{justify-content:space-between}
+  .transactions-v3 .wk-btn{width:44px;height:44px;font-size:20px}
+  .transactions-v3 .wk-label{min-width:0;flex:1}
+  .transactions-v3 .kpis{grid-template-columns:1fr 1fr;gap:8px}
+  .transactions-v3 .kpi{padding:12px 13px;border-radius:14px;gap:4px}
+  .transactions-v3 .kpi--main{grid-column:1/-1}
+  .transactions-v3 .kpi-v{font-size:19px}
+  .transactions-v3 .charts{gap:12px}
+  .transactions-v3 .cb{padding:9px 8px}
+  .transactions-v3 .cb-h{gap:8px}
+  .transactions-v3 .cb-n{font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .transactions-v3 .cb-s{font-size:14px}
+  .transactions-v3 .avg b{font-size:15px}
+  .transactions-v3 .avg span{font-size:10.5px}
+  .transactions-v3 .trend{height:230px}
+  .transactions-v3 .tr-tip{font-size:12px;padding:7px 10px}
+  .transactions-v3 .blegend{gap:10px}
+  .transactions-v3 .blg{font-size:12.5px}
+  .transactions-v3 .bar-row{gap:8px;margin-bottom:12px}
+  .transactions-v3 .bar-row .sec-sub{order:3;width:100%;font-size:12.5px}
+  .transactions-v3 .bar-row .ml-auto{width:100%;margin-left:0!important}
+  .transactions-v3 .bar-row .ml-auto .btn{flex:1;padding:0 10px}
+  .transactions-v3 .seg{display:flex;width:100%}
+  .transactions-v3 .seg button{flex:1;padding:9px 4px;font-size:13.5px}
+  .transactions-v3 .bar-row.chips{flex-wrap:nowrap;overflow-x:auto;margin-left:-14px;margin-right:-14px;padding:0 14px 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .transactions-v3 .bar-row.chips::-webkit-scrollbar{display:none}
+  .transactions-v3 .chip{flex-shrink:0;white-space:nowrap;padding:9px 12px;font-size:13.5px}
+  .transactions-v3 .search{width:100%;font-size:16px}
+  .transactions-v3 .sortsel{width:100%;margin-left:0!important;font-size:16px}
+  .transactions-v3 .addbox{padding:12px;border-radius:14px;margin-bottom:12px}
+  .transactions-v3 .qa{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  .transactions-v3 .qa input.qa-amt{grid-column:1/-1;width:100%;height:48px;font-size:18px;font-weight:600;color:var(--ink-900)}
+  .transactions-v3 .qa select,.transactions-v3 .qa input[type=date]{min-width:0;width:100%;height:48px;font-size:16px;padding:0 10px}
+  .transactions-v3 .qa button{grid-column:1/-1;height:48px}
+  .transactions-v3 .hint{font-size:12px;margin-top:8px}
+  .transactions-v3 .tlist{gap:6px}
+  .transactions-v3 .tx{gap:10px;padding:10px 10px 10px 12px;min-height:0;border-radius:14px;align-items:flex-start}
+  .transactions-v3 .tx-ic{display:none}
+  .transactions-v3 .tx-t{font-size:15px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+  .transactions-v3 .tx-meta{gap:6px;margin-top:5px}
+  .transactions-v3 .tag--sub{max-width:160px}
+  .transactions-v3 .tx-sum{font-size:16px}
+  .transactions-v3 .tx-date{font-size:11.5px;margin-top:2px}
+  .transactions-v3 .tx-act{align-self:center}
+  .transactions-v3 .tx-act .iconbtn{width:40px;height:40px}
+  .transactions-v3 .tx-meta > button{padding:8px 6px;margin:-8px -6px}
+  .transactions-v3 .daysep{padding:10px 2px 4px;gap:8px}
+  .transactions-v3 .daysep b,.transactions-v3 .daysep span{font-size:12px}
+  .transactions-v3 .empty{padding:28px 16px;font-size:14px}
+  .transactions-v3 .btn{height:44px;padding:0 14px;font-size:14px}
+}

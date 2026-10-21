@@ -11,7 +11,7 @@ export function TaskViewSwitcher({
   setView: (v: TaskViewMode) => void;
 }) {
   return (
-    <div className="inline-flex items-center rounded-xl bg-white p-1 shadow-[var(--v2-shadow-card)]">
+    <div className="inline-flex items-center rounded-xl bg-white p-1 shadow-[var(--v2-shadow-card)] max-sm:flex max-sm:w-full">
       {(
         [
           ["day", "День", V2Icons.list],
@@ -25,7 +25,7 @@ export function TaskViewSwitcher({
             key={id}
             type="button"
             onClick={() => setView(id)}
-            className={`v2-tight inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium transition ${
+            className={`v2-tight inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium transition max-lg:h-10 max-lg:text-[14px] max-sm:flex-1 max-sm:justify-center ${
               active ? "bg-[var(--v2-ink-900)] text-white" : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
             }`}
           >

@@ -23,7 +23,7 @@ export function ChipBar({
   }))];
 
   return (
-    <div className="v2-no-scrollbar mb-5 flex items-center gap-2 overflow-x-auto">
+    <div className="v2-no-scrollbar -mx-3 mb-4 flex items-center gap-2 overflow-x-auto overscroll-x-contain px-3 py-1 sm:mx-0 sm:mb-5 sm:px-0 sm:py-0">
       {items.map((it) => {
         const active = projectFilter === it.id;
         return (
@@ -31,7 +31,7 @@ export function ChipBar({
             key={it.id}
             type="button"
             onClick={() => setProjectFilter(it.id)}
-            className={`v2-tight inline-flex h-8 shrink-0 items-center gap-2 rounded-full text-[12.5px] transition ${
+            className={`v2-tight inline-flex h-9 shrink-0 sm:h-8 items-center gap-2 rounded-full text-[12.5px] transition ${
               active
                 ? "bg-[var(--v2-brand-600)] pl-3 pr-3 text-white shadow-[var(--v2-shadow-glow)]"
                 : "bg-white pl-1 pr-3 text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-cardHv)]"

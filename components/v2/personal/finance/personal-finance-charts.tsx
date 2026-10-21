@@ -3,7 +3,23 @@
 import { formatPersonalRubShort } from "@/lib/v2/personal/formatters";
 import type { PersonalMonthSnapshotRow } from "@/lib/v2/personal/types";
 import { PERSONAL_MONTH_SHORT } from "@/lib/v2/personal/formatters";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+export function useCompactChartWidth(limit = 640) {
+  const [el, setEl] = useState<SVGSVGElement | null>(null);
+  const [width, setWidth] = useState<number | null>(null);
+  useEffect(() => {
+    const target = el?.parentElement;
+    if (!target || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const w = Math.round(entries[0]?.contentRect.width ?? 0);
+      setWidth(w > 0 && w < limit ? w : null);
+    });
+    ro.observe(target);
+    return () => ro.disconnect();
+  }, [el, limit]);
+  return [setEl, width] as const;
+}
 
 function smoothPath(pts: { x: number; y: number }[]) {
   if (pts.length < 2) return "";
@@ -33,8 +49,9 @@ export function PersonalCapitalChart({
   currentYear: number;
   currentMonth: number;
 }) {
-  const W = 720;
-  const H = 230;
+  const [svgRef, compactW] = useCompactChartWidth();
+  const W = compactW ?? 720;
+  const H = compactW ? 200 : 230;
   const padX = 18;
   const padTop = 22;
   const padBot = 34;
@@ -54,9 +71,11 @@ export function PersonalCapitalChart({
   const area = `${line} L ${pts[pts.length - 1]!.x} ${H - padBot} L ${pts[0]!.x} ${H - padBot} Z`;
   const hp = pts[hover];
   const hd = data[hover];
+  const labelEvery = compactW ? Math.ceil(data.length / Math.max(Math.floor(W / 36), 2)) : 1;
 
   return (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
       className="w-full"
       style={{ display: "block" }}
@@ -106,16 +125,18 @@ export function PersonalCapitalChart({
               stroke="#3B6FF7"
               strokeWidth="2.4"
             />
-            <text
-              x={p.x}
-              y={H - 12}
-              textAnchor="middle"
-              fontSize="11"
-              fill="#A1A1AA"
-              fontWeight={isCurrent ? 700 : 500}
-            >
-              {PERSONAL_MONTH_SHORT[(data[i]!.month - 1) % 12]}
-            </text>
+            {(data.length - 1 - i) % labelEvery === 0 ? (
+              <text
+                x={p.x}
+                y={H - 12}
+                textAnchor="middle"
+                fontSize="11"
+                fill="#A1A1AA"
+                fontWeight={isCurrent ? 700 : 500}
+              >
+                {PERSONAL_MONTH_SHORT[(data[i]!.month - 1) % 12]}
+              </text>
+            ) : null}
           </g>
         );
       })}

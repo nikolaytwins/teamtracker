@@ -74,7 +74,7 @@ export function TaskCheckbox({
         onChange();
       }}
       aria-pressed={checked}
-      className={`v2-ring-focus inline-flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-[7px] border transition-all duration-200 ${
+      className={`v2-ring-focus relative inline-flex h-[20px] w-[20px] shrink-0 before:absolute before:-inset-2.5 before:content-[''] max-lg:h-[22px] max-lg:w-[22px] items-center justify-center rounded-[7px] border transition-all duration-200 ${
         checked ? "v2-check-on border-transparent" : "border-[var(--v2-ink-300)] bg-white hover:border-[var(--v2-brand-400)] hover:bg-[var(--v2-brand-50)]/60"
       }`}
       style={{ background: checked ? accent : undefined }}
@@ -112,7 +112,7 @@ export function IconBtn({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)] disabled:opacity-40 ${className}`}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-500)] max-lg:h-10 max-lg:w-10 transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)] disabled:opacity-40 ${className}`}
     >
       {children}
     </button>
@@ -128,7 +128,7 @@ export function TimerButton({
   onClick: () => void;
   size?: "md" | "lg";
 }) {
-  const px = size === "lg" ? "h-11 w-11" : "h-9 w-9";
+  const px = size === "lg" ? "h-11 w-11" : "h-9 w-9 max-lg:h-10 max-lg:w-10";
   const ip = size === "lg" ? "h-5 w-5" : "h-[18px] w-[18px]";
   return (
     <button

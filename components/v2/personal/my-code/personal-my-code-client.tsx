@@ -135,22 +135,22 @@ function PatternDrawer({
   }, [onClose]);
 
   const field =
-    "v2-tight mt-1.5 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white";
+    "v2-tight mt-1.5 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[16px] outline-none transition sm:text-[14px] focus:border-[var(--v2-brand-400)] focus:bg-white";
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--v2-ink-900)]/35 backdrop-blur-[2px]" />
       <div
-        className="relative h-full w-[620px] max-w-[92vw] overflow-y-auto bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative h-full max-h-[100dvh] w-[620px] max-w-full overflow-y-auto overscroll-contain sm:max-w-[92vw] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start gap-4 border-b border-[var(--v2-ink-100)] bg-white/92 px-10 pb-4 pt-7 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start gap-4 border-b border-[var(--v2-ink-100)] bg-white/92 px-5 pb-4 pt-[calc(env(safe-area-inset-top)+16px)] backdrop-blur sm:px-10 sm:pt-7">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">{p.code}</span>
               <StateBadge k={p.state} states={states} />
             </div>
-            <h2 className="v2-tighter mt-2 text-[30px] font-light leading-[1.12] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+            <h2 className="v2-tighter mt-2 text-[24px] font-light leading-[1.12] sm:text-[30px] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
               {editing ? (
                 <input value={lead} onChange={(e) => setLead(e.target.value)} className={`${field} text-[22px] font-light`} />
               ) : (
@@ -161,13 +161,13 @@ function PatternDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+            className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9 text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
           >
             <IcClose className="h-[17px] w-[17px]" />
           </button>
         </div>
 
-        <div className="px-10 pb-32 pt-6">
+        <div className="px-5 pb-10 pt-6 sm:px-10 sm:pb-32">
           {editing ? (
             <div className="flex flex-col gap-4">
               <label>
@@ -192,7 +192,7 @@ function PatternDrawer({
           <DBlock label="Как я его узнаю">
             <ul className="flex flex-col gap-2">
               {p.recognize.map((r, i) => (
-                <li key={i} className="v2-tight flex gap-3 text-[14.5px] leading-relaxed text-[var(--v2-ink-700)]">
+                <li key={i} className="v2-tight flex gap-3 text-[16px] leading-relaxed sm:text-[14.5px] text-[var(--v2-ink-700)]">
                   <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[var(--v2-ink-300)]" />
                   {r}
                 </li>
@@ -200,27 +200,27 @@ function PatternDrawer({
             </ul>
           </DBlock>
 
-          <div className="mt-8 grid grid-cols-2 gap-4">
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-2xl bg-[var(--v2-ink-50)] p-5">
               <h4 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">Что он мне даёт</h4>
-              <p className="v2-tight mt-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-700)]" style={{ textWrap: "pretty" }}>
+              <p className="v2-tight mt-2.5 text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-700)]" style={{ textWrap: "pretty" }}>
                 «{p.gives}»
               </p>
             </div>
             <div className="rounded-2xl bg-[var(--v2-ink-50)] p-5">
               <h4 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">Какую цену я плачу</h4>
-              <p className="v2-tight mt-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-700)]" style={{ textWrap: "pretty" }}>
+              <p className="v2-tight mt-2.5 text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-700)]" style={{ textWrap: "pretty" }}>
                 «{p.cost}»
               </p>
             </div>
           </div>
 
-          <div className="mt-8 rounded-[20px] bg-[var(--v2-brand-50)] p-7">
+          <div className="mt-8 rounded-[20px] bg-[var(--v2-brand-50)] p-5 sm:p-7">
             <h4 className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-[var(--v2-brand-600)]">Новая реакция</h4>
-            <p className="v2-tighter mt-3 text-[24px] font-light leading-[1.25] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+            <p className="v2-tighter mt-3 text-[21px] font-light leading-[1.25] sm:text-[24px] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
               «{editing ? reaction : p.reaction}»
             </p>
-            <p className="v2-tight mt-3 text-[14px] leading-relaxed text-[var(--v2-brand-800)]/80">«{p.reactionSub}»</p>
+            <p className="v2-tight mt-3 text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-brand-800)]/80">«{p.reactionSub}»</p>
           </div>
 
           <DBlock label="Если → то">
@@ -244,7 +244,7 @@ function PatternDrawer({
             {p.examples.length ? (
               <div className="flex flex-col gap-2">
                 {p.examples.map((e, i) => (
-                  <p key={i} className="v2-tight border-l-2 border-[var(--v2-ink-200)] pl-4 text-[14px] leading-relaxed text-[var(--v2-ink-600)]">
+                  <p key={i} className="v2-tight border-l-2 border-[var(--v2-ink-200)] pl-4 text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-600)]">
                     {e}
                   </p>
                 ))}
@@ -270,11 +270,11 @@ function PatternDrawer({
                       setExampleDraft("");
                       setAddingEx(false);
                     }}
-                    className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white"
+                    className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] sm:h-9 font-medium text-white"
                   >
                     Добавить
                   </button>
-                  <button type="button" onClick={() => setAddingEx(false)} className="h-9 rounded-xl px-3.5 text-[12.5px] text-[var(--v2-ink-600)]">
+                  <button type="button" onClick={() => setAddingEx(false)} className="h-10 rounded-xl px-3.5 text-[12.5px] text-[var(--v2-ink-600)] sm:h-9">
                     Отмена
                   </button>
                 </div>
@@ -283,7 +283,7 @@ function PatternDrawer({
               <button
                 type="button"
                 onClick={() => setAddingEx(true)}
-                className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-xl border border-dashed border-[var(--v2-ink-300)] px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
+                className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-xl border border-dashed sm:h-9 border-[var(--v2-ink-300)] px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
               >
                 <V2Icons.plus className="h-3.5 w-3.5" /> Добавить пример
               </button>
@@ -291,7 +291,7 @@ function PatternDrawer({
           </DBlock>
         </div>
 
-        <div className="sticky bottom-0 flex items-center gap-2 border-t border-[var(--v2-ink-100)] bg-white/92 px-10 py-4 backdrop-blur">
+        <div className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t border-[var(--v2-ink-100)] bg-white/92 px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4 backdrop-blur sm:px-10 sm:py-4">
           <button
             type="button"
             onClick={() => onPin(p.id)}
@@ -336,18 +336,18 @@ function QuickMode({ items, onClose }: { items: string[]; onClose: () => void })
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-[var(--v2-ink-50)]">
-      <div className="flex min-h-full flex-col items-center px-8 py-16">
+    <div className="fixed inset-0 z-[90] overflow-y-auto overscroll-contain bg-[var(--v2-ink-50)]">
+      <div className="flex min-h-full flex-col items-center px-5 pb-[calc(env(safe-area-inset-bottom)+40px)] pt-[calc(env(safe-area-inset-top)+40px)] sm:px-8 sm:py-16">
         <span className="font-mono text-[11px] uppercase tracking-[0.28em] text-[var(--v2-ink-400)]">Мой код</span>
-        <div className="mt-12 flex w-full max-w-[760px] flex-col">
+        <div className="mt-8 flex w-full max-w-[760px] flex-col sm:mt-12">
           {items.map((q, i) => (
             <div
               key={i}
-              className="v2-card-in flex gap-8 border-t border-[var(--v2-ink-200)]/70 py-6"
+              className="v2-card-in flex gap-4 border-t sm:gap-8 border-[var(--v2-ink-200)]/70 py-6"
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <span className="v2-tnum w-6 pt-2 font-mono text-[13px] text-[var(--v2-ink-300)]">{i + 1}.</span>
-              <p className="v2-tighter text-[27px] font-light leading-[1.32] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+              <p className="v2-tighter text-[21px] font-light leading-[1.32] sm:text-[27px] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
                 {q}
               </p>
             </div>
@@ -388,17 +388,17 @@ function AgainModal({
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-3 backdrop-blur-sm sm:p-8"
       onClick={onClose}
     >
-      <div className="w-full max-w-[600px] overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
-        <div className="px-8 pb-7 pt-7">
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[600px] overflow-y-auto overscroll-contain rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 pb-6 pt-6 sm:px-8 sm:pb-7 sm:pt-7">
           <div className="flex items-start justify-between gap-4">
             <h2 className="v2-tighter text-[24px] font-light leading-tight text-[var(--v2-ink-900)]">Что сейчас происходит?</h2>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition sm:h-8 sm:w-8 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
             >
               <IcClose className="h-[17px] w-[17px]" />
             </button>
@@ -409,7 +409,7 @@ function AgainModal({
                 key={x.id}
                 type="button"
                 onClick={() => setSel(x.id)}
-                className={`v2-tight rounded-xl px-4 py-3 text-left text-[14.5px] transition ${
+                className={`v2-tight rounded-xl px-4 py-3 text-left text-[16px] sm:text-[14.5px] transition ${
                   sel === x.id ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-800)]" : "text-[var(--v2-ink-700)] hover:bg-[var(--v2-ink-50)]"
                 }`}
               >
@@ -429,7 +429,7 @@ function AgainModal({
                       onClose();
                       onOpenPattern(p.id);
                     }}
-                    className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--v2-ink-100)] px-3.5 text-[13px] font-medium text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-200)]"
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--v2-ink-100)] px-3.5 text-[13px] sm:h-9 font-medium text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-200)]"
                   >
                     <span className="font-mono text-[10.5px] tracking-[0.1em] text-[var(--v2-ink-500)]">{p.code}</span>
                     <IcChevR className="h-3.5 w-3.5 text-[var(--v2-ink-400)]" />
@@ -444,7 +444,7 @@ function AgainModal({
                   </p>
                 ))}
               </div>
-              <p className="v2-tight mt-6 border-l-2 border-[var(--v2-ink-200)] pl-4 text-[14.5px] leading-relaxed text-[var(--v2-ink-600)]">
+              <p className="v2-tight mt-6 border-l-2 border-[var(--v2-ink-200)] pl-4 text-[16px] leading-relaxed sm:text-[14.5px] text-[var(--v2-ink-600)]">
                 «{s.q}»
               </p>
             </div>
@@ -490,18 +490,18 @@ function AddModal({
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
   const field =
-    "v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white";
+    "v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[16px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white sm:text-[14.5px]";
   const lab = "text-[11.5px] uppercase tracking-[0.1em] font-semibold text-[var(--v2-ink-400)]";
   return (
     <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-3 backdrop-blur-sm sm:p-8"
       onClick={onClose}
     >
       <div
-        className="max-h-[88vh] w-full max-w-[600px] overflow-y-auto rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
+        className="max-h-[calc(100dvh-24px)] w-full max-w-[600px] overflow-y-auto overscroll-contain sm:max-h-[88vh] rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-8 pb-6 pt-7">
+        <div className="px-5 pb-6 pt-6 sm:px-8 sm:pt-7">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="v2-tighter text-[24px] font-light leading-tight text-[var(--v2-ink-900)]">Добавить вывод</h2>
@@ -512,20 +512,20 @@ function AddModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition sm:h-8 sm:w-8 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
             >
               <IcClose className="h-[17px] w-[17px]" />
             </button>
           </div>
           <div className="mt-6">
             <span className={lab}>Тип</span>
-            <div className="mt-2 inline-flex rounded-xl bg-[var(--v2-ink-100)] p-1">
+            <div className="mt-2 flex flex-wrap rounded-xl bg-[var(--v2-ink-100)] p-1 sm:inline-flex sm:flex-nowrap">
               {TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setType(t)}
-                  className={`v2-tight h-8 rounded-lg px-3.5 text-[12.5px] font-medium transition ${
+                  className={`v2-tight h-10 flex-1 whitespace-nowrap rounded-lg px-2.5 text-[12.5px] font-medium transition sm:h-8 sm:flex-none sm:px-3.5 ${
                     type === t ? "bg-white text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)]" : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
                   }`}
                 >
@@ -554,10 +554,10 @@ function AddModal({
               onChange={(e) => setDesc(e.target.value)}
               rows={3}
               placeholder="Как это проявляется, что даёт, какую цену я плачу"
-              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white"
+              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[16px] leading-relaxed outline-none transition sm:text-[14px] focus:border-[var(--v2-brand-400)] focus:bg-white"
             />
           </label>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className={lab}>Категория</span>
               <select value={cat} onChange={(e) => setCat(e.target.value)} className={`${field} cursor-pointer appearance-none`}>
@@ -591,7 +591,7 @@ function AddModal({
             </button>
           </div>
         </div>
-        <div className="sticky bottom-0 flex items-center justify-end gap-2 bg-[var(--v2-ink-50)] px-8 py-4">
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 bg-[var(--v2-ink-50)] px-5 py-4 sm:px-8">
           <button type="button" onClick={onClose} className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--v2-ink-600)]">
             Отмена
           </button>
@@ -682,7 +682,7 @@ export function PersonalMyCodeClient() {
 
   if (!doc) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-16 pt-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-16 pt-4 sm:px-8 sm:pt-6">
         <p className="v2-tight text-[14px] text-[var(--v2-ink-500)]">Загрузка…</p>
       </div>
     );
@@ -811,20 +811,20 @@ export function PersonalMyCodeClient() {
   const shownArch = arch.filter((a) => (archCat === "all" || a.cat === archCat) && (archSrc === "all" || a.src === archSrc));
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-20 pt-6">
+    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-12 pt-4 sm:px-8 sm:pb-20 sm:pt-6">
       <div className="mb-10 flex flex-wrap items-start justify-between gap-x-10 gap-y-6">
         <div className="min-w-[280px] max-w-[640px] flex-1">
-          <h1 className="v2-tighter text-[52px] font-light leading-none text-[var(--v2-ink-900)]">Мой код</h1>
+          <h1 className="v2-tighter text-[38px] font-light leading-none sm:text-[52px] text-[var(--v2-ink-900)]">Мой код</h1>
           <p className="v2-tight mt-4 text-[16px] leading-relaxed text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
             «Как я устроен, где чаще всего ломаю собственную систему и какие правила помогают мне действовать иначе.»
           </p>
         </div>
-        <div className="ml-auto flex shrink-0 flex-col items-end gap-3 pt-1">
-          <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col items-stretch gap-3 sm:ml-auto sm:w-auto sm:shrink-0 sm:items-end sm:pt-1">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setQuick(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:text-[var(--v2-ink-900)]"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-700)] sm:h-9 shadow-[var(--v2-shadow-card)] transition hover:text-[var(--v2-ink-900)]"
             >
               <IcEye className="h-4 w-4 text-[var(--v2-ink-400)]" /> Быстрый режим
             </button>
@@ -836,24 +836,24 @@ export function PersonalMyCodeClient() {
               <V2Icons.plus className="h-4 w-4" /> Добавить вывод
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center">
             <button
               type="button"
               onClick={() => setAgain(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-300)] px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-600)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
+              className="inline-flex h-10 items-center gap-1.5 self-start rounded-xl border border-[var(--v2-ink-300)] px-3.5 sm:h-9 sm:self-auto text-[12.5px] font-medium text-[var(--v2-ink-600)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
             >
               <IcAgain className="h-4 w-4 text-[var(--v2-ink-400)]" /> Похоже, я снова это делаю
             </button>
-            <label className="flex h-9 w-[300px] items-center gap-2 rounded-xl bg-white px-3 shadow-[var(--v2-shadow-card)]">
+            <label className="flex h-11 w-full items-center gap-2 rounded-xl bg-white px-3 sm:h-9 sm:w-[300px] shadow-[var(--v2-shadow-card)]">
               <V2Icons.search className="h-[15px] w-[15px] shrink-0 text-[var(--v2-ink-400)]" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Найти убеждение или вывод…"
-                className="v2-tight min-w-0 flex-1 bg-transparent text-[12.5px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+                className="v2-tight min-w-0 flex-1 bg-transparent text-[16px] sm:text-[12.5px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
               />
               {q ? (
-                <button type="button" onClick={() => setQ("")} className="text-[var(--v2-ink-400)] transition hover:text-[var(--v2-ink-700)]">
+                <button type="button" onClick={() => setQ("")} className="inline-flex h-9 w-9 items-center justify-center text-[var(--v2-ink-400)] sm:h-auto sm:w-auto transition hover:text-[var(--v2-ink-700)]">
                   <IcClose className="h-3.5 w-3.5" />
                 </button>
               ) : null}
@@ -872,11 +872,11 @@ export function PersonalMyCodeClient() {
           <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{doc.focus.length}</span>
           <span className="h-px flex-1 bg-[var(--v2-ink-200)]/80" />
         </div>
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(250px,1fr))" }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(250px,100%),1fr))" }}>
           {doc.focus.map((f) => (
             <article
               key={f.id}
-              className="group relative flex flex-col rounded-[20px] bg-white px-6 pb-4 pt-5 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+              className="group relative flex flex-col rounded-[20px] bg-white px-5 pb-4 pt-5 shadow-[var(--v2-shadow-card)] sm:px-6 transition hover:shadow-[var(--v2-shadow-cardHv)]"
             >
               <span className="v2-tnum font-mono text-[11px] text-[var(--v2-brand-500)]">{f.n}</span>
               <h3
@@ -885,7 +885,7 @@ export function PersonalMyCodeClient() {
               >
                 {f.title}
               </h3>
-              <p className="v2-tight mt-3 text-[14px] leading-relaxed text-[var(--v2-ink-600)]" style={{ textWrap: "pretty" }}>
+              <p className="v2-tight mt-3 text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-600)]" style={{ textWrap: "pretty" }}>
                 «{f.line}»
               </p>
               <button
@@ -893,7 +893,7 @@ export function PersonalMyCodeClient() {
                 onClick={() => {
                   if (f.ref.kind === "pattern") setOpen(f.ref.id);
                 }}
-                className="mt-auto inline-flex items-center gap-1 self-start pt-4 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:text-[var(--v2-brand-700)]"
+                className="mt-auto inline-flex min-h-10 items-center gap-1 self-start pt-3 text-[12.5px] sm:min-h-0 sm:pt-4 font-medium text-[var(--v2-ink-500)] transition hover:text-[var(--v2-brand-700)]"
               >
                 Подробнее <IcChevR className="h-3.5 w-3.5" />
               </button>
@@ -901,7 +901,7 @@ export function PersonalMyCodeClient() {
                 type="button"
                 title="Убрать из фокуса"
                 onClick={() => removeFocus(f.id)}
-                className="absolute right-3.5 top-3.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--v2-ink-300)] opacity-0 transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)] group-hover:opacity-100"
+                className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--v2-ink-300)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)] focus-visible:opacity-100! group-hover:opacity-100! sm:right-3.5 sm:top-3.5 sm:h-7 sm:w-7 [@media(hover:hover)_and_(min-width:1024px)]:opacity-0"
               >
                 <IcMinus className="h-4 w-4" />
               </button>
@@ -917,14 +917,14 @@ export function PersonalMyCodeClient() {
         </p>
       </section>
 
-      <div className="sticky top-0 z-20 -mx-8 mb-7 bg-[var(--v2-ink-50)]/90 px-8 py-3 backdrop-blur">
+      <div className="sticky top-0 z-20 -mx-3 mb-6 bg-[var(--v2-ink-50)]/90 px-3 py-2.5 sm:-mx-8 sm:mb-7 sm:px-8 sm:py-3 backdrop-blur">
         <div className="inline-flex items-center rounded-full bg-white p-1 shadow-[var(--v2-shadow-card)]">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`v2-tight inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition ${
+              className={`v2-tight inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] sm:h-8 sm:text-[12.5px] font-medium transition ${
                 tab === t.id ? "bg-[var(--v2-ink-900)] text-white" : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
               }`}
             >
@@ -937,18 +937,18 @@ export function PersonalMyCodeClient() {
 
       {tab === "beliefs" ? (
         <div className="max-w-[880px]">
-          <p className="v2-tighter pb-2 text-[27px] font-light leading-[1.3] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+          <p className="v2-tighter pb-2 text-[21px] font-light leading-[1.3] sm:text-[27px] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
             «Мысли, на которых я хочу строить следующую версию жизни.»
           </p>
           <div className="mt-6">
             {bels.map((b) => (
-              <div key={b.n} className="grid gap-7 border-t border-[var(--v2-ink-200)]/80 py-8" style={{ gridTemplateColumns: "46px minmax(0,1fr)" }}>
+              <div key={b.n} className="grid grid-cols-[28px_minmax(0,1fr)] gap-3 border-t border-[var(--v2-ink-200)]/80 py-6 sm:grid-cols-[46px_minmax(0,1fr)] sm:gap-7 sm:py-8">
                 <span className="v2-tnum pt-2 font-mono text-[12px] text-[var(--v2-ink-300)]">{b.n}</span>
                 <div>
-                  <p className="v2-tight text-[23px] font-light leading-[1.4] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+                  <p className="v2-tight text-[19px] font-light leading-[1.4] sm:text-[23px] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
                     «{b.text}»
                   </p>
-                  {b.note ? <p className="v2-tight mt-3 text-[13.5px] leading-relaxed text-[var(--v2-ink-500)]">{b.note}</p> : null}
+                  {b.note ? <p className="v2-tight mt-3 text-[15px] leading-relaxed sm:text-[13.5px] text-[var(--v2-ink-500)]">{b.note}</p> : null}
                 </div>
               </div>
             ))}
@@ -961,11 +961,11 @@ export function PersonalMyCodeClient() {
         <div className="max-w-[1120px]">
           <div className="flex flex-col gap-3 pb-6">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="w-[68px] font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">категория</span>
+              <span className="w-full font-mono sm:w-[68px] text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">категория</span>
               <button
                 type="button"
                 onClick={() => setArchCat("all")}
-                className={`v2-tight h-8 rounded-full px-3 text-[12.5px] font-medium transition ${
+                className={`v2-tight h-9 rounded-full px-3 text-[12.5px] font-medium transition sm:h-8 ${
                   archCat === "all" ? "bg-[var(--v2-ink-900)] text-white" : "bg-white text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)]"
                 }`}
               >
@@ -976,7 +976,7 @@ export function PersonalMyCodeClient() {
                   key={c}
                   type="button"
                   onClick={() => setArchCat(c)}
-                  className={`v2-tight h-8 rounded-full px-3 text-[12.5px] font-medium transition ${
+                  className={`v2-tight h-9 rounded-full px-3 text-[12.5px] font-medium transition sm:h-8 ${
                     archCat === c ? "bg-[var(--v2-ink-900)] text-white" : "bg-white text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)]"
                   }`}
                 >
@@ -985,11 +985,11 @@ export function PersonalMyCodeClient() {
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="w-[68px] font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">источник</span>
+              <span className="w-full font-mono sm:w-[68px] text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">источник</span>
               <button
                 type="button"
                 onClick={() => setArchSrc("all")}
-                className={`v2-tight h-8 rounded-full px-3 text-[12.5px] font-medium transition ${
+                className={`v2-tight h-9 rounded-full px-3 text-[12.5px] font-medium transition sm:h-8 ${
                   archSrc === "all" ? "bg-[var(--v2-ink-900)] text-white" : "bg-white text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)]"
                 }`}
               >
@@ -1000,7 +1000,7 @@ export function PersonalMyCodeClient() {
                   key={src}
                   type="button"
                   onClick={() => setArchSrc(src)}
-                  className={`v2-tight h-8 rounded-full px-3 text-[12.5px] font-medium transition ${
+                  className={`v2-tight h-9 rounded-full px-3 text-[12.5px] font-medium transition sm:h-8 ${
                     archSrc === src ? "bg-[var(--v2-ink-900)] text-white" : "bg-white text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)]"
                   }`}
                 >
@@ -1013,18 +1013,17 @@ export function PersonalMyCodeClient() {
             {shownArch.map((a, i) => (
               <div
                 key={a.id}
-                className={`group grid items-center gap-6 px-7 py-5 transition hover:bg-[var(--v2-ink-50)]/70 ${
+                className={`group flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-4 transition hover:bg-[var(--v2-ink-50)]/70 md:grid md:grid-cols-[minmax(0,1fr)_150px_130px_64px_96px] md:gap-6 md:px-7 md:py-5 ${
                   i ? "border-t border-[var(--v2-ink-100)]" : ""
                 }`}
-                style={{ gridTemplateColumns: "minmax(0,1fr) 150px 130px 64px 96px" }}
               >
-                <p className="v2-tight text-[15px] leading-snug text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+                <p className="v2-tight w-full text-[16px] leading-snug text-[var(--v2-ink-900)] md:w-auto md:text-[15px]" style={{ textWrap: "pretty" }}>
                   «{a.text}»
                 </p>
                 <span className="v2-tight text-[12.5px] text-[var(--v2-ink-600)]">{a.cat}</span>
                 <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">{a.src}</span>
                 <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{a.date}</span>
-                <span className="justify-self-end text-[12.5px] font-medium text-[var(--v2-ink-400)] group-hover:text-[var(--v2-brand-700)]">
+                <span className="hidden justify-self-end text-[12.5px] md:block font-medium text-[var(--v2-ink-400)] group-hover:text-[var(--v2-brand-700)]">
                   Открыть <IcChevR className="inline h-3.5 w-3.5" />
                 </span>
               </div>

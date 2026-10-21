@@ -72,9 +72,9 @@ export function ActiveTrackerHero({
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
         <HeroBackground />
       </div>
-      <div className="relative grid grid-cols-12 gap-8 p-7">
+      <div className="relative grid grid-cols-12 gap-5 p-4 sm:gap-8 sm:p-6 lg:p-7">
         <div className="col-span-12 flex flex-col lg:col-span-7">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
             {running ? (
               <span className="v2-livedot relative inline-flex h-2 w-2 rounded-full bg-[var(--v2-brand-500)] text-[var(--v2-brand-500)]" />
             ) : (
@@ -85,7 +85,7 @@ export function ActiveTrackerHero({
             <span className="font-medium normal-case tracking-normal text-[var(--v2-ink-500)]">{dueLabel}</span>
           </div>
 
-          <h2 className="v2-tighter mt-3 max-w-[34ch] text-[26px] font-semibold leading-[1.15] text-[var(--v2-ink-900)]">
+          <h2 className="v2-tighter mt-3 max-w-[34ch] break-words text-[21px] font-semibold leading-[1.2] text-[var(--v2-ink-900)] sm:text-[26px] sm:leading-[1.15]">
             {task.title}
           </h2>
 
@@ -102,12 +102,12 @@ export function ActiveTrackerHero({
             <PriorityDot priority={task.priority} />
           </div>
 
-          <div className="mt-7 flex items-end gap-6">
+          <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-3 sm:mt-7">
             <div className="leading-none">
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-ink-500)]">
                 Текущая сессия
               </div>
-              <div className="v2-tnum font-mono text-[64px] leading-none tracking-[-0.04em] text-[var(--v2-ink-900)]">
+              <div className="v2-tnum font-mono text-[48px] leading-none tracking-[-0.04em] text-[var(--v2-ink-900)] sm:text-[64px]">
                 {fmtTimer(elapsed)}
               </div>
             </div>
@@ -125,7 +125,7 @@ export function ActiveTrackerHero({
           </div>
 
           {est > 0 ? (
-            <div className="mt-7 max-w-[520px]">
+            <div className="mt-5 max-w-[520px] sm:mt-7">
               <div className="mb-2 flex items-center justify-between text-[12px]">
                 <span className="text-[var(--v2-ink-500)]">На задачу всего</span>
                 <span className="v2-tnum font-medium text-[var(--v2-ink-700)]">
@@ -189,14 +189,14 @@ function IdleHero({
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
         <HeroBackground />
       </div>
-      <div className="relative grid grid-cols-12 gap-8 p-7">
+      <div className="relative grid grid-cols-12 gap-5 p-4 sm:gap-8 sm:p-6 lg:p-7">
         <div className="col-span-12 flex flex-col lg:col-span-7">
           {selected ? (
             <>
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
                 Чем займёмся?
               </div>
-              <h2 className="v2-tighter mt-3 max-w-[38ch] text-[26px] font-semibold leading-[1.15] text-[var(--v2-ink-900)]">
+              <h2 className="v2-tighter mt-3 max-w-[38ch] break-words text-[21px] font-semibold leading-[1.2] text-[var(--v2-ink-900)] sm:text-[26px] sm:leading-[1.15]">
                 {selected.title}
               </h2>
               <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -204,7 +204,7 @@ function IdleHero({
                   <button
                     type="button"
                     onClick={() => setMenuOpen((v) => !v)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-white py-1 pl-1 pr-2 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-white py-1 pl-1 pr-2 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
                   >
                     {selected.project_name ? (
                       <ProjectChip
@@ -221,31 +221,34 @@ function IdleHero({
                     <V2Icons.chev className="h-4 w-4 text-[var(--v2-ink-400)]" />
                   </button>
                   {menuOpen && candidates.length > 1 ? (
-                    <div className="absolute left-0 top-full z-20 mt-2 max-h-[280px] min-w-[300px] overflow-y-auto rounded-xl border border-[var(--v2-ink-100)] bg-white py-1 shadow-[var(--v2-shadow-pop)]">
-                      {candidates.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedId(t.id);
-                            setMenuOpen(false);
-                          }}
-                          className={`flex w-full flex-col gap-0.5 px-3 py-2.5 text-left transition hover:bg-[var(--v2-ink-50)] ${
-                            t.id === selected.id ? "bg-[var(--v2-brand-50)]/60" : ""
-                          }`}
-                        >
-                          <span className="v2-tight text-[13px] font-medium text-[var(--v2-ink-900)]">{t.title}</span>
-                          <span className="text-[11px] text-[var(--v2-ink-500)]">
-                            {t.project_name ?? "Без проекта"} · {formatDueLabel(t.deadline_at, t.bucket)}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                    <>
+                      <div className="fixed inset-0 z-[70] bg-black/30 sm:hidden" aria-hidden onClick={() => setMenuOpen(false)} />
+                      <div className="fixed inset-x-2 bottom-[calc(var(--v2-mobnav-h,0px)+8px)] z-[71] max-h-[min(70dvh,480px)] overflow-y-auto overscroll-contain rounded-2xl border border-[var(--v2-ink-100)] bg-white p-1.5 shadow-[var(--v2-shadow-pop)] sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:z-20 sm:mt-2 sm:max-h-[280px] sm:min-w-[300px] sm:max-w-[min(420px,calc(100vw-3rem))] sm:rounded-xl sm:p-0 sm:py-1">
+                        {candidates.map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedId(t.id);
+                              setMenuOpen(false);
+                            }}
+                            className={`flex w-full flex-col gap-0.5 rounded-xl px-3 py-3 text-left transition hover:bg-[var(--v2-ink-50)] sm:rounded-none sm:py-2.5 ${
+                              t.id === selected.id ? "bg-[var(--v2-brand-50)]/60" : ""
+                            }`}
+                          >
+                            <span className="v2-tight text-[15px] font-medium text-[var(--v2-ink-900)] sm:text-[13px]">{t.title}</span>
+                            <span className="text-[12px] text-[var(--v2-ink-500)] sm:text-[11px]">
+                              {t.project_name ?? "Без проекта"} · {formatDueLabel(t.deadline_at, t.bucket)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   ) : null}
                 </div>
                 <PriorityDot priority={selected.priority} />
               </div>
-              <div className="mt-8 flex items-center gap-3">
+              <div className="mt-6 flex items-center gap-3 sm:mt-8">
                 <TimerButton running={false} onClick={() => onStart?.(selected.id)} size="lg" />
                 <span className="text-[13px] text-[var(--v2-ink-500)]">Запустить таймер на этой задаче</span>
               </div>
@@ -285,7 +288,7 @@ function HeroMetrics({
 }: HeroMetricsProps) {
   return (
     <div className="col-span-12 flex flex-col gap-4 lg:col-span-5">
-      <div className="flex items-center justify-between rounded-2xl bg-gradient-to-br from-[var(--v2-brand-50)]/80 to-white p-5 shadow-[var(--v2-shadow-card)]">
+      <div className="flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-[var(--v2-brand-50)]/80 to-white p-4 shadow-[var(--v2-shadow-card)] sm:p-5">
         <Ring
           value={completedToday}
           total={totalToday || undefined}

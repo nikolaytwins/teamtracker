@@ -13,17 +13,17 @@ function preserveSourceLineBreaks(md: string) {
 export function PersonalFinanceRulesClient({ title, body }: { title: string; body: string }) {
   return (
     <div className="min-h-0 flex-1 overflow-auto bg-[linear-gradient(180deg,#F7F8FC_0%,#FFFFFF_28%)]">
-      <div className="mx-auto max-w-[760px] px-5 pb-24 pt-6 sm:px-8">
+      <div className="mx-auto max-w-[760px] px-3 pb-24 pt-4 sm:px-8 sm:pt-6">
         <Link
           href={appPath("/v2/personal/finance/accounts")}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--v2-ink-500)] transition hover:text-[var(--v2-ink-800)]"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--v2-ink-500)] transition hover:text-[var(--v2-ink-800)] max-sm:min-h-10 max-sm:px-1"
         >
           <V2Icons.chevL className="h-3.5 w-3.5" />
           Счета и фонды
         </Link>
 
-        <article className="mt-6 overflow-hidden rounded-[28px] bg-white px-6 py-8 shadow-[var(--v2-shadow-soft)] sm:px-10 sm:py-10">
-          <h1 className="v2-tighter text-[28px] font-bold leading-[1.15] text-[var(--v2-ink-900)] sm:text-[32px]">
+        <article className="mt-3 overflow-hidden rounded-[22px] bg-white px-4 py-6 shadow-[var(--v2-shadow-soft)] sm:mt-6 sm:rounded-[28px] sm:px-10 sm:py-10">
+          <h1 className="v2-tighter text-[24px] font-bold leading-[1.15] text-[var(--v2-ink-900)] sm:text-[32px]">
             {title}
           </h1>
           <p className="v2-tight mt-2 text-[13.5px] text-[var(--v2-ink-500)]">
@@ -73,7 +73,7 @@ export function PersonalFinanceRulesClient({ title, body }: { title: string; bod
                   <strong className="font-semibold text-[var(--v2-ink-900)]">{children}</strong>
                 ),
                 table: ({ children }) => (
-                  <div className="my-6 overflow-x-auto rounded-xl border border-[var(--v2-ink-100)]">
+                  <div className="my-6 overflow-x-auto rounded-xl border border-[var(--v2-ink-100)] max-sm:-mx-1">
                     <table className="w-full min-w-[480px] border-collapse text-left text-[14px] text-[var(--v2-ink-700)]">
                       {children}
                     </table>
@@ -85,10 +85,10 @@ export function PersonalFinanceRulesClient({ title, body }: { title: string; bod
                   </thead>
                 ),
                 th: ({ children }) => (
-                  <th className="border-b border-[var(--v2-ink-100)] px-4 py-3">{children}</th>
+                  <th className="border-b border-[var(--v2-ink-100)] px-4 py-3 max-sm:px-3 max-sm:first:sticky max-sm:first:left-0 max-sm:first:bg-[var(--v2-ink-50)]">{children}</th>
                 ),
                 td: ({ children }) => (
-                  <td className="border-b border-[var(--v2-ink-100)] px-4 py-3 align-top">{children}</td>
+                  <td className="border-b border-[var(--v2-ink-100)] px-4 py-3 align-top max-sm:px-3 max-sm:first:sticky max-sm:first:left-0 max-sm:first:bg-white">{children}</td>
                 ),
                 tr: ({ children }) => <tr className="last:[&>td]:border-b-0">{children}</tr>,
               }}

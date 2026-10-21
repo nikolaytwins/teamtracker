@@ -57,16 +57,16 @@ export function HomeFinanceHero() {
 
   return (
     <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,560px)]">
-      <div className="flex min-h-[430px] flex-col justify-center gap-2.5 px-8 py-8">
-        <h1 className="v2-tight text-[40px] font-semibold leading-[1.1] tracking-[-0.036em] text-[var(--v2-ink-900)]">
+      <div className="flex flex-col justify-center gap-2.5 px-4 py-5 sm:px-6 sm:py-6 lg:min-h-[430px] lg:px-8 lg:py-8">
+        <h1 className="v2-tight text-[28px] font-semibold leading-[1.1] tracking-[-0.036em] text-[var(--v2-ink-900)] sm:text-[34px] lg:text-[40px]">
           Показатели месяца
         </h1>
 
         <div
-          className="mt-3 max-w-[880px] rounded-[20px] px-7 py-6 text-white"
+          className="mt-2 max-w-[880px] rounded-[20px] px-5 py-5 text-white sm:mt-3 sm:px-7 sm:py-6"
           style={{ background: HERO_BLUE, boxShadow: "0 16px 40px -18px rgba(45,94,239,0.85)" }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-white/60">
               Прибыль · {monthLabel}
             </span>
@@ -81,13 +81,13 @@ export function HomeFinanceHero() {
               <HeroSkeleton className="ml-1 h-4 w-24 bg-white/20" />
             ) : null}
           </div>
-          <div className="mt-3 flex flex-wrap items-end gap-4">
+          <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-2">
             {ready ? (
-              <span className="v2-tnum text-[62px] font-semibold leading-none tracking-[-0.042em]">
+              <span className="v2-tnum text-[40px] font-semibold leading-none tracking-[-0.042em] sm:text-[54px] lg:text-[62px]">
                 {formatRub(profit)}
               </span>
             ) : (
-              <HeroSkeleton className="h-[62px] w-[min(280px,70%)] bg-white/20" />
+              <HeroSkeleton className="h-[40px] w-[min(280px,70%)] bg-white/20 sm:h-[62px]" />
             )}
             {ready && delta != null ? (
               <span className="v2-tight inline-flex items-center gap-1 rounded-[10px] bg-white/16 px-[11px] py-1.5 text-[15px] font-semibold">
@@ -105,7 +105,7 @@ export function HomeFinanceHero() {
           ) : null}
         </div>
 
-        <div className="mt-3 grid max-w-[880px] grid-cols-1 gap-3.5 sm:grid-cols-[1.18fr_1fr_1fr]">
+        <div className="mt-2 grid max-w-[880px] grid-cols-1 gap-2 sm:mt-3 sm:grid-cols-[1.18fr_1fr_1fr] sm:gap-3.5">
           {(
             [
               ["Предполагаемая выручка", summary?.projectExpectedRevenue],
@@ -116,17 +116,17 @@ export function HomeFinanceHero() {
             <Link
               key={label}
               href={appPath("/v2/agency")}
-              className="block rounded-2xl bg-[var(--v2-ink-50)] px-[18px] py-4 transition hover:bg-[var(--v2-ink-100)]"
+              className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--v2-ink-50)] px-4 py-3.5 transition hover:bg-[var(--v2-ink-100)] sm:block sm:px-[18px] sm:py-4"
             >
-              <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-[var(--v2-ink-400)]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)] sm:text-[11.5px] sm:tracking-[0.13em]">
                 {label}
               </span>
               {ready && value != null ? (
-                <div className="v2-tnum v2-tight mt-2 text-[21px] font-medium tracking-[-0.02em] text-[var(--v2-ink-800)]">
+                <div className="v2-tnum v2-tight shrink-0 text-[18px] font-medium tracking-[-0.02em] text-[var(--v2-ink-800)] sm:mt-2 sm:text-[21px]">
                   {formatRub(value)}
                 </div>
               ) : (
-                <HeroSkeleton className="mt-2 h-7 w-[min(140px,80%)]" />
+                <HeroSkeleton className="h-6 w-[min(120px,40%)] sm:mt-2 sm:h-7 sm:w-[min(140px,80%)]" />
               )}
             </Link>
           ))}

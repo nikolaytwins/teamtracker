@@ -86,6 +86,7 @@ export function PersonalMoneyInline({
     return (
       <input
         ref={inputRef}
+        autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
@@ -106,7 +107,7 @@ export function PersonalMoneyInline({
             setEditing(false);
           }
         }}
-        className={`v2-tnum w-[120px] rounded-lg border border-[var(--v2-brand-300)] bg-white px-2.5 py-1.5 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] outline-none ring-2 ring-[var(--v2-brand-100)] ${className}`}
+        className={`v2-tnum w-[120px] rounded-lg border border-[var(--v2-brand-300)] bg-white px-2.5 py-1.5 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] outline-none ring-2 ring-[var(--v2-brand-100)] ${className} max-sm:min-w-[140px] max-sm:text-[length:max(16px,1em)]`}
         inputMode="decimal"
       />
     );
@@ -118,7 +119,7 @@ export function PersonalMoneyInline({
       onClick={() => setEditing(true)}
       disabled={saving}
       title={title}
-      className={`v2-tnum rounded-lg px-2 py-1 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] transition hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)] disabled:opacity-50 ${className}`}
+      className={`v2-tnum rounded-lg px-2 py-1 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] transition hover:bg-[var(--v2-brand-50)] hover:text-[var(--v2-brand-700)] disabled:opacity-50 ${className} max-sm:min-h-10`}
     >
       {display ?? <PersonalAmt v={value} />}
     </button>

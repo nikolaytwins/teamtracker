@@ -108,7 +108,7 @@ export function AgencyClientEstimateView({ data }: { data: PublicClientEstimate 
             <h2 className="sec-title">Список работ</h2>
             <span className="sec-sub">{month.label}</span>
           </div>
-          <table>
+          <table className="tbl-cards">
             <thead>
               <tr>
                 <th>Услуга</th>
@@ -120,13 +120,13 @@ export function AgencyClientEstimateView({ data }: { data: PublicClientEstimate 
             <tbody>
               {month.lines.map((line, i) => (
                 <tr key={`${line.title}-${i}`}>
-                  <td>
+                  <td className="c-name">
                     <div className="t-name">{line.title}</div>
                     {line.package ? <div className="sub">пакет</div> : null}
                   </td>
-                  <td className="right">{line.package ? 1 : line.quantity}</td>
-                  <td className="right">{money(line.unitPrice)}</td>
-                  <td className="right">
+                  <td className="right c-qty" data-label="Кол-во">{line.package ? 1 : line.quantity}</td>
+                  <td className="right c-price" data-label="Стоимость">{money(line.unitPrice)}</td>
+                  <td className="right c-sum" data-label="Сумма">
                     <span className="sum">{money(line.sum)}</span>
                   </td>
                 </tr>

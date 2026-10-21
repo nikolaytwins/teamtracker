@@ -102,7 +102,7 @@ export function PersonalOperationModal({
   };
 
   const submit = async () => {
-    const n = parseFloat(amount);
+    const n = parseFloat(amount.replace(/\s/g, "").replace(",", "."));
     if (!Number.isFinite(n) || n <= 0) {
       setError("Укажите сумму");
       return;
@@ -142,9 +142,24 @@ export function PersonalOperationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
-        <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Новая операция</h2>
+    <div
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/30 sm:items-center sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="max-h-[94dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-[var(--v2-shadow-pop)] sm:max-h-[90vh] sm:rounded-2xl sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Новая операция</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть"
+            className="-mr-2 inline-flex h-10 w-10 items-center justify-center rounded-full text-[22px] leading-none text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] sm:hidden"
+          >
+            ×
+          </button>
+        </div>
         <div className="mt-4 flex gap-1 rounded-xl bg-[var(--v2-ink-100)]/70 p-1">
           {(
             [
@@ -162,7 +177,7 @@ export function PersonalOperationModal({
                   setNewCategoryName("");
                 }
               }}
-              className={`flex-1 rounded-lg py-2 text-[12.5px] font-medium transition ${
+              className={`flex-1 rounded-lg py-2 text-[12.5px] font-medium transition max-sm:py-2.5 max-sm:text-[14px] ${
                 txnType === k
                   ? "bg-white text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)]"
                   : "text-[var(--v2-ink-500)]"
@@ -175,12 +190,18 @@ export function PersonalOperationModal({
         <label className="mt-4 block text-xs text-[var(--v2-ink-500)]">
           Сумма, ₽
           <input
-            type="number"
-            min="0"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
+            autoFocus
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="v2-tnum mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+            className="v2-tnum mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm max-sm:h-12 max-sm:text-[20px] max-sm:font-semibold"
           />
         </label>
         <label className="mt-3 block text-xs text-[var(--v2-ink-500)]">
@@ -189,7 +210,7 @@ export function PersonalOperationModal({
             type="date"
             value={txnDate}
             onChange={(e) => setTxnDate(e.target.value)}
-            className="mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+            className="mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-sm:h-11 max-sm:text-[16px]"
           />
         </label>
         {txnType === "expense" ? (
@@ -203,7 +224,7 @@ export function PersonalOperationModal({
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   placeholder="Название категории"
                   disabled={creatingCategory}
-                  className="h-10 w-full rounded-xl border border-[var(--v2-brand-300)] px-3 text-sm outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+                  className="h-10 w-full rounded-xl border border-[var(--v2-brand-300)] px-3 text-sm outline-none ring-[var(--v2-brand-500)] focus:ring-2 max-sm:h-11 max-sm:text-[16px]"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -220,7 +241,7 @@ export function PersonalOperationModal({
                     type="button"
                     disabled={creatingCategory || !newCategoryName.trim()}
                     onClick={() => void submitNewCategory()}
-                    className="h-8 flex-1 rounded-lg bg-[var(--v2-brand-600)] px-3 text-[12px] font-medium text-white disabled:opacity-45"
+                    className="h-8 flex-1 rounded-lg bg-[var(--v2-brand-600)] px-3 text-[12px] font-medium text-white disabled:opacity-45 max-sm:h-10 max-sm:text-[14px]"
                   >
                     {creatingCategory ? "…" : "Создать"}
                   </button>
@@ -231,7 +252,7 @@ export function PersonalOperationModal({
                       setCreatingCategoryOpen(false);
                       setNewCategoryName("");
                     }}
-                    className="h-8 rounded-lg px-3 text-[12px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+                    className="h-8 rounded-lg px-3 text-[12px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] max-sm:h-10 max-sm:text-[14px]"
                   >
                     Отмена
                   </button>
@@ -242,7 +263,7 @@ export function PersonalOperationModal({
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+                  className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-sm:h-11 max-sm:text-[16px]"
                 >
                   <option value="">Без категории</option>
                   {categoriesForMonth.map((c) => (
@@ -259,7 +280,7 @@ export function PersonalOperationModal({
                     setCreatingCategoryOpen(true);
                     setNewCategoryName("");
                   }}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--v2-ink-200)] text-[var(--v2-brand-700)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)]"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--v2-ink-200)] text-[var(--v2-brand-700)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)] max-sm:h-11 max-sm:w-11"
                 >
                   <V2Icons.plus className="h-4 w-4" />
                 </button>
@@ -272,7 +293,7 @@ export function PersonalOperationModal({
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+            className="mt-1 h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm max-sm:h-11 max-sm:text-[16px]"
           />
         </label>
         {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
@@ -280,7 +301,7 @@ export function PersonalOperationModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
+            className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] max-sm:h-12"
           >
             Отмена
           </button>
@@ -288,7 +309,7 @@ export function PersonalOperationModal({
             type="button"
             disabled={saving}
             onClick={() => void submit()}
-            className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-sm font-medium text-white disabled:opacity-50"
+            className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-sm font-medium text-white disabled:opacity-50 max-sm:h-12 max-sm:flex-1 max-sm:text-[15px]"
           >
             Сохранить
           </button>

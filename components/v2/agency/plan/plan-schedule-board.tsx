@@ -41,7 +41,7 @@ function Icon({
   name,
   className = "svgi",
 }: {
-  name: "check" | "star" | "next" | "del" | "plus";
+  name: "check" | "star" | "next" | "del" | "plus" | "cal";
   className?: string;
 }) {
   const fillStar = name === "star";
@@ -72,6 +72,13 @@ function Icon({
         <>
           <path d="M12 5v14" />
           <path d="M5 12h14" />
+        </>
+      ) : null}
+      {name === "cal" ? (
+        <>
+          <rect x="4" y="5.5" width="16" height="14" rx="2.5" />
+          <path d="M4 10h16" />
+          <path d="M8.5 3.5v4M15.5 3.5v4" />
         </>
       ) : null}
     </svg>
@@ -246,9 +253,11 @@ export function PlanScheduleBoard({
     if (!board) return;
     const colsEl = [...board.querySelectorAll<HTMLElement>(".col")];
     if (!colsEl.length) return;
-    const i = Math.round(board.scrollLeft / colW());
+    const w = colW();
+    const i = Math.round(board.scrollLeft / w);
+    const visible = Math.max(1, Math.min(cols, Math.round((board.clientWidth + 14) / w)));
     const a = colsEl[i];
-    const b = colsEl[Math.min(colsEl.length - 1, i + cols - 1)];
+    const b = colsEl[Math.min(colsEl.length - 1, i + visible - 1)];
     if (!a || !b) return;
     const da = new Date(a.dataset.day + "T12:00:00");
     const db = new Date(b.dataset.day + "T12:00:00");
@@ -282,6 +291,11 @@ export function PlanScheduleBoard({
   useEffect(() => {
     goToday(false);
   }, [goToday]);
+
+  useEffect(() => {
+    window.addEventListener("resize", updRange);
+    return () => window.removeEventListener("resize", updRange);
+  }, [updRange]);
 
   const run = async (action: () => Promise<unknown>, msg: string, snap?: PlanItemRow[]) => {
     if (busy) return;
@@ -354,6 +368,11 @@ export function PlanScheduleBoard({
     );
 
   const toggleDone = (item: PlanItemRow) => patchStatus(item, item.completed_at ? "todo" : "done");
+
+  const moveTo = (item: PlanItemRow, date: string) => {
+    if (!date || item.plan_date === date) return;
+    return run(() => updatePlanItemApi(item.id, { plan_date: date }), `Перенесено на ${dm(date)}`);
+  };
 
   const onDrop = async (day: string, e?: DragEvent) => {
     const checklistId = parseChecklistDrag(
@@ -560,6 +579,7 @@ export function PlanScheduleBoard({
                             `Перенесено на ${dm(addDaysIso(d, 1))}`
                           )
                         }
+                        onMove={(date) => void moveTo(i, date)}
                         onDel={() => run(() => deletePlanItemApi(i.id), "Удалено")}
                         onTogglePrio={() =>
                           run(
@@ -617,6 +637,7 @@ export function PlanScheduleBoard({
                             `Перенесено на ${dm(addDaysIso(d, 1))}`
                           )
                         }
+                        onMove={(date) => void moveTo(i, date)}
                         onDel={() => run(() => deletePlanItemApi(i.id), "Удалено")}
                       />
                     ))}
@@ -657,6 +678,7 @@ export function PlanScheduleBoard({
                             `Перенесено на ${dm(addDaysIso(d, 1))}`
                           )
                         }
+                        onMove={(date) => void moveTo(i, date)}
                         onDel={() => run(() => deletePlanItemApi(i.id), "Удалено")}
                         onTogglePrio={() =>
                           run(() => updatePlanItemApi(i.id, { priority: 1 }), "В главное")
@@ -768,6 +790,7 @@ function ItemCard({
   onDone,
   onStatus,
   onNext,
+  onMove,
   onDel,
   onTogglePrio,
 }: {
@@ -784,6 +807,7 @@ function ItemCard({
   onDone: () => void;
   onStatus?: (status: PlanWorkStatus) => void;
   onNext: () => void;
+  onMove: (date: string) => void;
   onDel: () => void;
   onTogglePrio?: () => void;
 }) {
@@ -930,6 +954,22 @@ function ItemCard({
         <button type="button" className="ib" title="На завтра" onClick={() => void onNext()}>
           <Icon name="next" />
         </button>
+        <label className="ib ib-date" title="Перенести на дату">
+          <Icon name="cal" />
+          <input
+            type="date"
+            aria-label="Перенести на дату"
+            value={item.plan_date ?? ""}
+            onClick={(e) => {
+              try {
+                e.currentTarget.showPicker?.();
+              } catch {
+                /* ignore */
+              }
+            }}
+            onChange={(e) => onMove(e.target.value)}
+          />
+        </label>
         <button type="button" className="ib del" title="Удалить" onClick={() => void onDel()}>
           <Icon name="del" />
         </button>

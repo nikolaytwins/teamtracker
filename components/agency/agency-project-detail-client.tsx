@@ -105,7 +105,7 @@ function ExpenseRow({
 
   return (
     <tr>
-      <td>
+      <td className="c-name">
         {editingField === 'employeeName' ? (
           <input
             type="text"
@@ -125,13 +125,13 @@ function ExpenseRow({
           </button>
         )}
       </td>
-      <td>
+      <td className="c-role" data-label="Роль">
         {editingField === 'employeeRole' ? (
           <select
             value={tempValue}
             onChange={(e) => {
-              setTempValue(e.target.value)
-              handleSave('employeeRole')
+              onUpdate(expense.id, 'employeeRole', e.target.value)
+              setEditingField(null)
             }}
             onBlur={() => setEditingField(null)}
             autoFocus
@@ -147,10 +147,11 @@ function ExpenseRow({
           </button>
         )}
       </td>
-      <td className="right">
+      <td className="right c-sum" data-label="Сумма">
         {editingField === 'amount' ? (
           <input
             type="number"
+            inputMode="decimal"
             step="0.01"
             value={tempValue}
             onChange={(e) => setTempValue(e.target.value)}
@@ -168,7 +169,7 @@ function ExpenseRow({
           </button>
         )}
       </td>
-      <td>
+      <td className="c-notes" data-label="Заметки">
         {editingField === 'notes' ? (
           <input
             type="text"
@@ -188,7 +189,7 @@ function ExpenseRow({
           </button>
         )}
       </td>
-      <td className="right">
+      <td className="right c-acts">
         <button type="button" onClick={() => onDelete(expense.id)} className="del">
           Удалить
         </button>
@@ -953,7 +954,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
               <div className="kpi-v">{money(effectiveTotalAmount)}</div>
               <div className="kpi-s">{monthMeta.label.toLowerCase()}</div>
             </div>
-            <div className="kpi">
+            <div className="kpi kpi--paid">
               <div className="kpi-l">Оплачено</div>
               <div className="kpi-v">{money(project.paidAmount)}</div>
               <div className="kpi-s">к оплате {money(due)}</div>
@@ -989,6 +990,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
               name="quantity"
               placeholder="Кол-во"
               type="number"
+              inputMode="decimal"
               min={1}
               defaultValue={1}
               style={{ display: addBillingType === 'fixed' ? undefined : 'none' }}
@@ -998,16 +1000,17 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
               name="unitPrice"
               placeholder="Цена, ₽"
               type="number"
+              inputMode="decimal"
               min={0}
               style={{ display: addBillingType === 'fixed' ? undefined : 'none' }}
             />
-            <button type="submit" className="btn btn--dark btn--sm" style={{ height: 42, padding: '0 18px' }}>
+            <button type="submit" className="btn btn--dark btn--sm addbar-go">
               Добавить
             </button>
           </form>
 
           <div className="tbl-wrap">
-          <table>
+          <table className="tbl-cards tbl-tasks">
             <thead>
               <tr>
                 <th>Задача</th>
@@ -1026,17 +1029,18 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                 const previousSeconds = Math.max(0, Number(d.timerPreviousSeconds) || 0)
                 const running = Boolean(d.timerStartedAt)
                 return (
-                  <tr key={d.id}>
-                    <td>
+                  <tr key={d.id} className={isHourly ? 'is-hourly' : undefined}>
+                    <td className="c-name">
                       <input
                         type="text"
                         defaultValue={d.title}
                         onBlur={(e) => handleUpdateDetail(d.id, 'title')(e.target.value)}
+                        aria-label="Название задачи"
                         className="cell-inp t-name"
                       />
                       <div className="sub">{isHourly ? 'По времени' : 'Фикс'}</div>
                     </td>
-                    <td className="right">
+                    <td className="right c-qty" data-label={isHourly ? 'Время' : 'Кол-во'}>
                       {isHourly ? (
                         <HourlyClockCell
                           liveSeconds={liveSeconds}
@@ -1050,34 +1054,38 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                       ) : (
                         <input
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           defaultValue={d.quantity}
                           onBlur={(e) => handleUpdateDetail(d.id, 'quantity')(e.target.value)}
+                          aria-label="Количество"
                           className="cell-inp cell-inp--n"
                         />
                       )}
                     </td>
-                    <td className="right">
+                    <td className="right c-price" data-label="Цена">
                       {isHourly ? (
                         <span className="dash" style={{ color: 'var(--ink-300)' }}>—</span>
                       ) : (
                         <input
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           defaultValue={d.unitPrice}
                           onBlur={(e) => handleUpdateDetail(d.id, 'unitPrice')(e.target.value)}
+                          aria-label="Цена"
                           className="cell-inp cell-inp--n"
                         />
                       )}
                     </td>
-                    <td className="right">
+                    <td className="right c-sum" data-label="Итого">
                       <LineSumCell
                         value={lineTotal}
                         overridden={d.totalOverrideRub != null && Number.isFinite(d.totalOverrideRub)}
                         onCommit={(next) => handleUpdateLineTotal(d.id, next)}
                       />
                     </td>
-                    <td className="right">
+                    <td className="right c-acts">
                       <div className="acts">
                         {isHourly ? (
                           <button
@@ -1119,12 +1127,13 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
               <div className="kick">Стоимость часа</div>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 value={hourlyRateDraft}
                 onChange={(e) => setHourlyRateDraft(e.target.value)}
-                className="inp inp--n"
-                style={{ marginTop: 8, width: 140 }}
+                aria-label="Стоимость часа"
+                className="inp inp--n rate-inp"
               />
             </div>
             <button type="button" disabled={savingRate} onClick={() => void handleSaveHourlyRate()} className="btn btn--line btn--sm">
@@ -1150,12 +1159,13 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
                 <option value="copywriter">Копирайтер</option>
                 <option value="assistant">Ассистент</option>
               </select>
-              <input name="amount" type="number" step="0.01" required placeholder="Сумма" className="inp" />
+              <input name="amount" type="number" inputMode="decimal" step="0.01" required placeholder="Сумма" className="inp" />
               <input name="notes" type="text" placeholder="Заметки" className="inp" />
               <button type="submit" className="btn btn--pri btn--sm">Добавить</button>
             </form>
           ) : null}
-          <table>
+          <div className="tbl-wrap">
+          <table className="tbl-cards tbl-exp">
             <thead>
               <tr>
                 <th>Сотрудник</th>
@@ -1182,6 +1192,7 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
               ) : null}
             </tbody>
           </table>
+          </div>
         </section>
 
         <section className="share" id="client-share">

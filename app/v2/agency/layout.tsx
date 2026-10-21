@@ -35,15 +35,15 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="shrink-0 border-b border-[var(--v2-ink-100)] bg-white px-6">
-        <div className="flex gap-1 py-2">
+      <div className="shrink-0 border-b border-[var(--v2-ink-100)] bg-white px-4 lg:px-6">
+        <div className="flex gap-1 py-2 max-lg:pt-3">
           {REVENUE_TABS.map((tab) => {
             const active = tab.match(pathname);
             return (
               <Link
                 key={tab.href}
                 href={appPath(tab.href)}
-                className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition ${
+                className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition max-lg:flex max-lg:h-10 max-lg:items-center max-lg:px-4 max-lg:text-[14px] ${
                   active
                     ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
                     : "text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)]"

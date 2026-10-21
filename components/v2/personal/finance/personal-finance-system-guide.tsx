@@ -47,16 +47,16 @@ export function PersonalFinanceSystemGuide() {
   return (
     <div className="min-h-full overflow-y-auto">
       <header className="relative overflow-hidden border-b border-[var(--v2-ink-100)] bg-white">
-        <div className="relative mx-auto grid min-h-[440px] max-w-[1180px] lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,460px)]">
-          <div className="relative z-10 flex flex-col justify-center px-6 py-10 lg:px-10 lg:py-14">
+        <div className="relative mx-auto grid max-w-[1180px] lg:min-h-[440px] lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,460px)]">
+          <div className="relative z-10 flex flex-col justify-center px-4 py-7 sm:px-6 sm:py-10 lg:px-10 lg:py-14">
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--v2-brand-50)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-brand-700)]">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--v2-brand-500)]" />
               Финансовая система
             </span>
-            <h1 className="v2-tighter mt-5 max-w-[640px] text-[42px] font-light leading-[1.04] text-[var(--v2-ink-900)] sm:text-[54px]">
+            <h1 className="v2-tighter mt-4 max-w-[640px] text-[34px] font-light leading-[1.06] text-[var(--v2-ink-900)] sm:mt-5 sm:text-[54px] sm:leading-[1.04]">
               Одно простое решение<br />на каждый месяц
             </h1>
-            <p className="v2-tight mt-4 max-w-[520px] text-[17px] leading-relaxed text-[var(--v2-ink-600)]">
+            <p className="v2-tight mt-3 max-w-[520px] text-[15.5px] leading-relaxed text-[var(--v2-ink-600)] sm:mt-4 sm:text-[17px]">
               Сначала зарплата и жизнь. Всё сверх нормального бюджета автоматически превращается в накопления.
             </p>
           </div>
@@ -76,8 +76,8 @@ export function PersonalFinanceSystemGuide() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1050px] space-y-5 px-6 py-10 lg:px-10 lg:py-12">
-        <section className="overflow-hidden rounded-3xl bg-[var(--v2-ink-900)] p-7 text-white shadow-[var(--v2-shadow-pop)] sm:p-9">
+      <main className="mx-auto max-w-[1050px] space-y-4 px-3 py-5 sm:space-y-5 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
+        <section className="overflow-hidden rounded-3xl bg-[var(--v2-ink-900)] p-5 text-white shadow-[var(--v2-shadow-pop)] sm:p-9">
           <Kicker light>Правило месяца</Kicker>
           <p className="v2-tighter mt-3 max-w-[820px] text-[25px] font-light leading-snug sm:text-[31px]">
             Откладываю зарплату, выбираю режим жизни — экономный или нормальный. При профиците сверх 200 000 ₽: 20% на удовольствия и кайфы, 80% откладываю.
@@ -98,7 +98,7 @@ export function PersonalFinanceSystemGuide() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-3xl border border-[var(--v2-brand-200)] bg-white p-7 shadow-[var(--v2-shadow-card)] sm:p-9">
+        <section className="overflow-hidden rounded-3xl border border-[var(--v2-brand-200)] bg-white p-5 shadow-[var(--v2-shadow-card)] sm:p-9">
           <Kicker>Горизонт до 1 октября 2027</Kicker>
           <p className="v2-tighter mt-3 max-w-[760px] text-[24px] font-light leading-snug text-[var(--v2-ink-900)] sm:text-[28px]">
             Две цели, к которым сходится вся система.
@@ -130,7 +130,7 @@ export function PersonalFinanceSystemGuide() {
         </section>
 
         <section className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-card)]">
+          <div className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)] sm:p-6">
             <Kicker>Сначала бизнес</Kicker>
             <div className="mt-5 rounded-2xl bg-[var(--v2-ink-50)] px-5 py-5">
               <div className="flex items-end justify-between gap-4">
@@ -146,7 +146,7 @@ export function PersonalFinanceSystemGuide() {
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-card)]">
+          <div className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)] sm:p-6">
             <Kicker>Затем обязательная жизнь</Kicker>
             <div className="mt-3">
               {fixedPayments.map((item) => (
@@ -161,11 +161,11 @@ export function PersonalFinanceSystemGuide() {
         </section>
 
         <section className="grid gap-5 md:grid-cols-2">
-          <div className="rounded-3xl border border-[var(--v2-ink-200)] bg-white p-7 shadow-[var(--v2-shadow-card)]">
+          <div className="rounded-3xl border border-[var(--v2-ink-200)] bg-white p-5 shadow-[var(--v2-shadow-card)] sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <Kicker>Экономный месяц</Kicker>
-                <p className="v2-tnum mt-2 text-[36px] font-semibold leading-none text-[var(--v2-ink-900)]">170 000 ₽</p>
+                <p className="v2-tnum mt-2 text-[30px] font-semibold leading-none sm:text-[36px] text-[var(--v2-ink-900)]">170 000 ₽</p>
               </div>
               <span className="rounded-full bg-[var(--v2-ink-100)] px-3 py-1 text-[11px] font-medium text-[var(--v2-ink-500)]">режим экономии</span>
             </div>
@@ -182,11 +182,11 @@ export function PersonalFinanceSystemGuide() {
             </p>
           </div>
 
-          <div className="rounded-3xl border border-emerald-200 bg-emerald-50/65 p-7 shadow-[var(--v2-shadow-card)]">
+          <div className="rounded-3xl border border-emerald-200 bg-emerald-50/65 p-5 shadow-[var(--v2-shadow-card)] sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <Kicker>Нормальный месяц</Kicker>
-                <p className="v2-tnum mt-2 text-[36px] font-semibold leading-none text-emerald-950">200 000 ₽</p>
+                <p className="v2-tnum mt-2 text-[30px] font-semibold leading-none sm:text-[36px] text-emerald-950">200 000 ₽</p>
               </div>
               <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-medium text-emerald-700">от 200 тысяч</span>
             </div>
@@ -205,16 +205,16 @@ export function PersonalFinanceSystemGuide() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-3xl bg-[var(--v2-brand-600)] p-7 text-white shadow-[var(--v2-shadow-glow)] sm:p-9">
+        <section className="overflow-hidden rounded-3xl bg-[var(--v2-brand-600)] p-5 text-white shadow-[var(--v2-shadow-glow)] sm:p-9">
           <Kicker light>Всё сверх 200 000 ₽</Kicker>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl bg-white/[0.1] p-6">
-              <p className="v2-tnum text-[46px] font-semibold leading-none">80%</p>
+              <p className="v2-tnum text-[38px] font-semibold leading-none sm:text-[46px]">80%</p>
               <p className="mt-3 text-[16px] font-medium">Откладываю</p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-white/55">Сначала заполняю подушку, затем увеличиваю капитал.</p>
             </div>
             <div className="rounded-2xl bg-white p-6 text-[var(--v2-ink-900)]">
-              <p className="v2-tnum text-[46px] font-semibold leading-none text-[var(--v2-brand-700)]">20%</p>
+              <p className="v2-tnum text-[38px] font-semibold leading-none sm:text-[46px] text-[var(--v2-brand-700)]">20%</p>
               <p className="mt-3 text-[16px] font-medium">На удовольствия и кайфы</p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--v2-ink-500)]">Можно жить чуть свободнее, не превращая весь рост дохода в расходы.</p>
             </div>
@@ -233,9 +233,9 @@ export function PersonalFinanceSystemGuide() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-[var(--v2-brand-200)] bg-white px-7 py-8 text-center shadow-[var(--v2-shadow-card)]">
+        <section className="rounded-3xl border border-[var(--v2-brand-200)] bg-white px-5 py-6 text-center sm:px-7 sm:py-8 shadow-[var(--v2-shadow-card)]">
           <Kicker>Вся система в одной строке</Kicker>
-          <p className="v2-tighter mx-auto mt-3 max-w-[800px] text-[25px] font-light leading-snug text-[var(--v2-ink-900)]">
+          <p className="v2-tighter mx-auto mt-3 max-w-[800px] text-[21px] sm:text-[25px] font-light leading-snug text-[var(--v2-ink-900)]">
             50 тысяч на зарплату → 170 или 200 тысяч на жизнь → всё сверх 200 делю 80 / 20.
           </p>
         </section>

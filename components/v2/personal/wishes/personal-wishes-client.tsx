@@ -219,15 +219,15 @@ const MANIFESTO_PATH: { title: string; body: string }[] = [
 function ManifestoPlate() {
   const [open, setOpen] = useState(false);
   return (
-    <section className="mb-7 overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-soft)]">
+    <section className="mb-5 overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-soft)] lg:mb-7">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-center gap-6 px-7 py-5 text-left sm:px-8"
+        className="group flex w-full items-center gap-4 px-5 py-4 text-left sm:gap-6 sm:px-8 sm:py-5"
       >
         <p
-          className="v2-tighter min-w-0 flex-1 text-[26px] font-light leading-[1.2] text-[var(--v2-ink-900)] sm:text-[30px]"
+          className="v2-tighter min-w-0 flex-1 text-[21px] font-light leading-[1.2] text-[var(--v2-ink-900)] sm:text-[30px]"
           style={{ textWrap: "pretty" }}
         >
           {MANIFESTO_BRIEF[0]}
@@ -239,7 +239,7 @@ function ManifestoPlate() {
         />
       </button>
       {open ? (
-        <div className="border-t border-[var(--v2-ink-100)] px-7 pb-8 pt-6 sm:px-8">
+        <div className="border-t border-[var(--v2-ink-100)] px-5 pb-6 pt-5 sm:px-8 sm:pb-8 sm:pt-6">
           <div className="flex max-w-[62ch] flex-col gap-3">
             {MANIFESTO_BRIEF.slice(1).map((p) => (
               <p
@@ -409,7 +409,7 @@ function ModeSwitch({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void 
           key={m.id}
           type="button"
           onClick={() => setMode(m.id)}
-          className={`v2-tight h-8 rounded-full px-4 text-[12.5px] font-medium transition ${
+          className={`v2-tight h-9 rounded-full px-3.5 text-[13px] font-medium transition lg:h-8 lg:px-4 lg:text-[12.5px] ${
             mode === m.id
               ? "bg-[var(--v2-ink-900)] text-white"
               : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
@@ -502,7 +502,7 @@ function PhotoSlot({
         <button
           type="button"
           onClick={onClear}
-          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)] shadow-sm transition hover:text-[var(--v2-ink-900)]"
+          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)] shadow-sm transition hover:text-[var(--v2-ink-900)] max-lg:left-2 max-lg:right-auto max-lg:h-9 max-lg:w-9"
           title="Убрать файл"
         >
           <IcClose className="h-3.5 w-3.5" />
@@ -781,14 +781,14 @@ function Fullscreen({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 backdrop-blur-sm lg:z-50 lg:p-8"
       onClick={onClose}
     >
       <div
-        className="relative flex h-[min(84vh,780px)] w-full max-w-[1180px] overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative flex h-[min(84vh,780px)] w-full max-w-[1180px] overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)] max-lg:h-[100dvh] max-lg:flex-col max-lg:rounded-none max-lg:pt-[env(safe-area-inset-top)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative min-w-0 flex-1 bg-[var(--v2-ink-100)]">
+        <div className={`relative min-w-0 flex-1 bg-[var(--v2-ink-100)] max-lg:flex-none ${current ? "max-lg:h-[44dvh]" : "max-lg:h-[150px]"}`}>
           {current ? (
             <PhotoSlot
               media={current}
@@ -864,7 +864,7 @@ function Fullscreen({
             </div>
           ) : null}
         </div>
-        <div className="flex w-[400px] shrink-0 flex-col overflow-y-auto px-9 py-8">
+        <div className="flex w-[400px] shrink-0 flex-col overflow-y-auto px-9 py-8 max-lg:min-h-0 max-lg:w-full max-lg:flex-1 max-lg:overscroll-contain max-lg:px-5 max-lg:pb-[calc(16px+env(safe-area-inset-bottom))] max-lg:pt-5">
           {editing ? (
             <>
               <label className="block">
@@ -875,7 +875,7 @@ function Fullscreen({
                   autoFocus
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white"
+                  className="v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] max-lg:text-[16px] outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white"
                 />
               </label>
               <label className="mt-4 block">
@@ -887,7 +887,7 @@ function Fullscreen({
                   onChange={(e) => setDesc(e.target.value)}
                   rows={4}
                   placeholder="Как это должно ощущаться"
-                  className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
+                  className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] max-lg:text-[16px] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
                 />
               </label>
               <div className="mt-4">
@@ -902,7 +902,7 @@ function Fullscreen({
                         key={meta.id}
                         type="button"
                         onClick={() => toggleCat(meta.id)}
-                        className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition"
+                        className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition max-lg:h-9"
                         style={
                           on
                             ? { background: meta.tint, color: "#fff", borderColor: meta.tint }
@@ -932,7 +932,7 @@ function Fullscreen({
                           }
                         }}
                         placeholder="Название"
-                        className="v2-tight h-8 w-[140px] rounded-full border border-[var(--v2-ink-200)] px-3 text-[12.5px] outline-none focus:border-[var(--v2-brand-400)]"
+                        className="v2-tight h-8 w-[140px] rounded-full border border-[var(--v2-ink-200)] px-3 text-[12.5px] outline-none max-lg:h-9 max-lg:text-[16px] focus:border-[var(--v2-brand-400)]"
                       />
                       <button
                         type="button"
@@ -1010,7 +1010,8 @@ function Fullscreen({
                           <button
                             type="button"
                             onClick={() => onRemoveImage(img.id)}
-                            className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)] shadow-sm"
+                            aria-label="Убрать файл"
+                            className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)] shadow-sm max-lg:h-7 max-lg:w-7"
                           >
                             <IcClose className="h-2.5 w-2.5" />
                           </button>
@@ -1055,7 +1056,7 @@ function Fullscreen({
                 })}
               </div>
               <h2
-                className="v2-tighter mt-5 text-[32px] font-light leading-[1.12] text-[var(--v2-ink-900)]"
+                className="v2-tighter mt-4 text-[26px] font-light leading-[1.12] text-[var(--v2-ink-900)] lg:mt-5 lg:text-[32px]"
                 style={{ textWrap: "pretty" }}
               >
                 {w.title}
@@ -1083,7 +1084,7 @@ function Fullscreen({
                     key={id}
                     type="button"
                     onClick={() => void onPatch({ scale: id })}
-                    className="v2-tight h-8 rounded-full border px-3 text-[12px] font-medium transition"
+                    className="v2-tight h-8 rounded-full border px-3 text-[12px] font-medium transition max-lg:h-9 max-lg:text-[12.5px]"
                     style={
                       on
                         ? { background: meta.tint, color: "#fff", borderColor: meta.tint }
@@ -1118,7 +1119,7 @@ function Fullscreen({
               Ближайшее
             </button>
           </div>
-          <div className="mt-auto flex items-center gap-2 pt-8">
+          <div className="mt-auto flex items-center gap-2 pt-8 max-lg:pt-6 max-lg:[&>button]:h-10">
             {editing ? (
               <>
                 <button
@@ -1147,14 +1148,16 @@ function Fullscreen({
                 <button
                   type="button"
                   onClick={onPrev}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)]"
+                  aria-label="Предыдущее"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)] max-lg:w-10"
                 >
                   <V2Icons.chevL className="h-[18px] w-[18px]" />
                 </button>
                 <button
                   type="button"
                   onClick={onNext}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)]"
+                  aria-label="Следующее"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-200)] max-lg:w-10"
                 >
                   <V2Icons.arrowR className="h-[18px] w-[18px]" />
                 </button>
@@ -1181,7 +1184,8 @@ function Fullscreen({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-[var(--v2-ink-600)] transition hover:text-[var(--v2-ink-900)]"
+          aria-label="Закрыть"
+          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-[var(--v2-ink-600)] transition hover:text-[var(--v2-ink-900)] max-lg:right-3 max-lg:top-[calc(env(safe-area-inset-top)+10px)] max-lg:h-10 max-lg:w-10 max-lg:shadow-[var(--v2-shadow-card)]"
         >
           <IcClose className="h-[18px] w-[18px]" />
         </button>
@@ -1292,14 +1296,14 @@ function AddModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 backdrop-blur-sm max-sm:items-end lg:z-50 sm:p-8"
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto overflow-x-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
+        className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)] max-sm:max-h-[calc(100dvh-env(safe-area-inset-top)-8px)] max-sm:rounded-b-none"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-8 pb-6 pt-7">
+        <div className="px-8 pb-6 pt-7 max-sm:px-5 max-sm:pb-5 max-sm:pt-5">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="v2-tighter text-[24px] font-light leading-tight text-[var(--v2-ink-900)]">Новое желание</h2>
@@ -1310,7 +1314,8 @@ function AddModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+              aria-label="Закрыть"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)] max-lg:h-10 max-lg:w-10"
             >
               <IcClose className="h-[17px] w-[17px]" />
             </button>
@@ -1335,7 +1340,7 @@ function AddModal({
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="flex h-[168px] w-full flex-col items-center justify-center gap-2 px-4 text-center hover:bg-[var(--v2-ink-200)]/40"
+                className="flex h-[168px] w-full flex-col items-center justify-center gap-2 px-4 text-center hover:bg-[var(--v2-ink-200)]/40 max-sm:h-[120px]"
               >
                 <V2Icons.upload className="h-6 w-6 text-[var(--v2-ink-400)]" />
                 <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">
@@ -1359,7 +1364,8 @@ function AddModal({
                       <button
                         type="button"
                         onClick={() => removeAt(i)}
-                        className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)]"
+                        aria-label="Убрать файл"
+                        className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-[var(--v2-ink-600)] max-lg:h-8 max-lg:w-8"
                       >
                         <IcClose className="h-3 w-3" />
                       </button>
@@ -1402,7 +1408,7 @@ function AddModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Дом с большими окнами у воды"
-              className="v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
+              className="v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] max-lg:text-[16px] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
             />
           </label>
           <label className="mt-4 block">
@@ -1414,7 +1420,7 @@ function AddModal({
               onChange={(e) => setDesc(e.target.value)}
               rows={2}
               placeholder="Как это должно ощущаться"
-              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
+              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] max-lg:text-[16px] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
             />
           </label>
           <div className="mt-4">
@@ -1429,7 +1435,7 @@ function AddModal({
                     key={meta.id}
                     type="button"
                     onClick={() => toggle(meta.id)}
-                    className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition"
+                    className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition max-lg:h-9"
                     style={
                       on
                         ? { background: meta.tint, color: "#fff", borderColor: meta.tint }
@@ -1457,7 +1463,7 @@ function AddModal({
                       }
                     }}
                     placeholder="Название"
-                    className="v2-tight h-8 w-[140px] rounded-full border border-[var(--v2-ink-200)] px-3 text-[12.5px] outline-none focus:border-[var(--v2-brand-400)]"
+                    className="v2-tight h-8 w-[140px] rounded-full border border-[var(--v2-ink-200)] px-3 text-[12.5px] outline-none max-lg:h-9 max-lg:text-[16px] focus:border-[var(--v2-brand-400)]"
                   />
                   <button
                     type="button"
@@ -1492,7 +1498,7 @@ function AddModal({
                     key={id}
                     type="button"
                     onClick={() => setScale(id)}
-                    className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition"
+                    className="v2-tight h-8 rounded-full border px-3 text-[12.5px] font-medium transition max-lg:h-9"
                     style={
                       on
                         ? { background: meta.tint, color: "#fff", borderColor: meta.tint }
@@ -1527,7 +1533,7 @@ function AddModal({
             </p>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 bg-[var(--v2-ink-50)] px-8 py-4">
+        <div className="flex items-center justify-end gap-2 bg-[var(--v2-ink-50)] px-8 py-4 max-sm:sticky max-sm:bottom-0 max-sm:px-5 max-sm:pb-[calc(12px+env(safe-area-inset-bottom))] max-sm:pt-3 max-sm:[&>button]:h-11 max-sm:[&>button]:flex-1">
           <button
             type="button"
             onClick={onClose}
@@ -1551,12 +1557,12 @@ function AddModal({
 
 function TextMode() {
   return (
-    <div className="max-w-[900px] rounded-[24px] bg-white px-[88px] py-[72px] shadow-[var(--v2-shadow-soft)]">
+    <div className="max-w-[900px] rounded-[24px] bg-white px-5 py-8 shadow-[var(--v2-shadow-soft)] sm:px-12 sm:py-14 lg:px-[88px] lg:py-[72px]">
       {ESSAY.map((p, i) =>
         p.lead ? (
           <p
             key={i}
-            className="v2-tighter text-[30px] font-light leading-[1.3] text-[var(--v2-ink-900)]"
+            className="v2-tighter text-[24px] font-light leading-[1.3] text-[var(--v2-ink-900)] sm:text-[30px]"
             style={{ textWrap: "pretty" }}
           >
             {p.text}
@@ -1564,7 +1570,7 @@ function TextMode() {
         ) : p.pull ? (
           <p
             key={i}
-            className="v2-tight my-9 border-l-2 border-[var(--v2-brand-300)] pl-6 text-[21px] font-light leading-[1.45] text-[var(--v2-brand-700)]"
+            className="v2-tight my-7 border-l-2 border-[var(--v2-brand-300)] pl-4 text-[19px] font-light sm:my-9 sm:pl-6 sm:text-[21px] leading-[1.45] text-[var(--v2-brand-700)]"
             style={{ textWrap: "pretty" }}
           >
             {p.text}
@@ -1572,7 +1578,7 @@ function TextMode() {
         ) : (
           <p
             key={i}
-            className="v2-tight mt-6 text-[17px] leading-[1.75] text-[var(--v2-ink-700)]"
+            className="v2-tight mt-5 text-[16.5px] leading-[1.7] text-[var(--v2-ink-700)] sm:mt-6 sm:text-[17px] sm:leading-[1.75]"
             style={{ textWrap: "pretty" }}
           >
             {p.text}
@@ -1588,12 +1594,12 @@ function TextMode() {
 
 function DayMode() {
   return (
-    <div className="flex max-w-[1000px] flex-col gap-10">
+    <div className="flex max-w-[1000px] flex-col gap-7 sm:gap-10">
       {MYDAY.map((block) => {
         const Ic = DAY_ICONS[block.icon];
         return (
           <section key={block.part}>
-            <div className="mb-5 flex items-center gap-3">
+            <div className="mb-3.5 flex items-center gap-3 sm:mb-5">
               <span
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full"
                 style={{ background: WISH_CATS.material.bg, color: block.tint }}
@@ -1607,9 +1613,9 @@ function DayMode() {
               {block.items.map((it) => (
                 <div
                   key={it.t}
-                  className="group flex gap-6 rounded-[20px] bg-white px-6 py-5 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+                  className="group flex gap-3.5 rounded-[20px] bg-white px-4 py-4 shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] sm:gap-6 sm:px-6 sm:py-5"
                 >
-                  <span className="v2-tnum w-[54px] shrink-0 pt-0.5 text-[13px] font-medium text-[var(--v2-ink-400)]">
+                  <span className="v2-tnum w-[42px] shrink-0 pt-0.5 text-[13px] font-medium text-[var(--v2-ink-400)] sm:w-[54px]">
                     {it.t}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -1629,7 +1635,7 @@ function DayMode() {
                     ) : null}
                   </div>
                   {it.img ? (
-                    <div className="h-[88px] w-[132px] shrink-0 overflow-hidden rounded-xl bg-[var(--v2-ink-100)]">
+                    <div className="hidden h-[88px] w-[132px] shrink-0 overflow-hidden rounded-xl bg-[var(--v2-ink-100)] sm:block">
                       <div className="flex h-full items-center justify-center text-[11px] text-[var(--v2-ink-400)]">
                         фото
                       </div>
@@ -1878,15 +1884,15 @@ export function PersonalWishesClient() {
   const current = open ? items.find((w) => w.id === open) : null;
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-16 pt-6">
-      <div className="mb-7 flex items-center justify-between gap-8">
-        <h1 className="v2-tighter text-[54px] font-light leading-none text-[var(--v2-ink-900)]">Желания</h1>
-        <div className="flex shrink-0 items-center gap-2.5">
+    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-8 pt-4 sm:px-6 lg:px-8 lg:pb-16 lg:pt-6">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 lg:mb-7 lg:flex-nowrap lg:gap-8">
+        <h1 className="v2-tighter text-[36px] font-light leading-none text-[var(--v2-ink-900)] sm:text-[44px] lg:text-[54px]">Желания</h1>
+        <div className="flex items-center gap-2 max-lg:w-full max-lg:flex-wrap lg:shrink-0 lg:gap-2.5">
           <ModeSwitch mode={mode} setMode={setMode} />
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)] max-lg:flex-1"
           >
             <V2Icons.plus className="h-4 w-4" /> Добавить желание
           </button>
@@ -1906,7 +1912,7 @@ export function PersonalWishesClient() {
 
       {mode === "visual" ? (
         <>
-          <div className="mb-7 flex flex-wrap items-center gap-2">
+          <div className="mb-5 flex items-center gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 max-sm:pb-1.5 max-sm:pt-0.5 max-sm:[scrollbar-width:none] sm:flex-wrap lg:mb-7 [&::-webkit-scrollbar]:hidden max-sm:[&>button]:shrink-0 max-sm:[&>button]:whitespace-nowrap">
             <button
               type="button"
               onClick={() => setCat("all")}
@@ -1969,7 +1975,7 @@ export function PersonalWishesClient() {
           {loading ? (
             <p className="v2-tight text-[14px] text-[var(--v2-ink-500)]">Загрузка…</p>
           ) : shown.length === 0 ? (
-            <div className="rounded-[24px] bg-white px-10 py-16 text-center shadow-[var(--v2-shadow-soft)]">
+            <div className="rounded-[24px] bg-white px-6 py-12 text-center shadow-[var(--v2-shadow-soft)] sm:px-10 sm:py-16">
               <p className="v2-tighter text-[28px] font-light text-[var(--v2-ink-900)]">
                 {nearOnly ? "Нет ближайших" : "Пока пусто"}
               </p>

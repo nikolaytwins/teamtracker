@@ -283,7 +283,7 @@ export function PersonalTransactionsClient({
 
   const quickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    const n = parseFloat(qaAmount);
+    const n = parseFloat(qaAmount.replace(/\s/g, "").replace(",", "."));
     if (!Number.isFinite(n) || n <= 0) {
       setError("Укажите сумму");
       return;
@@ -476,7 +476,7 @@ export function PersonalTransactionsClient({
               </div>
             </div>
 
-            <div className="bar-row">
+            <div className="bar-row chips">
               <button
                 type="button"
                 className={`chip${filterCat ? "" : " on"}`}
@@ -521,9 +521,9 @@ export function PersonalTransactionsClient({
             <div className="addbox">
               <form className="qa" onSubmit={(e) => void quickAdd(e)}>
                 <input
-                  type="number"
-                  min="0"
-                  step="100"
+                  type="text"
+                  inputMode="decimal"
+                  className="qa-amt tnum"
                   value={qaAmount}
                   onChange={(e) => setQaAmount(e.target.value)}
                   placeholder="Сумма ₽"
@@ -832,16 +832,16 @@ function StatementImportModal({
     .reduce((s, i) => s + i.amount_rub, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-pop)]">
-        <div className="border-b border-[var(--v2-ink-100)] px-6 py-4">
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/35 sm:items-center sm:p-4">
+      <div className="flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-[var(--v2-shadow-pop)] sm:max-h-[90vh] sm:rounded-2xl">
+        <div className="border-b border-[var(--v2-ink-100)] px-4 py-4 sm:px-6">
           <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Импорт выписки</h2>
           <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
             PDF Т-Банка («Движение средств за период») или CSV из раздела «Операции». Дубликаты пропускаются автоматически. Новые категории — кнопкой + у операции.
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           {items.length === 0 ? (
             <div
               onDragOver={(e) => {
@@ -855,7 +855,7 @@ function StatementImportModal({
                 const f = e.dataTransfer.files?.[0];
                 if (f) void parseFile(f);
               }}
-              className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-14 transition ${
+              className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-10 text-center transition sm:px-6 sm:py-14 ${
                 dragOver
                   ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)]"
                   : "border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/50"
@@ -872,7 +872,7 @@ function StatementImportModal({
                 type="button"
                 disabled={parsing}
                 onClick={() => fileRef.current?.click()}
-                className="mt-5 h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white disabled:opacity-50"
+                className="mt-5 h-11 rounded-xl bg-[var(--v2-ink-900)] px-5 text-[14px] font-medium text-white disabled:opacity-50 sm:h-9 sm:px-4 sm:text-[13px]"
               >
                 Выбрать файл
               </button>
@@ -896,7 +896,7 @@ function StatementImportModal({
                   <select
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
-                    className="mt-1 h-10 w-full max-w-sm rounded-xl border border-[var(--v2-ink-200)] px-3 text-[13px]"
+                    className="mt-1 h-11 w-full max-w-sm rounded-xl border border-[var(--v2-ink-200)] px-3 text-[16px] sm:h-10 sm:text-[13px]"
                   >
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>
@@ -917,8 +917,8 @@ function StatementImportModal({
                 </span>
               </div>
 
-              <div className="max-h-[42vh] overflow-y-auto rounded-xl border border-[var(--v2-ink-100)]">
-                <table className="w-full text-left text-[12.5px]">
+              <div className="max-h-[50dvh] overflow-auto overscroll-contain rounded-xl border border-[var(--v2-ink-100)] sm:max-h-[42vh]">
+                <table className="w-full min-w-[540px] text-left text-[12.5px] sm:min-w-0">
                   <thead className="sticky top-0 bg-[var(--v2-ink-50)] text-[11px] uppercase tracking-wide text-[var(--v2-ink-500)]">
                     <tr>
                       <th className="w-10 px-3 py-2">
@@ -966,7 +966,7 @@ function StatementImportModal({
                                   onChange={(e) => setNewCategoryName(e.target.value)}
                                   placeholder="Название категории"
                                   disabled={creatingCategory}
-                                  className="h-8 w-full rounded-lg border border-[var(--v2-brand-300)] px-2 text-[12px] outline-none ring-[var(--v2-brand-500)] focus:ring-2"
+                                  className="h-8 w-full rounded-lg border border-[var(--v2-brand-300)] px-2 text-[12px] outline-none ring-[var(--v2-brand-500)] focus:ring-2 max-sm:h-10 max-sm:text-[16px]"
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") {
                                       e.preventDefault();
@@ -1016,7 +1016,7 @@ function StatementImportModal({
                                       )
                                     );
                                   }}
-                                  className="h-8 min-w-0 max-w-[118px] flex-1 rounded-lg border border-[var(--v2-ink-200)] px-1.5 text-[12px]"
+                                  className="h-8 min-w-0 max-w-[118px] flex-1 rounded-lg border border-[var(--v2-ink-200)] px-1.5 text-[12px] max-sm:h-10 max-sm:max-w-[140px] max-sm:text-[16px]"
                                 >
                                   <option value="">—</option>
                                   {categoriesForItem(item).map((c) => (
@@ -1033,7 +1033,7 @@ function StatementImportModal({
                                     setCreatingForIdx(idx);
                                     setNewCategoryName(item.budget_category_name ?? "");
                                   }}
-                                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--v2-ink-200)] text-[var(--v2-brand-700)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)]"
+                                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--v2-ink-200)] text-[var(--v2-brand-700)] transition hover:border-[var(--v2-brand-300)] hover:bg-[var(--v2-brand-50)] max-sm:h-10 max-sm:w-10"
                                 >
                                   <V2Icons.plus className="h-3.5 w-3.5" />
                                 </button>
@@ -1077,11 +1077,11 @@ function StatementImportModal({
           {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[var(--v2-ink-100)] px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-[var(--v2-ink-100)] px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4 sm:px-6 sm:pb-4">
           <button
             type="button"
             onClick={onClose}
-            className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
+            className="h-11 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] sm:h-9"
           >
             Отмена
           </button>
@@ -1090,7 +1090,7 @@ function StatementImportModal({
               type="button"
               disabled={saving || selectedCount === 0}
               onClick={() => void commit()}
-              className="h-9 rounded-xl bg-[var(--v2-brand-600)] px-4 text-sm font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50"
+              className="h-11 flex-1 rounded-xl bg-[var(--v2-brand-600)] px-4 text-sm font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50 sm:h-9 sm:flex-none"
             >
               {saving ? "Импорт…" : `Импортировать ${selectedCount}`}
             </button>

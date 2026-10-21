@@ -134,7 +134,7 @@ function computeDirComparison(doc: BrandDoc) {
 }
 
 const fieldCls =
-  "h-9 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3 text-[13.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white v2-tight";
+  "h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3 text-[16px] sm:h-9 sm:text-[13.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white v2-tight";
 
 export function PersonalDashboardYoutubeClient() {
   const [doc, setDoc] = useState<BrandDoc | null>(null);
@@ -262,11 +262,11 @@ export function PersonalDashboardYoutubeClient() {
     "minmax(220px,1.4fr) 150px 88px 88px 68px 68px 68px 150px minmax(160px,1fr)";
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6">
+    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-12 pt-4 sm:px-8 sm:pb-24 sm:pt-6">
       <div className="mx-auto max-w-[1320px]">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-          <div className="min-w-[240px] max-w-[680px] flex-1">
-            <h1 className="v2-tighter text-[42px] font-light leading-none text-[var(--v2-ink-900)]">YouTube Lab</h1>
+          <div className="min-w-0 max-w-[680px] flex-1 sm:min-w-[240px]">
+            <h1 className="v2-tighter text-[32px] font-light leading-none sm:text-[42px] text-[var(--v2-ink-900)]">YouTube Lab</h1>
             <p
               className="v2-tight mt-3 text-[15px] leading-relaxed text-[var(--v2-ink-500)]"
               style={{ textWrap: "pretty" }}
@@ -282,7 +282,7 @@ export function PersonalDashboardYoutubeClient() {
                 key={f.id}
                 type="button"
                 onClick={() => setFilter(f.id)}
-                className={`v2-tight h-8 rounded-full px-3.5 text-[12.5px] font-medium transition ${
+                className={`v2-tight h-9 rounded-full px-3.5 text-[12.5px] font-medium transition sm:h-8 ${
                   filter === f.id
                     ? "bg-[var(--v2-ink-900)] text-white"
                     : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
@@ -306,12 +306,12 @@ export function PersonalDashboardYoutubeClient() {
               }
             }}
             placeholder="Быстро добавить ролик — название"
-            className={`${fieldCls} max-w-[420px] flex-1 border-0 bg-transparent px-1 focus:bg-transparent`}
+            className={`${fieldCls} min-w-0 basis-[calc(100%-28px)] max-w-[420px] flex-1 border-0 sm:basis-auto bg-transparent px-1 focus:bg-transparent`}
           />
           <select
             value={quickDir}
             onChange={(e) => setQuickDir(e.target.value)}
-            className="v2-tight h-9 cursor-pointer appearance-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3 text-[12.5px] text-[var(--v2-ink-700)] outline-none"
+            className="v2-tight h-11 min-w-0 flex-1 cursor-pointer appearance-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3 text-[16px] sm:h-9 sm:flex-none sm:text-[12.5px] text-[var(--v2-ink-700)] outline-none"
           >
             {doc.dirs.map((d) => (
               <option key={d.id} value={d.id}>
@@ -323,7 +323,7 @@ export function PersonalDashboardYoutubeClient() {
             type="button"
             onClick={() => void quickAdd()}
             disabled={!quickTitle.trim()}
-            className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-40"
+            className="v2-tight h-11 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] sm:h-9 font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-40"
           >
             Добавить
           </button>
@@ -335,8 +335,10 @@ export function PersonalDashboardYoutubeClient() {
               className="grid gap-4 border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/60 px-6 py-3.5"
               style={{ gridTemplateColumns: grid }}
             >
-              {["Название", "Направление", "Дата", "Views", "CTR", "Avg %", "Subs", "Сигнал", "Вывод"].map((h) => (
-                <BK key={h}>{h}</BK>
+              {["Название", "Направление", "Дата", "Views", "CTR", "Avg %", "Subs", "Сигнал", "Вывод"].map((h, i) => (
+                <span key={h} className={i ? undefined : "max-md:sticky max-md:left-0 max-md:z-[1] max-md:-ml-6 max-md:bg-[#fcfcfc] max-md:pl-6"}>
+                  <BK>{h}</BK>
+                </span>
               ))}
             </div>
 
@@ -346,7 +348,7 @@ export function PersonalDashboardYoutubeClient() {
                 className="grid items-center gap-4 border-b border-[var(--v2-ink-100)] px-6 py-3.5 last:border-0 hover:bg-[var(--v2-ink-50)]/40"
                 style={{ gridTemplateColumns: grid }}
               >
-                <div className="min-w-0">
+                <div className="min-w-0 max-md:sticky max-md:left-0 max-md:z-[1] max-md:-ml-6 max-md:bg-white max-md:pl-6">
                   <EditableText
                     editing={editing?.id === v.id && editing.field === "title"}
                     value={v.title}
@@ -371,7 +373,7 @@ export function PersonalDashboardYoutubeClient() {
                 <select
                   value={v.dir}
                   onChange={(e) => void patchVideo(v.id, { dir: e.target.value })}
-                  className="v2-tight h-8 w-full cursor-pointer appearance-none rounded-lg border-0 bg-transparent py-0 pl-0 text-[12.5px] text-[var(--v2-ink-600)] outline-none hover:text-[var(--v2-ink-900)]"
+                  className="v2-tight h-8 w-full cursor-pointer appearance-none rounded-lg border-0 bg-transparent py-0 pl-0 text-[16px] text-[var(--v2-ink-600)] outline-none md:text-[12.5px] hover:text-[var(--v2-ink-900)]"
                   title={dirName(v.dir)}
                 >
                   {doc.dirs.map((d) => (
@@ -489,9 +491,9 @@ export function PersonalDashboardYoutubeClient() {
           </div>
           {dirStats.length ? (
             <>
-              <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px,1fr))" }}>
+              <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(260px,100%),1fr))" }}>
                 {dirStats.map((s) => (
-                  <div key={s.dir} className="rounded-[20px] bg-white px-6 py-5 shadow-[var(--v2-shadow-card)]">
+                  <div key={s.dir} className="rounded-[20px] bg-white px-5 py-5 sm:px-6 shadow-[var(--v2-shadow-card)]">
                     <h3 className="v2-tight text-[16px] font-medium text-[var(--v2-ink-900)]">{s.name}</h3>
                     <p className="v2-tnum mt-1 text-[12px] text-[var(--v2-ink-400)]">
                       {s.videos} {s.videos === 1 ? "ролик" : s.videos < 5 ? "ролика" : "роликов"}
@@ -567,12 +569,12 @@ function EditableText({
           if (e.key === "Enter") onCommit(draft);
           if (e.key === "Escape") onCancel();
         }}
-        className="v2-tight h-8 w-full rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 text-[13px] outline-none"
+        className="v2-tight h-10 w-full rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 text-[16px] outline-none sm:h-8 sm:text-[13px]"
       />
     );
   }
   return (
-    <button type="button" onClick={onStart} className={`block w-full truncate text-left ${className ?? ""}`}>
+    <button type="button" onClick={onStart} className={`block w-full truncate text-left max-md:py-1.5 ${className ?? ""}`}>
       {display ?? value}
     </button>
   );
@@ -614,7 +616,7 @@ function EditableMetric({
           if (e.key === "Enter") onCommit(parseNum(draft));
           if (e.key === "Escape") onCancel();
         }}
-        className="v2-tnum h-8 w-full rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 text-[13px] outline-none"
+        className="v2-tnum h-10 w-full rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 text-[16px] outline-none sm:h-8 sm:text-[13px]"
       />
     );
   }
@@ -622,7 +624,7 @@ function EditableMetric({
     <button
       type="button"
       onClick={onStart}
-      className={`v2-tnum block w-full text-left text-[12.5px] transition hover:text-[var(--v2-brand-700)] ${
+      className={`v2-tnum block w-full text-left text-[12.5px] transition max-md:py-2 hover:text-[var(--v2-brand-700)] ${
         strong ? "font-medium text-[var(--v2-ink-900)]" : "text-[var(--v2-ink-700)]"
       }`}
     >

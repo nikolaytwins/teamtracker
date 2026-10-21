@@ -38,3 +38,52 @@
   height:40px;padding:0 14px;border-radius:11px;border:none;background:var(--brand-600);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;
 }
 .ideas-tasks-v3 .qa .proj-create button:disabled{opacity:.4}
+
+@media (hover:none){
+  .ideas-tasks-v3 .tip:hover::after{display:none}
+  .ideas-tasks-v3 .note-acts{opacity:1}
+  .ideas-tasks-v3 .note-t{padding-right:76px}
+  .ideas-tasks-v3 .note:hover,.ideas-tasks-v3 .idea:hover{transform:none}
+  .ideas-tasks-v3 .idea{cursor:pointer}
+}
+@media (max-width:1023px){
+  .ideas-tasks-v3 .scrim{z-index:94}
+  .ideas-tasks-v3 .drawer{z-index:95}
+  .ideas-tasks-v3 .toast{bottom:calc(var(--v2-mobnav-h,0px) + 12px)}
+  .ideas-tasks-v3 .kb{scroll-snap-type:x mandatory}
+  .ideas-tasks-v3 .col{scroll-snap-align:start}
+}
+@media (max-width:640px){
+  .ideas-tasks-v3 .page{padding-left:12px;padding-right:12px;padding-bottom:28px;gap:16px}
+  .ideas-tasks-v3 .pad{padding:16px 14px}
+  .ideas-tasks-v3 .bar{gap:8px}
+  .ideas-tasks-v3 .bar .seg{order:0}
+  .ideas-tasks-v3 .bar .qa-add{order:1;height:44px}
+  .ideas-tasks-v3 .bar .search{order:2;flex:1 1 100%;width:auto;font-size:16px}
+  .ideas-tasks-v3 .bar .sortsel{order:3;flex:1 1 0;min-width:0;font-size:16px}
+  .ideas-tasks-v3 .seg button{padding:10px 16px}
+  .ideas-tasks-v3 .qa input[type=text]{min-width:0;flex:1 1 100%;height:48px}
+  .ideas-tasks-v3 .qa select{flex:1 1 0;min-width:0;height:48px;font-size:16px}
+  .ideas-tasks-v3 .qa button{flex:1 1 100%;height:48px}
+  .ideas-tasks-v3 .ideas-lead{font-size:14.5px;margin-bottom:14px}
+  .ideas-tasks-v3 .grp{margin-bottom:20px}
+  .ideas-tasks-v3 .grp-n{font-size:17px}
+  .ideas-tasks-v3 .notes{grid-template-columns:minmax(0,1fr);gap:10px}
+  .ideas-tasks-v3 .note{padding:18px 16px 14px;min-height:0;border-radius:18px}
+  .ideas-tasks-v3 .note-t{font-size:17px;padding-right:84px}
+  .ideas-tasks-v3 .note-acts{opacity:1;right:10px;top:10px}
+  .ideas-tasks-v3 .note-act{width:38px;height:38px}
+  .ideas-tasks-v3 .kb{margin:0 -12px;padding:4px 12px 14px;scroll-padding:0 12px;gap:10px}
+  .ideas-tasks-v3 .col{flex:0 0 84vw;padding:14px 12px}
+  .ideas-tasks-v3 .col-add{min-height:44px}
+  .ideas-tasks-v3 .drawer{width:100vw;max-width:100vw}
+  .ideas-tasks-v3 .dr-h{padding:calc(14px + env(safe-area-inset-top,0px)) 16px 12px;justify-content:space-between}
+  .ideas-tasks-v3 .dr-b{padding:16px;gap:16px}
+  .ideas-tasks-v3 .dr-f{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+  .ideas-tasks-v3 .dr-f .btn{flex:1 1 auto}
+  .ideas-tasks-v3 .fld input,.ideas-tasks-v3 .fld select,.ideas-tasks-v3 .fld textarea{font-size:16px}
+  .ideas-tasks-v3 .fld2{grid-template-columns:minmax(0,1fr);gap:12px}
+  .ideas-tasks-v3 .dr-act{min-height:48px}
+  .ideas-tasks-v3 .toast{left:12px;right:12px;transform:translateY(180%);font-size:14px;padding:12px 14px}
+  .ideas-tasks-v3 .toast.on{transform:none}
+}

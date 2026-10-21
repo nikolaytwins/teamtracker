@@ -12,8 +12,8 @@ export function DispatchPagePlaceholder({
   apiHint,
 }: DispatchPagePlaceholderProps) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-6 py-8">
-      <div className="mx-auto w-full max-w-2xl rounded-2xl border border-[var(--v2-ink-100)] bg-white p-8 shadow-sm">
+    <div className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 sm:py-8">
+      <div className="mx-auto w-full max-w-2xl rounded-2xl border border-[var(--v2-ink-100)] bg-white p-5 shadow-sm sm:p-8">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-brand-600)]">
           Sofia dispatch
         </p>
@@ -24,7 +24,7 @@ export function DispatchPagePlaceholder({
           после макета — существующие страницы «Агентство» и канбан не затронуты.
         </p>
         {apiHint ? (
-          <p className="mt-3 font-mono text-[12px] text-[var(--v2-ink-500)]">{apiHint}</p>
+          <p className="mt-3 break-all font-mono text-[12px] text-[var(--v2-ink-500)]">{apiHint}</p>
         ) : null}
       </div>
     </div>

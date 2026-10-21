@@ -56,17 +56,17 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
 
   return (
     <div>
-      <div className="mb-6">
-        <Link href={appPath(paths.listHref)} className="text-sm font-medium text-[var(--primary)] hover:underline">
+      <div className="mb-4 sm:mb-6">
+        <Link href={appPath(paths.listHref)} className="text-sm font-medium text-[var(--primary)] hover:underline max-sm:inline-flex max-sm:min-h-10 max-sm:items-center">
           ← Назад к проектам
         </Link>
       </div>
 
       <div className="max-w-2xl">
-        <h1 className="text-2xl font-bold text-[var(--text)] mb-6">Новый проект</h1>
+        <h1 className="text-2xl font-bold text-[var(--text)] mb-4 sm:mb-6">Новый проект</h1>
 
-        <div className="bg-[var(--surface)] shadow-[var(--shadow-card)] rounded-lg p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-[var(--surface)] shadow-[var(--shadow-card)] rounded-lg p-4 sm:p-6">
+          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
                 {error}
@@ -95,6 +95,7 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
                   id="totalAmount"
                   name="totalAmount"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   required
                   className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
@@ -109,6 +110,7 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
                   id="paidAmount"
                   name="paidAmount"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   defaultValue="0"
                   className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
@@ -136,17 +138,17 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
 
             <div>
               <span className="block text-sm font-medium text-[var(--text)] mb-1">Направление *</span>
-              <div className="flex flex-wrap gap-4">
-                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
-                  <input type="radio" name="businessLine" value="agency" defaultChecked />
+              <div className="flex flex-wrap gap-4 max-sm:gap-x-5 max-sm:gap-y-1">
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)] max-sm:min-h-10">
+                  <input type="radio" name="businessLine" value="agency" defaultChecked className="max-sm:h-5 max-sm:w-5" />
                   Агентство
                 </label>
-                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
-                  <input type="radio" name="businessLine" value="impulse" />
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)] max-sm:min-h-10">
+                  <input type="radio" name="businessLine" value="impulse" className="max-sm:h-5 max-sm:w-5" />
                   Импульс
                 </label>
-                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
-                  <input type="radio" name="businessLine" value="qmagic" />
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)] max-sm:min-h-10">
+                  <input type="radio" name="businessLine" value="qmagic" className="max-sm:h-5 max-sm:w-5" />
                   Qmagic
                 </label>
               </div>
@@ -208,7 +210,7 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
                 id="deadline"
                 name="deadline"
                 type="date"
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
+                className="w-full max-sm:min-h-[42px] max-sm:min-w-0 px-3 py-2 border border-[var(--border)] rounded-md focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)]"
               />
             </div>
 
@@ -237,17 +239,17 @@ export function NewAgencyProjectClient({ variant }: { variant: AgencyFinanceVari
               />
             </div>
 
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end">
               <Link
                 href={appPath(paths.listHref)}
-                className="px-4 py-2 border border-[var(--border)] rounded-md text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
+                className="px-4 py-2 border border-[var(--border)] rounded-md text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)] max-sm:py-3 max-sm:text-center max-sm:text-base"
               >
                 Отмена
               </Link>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-[var(--primary)] text-white rounded-md text-sm font-medium hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-[var(--primary)] text-white rounded-md text-sm font-medium hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed max-sm:py-3 max-sm:text-base"
               >
                 {loading ? 'Создание...' : 'Создать проект'}
               </button>

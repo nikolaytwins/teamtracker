@@ -47,29 +47,44 @@ export function CommandPalette({
   const hasResults = results.tasks.length > 0 || results.projects.length > 0;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/30 pt-[15vh]">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/30 px-2 pt-[calc(8px+env(safe-area-inset-top))] sm:px-0 sm:pt-[15vh]">
       <button type="button" className="absolute inset-0" onClick={onClose} aria-label="Закрыть" />
-      <div className="relative w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
-        <input
-          autoFocus
-          className="v2-input text-base"
-          placeholder="Найти задачу или проект…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && trimmed && onCreateTask) {
-              e.preventDefault();
-              onCreateTask(trimmed);
-              onClose();
-            }
-          }}
-        />
-        <ul className="mt-3 max-h-64 overflow-y-auto text-sm">
+      <div className="relative flex h-[calc(100dvh-16px-env(safe-area-inset-top))] w-full max-w-lg flex-col rounded-2xl bg-white p-3 shadow-2xl sm:block sm:h-auto sm:p-4">
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            enterKeyHint="go"
+            className="v2-input text-base max-sm:min-h-12 max-sm:!text-[16px]"
+            placeholder="Найти задачу или проект…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                onClose();
+                return;
+              }
+              if (e.key === "Enter" && trimmed && onCreateTask) {
+                e.preventDefault();
+                onCreateTask(trimmed);
+                onClose();
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-12 shrink-0 rounded-lg px-2 text-[15px] font-medium text-[var(--v2-brand-700)] sm:hidden"
+          >
+            Отмена
+          </button>
+        </div>
+        <ul className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain text-[15px] sm:max-h-64 sm:flex-none sm:text-sm">
           {onCreateTask ? (
             <li>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left font-medium text-[var(--v2-brand-700)] hover:bg-[var(--v2-brand-50)]"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left sm:py-2.5 font-medium text-[var(--v2-brand-700)] hover:bg-[var(--v2-brand-50)]"
                 onClick={() => {
                   onCreateTask(trimmed);
                   onClose();
@@ -84,7 +99,7 @@ export function CommandPalette({
             <li key={t.id}>
               <button
                 type="button"
-                className="w-full rounded-lg px-3 py-2 text-left hover:bg-[var(--v2-ink-50)]"
+                className="w-full rounded-lg px-3 py-3 text-left hover:bg-[var(--v2-ink-50)] sm:py-2"
                 onClick={() => {
                   onClose();
                   router.push(appPath("/v2/home"));
@@ -98,7 +113,7 @@ export function CommandPalette({
             <li key={p.id}>
               <button
                 type="button"
-                className="w-full rounded-lg px-3 py-2 text-left hover:bg-[var(--v2-ink-50)]"
+                className="w-full rounded-lg px-3 py-3 text-left hover:bg-[var(--v2-ink-50)] sm:py-2"
                 onClick={() => {
                   onClose();
                   router.push(appPath(`/v2/projects?project=${p.id}`));

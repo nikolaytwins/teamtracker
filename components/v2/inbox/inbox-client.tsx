@@ -93,7 +93,7 @@ export function V2InboxClient() {
   }
 
   return (
-    <div className="px-7 py-6">
+    <div className="px-3 py-4 sm:px-7 sm:py-6">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="v2-tighter text-[32px] font-semibold tracking-tight text-[var(--v2-ink-900)]">Входящие</h1>

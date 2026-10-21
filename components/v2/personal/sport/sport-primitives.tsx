@@ -44,7 +44,7 @@ export function SpSect({
 }) {
   return (
     <section id={id} style={{ scrollMarginTop: 24 }}>
-      <div className="mb-3 flex items-center gap-2.5 px-0.5">
+      <div className="mb-3 flex items-center gap-2.5 px-0.5 max-lg:flex-wrap max-lg:gap-y-1">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: accent }} />
         <h2 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">{title}</h2>
         {hint ? <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">{hint}</span> : null}
@@ -85,7 +85,7 @@ export function SpInp({
       onChange={(e) => onChange(e.target.value)}
       placeholder={ph}
       onKeyDown={onKeyDown}
-      className={`rounded-lg border border-transparent bg-transparent px-2 py-1.5 -mx-1 text-[var(--v2-ink-900)] outline-none transition hover:border-[var(--v2-ink-200)] hover:bg-[var(--v2-ink-50)]/60 focus:border-[var(--v2-brand-400)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,111,247,0.10)] ${mono ? "v2-tnum" : ""} ${bold ? "font-semibold" : ""} ${className}`}
+      className={`rounded-lg border border-transparent bg-transparent px-2 py-1.5 -mx-1 text-[var(--v2-ink-900)] outline-none transition hover:border-[var(--v2-ink-200)] hover:bg-[var(--v2-ink-50)]/60 focus:border-[var(--v2-brand-400)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,111,247,0.10)] max-lg:text-[16px]! ${mono ? "v2-tnum" : ""} ${bold ? "font-semibold" : ""} ${className}`}
       style={{ width: w, textAlign: align, fontSize: size }}
     />
   );
@@ -110,7 +110,7 @@ export function SpArea({
       onChange={(e) => onChange(e.target.value)}
       placeholder={ph}
       rows={rows}
-      className={`w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-1.5 -mx-1 text-[13.5px] leading-[1.5] text-[var(--v2-ink-700)] outline-none transition hover:border-[var(--v2-ink-200)] hover:bg-[var(--v2-ink-50)]/60 focus:border-[var(--v2-brand-400)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,111,247,0.10)] ${className}`}
+      className={`w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-1.5 -mx-1 text-[13.5px] leading-[1.5] text-[var(--v2-ink-700)] outline-none transition hover:border-[var(--v2-ink-200)] hover:bg-[var(--v2-ink-50)]/60 focus:border-[var(--v2-brand-400)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,111,247,0.10)] max-lg:text-[16px]! ${className}`}
     />
   );
 }
@@ -155,7 +155,7 @@ export function SpChip({
 }) {
   return (
     <span
-      className={`inline-flex h-[26px] items-center gap-1 whitespace-nowrap rounded-lg px-2.5 text-[12.5px] font-medium v2-tnum ${className}`}
+      className={`inline-flex h-[26px] items-center gap-1 whitespace-nowrap rounded-lg px-2.5 text-[12.5px] font-medium v2-tnum max-lg:h-auto max-lg:min-h-[32px] ${className}`}
       style={{ color: tint, background: bg }}
     >
       {children}

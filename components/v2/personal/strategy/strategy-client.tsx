@@ -48,11 +48,11 @@ export function StrategyClient() {
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="relative overflow-hidden border-b border-[var(--v2-ink-100)] bg-gradient-to-br from-[var(--v2-brand-600)] via-[var(--v2-brand-500)] to-[#1F3AAF]">
         <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,.35),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,.2),transparent_40%)]" />
-        <div className="relative mx-auto max-w-[1180px] px-6 py-10 lg:px-10">
+        <div className="relative mx-auto max-w-[1180px] px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
             Личный план
           </p>
-          <h1 className="v2-tighter mt-2 text-[40px] font-bold leading-none text-white sm:text-[48px]">
+          <h1 className="v2-tighter mt-2 text-[34px] font-bold leading-none text-white sm:text-[48px]">
             База данных
           </h1>
           <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-white/80">
@@ -61,7 +61,7 @@ export function StrategyClient() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1180px] px-6 py-8 lg:px-10">
+      <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
         {error ? (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
             {error}
@@ -84,7 +84,7 @@ export function StrategyClient() {
                     key={t.key}
                     type="button"
                     onClick={() => setTag(t.key)}
-                    className={`h-8 rounded-full px-3 text-[12.5px] font-semibold transition ${
+                    className={`h-10 rounded-full px-3.5 text-[13px] sm:h-8 sm:px-3 sm:text-[12.5px] font-semibold transition ${
                       active
                         ? "bg-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]"
                         : "bg-white text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)] hover:text-[var(--v2-ink-900)]"
@@ -130,7 +130,7 @@ export function StrategyClient() {
                     <h3 className="v2-tight text-[16px] font-bold leading-snug text-[var(--v2-ink-900)] group-hover:text-[var(--v2-brand-700)]">
                       {article.title}
                     </h3>
-                    <p className="v2-tight mt-2 line-clamp-3 text-[12.5px] leading-relaxed text-[var(--v2-ink-500)]">
+                    <p className="v2-tight mt-2 line-clamp-3 text-[14px] sm:text-[12.5px] leading-relaxed text-[var(--v2-ink-500)]">
                       {article.excerpt}
                     </p>
                     <p className="mt-3 text-[12px] font-semibold text-[var(--v2-brand-600)]">

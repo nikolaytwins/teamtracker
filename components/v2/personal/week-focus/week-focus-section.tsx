@@ -42,7 +42,7 @@ function FocusEditForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Что главное на этой неделе"
-          className="v2-tight h-11 rounded-xl border-[1.5px] border-[var(--v2-ink-200)] bg-white px-3.5 text-[15px] outline-none focus:border-[var(--v2-brand-500)]"
+          className="v2-tight h-11 rounded-xl border-[1.5px] border-[var(--v2-ink-200)] bg-white px-3.5 text-[16px] outline-none focus:border-[var(--v2-brand-500)]"
           autoFocus
           onKeyDown={(e) => {
             if (e.key === "Enter") e.preventDefault();
@@ -56,7 +56,7 @@ function FocusEditForm({
           onChange={(e) => setNote(e.target.value)}
           placeholder="Детали, дедлайн, ссылка на контекст…"
           rows={3}
-          className="v2-tight min-h-[84px] w-full resize-y rounded-xl border-[1.5px] border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[14px] leading-relaxed outline-none focus:border-[var(--v2-brand-500)]"
+          className="v2-tight min-h-[84px] w-full resize-y rounded-xl border-[1.5px] border-[var(--v2-ink-200)] bg-white px-3.5 py-2.5 text-[16px] leading-relaxed outline-none sm:text-[14px] focus:border-[var(--v2-brand-500)]"
         />
       </div>
       <div className="flex gap-2">
@@ -105,7 +105,7 @@ function FocusSlot({
   if (mode === "add" || (mode === "edit" && goal)) {
     return (
       <div
-        className={`rounded-2xl px-5 py-4 ${
+        className={`rounded-2xl px-4 py-4 sm:px-5 ${
           variant === "hero"
             ? isMain
               ? "text-white"
@@ -143,7 +143,7 @@ function FocusSlot({
   if (!goal) {
     return (
       <div
-        className={`rounded-2xl px-5 py-5 ${
+        className={`rounded-2xl px-4 py-5 sm:px-5 ${
           variant === "hero"
             ? isMain
               ? "border border-dashed border-white/35 bg-white/8 text-white"
@@ -186,7 +186,7 @@ function FocusSlot({
 
   return (
     <div
-      className={`group relative rounded-2xl px-5 py-[18px] transition ${
+      className={`group relative rounded-2xl px-4 py-4 transition sm:px-5 sm:py-[18px] ${
         variant === "hero"
           ? done
             ? "bg-[#1a3fb8] text-white"
@@ -221,7 +221,7 @@ function FocusSlot({
       </p>
       {goal.note ? (
         <p
-          className={`v2-tight mt-1 text-[13.5px] ${
+          className={`v2-tight mt-1 text-[15px] sm:text-[13.5px] ${
             variant === "hero" || done ? "text-white/70" : "text-[var(--v2-ink-500)]"
           }`}
         >
@@ -232,7 +232,7 @@ function FocusSlot({
         <button
           type="button"
           onClick={() => void onToggle(goal)}
-          className={`v2-tight rounded-lg px-2.5 py-1 text-[12.5px] font-medium transition ${
+          className={`v2-tight min-h-10 rounded-lg px-3 py-1 text-[13px] font-medium transition sm:min-h-0 sm:px-2.5 sm:text-[12.5px] ${
             variant === "hero" || done
               ? "bg-white/15 text-white hover:bg-white/25"
               : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-700)] hover:bg-[var(--v2-ink-200)]"
@@ -243,7 +243,7 @@ function FocusSlot({
         <button
           type="button"
           onClick={() => setMode("edit")}
-          className={`v2-tight rounded-lg px-2.5 py-1 text-[12.5px] font-medium transition ${
+          className={`v2-tight min-h-10 rounded-lg px-3 py-1 text-[13px] font-medium transition sm:min-h-0 sm:px-2.5 sm:text-[12.5px] ${
             variant === "hero" || done
               ? "bg-white/15 text-white hover:bg-white/25"
               : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-700)] hover:bg-[var(--v2-ink-200)]"
@@ -254,7 +254,7 @@ function FocusSlot({
         <button
           type="button"
           onClick={() => void onRemove(goal.id)}
-          className={`v2-tight rounded-lg px-2.5 py-1 text-[12.5px] font-medium transition ${
+          className={`v2-tight min-h-10 rounded-lg px-3 py-1 text-[13px] font-medium transition sm:min-h-0 sm:px-2.5 sm:text-[12.5px] ${
             variant === "hero" || done
               ? "bg-white/15 text-white hover:bg-white/25"
               : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-700)] hover:bg-[var(--v2-ink-200)]"
@@ -285,12 +285,12 @@ export function WeekFocusSection({
   const heading = weekFocusHeading(weekOffset, focus?.label ?? "");
 
   const nav = (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center justify-between gap-2 sm:justify-start">
       <button
         type="button"
         disabled={weekOffset <= -12}
         onClick={() => onWeekOffsetChange(weekOffset - 1)}
-        className={`inline-flex h-[38px] w-[38px] items-center justify-center rounded-xl border-[1.5px] text-[16px] transition disabled:opacity-35 ${
+        className={`inline-flex h-10 w-10 sm:h-[38px] sm:w-[38px] items-center justify-center rounded-xl border-[1.5px] text-[16px] transition disabled:opacity-35 ${
           variant === "hero"
             ? "border-white/30 bg-white/10 text-white hover:bg-white/18"
             : "border-[var(--v2-ink-200)] bg-white text-[var(--v2-ink-600)] hover:border-[var(--v2-brand-500)] hover:text-[var(--v2-brand-600)]"
@@ -300,7 +300,7 @@ export function WeekFocusSection({
         ‹
       </button>
       <span
-        className={`v2-tnum min-w-[170px] text-center text-[16px] font-semibold tracking-[-0.02em] ${
+        className={`v2-tnum min-w-0 text-center text-[15px] sm:min-w-[170px] sm:text-[16px] font-semibold tracking-[-0.02em] ${
           variant === "hero" ? "text-white" : "text-[var(--v2-ink-900)]"
         }`}
       >
@@ -310,7 +310,7 @@ export function WeekFocusSection({
         type="button"
         disabled={weekOffset >= 12}
         onClick={() => onWeekOffsetChange(weekOffset + 1)}
-        className={`inline-flex h-[38px] w-[38px] items-center justify-center rounded-xl border-[1.5px] text-[16px] transition disabled:opacity-35 ${
+        className={`inline-flex h-10 w-10 sm:h-[38px] sm:w-[38px] items-center justify-center rounded-xl border-[1.5px] text-[16px] transition disabled:opacity-35 ${
           variant === "hero"
             ? "border-white/30 bg-white/10 text-white hover:bg-white/18"
             : "border-[var(--v2-ink-200)] bg-white text-[var(--v2-ink-600)] hover:border-[var(--v2-brand-500)] hover:text-[var(--v2-brand-600)]"
@@ -344,7 +344,7 @@ export function WeekFocusSection({
     return (
       <section className="relative overflow-hidden rounded-[20px] bg-[#1e4fd4] text-white">
         <div className="relative z-[1] grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
-          <div className="px-7 py-7 lg:px-8 lg:py-8">
+          <div className="px-4 py-5 sm:px-7 sm:py-7 lg:px-8 lg:py-8">
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-white/55">
                 Фокус недели
@@ -358,9 +358,9 @@ export function WeekFocusSection({
               >
                 {badge}
               </span>
-              <div className="ml-auto">{nav}</div>
+              <div className="w-full sm:ml-auto sm:w-auto">{nav}</div>
             </div>
-            <h1 className="v2-tight mb-5 text-[34px] font-semibold leading-[1.08] tracking-[-0.032em] text-white">
+            <h1 className="v2-tight mb-5 text-[26px] font-semibold leading-[1.08] sm:text-[34px] tracking-[-0.032em] text-white">
               {heading}
             </h1>
             {error ? <p className="v2-tight mb-3 text-[13px] text-red-200">{error}</p> : null}
@@ -383,7 +383,7 @@ export function WeekFocusSection({
   }
 
   return (
-    <section className="v2-card px-7 py-6">
+    <section className="v2-card px-4 py-5 sm:px-7 sm:py-6">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h2 className="v2-tight text-[24px] font-semibold tracking-[-0.028em] text-[var(--v2-ink-900)]">
           Фокус недели
@@ -397,7 +397,7 @@ export function WeekFocusSection({
         >
           {badge}
         </span>
-        <div className="ml-auto">{nav}</div>
+        <div className="w-full sm:ml-auto sm:w-auto">{nav}</div>
       </div>
       {error ? <p className="v2-tight mb-3 text-[13px] text-red-600">{error}</p> : null}
       {slots}

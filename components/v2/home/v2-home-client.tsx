@@ -221,6 +221,23 @@ export function V2HomeClient() {
     [dragId, movingTask, findTaskById, clearDrag]
   );
 
+  const moveTaskToBucket = useCallback(
+    async (taskId: string, bucket: V2TaskBucket) => {
+      if (movingTask || !canDropTaskOnHomeBucket(bucket)) return;
+      setMovingTask(true);
+      setError(null);
+      try {
+        await moveHomeTaskToBucket(taskId, bucket, findTaskById);
+        await reloadRef.current();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Не удалось перенести задачу");
+      } finally {
+        setMovingTask(false);
+      }
+    },
+    [movingTask, findTaskById]
+  );
+
   const filteredGroups = useMemo(() => {
     const unassignedIds = canViewUnassigned ? new Set(unassignedTasks.map((t) => t.id)) : new Set<string>();
     const next: Record<string, V2TaskWithMeta[]> = {};
@@ -305,6 +322,7 @@ export function V2HomeClient() {
     onToggleRun: toggleTimer,
     onToggleDone: toggleComplete,
     onOpenTask: setDrawerTaskId,
+    onMoveToBucket: (taskId: string, bucket: V2TaskBucket) => void moveTaskToBucket(taskId, bucket),
   };
 
   if (loading || bootLoading || !viewHydrated) {
@@ -321,7 +339,7 @@ export function V2HomeClient() {
         onOpenTask={setDrawerTaskId}
       />
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1180px] px-10 pb-24 pt-8">
+        <div className="mx-auto max-w-[1180px] px-3 pb-10 pt-4 sm:px-6 sm:pt-6 lg:px-10 lg:pb-24 lg:pt-8">
           {error ? (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
           ) : null}
@@ -346,7 +364,7 @@ export function V2HomeClient() {
             urgentToday={urgentTodayCount}
           />
 
-          <div className="mt-9">
+          <div className="mt-6 lg:mt-9">
             <ChipBar
               projectFilter={projectFilter}
               setProjectFilter={setProjectFilter}
@@ -400,9 +418,9 @@ export function V2HomeClient() {
             )}
           </div>
 
-          <div className="mt-12 flex items-center justify-between rounded-2xl bg-white/60 p-5 shadow-[var(--v2-shadow-card)] backdrop-blur">
+          <div className="mt-8 flex flex-col items-stretch gap-4 rounded-2xl bg-white/60 p-4 shadow-[var(--v2-shadow-card)] backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:p-5 lg:mt-12">
             <div className="flex items-center gap-3">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--v2-brand-500)] to-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]">
+              <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--v2-brand-500)] to-[var(--v2-brand-600)] text-white shadow-[var(--v2-shadow-glow)]">
                 <V2Icons.spark className="h-[18px] w-[18px]" />
               </div>
               <div>
@@ -414,7 +432,7 @@ export function V2HomeClient() {
             </div>
             <button
               type="button"
-              className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
+              className="v2-tight h-11 shrink-0 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[14px] sm:h-9 sm:text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
             >
               Открыть планировщик
             </button>

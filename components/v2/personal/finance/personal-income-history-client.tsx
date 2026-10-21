@@ -121,6 +121,7 @@ function EditableMoneyCell({
     return (
       <input
         ref={inputRef}
+        autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => void commit()}
@@ -133,7 +134,7 @@ function EditableMoneyCell({
             setEditing(false);
           }
         }}
-        className="v2-tnum w-full rounded-md border border-[var(--v2-brand-300)] bg-white px-2 py-1 text-right text-[13.5px] font-medium text-[var(--v2-ink-900)] outline-none ring-2 ring-[var(--v2-brand-100)]"
+        className="v2-tnum w-full min-w-0 rounded-md border border-[var(--v2-brand-300)] bg-white px-2 py-1 text-right text-[13.5px] font-medium text-[var(--v2-ink-900)] outline-none ring-2 ring-[var(--v2-brand-100)] max-md:py-2 max-md:text-[16px]"
         inputMode="numeric"
       />
     );
@@ -146,7 +147,7 @@ function EditableMoneyCell({
       type="button"
       onClick={() => setEditing(true)}
       disabled={saving}
-      className={`v2-tnum w-full rounded-md px-2 py-1 text-right text-[13.5px] transition hover:bg-[var(--v2-ink-50)] ${
+      className={`v2-tnum w-full rounded-md px-2 py-1 text-right text-[13.5px] transition hover:bg-[var(--v2-ink-50)] max-md:py-2.5 max-md:text-[14.5px] ${
         saving ? "opacity-60" : ""
       } ${
         empty
@@ -213,13 +214,22 @@ function YearCurrentHeader({
   monthCount: number;
 }) {
   return (
-    <div className="flex items-center gap-3 border-b border-[var(--v2-brand-100)] bg-[var(--v2-brand-50)]/50 px-5 py-3.5">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--v2-brand-100)] bg-[var(--v2-brand-50)]/50 px-4 py-3.5 sm:flex-nowrap sm:px-5">
       <span className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">{year}</span>
       <span className="rounded-md bg-[var(--v2-brand-100)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--v2-brand-700)]">
         текущий
       </span>
       {yearDelta != null ? <YearDeltaLine delta={yearDelta} partial={partialYear} /> : null}
       <span className="ml-auto text-[12px] text-[var(--v2-ink-400)]">{monthCount} мес.</span>
+    </div>
+  );
+}
+
+function HistoryCell({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-1 rounded-lg bg-[var(--v2-ink-50)]/70 pl-2.5 max-md:min-h-11 md:block md:rounded-none md:bg-transparent md:pl-0">
+      <span className="shrink-0 text-[11px] text-[var(--v2-ink-400)] md:hidden">{label}</span>
+      {children}
     </div>
   );
 }
@@ -234,49 +244,59 @@ function HistoryTableRow({
   onError: (msg: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-[1.35fr_1fr_1fr_0.95fr_1.15fr_0.95fr] items-center px-3 py-1.5 transition hover:bg-[var(--v2-ink-50)]/50">
-      <div className="px-2 py-2">
-        <span className="v2-tight text-[13.5px] font-medium text-[var(--v2-ink-900)]">
+    <div className="grid grid-cols-1 gap-1.5 px-3 py-3 transition hover:bg-[var(--v2-ink-50)]/50 min-[420px]:grid-cols-2 md:grid-cols-[1.35fr_1fr_1fr_0.95fr_1.15fr_0.95fr] md:items-center md:gap-0 md:py-1.5">
+      <div className="px-1 pb-0.5 min-[420px]:col-span-2 md:col-span-1 md:px-2 md:py-2">
+        <span className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)] md:text-[13.5px] md:font-medium">
           {monthTitle(row.year, row.month)}
         </span>
       </div>
-      <EditableMoneyCell
-        value={row.accounts_total_rub}
-        field="accounts_total_rub"
-        year={row.year}
-        month={row.month}
-        required
-        onSaved={onSaved}
-        onError={onError}
-      />
-      <div className="px-2 py-2 text-right">
-        <DeltaRub value={row.delta} />
-      </div>
-      <EditableMoneyCell
-        value={row.profit_rub}
-        field="profit_rub"
-        year={row.year}
-        month={row.month}
-        profitStyle
-        onSaved={onSaved}
-        onError={onError}
-      />
-      <EditableMoneyCell
-        value={row.earned_rub}
-        field="earned_rub"
-        year={row.year}
-        month={row.month}
-        onSaved={onSaved}
-        onError={onError}
-      />
-      <EditableMoneyCell
-        value={row.spent_rub}
-        field="spent_rub"
-        year={row.year}
-        month={row.month}
-        onSaved={onSaved}
-        onError={onError}
-      />
+      <HistoryCell label="На счетах">
+        <EditableMoneyCell
+          value={row.accounts_total_rub}
+          field="accounts_total_rub"
+          year={row.year}
+          month={row.month}
+          required
+          onSaved={onSaved}
+          onError={onError}
+        />
+      </HistoryCell>
+      <HistoryCell label="Динамика">
+        <div className="px-2 py-2 text-right">
+          <DeltaRub value={row.delta} />
+        </div>
+      </HistoryCell>
+      <HistoryCell label="Прибыль">
+        <EditableMoneyCell
+          value={row.profit_rub}
+          field="profit_rub"
+          year={row.year}
+          month={row.month}
+          profitStyle
+          onSaved={onSaved}
+          onError={onError}
+        />
+      </HistoryCell>
+      <HistoryCell label="Выручка">
+        <EditableMoneyCell
+          value={row.earned_rub}
+          field="earned_rub"
+          year={row.year}
+          month={row.month}
+          onSaved={onSaved}
+          onError={onError}
+        />
+      </HistoryCell>
+      <HistoryCell label="Расход">
+        <EditableMoneyCell
+          value={row.spent_rub}
+          field="spent_rub"
+          year={row.year}
+          month={row.month}
+          onSaved={onSaved}
+          onError={onError}
+        />
+      </HistoryCell>
     </div>
   );
 }
@@ -303,7 +323,7 @@ function YearAccordion({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition hover:bg-[var(--v2-ink-50)]/60"
+        className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3.5 text-left transition hover:bg-[var(--v2-ink-50)]/60 sm:flex-nowrap sm:px-5"
       >
         <V2Icons.chev
           className={`h-4 w-4 shrink-0 text-[var(--v2-ink-400)] transition-transform ${open ? "" : "-rotate-90"}`}
@@ -411,7 +431,7 @@ export function PersonalIncomeHistoryClient() {
   return (
     <PersonalMaskProvider masked={false}>
       <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-[var(--v2-ink-50)]/40">
-        <div className="mx-auto w-full max-w-[1180px] px-6 py-8">
+        <div className="mx-auto w-full max-w-[1180px] px-3 py-5 sm:px-6 sm:py-8">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="v2-tight text-[22px] font-semibold tracking-[-0.02em] text-[var(--v2-ink-900)]">
@@ -443,7 +463,7 @@ export function PersonalIncomeHistoryClient() {
           ) : null}
 
           <PfCard className="overflow-hidden">
-            <div className="grid grid-cols-[1.35fr_1fr_1fr_0.95fr_1.15fr_0.95fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
+            <div className="hidden grid-cols-[1.35fr_1fr_1fr_0.95fr_1.15fr_0.95fr] border-b md:grid border-[var(--v2-ink-100)]/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
               <div>Месяц</div>
               <div className="text-right">Всего на счетах</div>
               <div className="text-right">Динамика капитала</div>

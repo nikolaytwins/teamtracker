@@ -77,11 +77,11 @@ function Sect({
 }) {
   return (
     <section className="mb-14">
-      <div className="mb-5 flex items-end gap-5">
+      <div className="mb-5 flex flex-wrap items-end gap-x-5 gap-y-3">
         <div>
           <h2 className="v2-tight text-[21px] font-medium text-[var(--v2-ink-900)]">{title}</h2>
           {sub ? (
-            <p className="v2-tight mt-1.5 text-[14px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
+            <p className="v2-tight mt-1.5 text-[15px] text-[var(--v2-ink-500)] sm:text-[14px]" style={{ textWrap: "pretty" }}>
               «{sub}»
             </p>
           ) : null}
@@ -102,7 +102,7 @@ function GhostBtn({ children, onClick }: { children: ReactNode; onClick?: () => 
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)] transition hover:text-[var(--v2-ink-900)]"
+      className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] sm:h-9 font-medium text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)] transition hover:text-[var(--v2-ink-900)]"
     >
       {children}
     </button>
@@ -123,13 +123,12 @@ function DirectionRow({ d }: { d: LifeStrategyDirection }) {
             setOpen((o) => !o);
           }
         }}
-        className="group grid cursor-pointer items-start gap-8 py-7"
-        style={{ gridTemplateColumns: "56px minmax(0,1fr) 300px" }}
+        className="group grid cursor-pointer grid-cols-[28px_minmax(0,1fr)] items-start gap-x-3 gap-y-4 py-6 md:grid-cols-[56px_minmax(0,1fr)_300px] md:gap-8 md:py-7"
       >
         <span className="v2-tnum pt-2 font-mono text-[13px] text-[var(--v2-ink-300)]">{d.n}</span>
         <div className="min-w-0">
           <Kicker>{d.kicker}</Kicker>
-          <h3 className="v2-tighter mt-1.5 text-[26px] font-light leading-[1.15] text-[var(--v2-ink-900)] transition group-hover:text-[var(--v2-brand-700)]">
+          <h3 className="v2-tighter mt-1.5 text-[22px] font-light leading-[1.15] sm:text-[26px] text-[var(--v2-ink-900)] transition group-hover:text-[var(--v2-brand-700)]">
             {d.name}
           </h3>
           {open ? (
@@ -143,7 +142,7 @@ function DirectionRow({ d }: { d: LifeStrategyDirection }) {
               {d.why ? (
                 <div>
                   <Kicker>{d.whyLabel}</Kicker>
-                  <p className="v2-tight mt-1.5 text-[14.5px] leading-relaxed text-[var(--v2-ink-600)]" style={{ textWrap: "pretty" }}>
+                  <p className="v2-tight mt-1.5 text-[16px] leading-relaxed sm:text-[14.5px] text-[var(--v2-ink-600)]" style={{ textWrap: "pretty" }}>
                     «{d.why}»
                   </p>
                 </div>
@@ -158,8 +157,8 @@ function DirectionRow({ d }: { d: LifeStrategyDirection }) {
             </p>
           )}
         </div>
-        <div className="flex flex-col gap-3 pt-1">
-          <div className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">
+        <div className="col-start-2 flex flex-col gap-3 md:col-start-auto md:pt-1">
+          <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-[var(--v2-shadow-card)]">
             <Kicker>Статус</Kicker>
             <p className="v2-tight mt-1.5 text-[13.5px] font-medium text-[var(--v2-ink-900)]">{d.status}</p>
             {d.next ? (
@@ -175,7 +174,7 @@ function DirectionRow({ d }: { d: LifeStrategyDirection }) {
           </div>
           <button
             type="button"
-            className="inline-flex items-center gap-1 self-start text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:text-[var(--v2-brand-700)]"
+            className="inline-flex min-h-10 items-center gap-1 self-start text-[12.5px] font-medium text-[var(--v2-ink-500)] sm:min-h-0 transition hover:text-[var(--v2-brand-700)]"
           >
             {d.cta} <IcChevR className="h-3.5 w-3.5" />
           </button>
@@ -202,23 +201,23 @@ function HistoryDrawer({
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--v2-ink-900)]/35 backdrop-blur-[2px]" />
       <div
-        className="relative h-full w-[520px] max-w-[92vw] overflow-y-auto bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative h-full max-h-[100dvh] w-[520px] max-w-full overflow-y-auto overscroll-contain sm:max-w-[92vw] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--v2-ink-100)] px-9 pb-5 pt-7">
-          <h2 className="v2-tighter text-[26px] font-light text-[var(--v2-ink-900)]">История периодов</h2>
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--v2-ink-100)] px-5 pb-5 pt-[calc(env(safe-area-inset-top)+16px)] sm:px-9 sm:pt-7">
+          <h2 className="v2-tighter text-[22px] font-light text-[var(--v2-ink-900)] sm:text-[26px]">История периодов</h2>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9 text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
           >
             <IcClose className="h-[17px] w-[17px]" />
           </button>
         </div>
-        <div className="flex flex-col px-9 py-6">
+        <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-6 sm:px-9 sm:py-6">
           {doc.history.map((h, i) => (
             <button
               key={h.id}
@@ -301,9 +300,9 @@ function EditDrawer({
 
   const lab = "text-[11.5px] uppercase tracking-[0.1em] font-semibold text-[var(--v2-ink-400)]";
   const field =
-    "v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white";
+    "v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[16px] text-[var(--v2-ink-900)] outline-none sm:text-[14.5px] transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white";
   const area =
-    "v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white";
+    "v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[16px] leading-relaxed text-[var(--v2-ink-900)] outline-none sm:text-[14px] transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white";
 
   const lists: [string, string, React.RefObject<HTMLTextAreaElement | null>][] = [
     ["Активные направления", doc.directions.map((d) => d.name).join("\n"), dirsRef],
@@ -314,31 +313,31 @@ function EditDrawer({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--v2-ink-900)]/35 backdrop-blur-[2px]" />
       <div
-        className="relative h-full w-[600px] max-w-[92vw] overflow-y-auto bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative h-full max-h-[100dvh] w-[600px] max-w-full overflow-y-auto overscroll-contain sm:max-w-[92vw] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--v2-ink-100)] bg-white/92 px-9 pb-5 pt-7 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--v2-ink-100)] bg-white/92 px-5 pb-5 pt-[calc(env(safe-area-inset-top)+16px)] backdrop-blur sm:px-9 sm:pt-7">
           <div>
-            <h2 className="v2-tighter text-[26px] font-light text-[var(--v2-ink-900)]">Редактировать стратегию</h2>
+            <h2 className="v2-tighter text-[22px] font-light text-[var(--v2-ink-900)] sm:text-[26px]">Редактировать стратегию</h2>
             <p className="v2-tight mt-1.5 text-[13px] text-[var(--v2-ink-500)]">Простая форма, а не отдельный конструктор.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9 text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
           >
             <IcClose className="h-[17px] w-[17px]" />
           </button>
         </div>
-        <div className="px-9 py-6 pb-28">
+        <div className="px-5 py-6 pb-10 sm:px-9 sm:pb-28">
           <label className="block">
             <span className={lab}>Название сезона</span>
             <input ref={kickerRef} defaultValue={doc.season.kicker} className={field} />
           </label>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className={lab}>Дата начала</span>
               <input ref={startRef} defaultValue={doc.season.startDate} className={field} />
@@ -359,7 +358,7 @@ function EditDrawer({
             </label>
           ))}
         </div>
-        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[var(--v2-ink-100)] bg-white/92 px-9 py-4 backdrop-blur">
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[var(--v2-ink-100)] bg-white/92 px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4 sm:px-9 sm:py-4 backdrop-blur">
           <button
             type="button"
             onClick={onClose}
@@ -406,20 +405,24 @@ function PranaItem({ p, onChange }: { p: LifeStrategyPrana; onChange: (next: Lif
           onChange({ ...p, done: !p.done });
         }
       }}
-      className="relative flex flex-col rounded-2xl bg-white px-5 py-5 text-left shadow-[var(--v2-shadow-card)]"
+      className="relative flex flex-col rounded-2xl bg-white px-4 py-4 text-left sm:px-5 sm:py-5 shadow-[var(--v2-shadow-card)]"
     >
       <div className="flex items-center gap-1.5">
         <span className="v2-tight text-[13.5px] font-medium text-[var(--v2-ink-800)]">{p.label}</span>
         {p.tip ? (
           <span
             role="presentation"
-            onMouseEnter={() => setTip(true)}
-            onMouseLeave={() => setTip(false)}
+            onPointerEnter={(e) => {
+              if (e.pointerType === "mouse") setTip(true);
+            }}
+            onPointerLeave={(e) => {
+              if (e.pointerType === "mouse") setTip(false);
+            }}
             onClick={(e) => {
               e.stopPropagation();
               setTip((t) => !t);
             }}
-            className="text-[var(--v2-ink-300)] transition hover:text-[var(--v2-ink-600)]"
+            className="-m-2 p-2 text-[var(--v2-ink-300)] transition hover:text-[var(--v2-ink-600)]"
           >
             <IcInfo className="h-3.5 w-3.5" />
           </span>
@@ -452,7 +455,7 @@ function PranaItem({ p, onChange }: { p: LifeStrategyPrana; onChange: (next: Lif
         </div>
       )}
       {tip && p.tip ? (
-        <div className="absolute left-0 top-full z-30 mt-2 w-[320px] rounded-2xl bg-[var(--v2-ink-900)] px-5 py-4 text-white shadow-[var(--v2-shadow-pop)]">
+        <div className="absolute left-0 top-full z-30 mt-2 w-[320px] max-sm:static max-sm:mt-3 max-sm:w-auto max-sm:px-4 max-sm:py-3 rounded-2xl bg-[var(--v2-ink-900)] px-5 py-4 text-white shadow-[var(--v2-shadow-pop)]">
           <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-white/50">{p.label}</span>
           <p className="v2-tight mt-2 whitespace-pre-line text-[13px] leading-relaxed">{p.tip}</p>
         </div>
@@ -505,7 +508,7 @@ export function PersonalLifeStrategyClient() {
 
   if (!doc) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-16 pt-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-16 pt-4 sm:px-8 sm:pt-6">
         <p className="v2-tight text-[14px] text-[var(--v2-ink-500)]">Загрузка…</p>
       </div>
     );
@@ -617,11 +620,11 @@ export function PersonalLifeStrategyClient() {
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6">
+    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-12 pt-4 sm:px-8 sm:pb-24 sm:pt-6">
       <div className="mx-auto max-w-[1240px]">
         <div className="mb-9 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-          <h1 className="v2-tighter text-[52px] font-light leading-none text-[var(--v2-ink-900)]">Стратегия</h1>
-          <div className="ml-auto flex items-center gap-2 pb-1">
+          <h1 className="v2-tighter text-[38px] font-light leading-none sm:text-[52px] text-[var(--v2-ink-900)]">Стратегия</h1>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:pb-1">
             <GhostBtn onClick={() => setHist(true)}>
               <V2Icons.history className="h-4 w-4 text-[var(--v2-ink-400)]" /> История периодов
             </GhostBtn>
@@ -639,25 +642,25 @@ export function PersonalLifeStrategyClient() {
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</div>
         ) : null}
 
-        <div className="mb-14 rounded-[24px] bg-white px-11 py-10 shadow-[var(--v2-shadow-soft)]">
+        <div className="mb-14 rounded-[24px] bg-white px-5 py-6 sm:px-11 sm:py-10 shadow-[var(--v2-shadow-soft)]">
           <div className="flex flex-wrap items-baseline gap-5">
             <h2 className="text-[15px] font-semibold uppercase tracking-[0.14em] text-[var(--v2-brand-700)]">{doc.season.kicker}</h2>
             <span className="v2-tight v2-tnum text-[13.5px] text-[var(--v2-ink-400)]">{doc.season.dates}</span>
           </div>
           <p
-            className="v2-tighter mt-6 max-w-[46ch] text-[27px] font-light leading-[1.35] text-[var(--v2-ink-900)]"
+            className="v2-tighter mt-6 max-w-[46ch] text-[21px] font-light sm:text-[27px] leading-[1.35] text-[var(--v2-ink-900)]"
             style={{ whiteSpace: "pre-line", textWrap: "pretty" }}
           >
             «{doc.season.lead}»
           </p>
-          <div className="mt-8 flex flex-wrap items-start gap-10">
+          <div className="mt-6 flex flex-wrap items-start gap-6 sm:mt-8 sm:gap-10">
             <p
-              className="v2-tight max-w-[38ch] border-l-2 border-[var(--v2-brand-300)] pl-6 text-[18px] font-light leading-[1.5] text-[var(--v2-brand-800)]"
+              className="v2-tight max-w-[38ch] border-l-2 border-[var(--v2-brand-300)] pl-4 text-[18px] sm:pl-6 font-light leading-[1.5] text-[var(--v2-brand-800)]"
               style={{ whiteSpace: "pre-line", textWrap: "pretty" }}
             >
               «{doc.season.pull}»
             </p>
-            <div className="ml-auto text-right">
+            <div className="sm:ml-auto sm:text-right">
               <Kicker>Следующий большой review</Kicker>
               <p className="v2-tight mt-1.5 text-[19px] font-light text-[var(--v2-ink-900)]">{doc.season.review}</p>
             </div>
@@ -670,11 +673,11 @@ export function PersonalLifeStrategyClient() {
               <DirectionRow key={d.id} d={d} />
             ))}
           </div>
-          <div className="mt-8 rounded-[20px] bg-[var(--v2-ink-100)]/60 px-7 py-6">
+          <div className="mt-8 rounded-[20px] bg-[var(--v2-ink-100)]/60 px-5 py-5 sm:px-7 sm:py-6">
             <Kicker>Поддерживаю, но не развиваю</Kicker>
             <div className="mt-3 flex flex-col gap-2">
               {doc.maintain.map((m) => (
-                <div key={m.name} className="v2-tight flex items-baseline gap-3 text-[14.5px]">
+                <div key={m.name} className="v2-tight flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[15px] sm:text-[14.5px]">
                   <span className="font-medium text-[var(--v2-ink-800)]">{m.name}</span>
                   <span className="text-[var(--v2-ink-400)]">→</span>
                   <span className="text-[var(--v2-ink-500)]">{m.note}</span>
@@ -691,7 +694,7 @@ export function PersonalLifeStrategyClient() {
                 <button
                   type="button"
                   onClick={() => setNotOpen((o) => (o === i ? null : i))}
-                  className="group flex w-full items-start gap-4 px-7 py-4 text-left transition hover:bg-[var(--v2-ink-50)]/60"
+                  className="group flex w-full items-start gap-3 px-4 py-4 text-left sm:gap-4 sm:px-7 transition hover:bg-[var(--v2-ink-50)]/60"
                 >
                   <span className="shrink-0 text-[15px] leading-6 text-[var(--v2-ink-300)]">×</span>
                   <span className="v2-tight text-[15.5px] leading-6 text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
@@ -704,14 +707,14 @@ export function PersonalLifeStrategyClient() {
                   />
                 </button>
                 {notOpen === i ? (
-                  <div className="grid grid-cols-2 gap-6 px-7 pb-5 pl-[46px]">
+                  <div className="grid grid-cols-1 gap-4 px-4 pb-5 pl-[38px] sm:grid-cols-2 sm:gap-6 sm:px-7 sm:pl-[46px]">
                     <div>
                       <Kicker>Почему отложено</Kicker>
-                      <p className="v2-tight mt-1.5 text-[14px] leading-relaxed text-[var(--v2-ink-600)]">{n.why}</p>
+                      <p className="v2-tight mt-1.5 text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-600)]">{n.why}</p>
                     </div>
                     <div>
                       <Kicker>Когда вернуться</Kicker>
-                      <p className="v2-tight mt-1.5 text-[14px] leading-relaxed text-[var(--v2-ink-600)]">{n.when}</p>
+                      <p className="v2-tight mt-1.5 text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-600)]">{n.when}</p>
                     </div>
                   </div>
                 ) : null}
@@ -720,7 +723,7 @@ export function PersonalLifeStrategyClient() {
           </div>
         </Sect>
 
-        <section className="mb-14 rounded-[24px] border border-[var(--v2-ink-300)]/70 bg-[linear-gradient(180deg,#FCFCFD,#F7F8FB)] px-9 py-8">
+        <section className="mb-14 rounded-[24px] border border-[var(--v2-ink-300)]/70 bg-[linear-gradient(180deg,#FCFCFD,#F7F8FB)] px-5 py-6 sm:px-9 sm:py-8">
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--v2-ink-900)] text-white">
               <IcPause className="h-4 w-4" />
@@ -730,15 +733,15 @@ export function PersonalLifeStrategyClient() {
               {doc.lila.state}
             </span>
           </div>
-          <p className="v2-tighter mt-5 max-w-[52ch] text-[21px] font-light leading-[1.4] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+          <p className="v2-tighter mt-5 max-w-[52ch] text-[19px] font-light leading-[1.4] text-[var(--v2-ink-900)] sm:text-[21px]" style={{ textWrap: "pretty" }}>
             «{doc.lila.line}»
           </p>
-          <div className="mt-7 grid max-w-[860px] grid-cols-2 gap-8">
+          <div className="mt-7 grid max-w-[860px] grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
             <div>
               <Kicker cls="text-emerald-600">Разрешено</Kicker>
               <ul className="mt-2.5 flex flex-col gap-1.5">
                 {doc.lila.allowed.map((x, i) => (
-                  <li key={i} className="v2-tight text-[14px] leading-relaxed text-[var(--v2-ink-700)]">
+                  <li key={i} className="v2-tight text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-700)]">
                     {x}
                   </li>
                 ))}
@@ -748,20 +751,20 @@ export function PersonalLifeStrategyClient() {
               <Kicker>Не делаю</Kicker>
               <ul className="mt-2.5 flex flex-col gap-1.5">
                 {doc.lila.not.map((x, i) => (
-                  <li key={i} className="v2-tight text-[14px] leading-relaxed text-[var(--v2-ink-500)]">
+                  <li key={i} className="v2-tight text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-500)]">
                     {x}
                   </li>
                 ))}
               </ul>
             </div>
           </div>
-          <div className="mt-8 flex flex-wrap items-end gap-8 border-t border-[var(--v2-ink-200)] pt-6">
+          <div className="mt-8 flex flex-wrap items-end gap-4 border-t sm:gap-8 border-[var(--v2-ink-200)] pt-6">
             <p className="v2-tight max-w-[46ch] text-[18px] font-light leading-[1.45] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
               «{doc.lila.main}»
             </p>
             <Link
               href="/v2/personal/my-code"
-              className="ml-auto inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--v2-ink-700)] no-underline hover:text-[var(--v2-brand-700)]"
+              className="inline-flex min-h-10 items-center gap-1 text-[12.5px] font-medium text-[var(--v2-ink-700)] sm:ml-auto sm:min-h-0 no-underline hover:text-[var(--v2-brand-700)]"
             >
               Подробнее в Моём коде <IcChevR className="h-3.5 w-3.5" />
             </Link>
@@ -771,23 +774,23 @@ export function PersonalLifeStrategyClient() {
         <Sect title="Помнить на этой неделе">
           <div className="divide-y divide-[var(--v2-ink-100)] rounded-[20px] bg-white shadow-[var(--v2-shadow-card)]">
             {doc.rulePool.map((r, i) => (
-              <div key={r.id} className="flex items-center gap-6 px-7 py-5">
+              <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4 sm:flex-nowrap sm:gap-6 sm:px-7 sm:py-5">
                 <span className="v2-tnum w-6 font-mono text-[12px] text-[var(--v2-ink-300)]">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <p
-                  className="v2-tight min-w-0 flex-1 text-[19px] font-light leading-snug text-[var(--v2-ink-900)]"
+                  className="v2-tight min-w-0 flex-1 text-[17px] font-light leading-snug sm:text-[19px] text-[var(--v2-ink-900)]"
                   style={{ textWrap: "pretty" }}
                 >
                   «{r.text}»
                 </p>
-                <Link href="/v2/personal/my-code" className="v2-tight shrink-0 text-[12px] text-[var(--v2-ink-500)] hover:text-[var(--v2-brand-700)]">
+                <Link href="/v2/personal/my-code" className="v2-tight w-full pl-10 text-[12px] text-[var(--v2-ink-500)] hover:text-[var(--v2-brand-700)] sm:w-auto sm:shrink-0 sm:pl-0">
                   почему · {r.why}
                 </Link>
               </div>
             ))}
             {!doc.rulePool.length ? (
-              <p className="v2-tight px-7 py-6 text-[14px] text-[var(--v2-ink-500)]">Правил пока нет.</p>
+              <p className="v2-tight px-4 py-6 text-[14px] sm:px-7 text-[var(--v2-ink-500)]">Правил пока нет.</p>
             ) : null}
           </div>
         </Sect>
@@ -796,7 +799,7 @@ export function PersonalLifeStrategyClient() {
           title="Режим жизни"
           sub="Минимальные условия, без которых стратегический спринт перестаёт быть жизнью и снова превращается в гонку."
         >
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px,1fr))" }}>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(190px,1fr))] sm:gap-4">
             {doc.prana.map((p) => (
               <PranaItem
                 key={p.id}
@@ -817,14 +820,13 @@ export function PersonalLifeStrategyClient() {
             {doc.openQ.map((o, i) => (
               <div
                 key={i}
-                className="grid items-baseline gap-6 px-7 py-5"
-                style={{ gridTemplateColumns: "minmax(0,1fr) 280px 260px" }}
+                className="grid grid-cols-1 items-baseline gap-1.5 px-4 py-4 sm:px-7 sm:py-5 lg:grid-cols-[minmax(0,1fr)_280px_260px] lg:gap-6"
               >
                 <p className="v2-tight text-[17px] font-light leading-snug text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
                   «{o.q}»
                 </p>
                 <span className="v2-tight text-[13.5px] text-[var(--v2-ink-500)]">{o.st}</span>
-                <span className="v2-tight justify-self-end text-right text-[13px] text-[var(--v2-ink-400)]">{o.back}</span>
+                <span className="v2-tight text-[13px] lg:justify-self-end lg:text-right text-[var(--v2-ink-400)]">{o.back}</span>
               </div>
             ))}
           </div>
@@ -840,13 +842,13 @@ export function PersonalLifeStrategyClient() {
             </GhostBtn>
           }
         >
-          <div className="grid grid-cols-2 gap-x-12">
+          <div className="grid grid-cols-1 gap-x-12 md:grid-cols-2">
             {doc.game.map((g, i) => (
-              <div key={i} className="flex gap-6 border-t border-[var(--v2-ink-200)]/80 py-5">
+              <div key={i} className="flex gap-4 border-t border-[var(--v2-ink-200)]/80 py-5 sm:gap-6">
                 <span className="v2-tnum pt-1.5 font-mono text-[11.5px] text-[var(--v2-ink-300)]">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <p className="v2-tight text-[18px] font-light leading-[1.45] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+                <p className="v2-tight text-[17px] font-light leading-[1.45] text-[var(--v2-ink-900)] sm:text-[18px]" style={{ textWrap: "pretty" }}>
                   «{g}»
                 </p>
               </div>
@@ -858,7 +860,7 @@ export function PersonalLifeStrategyClient() {
           <button
             type="button"
             onClick={() => setSeasonQOpen((o) => !o)}
-            className="group flex w-full items-center gap-4 border-t border-[var(--v2-ink-200)]/80 py-4"
+            className="group flex w-full flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--v2-ink-200)]/80 py-4"
           >
             <h2 className="v2-tight text-[21px] font-medium text-[var(--v2-ink-900)]">Что проверяем к концу сезона</h2>
             <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{doc.seasonQ.length} вопросов</span>
@@ -869,10 +871,10 @@ export function PersonalLifeStrategyClient() {
             />
           </button>
           {seasonQOpen ? (
-            <div className="mt-3 grid grid-cols-2 gap-x-12">
+            <div className="mt-3 grid grid-cols-1 gap-x-12 md:grid-cols-2">
               {doc.seasonQ.map((s, i) => (
-                <div key={i} className="flex gap-6 border-t border-[var(--v2-ink-100)] py-5">
-                  <span className="w-[104px] shrink-0">
+                <div key={i} className="flex flex-col gap-2 border-t border-[var(--v2-ink-100)] py-5 sm:flex-row sm:gap-6">
+                  <span className="shrink-0 sm:w-[104px]">
                     <Kicker>{s.area}</Kicker>
                   </span>
                   <p className="v2-tight text-[15.5px] leading-relaxed text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>

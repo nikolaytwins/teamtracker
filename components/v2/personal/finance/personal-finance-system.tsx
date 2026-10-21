@@ -84,10 +84,10 @@ export function PfHorizon2027({
       hint={`осталось ${days.toLocaleString("ru-RU")} дн. · ${deadlineLabel}`}
     >
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           <Kick>Стабильный доход</Kick>
           <div className="mt-2 flex flex-wrap items-baseline gap-2.5">
-            <span className="v2-tighter v2-tnum text-[32px] font-semibold text-[var(--v2-ink-900)]">
+            <span className="v2-tighter v2-tnum text-[28px] font-semibold text-[var(--v2-ink-900)] sm:text-[32px]">
               400 000 ₽
             </span>
             <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">в месяц</span>
@@ -97,7 +97,7 @@ export function PfHorizon2027({
           </p>
           <div className="mt-5">
             <PfBar pct={incomePct} color={incomeOk ? "#10B981" : "#7C3AED"} />
-            <div className="v2-tight v2-tnum mt-2.5 flex items-center justify-between text-[12.5px] text-[var(--v2-ink-500)]">
+            <div className="v2-tight v2-tnum mt-2.5 flex items-center justify-between gap-3 text-[12.5px] text-[var(--v2-ink-500)]">
               <span>
                 сейчас ср. 6м <PersonalAmt v={avgMonthlyProfit} />
                 {monthProfit > 0 ? (
@@ -114,10 +114,10 @@ export function PfHorizon2027({
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           <Kick>Капитал</Kick>
           <div className="mt-2 flex flex-wrap items-baseline gap-2.5">
-            <span className="v2-tighter v2-tnum text-[32px] font-semibold text-[var(--v2-ink-900)]">
+            <span className="v2-tighter v2-tnum text-[28px] font-semibold text-[var(--v2-ink-900)] sm:text-[32px]">
               1,8–2,4 млн ₽
             </span>
           </div>
@@ -126,7 +126,7 @@ export function PfHorizon2027({
           </p>
           <div className="mt-5">
             <PfBar pct={capitalPct} color={capitalOk ? "#10B981" : "#7C3AED"} />
-            <div className="v2-tight v2-tnum mt-2.5 flex items-center justify-between text-[12.5px] text-[var(--v2-ink-500)]">
+            <div className="v2-tight v2-tnum mt-2.5 flex items-center justify-between gap-3 text-[12.5px] text-[var(--v2-ink-500)]">
               <span>
                 сейчас <PersonalAmt v={capitalNow} />
                 {capitalOk ? (
@@ -212,10 +212,14 @@ function Sect({
 }) {
   return (
     <section>
-      <div className="mb-3 flex items-center gap-2.5 px-0.5">
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
+      <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 px-0.5 sm:flex-nowrap">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: accent }} />
         <h2 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">{title}</h2>
-        {hint ? <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">{hint}</span> : null}
+        {hint ? (
+          <span className="v2-tight order-last w-full text-[12px] leading-snug text-[var(--v2-ink-500)] sm:order-none sm:w-auto sm:text-[12.5px]">
+            {hint}
+          </span>
+        ) : null}
         {right ? <div className="ml-auto">{right}</div> : null}
       </div>
       {children}
@@ -285,7 +289,7 @@ function InlineEditMoney({
             setEditing(false);
           }
         }}
-        className="v2-tnum w-36 rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 py-1 text-[22px] font-semibold outline-none"
+        className="v2-tnum w-36 max-w-full rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 py-1 text-[22px] font-semibold outline-none max-sm:text-[20px]"
       />
     );
   }
@@ -315,19 +319,19 @@ export function PfNearestGoal({
   if (!nearest) return null;
   const left = nearest.left;
   return (
-    <section className="rounded-2xl px-8 py-7 text-white shadow-[var(--v2-shadow-soft)]" style={{ background: "#2d5eef" }}>
-      <div className="flex flex-col items-start gap-10 lg:flex-row">
-        <div className="min-w-0 flex-1">
+    <section className="rounded-2xl px-5 py-6 text-white shadow-[var(--v2-shadow-soft)] sm:px-8 sm:py-7" style={{ background: "#2d5eef" }}>
+      <div className="flex flex-col items-start gap-6 sm:gap-10 lg:flex-row">
+        <div className="w-full min-w-0 flex-1">
           <Kick className="text-white/45">Следующий свободный рубль идёт в</Kick>
-          <div className="mt-2 flex flex-wrap items-baseline gap-3.5">
-            <span className="v2-tighter text-[38px] font-semibold leading-none">{nearest.title}</span>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-2">
+            <span className="v2-tighter text-[28px] font-semibold leading-none sm:text-[38px]">{nearest.title}</span>
             <span className="v2-tight v2-tnum text-[14px] text-white/55">
               <PersonalAmt v={nearest.filled} /> из <PersonalAmt v={nearest.target_rub} />
             </span>
           </div>
           <div className="mt-5 max-w-[520px]">
             <PfBar pct={nearest.pct} color="rgba(255,255,255,.9)" track="rgba(255,255,255,.15)" h={8} />
-            <div className="v2-tight v2-tnum mt-2.5 flex items-center justify-between text-[12.5px] text-white/55">
+            <div className="v2-tight v2-tnum mt-2.5 flex items-center justify-between gap-3 text-[12.5px] text-white/55">
               <span>{Math.round(nearest.pct * 100)}% цели</span>
               <span>
                 осталось <PersonalAmt v={left} />
@@ -335,7 +339,7 @@ export function PfNearestGoal({
             </div>
           </div>
         </div>
-        <div className="w-full shrink-0 rounded-xl bg-white/10 px-5 py-4 lg:w-[300px]">
+        <div className="w-full shrink-0 rounded-xl bg-white/10 px-4 py-4 sm:px-5 lg:w-[300px]">
           <Kick className="text-white/45">В подушке сейчас</Kick>
           <div className="mt-2 grid gap-1.5 text-[13px]">
             <div className="flex justify-between text-white/70">
@@ -399,11 +403,11 @@ export function PfMonthSplit({
 
   return (
     <Sect accent="#3B6FF7" title="Распределение месяца" hint="прибыль минус жизнь и фонды">
-      <Card className="p-6">
-        <div className="flex flex-col items-end gap-8 lg:flex-row">
+      <Card className="p-4 sm:p-6">
+        <div className="flex flex-col items-end gap-5 sm:gap-8 lg:flex-row">
           <div className="w-full shrink-0 lg:w-[300px]">
             <Kick>Прогнозируемая прибыль месяца</Kick>
-            <div className="v2-tighter v2-tnum mt-1.5 text-[36px] font-semibold text-[var(--v2-ink-900)]">
+            <div className="v2-tighter v2-tnum mt-1.5 text-[30px] font-semibold text-[var(--v2-ink-900)] sm:text-[36px]">
               <PersonalAmt v={income} />
             </div>
             <p className="v2-tight mt-2 text-[12.5px] text-[var(--v2-ink-500)]">
@@ -412,7 +416,7 @@ export function PfMonthSplit({
           </div>
           <div className="grid w-full flex-1 grid-cols-2 gap-3 lg:grid-cols-4">
             {split.map((s) => (
-              <div key={s.n} className="rounded-xl border border-[var(--v2-ink-100)] px-4 py-3.5">
+              <div key={s.n} className="min-w-0 rounded-xl border border-[var(--v2-ink-100)] px-3 py-3 sm:px-4 sm:py-3.5">
                 <div className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.c }} />
                   <span className="v2-tight text-[12.5px] text-[var(--v2-ink-500)]">{s.n}</span>
@@ -529,7 +533,7 @@ export function PfGoalQueue({
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="v2-tight text-[12.5px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)]"
+          className="v2-tight text-[12.5px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)] max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:text-[13.5px]"
         >
           {adding ? "Отмена" : "Добавить цель"}
         </button>
@@ -542,7 +546,7 @@ export function PfGoalQueue({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-9 rounded-lg border border-[var(--v2-ink-200)] px-3 text-[13px] text-[var(--v2-ink-900)]"
+              className="h-9 rounded-lg border border-[var(--v2-ink-200)] px-3 text-[13px] text-[var(--v2-ink-900)] max-sm:h-11 max-sm:text-[16px]"
               placeholder="Новая цель"
             />
           </label>
@@ -551,23 +555,23 @@ export function PfGoalQueue({
             <input
               value={hint}
               onChange={(e) => setHint(e.target.value)}
-              className="h-9 rounded-lg border border-[var(--v2-ink-200)] px-3 text-[13px] text-[var(--v2-ink-900)]"
+              className="h-9 rounded-lg border border-[var(--v2-ink-200)] px-3 text-[13px] text-[var(--v2-ink-900)] max-sm:h-11 max-sm:text-[16px]"
             />
           </label>
-          <label className="flex w-36 flex-col gap-1 text-[11px] text-[var(--v2-ink-500)]">
+          <label className="flex w-36 flex-col gap-1 text-[11px] text-[var(--v2-ink-500)] max-sm:min-w-0 max-sm:flex-1">
             Сумма, ₽
             <input
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               inputMode="decimal"
-              className="v2-tnum h-9 rounded-lg border border-[var(--v2-ink-200)] px-3 text-[13px]"
+              className="v2-tnum h-9 rounded-lg border border-[var(--v2-ink-200)] px-3 text-[13px] max-sm:h-11 max-sm:text-[16px]"
             />
           </label>
           <button
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white disabled:opacity-50"
+            className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white disabled:opacity-50 max-sm:h-11"
           >
             Сохранить
           </button>
@@ -743,7 +747,7 @@ export function PfMoscowReady({
               type="button"
               disabled={busy}
               onClick={() => toggleJob(v)}
-              className={`v2-tight h-7 rounded-lg px-3 text-[12px] font-medium transition disabled:opacity-60 ${
+              className={`v2-tight h-7 rounded-lg px-3 text-[12px] font-medium transition disabled:opacity-60 max-sm:h-9 max-sm:px-2.5 ${
                 stable === v
                   ? "bg-[var(--v2-ink-900)] text-white"
                   : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-900)]"
@@ -760,7 +764,7 @@ export function PfMoscowReady({
           {checks.map((c) => {
             const ok = c.now >= c.need;
             return (
-              <div key={c.n} className="flex items-center gap-4 px-6 py-4">
+              <div key={c.n} className="flex items-center gap-3 px-4 py-3.5 sm:gap-4 sm:px-6 sm:py-4">
                 <span
                   className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
                     ok ? "bg-emerald-500 text-white" : "border border-[var(--v2-ink-200)] text-[var(--v2-ink-300)]"
@@ -777,7 +781,7 @@ export function PfMoscowReady({
                     <PfBar pct={c.need ? c.now / c.need : 0} color={ok ? "#10B981" : "#3B6FF7"} />
                   </div>
                 ) : null}
-                <div className="v2-tight v2-tnum w-[190px] shrink-0 text-right text-[13.5px]">
+                <div className="v2-tight v2-tnum shrink-0 text-right text-[13px] max-sm:flex max-sm:flex-col sm:w-[190px] sm:text-[13.5px]">
                   {c.bool ? (
                     <span className={ok ? "font-medium text-emerald-600" : "text-[var(--v2-ink-400)]"}>
                       {ok ? "есть" : "нет"}
@@ -793,9 +797,9 @@ export function PfMoscowReady({
             );
           })}
         </Card>
-        <Card className="flex flex-col px-6 py-6">
+        <Card className="flex flex-col px-5 py-5 sm:px-6 sm:py-6">
           <Kick>До порога переезда</Kick>
-          <div className="v2-tighter v2-tnum mt-2 text-[32px] font-semibold text-[var(--v2-ink-900)]">
+          <div className="v2-tighter v2-tnum mt-2 text-[28px] font-semibold text-[var(--v2-ink-900)] sm:text-[32px]">
             <PersonalAmt v={gap} />
           </div>
           <div className="v2-tight v2-tnum text-[12.5px] text-[var(--v2-ink-500)]">
@@ -987,7 +991,7 @@ export function PfAccountsAsFunds({
                 ) : null}
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {group.items.map((a) => (
-                <Card key={a.id} className="px-6 py-6">
+                <Card key={a.id} className="px-5 py-5 sm:px-6 sm:py-6">
                   <div className="flex items-center gap-2.5">
                     <span
                       className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-white"
@@ -1052,7 +1056,7 @@ export function PfAccountsAsFunds({
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {sortedFunds.map((f) => (
-              <Card key={f.id} className="px-6 py-6">
+              <Card key={f.id} className="px-5 py-5 sm:px-6 sm:py-6">
                 <div className="flex items-center gap-2.5">
                   <span
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-white"
@@ -1089,7 +1093,7 @@ export function PfAccountsAsFunds({
                           onError(err instanceof Error ? err.message : "Не удалось обновить источник")
                         );
                     }}
-                    className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[13.5px] text-[var(--v2-ink-800)]"
+                    className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[13.5px] text-[var(--v2-ink-800)] max-sm:h-11 max-sm:text-[16px]"
                   >
                     <option value="">не указан</option>
                     {sourceOptionsForFund(f, sortedAccounts).map((a) => (
@@ -1130,7 +1134,7 @@ export function PfAccountsAsFunds({
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {sortedCapital.map((c) => (
-              <Card key={c.id} className="px-6 py-6">
+              <Card key={c.id} className="px-5 py-5 sm:px-6 sm:py-6">
                 <div className="flex items-center gap-2.5">
                   <span
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-white"

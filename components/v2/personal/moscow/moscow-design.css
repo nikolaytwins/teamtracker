@@ -290,3 +290,51 @@
   color: var(--msk-muted);
   font-weight: 700;
 }
+.moscow-page .msk-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.moscow-page .msk-table-scroll table {
+  margin: 1em 0 1.4em;
+}
+.moscow-page .msk-prose img {
+  max-width: 100%;
+  height: auto;
+}
+@media (max-width: 639px) {
+  .moscow-page .msk-shell {
+    padding: 16px 12px 48px;
+  }
+  .moscow-page .msk-back {
+    min-height: 40px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .moscow-page .msk-hero {
+    border-radius: 22px;
+    padding: 22px 18px 20px;
+  }
+  .moscow-page .msk-creed-god {
+    max-width: none;
+  }
+  .moscow-page .msk-focus-s {
+    font-size: 15px;
+  }
+  .moscow-page .msk-article {
+    border-radius: 22px;
+    padding: 22px 18px 30px;
+    overflow-wrap: break-word;
+  }
+  .moscow-page .msk-prose h3 {
+    font-size: 17.5px;
+  }
+  .moscow-page .msk-prose p,
+  .moscow-page .msk-prose li {
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .moscow-page .msk-table-scroll table {
+    min-width: 520px;
+  }
+}

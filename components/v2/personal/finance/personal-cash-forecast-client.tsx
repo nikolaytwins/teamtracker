@@ -169,7 +169,7 @@ export function PersonalCashForecastClient() {
 
   return (
     <PersonalMaskProvider masked={false}>
-      <div className="min-h-0 flex-1 overflow-auto bg-[var(--v2-ink-50)] px-6 py-6">
+      <div className="min-h-0 flex-1 overflow-auto bg-[var(--v2-ink-50)] px-3 py-4 sm:px-6 sm:py-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -184,7 +184,7 @@ export function PersonalCashForecastClient() {
               <button
                 type="button"
                 onClick={() => go(-1)}
-                className="rounded-lg p-2 text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
+                className="rounded-lg p-2 text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] max-sm:p-3"
                 aria-label="Предыдущий месяц"
               >
                 <V2Icons.chevL className="h-4 w-4" />
@@ -195,7 +195,7 @@ export function PersonalCashForecastClient() {
               <button
                 type="button"
                 onClick={() => go(1)}
-                className="rounded-lg p-2 text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
+                className="rounded-lg p-2 text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] max-sm:p-3"
                 aria-label="Следующий месяц"
               >
                 <V2Icons.chevR className="h-4 w-4" />
@@ -298,7 +298,7 @@ export function PersonalCashForecastClient() {
                         }
                       }}
                       placeholder="0"
-                      className="w-28 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-right text-[14px] v2-tnum text-[var(--v2-ink-900)] outline-none focus:border-[var(--v2-brand-400)]"
+                      className="w-28 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-right text-[14px] v2-tnum text-[var(--v2-ink-900)] outline-none focus:border-[var(--v2-brand-400)] max-sm:h-11 max-sm:w-32 max-sm:text-[16px]"
                     />
                     <span className="text-[13px] text-[var(--v2-ink-500)]">₽ / день</span>
                   </div>
@@ -329,7 +329,7 @@ export function PersonalCashForecastClient() {
                             type="button"
                             disabled={saving}
                             onClick={() => void removeExtra(e.id)}
-                            className="rounded-md px-2 py-1 text-[12px] text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-50)] hover:text-red-600"
+                            className="rounded-md px-2 py-1 text-[12px] text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-50)] hover:text-red-600 max-sm:px-3 max-sm:py-2.5 max-sm:text-[13px]"
                           >
                             Удалить
                           </button>
@@ -344,7 +344,7 @@ export function PersonalCashForecastClient() {
                     value={newLabel}
                     onChange={(e) => setNewLabel(e.target.value)}
                     placeholder="Название"
-                    className="min-w-[8rem] flex-1 rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[13px] outline-none focus:border-[var(--v2-brand-400)]"
+                    className="min-w-[8rem] flex-1 rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[13px] outline-none focus:border-[var(--v2-brand-400)] max-sm:h-11 max-sm:w-full max-sm:flex-none max-sm:text-[16px]"
                   />
                   <input
                     type="text"
@@ -352,13 +352,13 @@ export function PersonalCashForecastClient() {
                     value={newAmount}
                     onChange={(e) => setNewAmount(e.target.value)}
                     placeholder="Сумма"
-                    className="w-28 rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-right text-[13px] v2-tnum outline-none focus:border-[var(--v2-brand-400)]"
+                    className="w-28 rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-right text-[13px] v2-tnum outline-none focus:border-[var(--v2-brand-400)] max-sm:h-11 max-sm:min-w-0 max-sm:flex-1 max-sm:text-[16px]"
                   />
                   <button
                     type="button"
                     disabled={saving}
                     onClick={() => void addExtra()}
-                    className="rounded-lg bg-[var(--v2-brand-600)] px-3 py-2 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50"
+                    className="rounded-lg bg-[var(--v2-brand-600)] px-3 py-2 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50 max-sm:h-11 max-sm:px-5 max-sm:text-[14px]"
                   >
                     Добавить
                   </button>
@@ -411,7 +411,7 @@ export function PersonalCashForecastClient() {
                             <button
                               type="button"
                               onClick={() => toggleIncome(p.project_id)}
-                              className="rounded-md px-2 py-1 text-[12px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-800)]"
+                              className="rounded-md px-2 py-1 text-[12px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-800)] max-sm:px-3 max-sm:py-2.5 max-sm:text-[13px]"
                             >
                               {excluded ? "Вернуть" : "Убрать"}
                             </button>

@@ -140,6 +140,31 @@
     padding: 24px 18px 40px;
   }
 
+  .hy-art-back {
+    min-height: 40px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .hy-art-doc h1 {
+    font-size: 28px;
+    line-height: 1.12;
+  }
+
+  .hy-art-prose {
+    margin-top: 24px;
+    font-size: 16.5px;
+  }
+
+  .hy-art-prose h2 {
+    margin: 36px 0 12px;
+    font-size: 22px;
+  }
+
+  .hy-art-prose h3 {
+    font-size: 19px;
+  }
+
   .hy-art-prose table {
     display: block;
     overflow-x: auto;

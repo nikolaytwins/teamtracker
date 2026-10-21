@@ -43,7 +43,7 @@ export function AssigneeAvatarPicker({
             type="button"
             title={m.display_name}
             onClick={() => onChange(m.user_id)}
-            className={`inline-flex items-center gap-2 rounded-xl border px-2 py-1.5 transition ${
+            className={`inline-flex min-w-0 max-w-full items-center gap-2 rounded-xl border px-2 py-1.5 transition ${
               active
                 ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)] shadow-[var(--v2-shadow-card)]"
                 : "border-[var(--v2-ink-200)] hover:border-[var(--v2-ink-300)] hover:bg-[var(--v2-ink-50)]"
@@ -96,7 +96,7 @@ export function PriorityFlagPicker({
             key={key}
             type="button"
             onClick={() => onChange(active && allowUnset ? null : key)}
-            className={`v2-tight flex w-full min-w-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-left transition ${
+            className={`v2-tight flex min-h-11 w-full min-w-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-left transition sm:min-h-0 ${
               active ? "border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)]" : "border-[var(--v2-ink-200)] hover:border-[var(--v2-ink-300)]"
             }`}
           >

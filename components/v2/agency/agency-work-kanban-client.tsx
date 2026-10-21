@@ -13,18 +13,52 @@ import { appPath } from "@/lib/api-url";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+function MoveToColumn({
+  status,
+  onMove,
+  className = "",
+}: {
+  status: AgencyWorkStatus;
+  onMove: (status: AgencyWorkStatus) => void;
+  className?: string;
+}) {
+  return (
+    <label
+      className={`relative inline-flex h-9 shrink-0 items-center gap-1 rounded-lg bg-[var(--v2-ink-50)] px-2.5 text-[12px] font-medium text-[var(--v2-ink-600)] pointer-fine:hidden ${className}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      Колонка
+      <V2Icons.chev className="h-3.5 w-3.5 text-[var(--v2-ink-400)]" />
+      <select
+        value={status}
+        aria-label="Переместить в колонку"
+        onChange={(e) => onMove(e.target.value as AgencyWorkStatus)}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0 text-[16px]"
+      >
+        {AGENCY_WORK_STATUSES.map((s) => (
+          <option key={s.key} value={s.key}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function KanbanCard({
   card,
   dragging,
   onDragStart,
   onDragEnd,
   onDelete,
+  onMove,
 }: {
   card: AgencyKanbanCard;
   dragging: boolean;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onDelete?: () => void;
+  onMove: (status: AgencyWorkStatus) => void;
 }) {
   const payment =
     card.payment_status && card.kind === "finance"
@@ -81,19 +115,27 @@ function KanbanCard({
             <p className="text-[11px] text-[var(--v2-ink-400)]">Без финансов</p>
           )}
         </div>
-        {card.kind === "internal" && onDelete ? (
-          <button
-            type="button"
-            title="Удалить"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-          >
-            <V2Icons.trash className="h-3.5 w-3.5" />
-          </button>
+        {card.kind === "finance" && card.finance_project_id ? (
+          <span className="hidden h-9 w-[92px] shrink-0 pointer-coarse:block" aria-hidden />
+        ) : null}
+        {card.kind === "internal" ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <MoveToColumn status={card.work_status} onMove={onMove} />
+            {onDelete ? (
+              <button
+                type="button"
+                title="Удалить"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:text-[var(--v2-ink-400)] pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100"
+              >
+                <V2Icons.trash className="h-3.5 w-3.5 pointer-coarse:h-4 pointer-coarse:w-4" />
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </>
@@ -113,10 +155,12 @@ function KanbanCard({
           onDragStart(card.id);
         }}
         onDragEnd={onDragEnd}
+        className="relative"
       >
         <Link href={appPath(`/v2/agency/projects/${card.finance_project_id}`)} className={className}>
           {inner}
         </Link>
+        <MoveToColumn status={card.work_status} onMove={onMove} className="absolute bottom-3 right-3" />
       </div>
     );
   }
@@ -250,17 +294,17 @@ export function AgencyWorkKanbanClient() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--v2-ink-100)] bg-white px-6 py-4">
-        <div>
+      <header className="flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-[var(--v2-ink-100)] bg-white px-4 py-4 max-lg:items-center lg:px-6">
+        <div className="min-w-0 flex-1">
           <h1 className="v2-tighter text-[22px] font-bold text-[var(--v2-ink-900)]">Канбан проектов</h1>
-          <p className="mt-0.5 text-[13px] text-[var(--v2-ink-500)]">
+          <p className="mt-0.5 text-[13px] text-[var(--v2-ink-500)] max-sm:hidden">
             Проекты из «Проекты и финансы» + внутренние задачи · перетаскивай между колонками
           </p>
         </div>
         <button
           type="button"
           onClick={() => openAdd("not_started")}
-          className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[13px] font-semibold text-white transition hover:bg-[var(--v2-ink-800)]"
+          className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[13px] font-semibold text-white transition hover:bg-[var(--v2-ink-800)] max-lg:h-10 max-lg:text-[14px]"
         >
           <V2Icons.plus className="h-4 w-4" />
           Добавить
@@ -268,12 +312,12 @@ export function AgencyWorkKanbanClient() {
       </header>
 
       {error ? (
-        <div className="mx-6 mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+        <div className="mx-4 mt-3 rounded-xl lg:mx-6 border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
           {error}
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-6 py-4">
+      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-6 py-4 max-lg:snap-x max-lg:snap-mandatory max-lg:scroll-px-4 max-lg:overscroll-x-contain max-lg:px-4">
         {loading && !cards.length ? (
           <div className="flex flex-1 items-center justify-center text-[13px] text-[var(--v2-ink-400)]">
             Загрузка…
@@ -298,7 +342,7 @@ export function AgencyWorkKanbanClient() {
                   setDragId(null);
                   setDropStatus(null);
                 }}
-                className={`v2-kcol flex w-[280px] shrink-0 flex-col rounded-2xl bg-white/40 backdrop-blur-sm transition-all ${
+                className={`v2-kcol flex w-[280px] shrink-0 flex-col rounded-2xl bg-white/40 backdrop-blur-sm transition-all max-sm:w-[min(84vw,320px)] max-lg:snap-start ${
                   isDrop ? "ring-2 ring-[var(--v2-brand-400)]" : ""
                 }`}
               >
@@ -314,9 +358,9 @@ export function AgencyWorkKanbanClient() {
                     type="button"
                     onClick={() => openAdd(col.key)}
                     aria-label="Добавить в колонку"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)]"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)] max-lg:-my-1 max-lg:h-9 max-lg:w-9"
                   >
-                    <V2Icons.plus className="h-3.5 w-3.5" />
+                    <V2Icons.plus className="h-3.5 w-3.5 max-lg:h-4 max-lg:w-4" />
                   </button>
                 </div>
                 <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2.5">
@@ -333,6 +377,7 @@ export function AgencyWorkKanbanClient() {
                       onDelete={
                         card.kind === "internal" ? () => void deleteInternal(card.id) : undefined
                       }
+                      onMove={(status) => void moveCard(card.id, status)}
                     />
                   ))}
                   {!list.length ? (
@@ -349,11 +394,11 @@ export function AgencyWorkKanbanClient() {
 
       {addOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center sm:p-4"
           onClick={() => setAddOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"
+            className="max-h-[100dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl sm:pb-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -370,7 +415,7 @@ export function AgencyWorkKanbanClient() {
                 type="button"
                 onClick={() => setAddOpen(false)}
                 aria-label="Закрыть"
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-[18px] leading-none text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)]"
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-[18px] leading-none text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] max-lg:-mr-1 max-lg:-mt-1 max-lg:h-10 max-lg:w-10 max-lg:text-[22px]"
               >
                 ×
               </button>
@@ -390,7 +435,7 @@ export function AgencyWorkKanbanClient() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Сайт для клиента…"
-                  className="v2-input mt-1 h-10 w-full text-[14px]"
+                  className="v2-input mt-1 h-10 w-full text-[14px] max-lg:h-11 max-lg:text-[16px]!"
                 />
               </label>
 
@@ -399,7 +444,7 @@ export function AgencyWorkKanbanClient() {
                   type="checkbox"
                   checked={!includeInFinance}
                   onChange={(e) => setIncludeInFinance(!e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-[var(--v2-ink-300)]"
+                  className="mt-0.5 h-4 w-4 rounded border-[var(--v2-ink-300)] max-lg:h-5 max-lg:w-5"
                 />
                 <span>
                   <span className="font-semibold text-[var(--v2-ink-900)]">
@@ -417,10 +462,11 @@ export function AgencyWorkKanbanClient() {
                     Сумма, ₽
                     <input
                       type="number"
+                      inputMode="numeric"
                       value={totalAmount}
                       onChange={(e) => setTotalAmount(e.target.value)}
                       placeholder="0"
-                      className="v2-input mt-1 h-10 w-full text-[14px]"
+                      className="v2-input mt-1 h-10 w-full text-[14px] max-lg:h-11 max-lg:text-[16px]!"
                     />
                   </label>
                   <div>
@@ -437,7 +483,7 @@ export function AgencyWorkKanbanClient() {
                       ).map((opt) => (
                         <label
                           key={opt.value}
-                          className="inline-flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)]"
+                          className="inline-flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)] max-lg:min-h-10 max-lg:text-[14px]"
                         >
                           <input
                             type="radio"
@@ -458,7 +504,7 @@ export function AgencyWorkKanbanClient() {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Опционально"
-                    className="v2-input mt-1 h-10 w-full text-[14px]"
+                    className="v2-input mt-1 h-10 w-full text-[14px] max-lg:h-11 max-lg:text-[16px]!"
                   />
                 </label>
               )}
@@ -467,14 +513,14 @@ export function AgencyWorkKanbanClient() {
                 <button
                   type="button"
                   onClick={() => setAddOpen(false)}
-                  className="h-10 rounded-xl border border-[var(--v2-ink-200)] px-4 text-[13px] font-semibold text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
+                  className="h-10 rounded-xl border border-[var(--v2-ink-200)] px-4 text-[13px] font-semibold text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] max-sm:h-11 max-sm:flex-1"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !title.trim()}
-                  className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-semibold text-white hover:bg-[var(--v2-ink-800)] disabled:opacity-40"
+                  className="h-10 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-semibold text-white hover:bg-[var(--v2-ink-800)] disabled:opacity-40 max-sm:h-11 max-sm:flex-1"
                 >
                   {saving ? "Сохраняю…" : "Добавить"}
                 </button>

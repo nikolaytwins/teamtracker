@@ -236,7 +236,7 @@ export function PersonalAccountsClient() {
   return (
     <PersonalMaskProvider masked={masked}>
       <div className="flex min-h-0 flex-1 flex-col bg-[var(--v2-ink-25)]">
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--v2-ink-100)] bg-white/90 px-6 backdrop-blur-md">
+        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--v2-ink-100)] bg-white/90 px-4 backdrop-blur-md sm:px-6">
           <nav className="flex items-center gap-1.5 text-[13px] text-[var(--v2-ink-500)]">
             <Link href={appPath("/v2/personal/finance")} className="transition hover:text-[var(--v2-ink-800)]">
               Личное
@@ -262,7 +262,7 @@ export function PersonalAccountsClient() {
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[960px] flex-1 px-6 py-8">
+        <div className="mx-auto w-full max-w-[960px] flex-1 px-3 py-5 sm:px-6 sm:py-8">
           {error ? (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
               {error}
@@ -270,7 +270,7 @@ export function PersonalAccountsClient() {
           ) : null}
 
           <section className="mb-10">
-            <div className="mb-4 flex items-end justify-between gap-4">
+            <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
               <div>
                 <h1 className="v2-tight text-2xl font-semibold text-[var(--v2-ink-900)]">Счета</h1>
                 <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">
@@ -281,7 +281,7 @@ export function PersonalAccountsClient() {
               <button
                 type="button"
                 onClick={() => setAccountDraft(emptyAccount())}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-[13px] font-medium text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-50)]"
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-[13px] font-medium text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-50)] max-sm:h-11 max-sm:text-[14px]"
               >
                 <V2Icons.plus className="h-4 w-4" />
                 Добавить счёт
@@ -310,7 +310,7 @@ export function PersonalAccountsClient() {
                   return (
                   <div
                     key={a.id}
-                    className="flex items-center gap-4 rounded-2xl bg-white px-4 py-3 shadow-[var(--v2-shadow-soft)]"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-white px-3 py-3 shadow-[var(--v2-shadow-soft)] sm:flex-nowrap sm:gap-4 sm:px-4"
                   >
                     <span
                       className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
@@ -318,7 +318,7 @@ export function PersonalAccountsClient() {
                     >
                       <V2Icons.ruble className="h-5 w-5" />
                     </span>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 max-sm:basis-[calc(100%-52px)]">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="v2-tight font-medium text-[var(--v2-ink-900)]">{a.name}</div>
                         {isFx ? (
@@ -356,18 +356,18 @@ export function PersonalAccountsClient() {
                       }}
                       onError={setError}
                     />
-                    <div className="flex shrink-0 gap-1">
+                    <div className="flex shrink-0 gap-1 max-sm:ml-auto">
                       <button
                         type="button"
                         onClick={() => setAccountDraft({ ...a })}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)] max-sm:h-10 max-sm:w-10"
                       >
                         <V2Icons.edit className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
                         onClick={() => void deleteAccount(a.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 max-sm:h-10 max-sm:w-10"
                       >
                         <V2Icons.trash className="h-4 w-4" />
                       </button>
@@ -380,7 +380,7 @@ export function PersonalAccountsClient() {
           </section>
 
           <section>
-            <div className="mb-4 flex items-end justify-between gap-4">
+            <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
               <div>
                 <h2 className="v2-tight text-xl font-semibold text-[var(--v2-ink-900)]">Капитал</h2>
                 <p className="mt-1 text-[13px] text-[var(--v2-ink-500)]">Недвижимость, вклады, техника и прочие активы</p>
@@ -388,7 +388,7 @@ export function PersonalAccountsClient() {
               <button
                 type="button"
                 onClick={() => setCapitalDraft(emptyCapital())}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-[13px] font-medium text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-50)]"
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-[13px] font-medium text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-50)] max-sm:h-11 max-sm:text-[14px]"
               >
                 <V2Icons.plus className="h-4 w-4" />
                 Добавить актив
@@ -404,7 +404,7 @@ export function PersonalAccountsClient() {
                 {capital.map((c) => (
                   <div
                     key={c.id}
-                    className="flex items-center gap-4 rounded-2xl bg-white px-4 py-3 shadow-[var(--v2-shadow-soft)]"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-white px-3 py-3 shadow-[var(--v2-shadow-soft)] sm:flex-nowrap sm:gap-4 sm:px-4"
                   >
                     <span
                       className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
@@ -412,7 +412,7 @@ export function PersonalAccountsClient() {
                     >
                       <V2Icons.folder className="h-5 w-5 text-white" />
                     </span>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 max-sm:basis-[calc(100%-52px)]">
                       <div className="v2-tight font-medium text-[var(--v2-ink-900)]">{c.name}</div>
                       {c.meta ? <div className="text-[12px] text-[var(--v2-ink-500)]">{c.meta}</div> : null}
                     </div>
@@ -433,18 +433,18 @@ export function PersonalAccountsClient() {
                       }}
                       onError={setError}
                     />
-                    <div className="flex shrink-0 gap-1">
+                    <div className="flex shrink-0 gap-1 max-sm:ml-auto">
                       <button
                         type="button"
                         onClick={() => setCapitalDraft({ ...c })}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)] max-sm:h-10 max-sm:w-10"
                       >
                         <V2Icons.edit className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
                         onClick={() => void deleteCapital(c.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 max-sm:h-10 max-sm:w-10"
                       >
                         <V2Icons.trash className="h-4 w-4" />
                       </button>
@@ -457,8 +457,8 @@ export function PersonalAccountsClient() {
         </div>
 
         {accountDraft ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
+          <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/30 sm:items-center sm:p-4">
+            <div className="max-h-[94dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-[var(--v2-shadow-pop)] sm:max-h-[90vh] sm:rounded-2xl sm:p-6">
               <h3 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">
                 {accountDraft.id ? "Редактировать счёт" : "Новый счёт"}
               </h3>
@@ -466,7 +466,7 @@ export function PersonalAccountsClient() {
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
                   Название
                   <input
-                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                     value={accountDraft.name ?? ""}
                     onChange={(e) => setAccountDraft({ ...accountDraft, name: e.target.value })}
                   />
@@ -474,7 +474,7 @@ export function PersonalAccountsClient() {
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
                   Тип
                   <select
-                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                     value={accountDraft.account_type ?? "card"}
                     onChange={(e) => {
                       const account_type = e.target.value as PersonalAccountType;
@@ -495,7 +495,7 @@ export function PersonalAccountsClient() {
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
                   Валюта
                   <select
-                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                     value={accountDraft.currency_code ?? "RUB"}
                     onChange={(e) => {
                       const currency_code = e.target.value as PersonalAccountCurrency;
@@ -523,7 +523,8 @@ export function PersonalAccountsClient() {
                     {accountDraft.id ? "Баланс, ₽" : "Начальный баланс, ₽"}
                     <input
                       type="number"
-                      className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                      inputMode="numeric"
+                      className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                       value={accountDraft.balance_rub ?? 0}
                       onChange={(e) =>
                         setAccountDraft({
@@ -541,8 +542,9 @@ export function PersonalAccountsClient() {
                       : `Начальный остаток, ${accountDraft.currency_code}`}
                     <input
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
-                      className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                      className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                       value={accountDraft.balance_native ?? 0}
                       onChange={(e) =>
                         setAccountDraft({
@@ -556,7 +558,7 @@ export function PersonalAccountsClient() {
                     </span>
                   </label>
                 )}
-                <label className="flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)]">
+                <label className="flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)] max-sm:min-h-11 max-sm:gap-3 max-sm:text-[14px]">
                   <input
                     type="checkbox"
                     checked={accountDraft.disposable ?? true}
@@ -564,7 +566,7 @@ export function PersonalAccountsClient() {
                   />
                   Учитывать в «свободных деньгах»
                 </label>
-                <label className="flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)]">
+                <label className="flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)] max-sm:min-h-11 max-sm:gap-3 max-sm:text-[14px]">
                   <input
                     type="checkbox"
                     checked={accountDraft.in_cushion ?? false}
@@ -575,7 +577,7 @@ export function PersonalAccountsClient() {
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
                   Заметка
                   <input
-                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                     value={accountDraft.note ?? ""}
                     onChange={(e) => setAccountDraft({ ...accountDraft, note: e.target.value })}
                   />
@@ -585,7 +587,7 @@ export function PersonalAccountsClient() {
                 <button
                   type="button"
                   onClick={() => setAccountDraft(null)}
-                  className="h-9 rounded-lg px-4 text-[13px] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
+                  className="h-9 rounded-lg px-4 text-[13px] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] max-sm:h-12 max-sm:text-[14px]"
                 >
                   Отмена
                 </button>
@@ -593,7 +595,7 @@ export function PersonalAccountsClient() {
                   type="button"
                   disabled={saving}
                   onClick={() => void saveAccount()}
-                  className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-4 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50"
+                  className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-4 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50 max-sm:h-12 max-sm:flex-1 max-sm:text-[15px]"
                 >
                   Сохранить
                 </button>
@@ -603,8 +605,8 @@ export function PersonalAccountsClient() {
         ) : null}
 
         {capitalDraft ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
+          <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/30 sm:items-center sm:p-4">
+            <div className="max-h-[94dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-[var(--v2-shadow-pop)] sm:max-h-[90vh] sm:rounded-2xl sm:p-6">
               <h3 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">
                 {capitalDraft.id ? "Редактировать актив" : "Новый актив"}
               </h3>
@@ -612,7 +614,7 @@ export function PersonalAccountsClient() {
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
                   Название
                   <input
-                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                     value={capitalDraft.name ?? ""}
                     onChange={(e) => setCapitalDraft({ ...capitalDraft, name: e.target.value })}
                   />
@@ -621,7 +623,8 @@ export function PersonalAccountsClient() {
                   Стоимость, ₽
                   <input
                     type="number"
-                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                    inputMode="numeric"
+                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                     value={capitalDraft.amount_rub ?? 0}
                     onChange={(e) =>
                       setCapitalDraft({ ...capitalDraft, amount_rub: Number(e.target.value) || 0 })
@@ -631,7 +634,7 @@ export function PersonalAccountsClient() {
                 <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
                   Описание
                   <input
-                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px]"
+                    className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[14px] max-sm:h-11 max-sm:text-[16px]"
                     value={capitalDraft.meta ?? ""}
                     onChange={(e) => setCapitalDraft({ ...capitalDraft, meta: e.target.value })}
                   />
@@ -641,7 +644,7 @@ export function PersonalAccountsClient() {
                 <button
                   type="button"
                   onClick={() => setCapitalDraft(null)}
-                  className="h-9 rounded-lg px-4 text-[13px] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
+                  className="h-9 rounded-lg px-4 text-[13px] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] max-sm:h-12 max-sm:text-[14px]"
                 >
                   Отмена
                 </button>
@@ -649,7 +652,7 @@ export function PersonalAccountsClient() {
                   type="button"
                   disabled={saving}
                   onClick={() => void saveCapital()}
-                  className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-4 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50"
+                  className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-4 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50 max-sm:h-12 max-sm:flex-1 max-sm:text-[15px]"
                 >
                   Сохранить
                 </button>

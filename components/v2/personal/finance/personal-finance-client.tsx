@@ -245,7 +245,7 @@ function PfIconBtn({
       type="button"
       onClick={onClick}
       title={title}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition ${
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition max-sm:h-10 max-sm:w-10 ${
         active
           ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-600)]"
           : "text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
@@ -276,7 +276,7 @@ function PfTopbar({
   canOperate: boolean;
 }) {
   return (
-    <div className="flex h-14 items-center gap-3 border-b border-[var(--v2-ink-100)]/70 px-7">
+    <div className="flex h-14 items-center gap-3 border-b border-[var(--v2-ink-100)]/70 px-4 sm:px-7">
       <div className="v2-tight flex items-center gap-2 text-[13px] text-[var(--v2-ink-500)]">
         <span className="text-[var(--v2-ink-400)]">Личное</span>
         <span className="text-[var(--v2-ink-300)]">/</span>
@@ -299,7 +299,7 @@ function PfTopbar({
           onClick={onOperation}
           disabled={!canOperate}
           title={canOperate ? undefined : "Недоступно"}
-          className="v2-tight ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="v2-tight ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)] disabled:cursor-not-allowed disabled:opacity-40 max-sm:h-10 max-sm:text-[13.5px]"
         >
           <V2Icons.plus className="h-4 w-4" />
           Операция
@@ -327,16 +327,38 @@ function PfPageHead({
   const nextDisabled = next.year > nowY || (next.year === nowY && next.month > nowM);
 
   return (
-    <div className="mb-7 flex items-end justify-between gap-6">
+    <div className="mb-5 flex flex-col gap-3 sm:mb-7 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
       <div>
         <div className="v2-tight text-[12.5px] font-medium text-[var(--v2-ink-500)]">
           Личные финансы · {monthLabel(year, month)}
         </div>
-        <h1 className="v2-tighter mt-1 text-[40px] font-semibold leading-[1.05] text-[var(--v2-ink-900)]">
+        <h1 className="v2-tighter mt-1 text-[28px] font-semibold leading-[1.05] text-[var(--v2-ink-900)] sm:text-[40px]">
           Финансовая система
         </h1>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 rounded-xl bg-white/80 p-1 shadow-[var(--v2-shadow-card)] backdrop-blur lg:hidden">
+        <button
+          type="button"
+          aria-label="Предыдущий месяц"
+          onClick={() => onMonthChange(prev.year, prev.month)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[20px] text-[var(--v2-ink-600)]"
+        >
+          ‹
+        </button>
+        <span className="v2-tight flex-1 text-center text-[14px] font-medium text-[var(--v2-ink-900)]">
+          {monthLabel(year, month)}
+        </span>
+        <button
+          type="button"
+          aria-label="Следующий месяц"
+          disabled={nextDisabled}
+          onClick={() => !nextDisabled && onMonthChange(next.year, next.month)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[20px] text-[var(--v2-ink-600)] disabled:opacity-30"
+        >
+          ›
+        </button>
+      </div>
+      <div className="hidden items-center gap-2 lg:flex">
         <div className="hidden items-center gap-1 rounded-xl bg-white/80 p-1 shadow-[var(--v2-shadow-card)] backdrop-blur lg:flex">
           <button
             type="button"
@@ -1033,11 +1055,11 @@ function PfHistoryTable({
         <PfCard className="p-8 text-center text-sm text-[var(--v2-ink-500)]">История пока пуста</PfCard>
       ) : (
         <PfCard className="overflow-hidden">
-          <div className="grid grid-cols-[1.3fr_1fr_0.85fr_1fr_1fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)]">
+          <div className="grid grid-cols-[1.1fr_1fr_1fr] gap-x-2 border-b border-[var(--v2-ink-100)]/70 px-3 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-400)] sm:grid-cols-[1.3fr_1fr_0.85fr_1fr_1fr] sm:gap-x-0 sm:px-5 sm:text-[11px]">
             <div>Месяц</div>
             <div className="text-right">На счетах</div>
-            <div className="text-right">Динамика</div>
-            <div className="text-right">Выручка</div>
+            <div className="hidden text-right sm:block">Динамика</div>
+            <div className="hidden text-right sm:block">Выручка</div>
             <div className="text-right">Прибыль</div>
           </div>
           <div className="divide-y divide-[var(--v2-ink-100)]/70">
@@ -1053,11 +1075,11 @@ function PfHistoryTable({
               return (
                 <div
                   key={`${h.year}-${h.month}`}
-                  className={`grid grid-cols-[1.3fr_1fr_0.85fr_1fr_1fr] items-center px-5 py-3 text-[13.5px] transition hover:bg-[var(--v2-ink-50)]/60 ${
+                  className={`grid grid-cols-[1.1fr_1fr_1fr] items-center gap-x-2 px-3 py-3 text-[13px] transition hover:bg-[var(--v2-ink-50)]/60 sm:grid-cols-[1.3fr_1fr_0.85fr_1fr_1fr] sm:gap-x-0 sm:px-5 sm:text-[13.5px] ${
                     isCurrent ? "bg-[var(--v2-brand-50)]/40" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className="v2-tight font-medium text-[var(--v2-ink-900)]">{full}</span>
                     {isCurrent ? (
                       <span className="rounded bg-[var(--v2-brand-50)] px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wide text-[var(--v2-brand-700)]">
@@ -1067,8 +1089,13 @@ function PfHistoryTable({
                   </div>
                   <div className="v2-tight text-right font-semibold text-[var(--v2-ink-900)]">
                     <PersonalAmt v={h.accounts_total_rub} />
+                    {deltaPct != null ? (
+                      <div className="mt-0.5 sm:hidden">
+                        <PfDelta value={deltaPct} />
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="text-right">
+                  <div className="hidden text-right sm:block">
                     {deltaPct != null ? (
                       <span className="inline-flex flex-col items-end gap-0.5">
                         <PfDelta value={deltaPct} />
@@ -1084,7 +1111,7 @@ function PfHistoryTable({
                       <span className="text-[var(--v2-ink-300)]">—</span>
                     )}
                   </div>
-                  <div className="v2-tnum text-right font-medium text-[var(--v2-ink-800)]">
+                  <div className="v2-tnum hidden text-right font-medium text-[var(--v2-ink-800)] sm:block">
                     {h.earned_rub != null ? <PersonalAmt v={h.earned_rub} /> : "—"}
                   </div>
                   <div className="v2-tnum text-right font-medium text-emerald-600">
@@ -1232,7 +1259,7 @@ function PfTaxModal({
       {label}
       <div className="relative mt-1">
         <input
-          className="v2-tnum w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px] outline-none focus:border-[var(--v2-brand-300)] focus:ring-2 focus:ring-[var(--v2-brand-100)]"
+          className="v2-tnum w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px] outline-none focus:border-[var(--v2-brand-300)] focus:ring-2 focus:ring-[var(--v2-brand-100)] max-sm:py-2.5 max-sm:text-[16px]"
           value={form[key]}
           inputMode="decimal"
           placeholder={opts?.placeholder}
@@ -1248,8 +1275,8 @@ function PfTaxModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/30 sm:items-center sm:p-4">
+      <div className="max-h-[94dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-[var(--v2-shadow-pop)] sm:max-h-[90vh] sm:rounded-2xl sm:p-6">
         <h3 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Настройка налогов ИП · Патент</h3>
         <p className="mt-1 text-[12.5px] text-[var(--v2-ink-500)]">
           Фикс. взносы, налог с выручки ({Math.round(tax.revenue_rate * 100)}% с суммы свыше{" "}
@@ -1259,13 +1286,13 @@ function PfTaxModal({
           <label className="block text-[12px] font-medium text-[var(--v2-ink-600)]">
             Схема
             <input
-              className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px] outline-none focus:border-[var(--v2-brand-300)] focus:ring-2 focus:ring-[var(--v2-brand-100)]"
+              className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-3 py-2 text-[14px] outline-none focus:border-[var(--v2-brand-300)] focus:ring-2 focus:ring-[var(--v2-brand-100)] max-sm:py-2.5 max-sm:text-[16px]"
               value={form.scheme}
               placeholder="ИП · Патент (ПСН)"
               onChange={(e) => setForm((f) => ({ ...f, scheme: e.target.value }))}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {field("Выручка за год", "yearRevenue", { suffix: "₽" })}
             {field("Фикс. взносы за год", "fixedContributions", { suffix: "₽", placeholder: "57390" })}
           </div>
@@ -1321,7 +1348,7 @@ function PfTaxModal({
                     type="button"
                     disabled={advBusy}
                     onClick={() => void deleteAdvance(a.id)}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50 max-sm:-my-1.5 max-sm:h-9 max-sm:w-9"
                     aria-label="Удалить взнос"
                   >
                     <V2Icons.trash className="h-3.5 w-3.5" />
@@ -1333,29 +1360,29 @@ function PfTaxModal({
             <p className="mt-2 text-[12.5px] text-[var(--v2-ink-400)]">Пока нет оплаченных взносов.</p>
           )}
 
-          <div className="mt-2 flex items-end gap-2">
-            <label className="flex-1 text-[11px] font-medium text-[var(--v2-ink-500)]">
+          <div className="mt-2 flex flex-wrap items-end gap-2 sm:flex-nowrap">
+            <label className="w-full text-[11px] font-medium text-[var(--v2-ink-500)] sm:w-auto sm:flex-1">
               Комментарий
               <input
-                className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--v2-brand-300)]"
+                className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--v2-brand-300)] max-sm:h-11 max-sm:text-[16px]"
                 value={advLabel}
                 placeholder="1 квартал"
                 onChange={(e) => setAdvLabel(e.target.value)}
               />
             </label>
-            <label className="w-24 text-[11px] font-medium text-[var(--v2-ink-500)]">
+            <label className="min-w-0 flex-1 text-[11px] font-medium text-[var(--v2-ink-500)] sm:w-24 sm:flex-initial">
               Дата
               <input
                 type="date"
-                className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-2 py-1.5 text-[12px] outline-none focus:border-[var(--v2-brand-300)]"
+                className="mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] bg-white px-2 py-1.5 text-[12px] outline-none focus:border-[var(--v2-brand-300)] max-sm:h-11 max-sm:text-[16px]"
                 value={advDate}
                 onChange={(e) => setAdvDate(e.target.value)}
               />
             </label>
-            <label className="w-28 text-[11px] font-medium text-[var(--v2-ink-500)]">
+            <label className="min-w-0 flex-1 text-[11px] font-medium text-[var(--v2-ink-500)] sm:w-28 sm:flex-initial">
               Сумма
               <input
-                className="v2-tnum mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--v2-brand-300)]"
+                className="v2-tnum mt-1 w-full rounded-lg border border-[var(--v2-ink-200)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--v2-brand-300)] max-sm:h-11 max-sm:text-[16px]"
                 value={advAmount}
                 inputMode="decimal"
                 placeholder="₽"
@@ -1366,7 +1393,7 @@ function PfTaxModal({
               type="button"
               disabled={advBusy}
               onClick={() => void addAdvance()}
-              className="inline-flex h-[34px] items-center gap-1 rounded-lg bg-[var(--v2-ink-900)] px-3 text-[12.5px] font-medium text-white transition hover:bg-black disabled:opacity-50"
+              className="inline-flex h-[34px] items-center justify-center gap-1 rounded-lg bg-[var(--v2-ink-900)] px-3 text-[12.5px] font-medium text-white transition hover:bg-black disabled:opacity-50 max-sm:h-11 max-sm:w-full max-sm:text-[14px]"
             >
               <V2Icons.plus className="h-3.5 w-3.5" />
               Добавить
@@ -1384,7 +1411,7 @@ function PfTaxModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-9 rounded-lg px-4 text-[13px] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)]"
+            className="h-9 rounded-lg px-4 text-[13px] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] max-sm:h-12 max-sm:text-[14px]"
           >
             Закрыть
           </button>
@@ -1392,7 +1419,7 @@ function PfTaxModal({
             type="button"
             disabled={saving}
             onClick={() => onSave(form)}
-            className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-4 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50"
+            className="h-9 rounded-lg bg-[var(--v2-brand-600)] px-4 text-[13px] font-medium text-white hover:bg-[var(--v2-brand-700)] disabled:opacity-50 max-sm:h-12 max-sm:flex-1 max-sm:text-[15px]"
           >
             {saving ? "Сохранение…" : "Сохранить"}
           </button>
@@ -1438,7 +1465,7 @@ function PfTaxCard({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-medium text-[var(--v2-ink-700)] transition hover:bg-[var(--v2-ink-50)]"
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-medium text-[var(--v2-ink-700)] transition hover:bg-[var(--v2-ink-50)] max-sm:h-9 max-sm:px-3 max-sm:text-[13px]"
             >
               <V2Icons.edit className="h-3.5 w-3.5" />
               Настроить
@@ -1570,7 +1597,7 @@ function PfBudgetCard({
         right={
           <Link
             href={txLink}
-            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-medium text-[var(--v2-ink-700)] transition hover:bg-[var(--v2-ink-50)]"
+            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-medium text-[var(--v2-ink-700)] transition hover:bg-[var(--v2-ink-50)] max-sm:h-9 max-sm:px-3 max-sm:text-[13px]"
           >
             Транзакции
             <V2Icons.chevR className="h-3.5 w-3.5" />
@@ -1795,7 +1822,7 @@ export function PersonalFinanceClient() {
         />
 
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1200px] px-6 pb-24 pt-8 lg:px-10">
+          <div className="mx-auto max-w-[1200px] px-3 pb-28 pt-4 sm:px-6 sm:pt-8 lg:px-10 lg:pb-24">
             {error ? (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
                 {error}
@@ -1812,7 +1839,7 @@ export function PersonalFinanceClient() {
               today={today}
             />
 
-            <div className="space-y-7">
+            <div className="space-y-6 sm:space-y-7">
               <PfHeroCards summary={summary} accounts={accounts} funds={funds ?? []} history={history} year={year} month={month} />
               <HomePersonalFinanceProvider>
                 <HomeDynamicsChart />
@@ -1897,9 +1924,17 @@ export function PersonalFinanceClient() {
           onReload={() => void reload()}
         />
 
+        <button
+          type="button"
+          onClick={() => setOperationOpen(true)}
+          aria-label="Новая операция"
+          className="fixed bottom-[calc(var(--v2-mobnav-h,0px)+12px)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--v2-ink-900)] text-white shadow-lg ring-2 ring-white active:scale-95 sm:hidden"
+        >
+          <V2Icons.plus className="h-6 w-6" />
+        </button>
         <Link
           href={appPath("/v2/personal/finance/assistant")}
-          className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full shadow-lg ring-2 ring-white transition hover:scale-105 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v2-brand-500,#2a56eb)]"
+          className="fixed bottom-[calc(var(--v2-mobnav-h,0px)+80px)] right-5 z-30 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full shadow-lg ring-2 ring-white transition hover:scale-105 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v2-brand-500,#2a56eb)] sm:bottom-[calc(var(--v2-mobnav-h,0px)+16px)] sm:right-6 sm:h-14 sm:w-14 lg:bottom-6"
           aria-label="Финансовый помощник София"
           title="София — финансовый помощник"
         >

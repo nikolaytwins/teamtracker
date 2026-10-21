@@ -66,7 +66,7 @@ export function TaskModalSubtaskRow({
           <button
             type="button"
             onClick={() => setEditingTitle(true)}
-            className={`v2-tight block w-full text-left text-[13px] ${completed ? "text-[var(--v2-ink-400)] line-through" : "text-[var(--v2-ink-800)]"}`}
+            className={`v2-tight block w-full text-left text-[13px] max-sm:min-h-8 max-sm:text-[14px] ${completed ? "text-[var(--v2-ink-400)] line-through" : "text-[var(--v2-ink-800)]"}`}
           >
             {sub.title}
           </button>
@@ -76,7 +76,7 @@ export function TaskModalSubtaskRow({
             <button
               type="button"
               onClick={() => setOpenField((f) => (f === "priority" ? null : "priority"))}
-              className="rounded-md px-1 py-0.5 hover:bg-[var(--v2-ink-100)]"
+              className="rounded-md px-1 py-0.5 hover:bg-[var(--v2-ink-100)] max-sm:px-2 max-sm:py-2"
             >
               <span className="inline-flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: pm.dot }} />
@@ -91,7 +91,7 @@ export function TaskModalSubtaskRow({
             <button
               type="button"
               onClick={() => setOpenField((f) => (f === "assignee" ? null : "assignee"))}
-              className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-[var(--v2-ink-100)]"
+              className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-[var(--v2-ink-100)] max-sm:px-2 max-sm:py-2"
             >
               {member ? (
                 <>
@@ -116,7 +116,7 @@ export function TaskModalSubtaskRow({
             <button
               type="button"
               onClick={() => setOpenField((f) => (f === "planned" ? null : "planned"))}
-              className="v2-tight rounded-md px-1 py-0.5 text-[11px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+              className="v2-tight rounded-md px-1 py-0.5 text-[11px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] max-sm:px-2 max-sm:py-2"
             >
               <V2Icons.cal className="mr-0.5 inline h-3 w-3" />
               {sub.planned_at ? "выполнение" : "без даты"}
@@ -129,7 +129,7 @@ export function TaskModalSubtaskRow({
             <button
               type="button"
               onClick={() => setOpenField((f) => (f === "deadline" ? null : "deadline"))}
-              className="v2-tight rounded-md px-1 py-0.5 text-[11px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+              className="v2-tight rounded-md px-1 py-0.5 text-[11px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] max-sm:px-2 max-sm:py-2"
             >
               <V2Icons.clock className="mr-0.5 inline h-3 w-3" />
               дедлайн {sub.deadline_at ? "" : "—"}

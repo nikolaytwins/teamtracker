@@ -120,7 +120,7 @@ const FUND_ICON = { cush: ShieldIcon, wish: WishIcon, est: HouseIcon };
 
 function GoalPhoto({ id, title, tall = false }: { id: string; title: string; tall?: boolean }) {
   const src = GOAL_PHOTO[id];
-  if (!src) return <div className="ph" style={tall ? { height: 240, borderRadius: 18 } : undefined}>{title || "Фото цели"}</div>;
+  if (!src) return <div className={tall ? "ph ph-tall" : "ph"}>{title || "Фото цели"}</div>;
   return <img className="fit" src={appPath(src)} alt="" style={{ objectPosition: GOAL_PHOTO_POS[id] ?? "center" }} />;
 }
 
@@ -903,14 +903,14 @@ export function GoalsPageClient() {
 
   return (
     <div className="flex min-h-full min-w-0 flex-1 flex-col">
-      <div className="shrink-0 border-b border-[var(--v2-ink-100)] bg-white px-6">
+      <div className="shrink-0 border-b border-[var(--v2-ink-100)] bg-white px-3 sm:px-6">
         <div className="flex gap-1 py-2">
           {tabs.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => router.replace(appPath(item.href))}
-              className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition ${
+              className={`rounded-lg px-3 py-2.5 text-[14px] font-medium transition max-lg:flex-1 lg:py-1.5 lg:text-[13px] ${
                 tab === item.id
                   ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
                   : "text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)]"

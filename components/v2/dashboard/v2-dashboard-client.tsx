@@ -81,7 +81,7 @@ export function V2DashboardClient() {
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="relative overflow-hidden border-b border-[var(--v2-ink-100)] bg-gradient-to-br from-[var(--v2-brand-600)] via-[var(--v2-brand-500)] to-[#1F3AAF]">
         <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_20%,rgba(255,255,255,.35),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,.2),transparent_40%)]" />
-        <div className="relative mx-auto flex max-w-[1180px] flex-wrap items-end justify-between gap-4 px-6 py-10 lg:px-10">
+        <div className="relative mx-auto flex max-w-[1180px] flex-wrap items-end justify-between gap-4 px-4 pb-8 pt-6 sm:px-6 sm:py-10 lg:px-10">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
               {data?.now.monthLabel ?? "…"} · сегодня
@@ -110,7 +110,7 @@ export function V2DashboardClient() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1180px] space-y-8 px-6 py-8 lg:px-10">
+      <div className="mx-auto max-w-[1180px] space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 lg:px-10">
         {error ? (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
             {error}

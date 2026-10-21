@@ -57,7 +57,7 @@ function BGhost({ children, onClick }: { children: React.ReactNode; onClick?: (e
     <button
       type="button"
       onClick={onClick}
-      className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)] transition hover:text-[var(--v2-ink-900)]"
+      className="v2-tight inline-flex h-10 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] sm:h-9 font-medium text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)] transition hover:text-[var(--v2-ink-900)]"
     >
       {children}
     </button>
@@ -77,11 +77,11 @@ function BSect({
 }) {
   return (
     <section className="mb-14">
-      <div className="mb-5 flex items-end gap-5">
+      <div className="mb-5 flex flex-wrap items-end gap-x-5 gap-y-3">
         <div>
           <h2 className="v2-tight text-[21px] font-medium text-[var(--v2-ink-900)]">{title}</h2>
           {sub ? (
-            <p className="v2-tight mt-1.5 max-w-[70ch] text-[14px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
+            <p className="v2-tight mt-1.5 max-w-[70ch] text-[15px] text-[var(--v2-ink-500)] sm:text-[14px]" style={{ textWrap: "pretty" }}>
               «{sub}»
             </p>
           ) : null}
@@ -120,7 +120,7 @@ function uid(prefix: string) {
 }
 
 const fieldCls =
-  "mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white v2-tight";
+  "mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[16px] text-[var(--v2-ink-900)] outline-none sm:text-[14.5px] transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white v2-tight";
 const labCls = "text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]";
 
 export function PersonalBrandClient() {
@@ -291,11 +291,11 @@ export function PersonalBrandClient() {
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6">
+    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-12 pt-4 sm:px-8 sm:pb-24 sm:pt-6">
       <div className="mx-auto max-w-[1320px]">
         <div className="mb-10 flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
           <div className="min-w-[280px] max-w-[640px] flex-1">
-            <h1 className="v2-tighter text-[52px] font-light leading-none text-[var(--v2-ink-900)]">Личный бренд</h1>
+            <h1 className="v2-tighter text-[38px] font-light leading-none sm:text-[52px] text-[var(--v2-ink-900)]">Личный бренд</h1>
             <p
               className="v2-tight mt-4 text-[16px] leading-relaxed text-[var(--v2-ink-500)]"
               style={{ textWrap: "pretty" }}
@@ -306,7 +306,7 @@ export function PersonalBrandClient() {
             {error ? <p className="mt-2 text-[13px] text-red-600">{error}</p> : null}
             {saving ? <p className="mt-1 text-[12px] text-[var(--v2-ink-400)]">Сохранение…</p> : null}
           </div>
-          <div className="ml-auto flex shrink-0 items-center gap-2 pt-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:shrink-0 sm:pt-2">
             <BGhost onClick={() => setInsightOpen(true)}>
               <V2Icons.plus className="h-4 w-4 text-[var(--v2-ink-400)]" /> Инсайт аудитории
             </BGhost>
@@ -324,7 +324,7 @@ export function PersonalBrandClient() {
         </div>
 
         {/* Hyp */}
-        <div className="mb-14 rounded-[24px] bg-white px-11 py-10 shadow-[var(--v2-shadow-soft)]">
+        <div className="mb-14 rounded-[24px] bg-white px-5 py-6 sm:px-11 sm:py-10 shadow-[var(--v2-shadow-soft)]">
           <div className="flex flex-wrap items-center gap-4">
             <BK cls="text-[var(--v2-ink-500)]">Текущая гипотеза</BK>
             <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-[var(--v2-brand-50)] px-2.5 text-[11px] font-semibold text-[var(--v2-brand-700)]">
@@ -343,17 +343,17 @@ export function PersonalBrandClient() {
             </button>
           </div>
           <p
-            className="v2-tighter mt-6 max-w-[48ch] text-[27px] font-light leading-[1.35] text-[var(--v2-ink-900)]"
+            className="v2-tighter mt-6 max-w-[48ch] text-[21px] font-light sm:text-[27px] leading-[1.35] text-[var(--v2-ink-900)]"
             style={{ textWrap: "pretty" }}
           >
             «{doc.hyp.main}»
           </p>
-          <div className="mt-9 grid gap-9" style={{ gridTemplateColumns: "minmax(0,1.15fr) minmax(0,.9fr) minmax(0,1fr)" }}>
+          <div className="mt-7 grid grid-cols-1 gap-6 sm:mt-9 md:grid-cols-[minmax(0,1.15fr)_minmax(0,.9fr)_minmax(0,1fr)] md:gap-9">
             <div>
               <BK>Что я показываю</BK>
               <ul className="mt-2.5 flex flex-col gap-1.5">
                 {doc.hyp.show.map((x, i) => (
-                  <li key={i} className="v2-tight text-[14px] leading-relaxed text-[var(--v2-ink-700)]">
+                  <li key={i} className="v2-tight text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-700)]">
                     {x}
                   </li>
                 ))}
@@ -372,7 +372,7 @@ export function PersonalBrandClient() {
               <BK>Не хочу становиться</BK>
               <ul className="mt-2.5 flex flex-col gap-1.5">
                 {doc.hyp.avoid.map((x, i) => (
-                  <li key={i} className="v2-tight text-[14px] leading-relaxed text-[var(--v2-ink-500)]">
+                  <li key={i} className="v2-tight text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-500)]">
                     {x}
                   </li>
                 ))}
@@ -397,7 +397,7 @@ export function PersonalBrandClient() {
                   key={k}
                   type="button"
                   onClick={() => setLabFilter(k)}
-                  className={`v2-tight h-7 rounded-full px-3.5 text-[12px] font-medium transition ${
+                  className={`v2-tight h-9 rounded-full px-3.5 text-[12px] sm:h-7 font-medium transition ${
                     labFilter === k
                       ? "bg-[var(--v2-ink-900)] text-white"
                       : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
@@ -416,7 +416,7 @@ export function PersonalBrandClient() {
             const openCount = items.filter((x) => x.status === "open").length;
             if (!items.length) {
               return (
-                <div className="rounded-[24px] border border-dashed border-[var(--v2-ink-200)] bg-white/70 px-8 py-12 text-center">
+                <div className="rounded-[24px] border border-dashed border-[var(--v2-ink-200)] bg-white/70 px-5 py-10 sm:px-8 sm:py-12 text-center">
                   <p className="v2-tighter text-[22px] font-light text-[var(--v2-ink-800)]">Пока пусто</p>
                   <p className="v2-tight mx-auto mt-2 max-w-[42ch] text-[14px] text-[var(--v2-ink-500)]">
                     Добавьте инсайт аудитории или гипотезу кнопками сверху — они появятся здесь.
@@ -426,7 +426,7 @@ export function PersonalBrandClient() {
             }
             return (
               <div className="overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-soft)]">
-                <div className="flex items-center justify-between gap-4 border-b border-[var(--v2-ink-100)] px-7 py-4">
+                <div className="flex items-center justify-between gap-4 border-b border-[var(--v2-ink-100)] px-4 py-4 sm:px-7">
                   <BK cls="text-[var(--v2-ink-500)]">Записи лаборатории</BK>
                   <span className="v2-tnum text-[12.5px] text-[var(--v2-ink-400)]">
                     {openCount} открытых · {items.length} всего
@@ -439,10 +439,9 @@ export function PersonalBrandClient() {
                     return (
                       <div
                         key={item.id}
-                        className={`group grid items-start gap-5 px-7 py-5 transition ${
+                        className={`group grid grid-cols-1 items-start gap-3 px-4 py-4 transition sm:grid-cols-[112px_minmax(0,1fr)_auto] sm:gap-5 sm:px-7 sm:py-5 ${
                           done ? "bg-[var(--v2-ink-50)]/50 opacity-70" : "hover:bg-[var(--v2-ink-50)]/40"
                         }`}
-                        style={{ gridTemplateColumns: "112px minmax(0,1fr) auto" }}
                       >
                         <div className="pt-0.5">
                           <span
@@ -481,12 +480,12 @@ export function PersonalBrandClient() {
                             {done ? " · взято в работу" : ""}
                           </p>
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1.5 opacity-0 transition group-hover:opacity-100">
+                        <div className="flex shrink-0 flex-wrap items-center gap-1.5 transition sm:flex-col sm:items-end focus-within:opacity-100! group-hover:opacity-100! [@media(hover:hover)_and_(min-width:1024px)]:opacity-0">
                           {isHyp && !done ? (
                             <button
                               type="button"
                               onClick={() => void promoteHypFromBacklog(item)}
-                              className="v2-tight h-8 rounded-lg bg-[var(--v2-ink-900)] px-3 text-[12px] font-medium text-white"
+                              className="v2-tight h-10 rounded-lg bg-[var(--v2-ink-900)] px-3 text-[12px] sm:h-8 font-medium text-white"
                             >
                               Сделать текущей
                             </button>
@@ -495,7 +494,7 @@ export function PersonalBrandClient() {
                             <button
                               type="button"
                               onClick={() => void setLabItemStatus(item.id, "done")}
-                              className="v2-tight h-8 rounded-lg px-3 text-[12px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                              className="v2-tight h-10 rounded-lg px-3 text-[12px] font-medium text-[var(--v2-ink-500)] max-sm:bg-[var(--v2-ink-50)] sm:h-8 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
                             >
                               Готово
                             </button>
@@ -503,7 +502,7 @@ export function PersonalBrandClient() {
                             <button
                               type="button"
                               onClick={() => void setLabItemStatus(item.id, "open")}
-                              className="v2-tight h-8 rounded-lg px-3 text-[12px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                              className="v2-tight h-10 rounded-lg px-3 text-[12px] font-medium text-[var(--v2-ink-500)] max-sm:bg-[var(--v2-ink-50)] sm:h-8 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
                             >
                               Вернуть
                             </button>
@@ -511,7 +510,7 @@ export function PersonalBrandClient() {
                           <button
                             type="button"
                             onClick={() => void removeLabItem(item.id)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-300)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--v2-ink-300)] sm:h-8 sm:w-8 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
                             title="Удалить"
                           >
                             <V2Icons.trash className="h-3.5 w-3.5" />
@@ -528,19 +527,19 @@ export function PersonalBrandClient() {
 
         <BSect title="Кого мы сейчас считаем ядром">
           <p
-            className="v2-tighter mb-8 max-w-[44ch] text-[27px] font-light leading-[1.35] text-[var(--v2-ink-900)]"
+            className="v2-tighter mb-8 max-w-[44ch] text-[21px] sm:text-[27px] font-light leading-[1.35] text-[var(--v2-ink-900)]"
             style={{ textWrap: "pretty" }}
           >
             «{doc.core.main}»
           </p>
-          <div className="grid gap-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(250px,1fr))" }}>
+          <div className="grid gap-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(250px,100%),1fr))" }}>
             {doc.core.blocks.map((b) => (
               <div key={b.t} className="rounded-[20px] bg-white px-6 py-6 shadow-[var(--v2-shadow-card)]">
                 <BK>{b.t}</BK>
                 {b.lead ? <p className="v2-tight mt-2.5 text-[13px] text-[var(--v2-ink-500)]">{b.lead}</p> : null}
                 <ul className="mt-2.5 flex flex-col gap-1.5">
                   {b.items.map((x, i) => (
-                    <li key={i} className="v2-tight text-[14px] leading-relaxed text-[var(--v2-ink-700)]" style={{ textWrap: "pretty" }}>
+                    <li key={i} className="v2-tight text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-700)]" style={{ textWrap: "pretty" }}>
                       {x}
                     </li>
                   ))}
@@ -551,11 +550,11 @@ export function PersonalBrandClient() {
         </BSect>
 
         <BSect title="Что мы пока не знаем" sub="Гипотеза остаётся гипотезой, пока эти вопросы открыты.">
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px,1fr))" }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(320px,100%),1fr))" }}>
             {doc.unknown.map((u, i) => (
               <div
                 key={i}
-                className="group flex flex-col rounded-[20px] border border-[var(--v2-ink-300)]/70 bg-white/60 px-6 py-5 transition hover:bg-white"
+                className="group flex flex-col rounded-[20px] border border-[var(--v2-ink-300)]/70 bg-white/60 px-5 py-5 transition hover:bg-white sm:px-6"
               >
                 <IcQ className="h-5 w-5 text-[var(--v2-ink-300)]" />
                 <p className="v2-tight mt-3 flex-1 text-[15.5px] leading-relaxed text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
@@ -564,7 +563,7 @@ export function PersonalBrandClient() {
                 <button
                   type="button"
                   onClick={() => setVideoModal(true)}
-                  className="v2-tight mt-4 inline-flex items-center gap-1.5 self-start text-[12.5px] font-medium text-[var(--v2-ink-400)] transition group-hover:text-[var(--v2-brand-700)]"
+                  className="v2-tight mt-2 inline-flex min-h-10 items-center gap-1.5 self-start text-[12.5px] font-medium text-[var(--v2-ink-400)] sm:mt-4 sm:min-h-0 transition group-hover:text-[var(--v2-brand-700)]"
                 >
                   <V2Icons.plus className="h-3.5 w-3.5" /> Создать контент-тест
                 </button>
@@ -582,25 +581,27 @@ export function PersonalBrandClient() {
                   <button
                     type="button"
                     onClick={() => setDirOpen(on ? null : d.id)}
-                    className="group grid w-full items-start gap-8 py-6 text-left"
-                    style={{ gridTemplateColumns: "minmax(0,1fr) 200px 150px 24px" }}
+                    className="group grid w-full grid-cols-[minmax(0,1fr)_24px] items-start gap-4 py-5 text-left md:grid-cols-[minmax(0,1fr)_200px_150px_24px] md:gap-8 md:py-6"
                   >
                     <div className="min-w-0">
                       <h3 className="v2-tighter text-[22px] font-light leading-tight text-[var(--v2-ink-900)] transition group-hover:text-[var(--v2-brand-700)]">
                         {d.name}
                       </h3>
                       <p
-                        className="v2-tight mt-2 max-w-[64ch] text-[14px] leading-relaxed text-[var(--v2-ink-500)]"
+                        className="v2-tight mt-2 max-w-[64ch] text-[15px] leading-relaxed sm:text-[14px] text-[var(--v2-ink-500)]"
                         style={{ textWrap: "pretty" }}
                       >
                         {d.need}
                       </p>
+                      <p className="v2-tight v2-tnum mt-2 text-[13px] text-[var(--v2-ink-700)] md:hidden">
+                        {d.status} · {d.videos} · {d.avg}
+                      </p>
                     </div>
-                    <div>
+                    <div className="hidden md:block">
                       <BK>Статус</BK>
                       <p className="v2-tight mt-1.5 text-[13.5px] font-medium text-[var(--v2-ink-800)]">{d.status}</p>
                     </div>
-                    <div>
+                    <div className="hidden md:block">
                       <BK>Роликов</BK>
                       <p className="v2-tnum mt-1.5 text-[13.5px] text-[var(--v2-ink-800)]">
                         {d.videos} · {d.avg}
@@ -611,7 +612,7 @@ export function PersonalBrandClient() {
                     />
                   </button>
                   {on ? (
-                    <div className="grid gap-8 pb-7" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) 260px" }}>
+                    <div className="grid grid-cols-1 gap-5 pb-7 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_260px] md:gap-8">
                       <div>
                         <BK>Гипотеза</BK>
                         <p className="v2-tight mt-2 text-[15px] leading-relaxed text-[var(--v2-ink-800)]" style={{ textWrap: "pretty" }}>
@@ -628,7 +629,7 @@ export function PersonalBrandClient() {
                         <BK>Примеры</BK>
                         <ul className="mt-2 flex flex-col gap-1.5">
                           {d.ex.map((x, i) => (
-                            <li key={i} className="v2-tight text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">
+                            <li key={i} className="v2-tight text-[15px] leading-relaxed sm:text-[13.5px] text-[var(--v2-ink-600)]">
                               {x}
                             </li>
                           ))}
@@ -652,7 +653,7 @@ export function PersonalBrandClient() {
         >
           <div className="divide-y divide-[var(--v2-ink-100)] rounded-[20px] bg-white shadow-[var(--v2-shadow-card)]">
             {doc.insights.map((x, i) => (
-              <div key={i} className="grid items-start gap-6 px-7 py-5" style={{ gridTemplateColumns: "minmax(0,1fr) 220px 170px" }}>
+              <div key={i} className="grid grid-cols-1 items-start gap-2 px-4 py-4 sm:px-7 sm:py-5 md:grid-cols-[minmax(0,1fr)_220px_170px] md:gap-6">
                 <p
                   className="v2-tight text-[16.5px] font-light leading-relaxed text-[var(--v2-ink-900)]"
                   style={{ textWrap: "pretty" }}
@@ -660,7 +661,7 @@ export function PersonalBrandClient() {
                   «{x.t}»
                 </p>
                 <span className="v2-tight pt-1 text-[12.5px] text-[var(--v2-ink-500)]">{x.src}</span>
-                <span className="flex items-center justify-self-end gap-2.5 pt-1">
+                <span className="flex items-center gap-2.5 md:justify-self-end md:pt-1">
                   <Dots n={x.power} tint="#2A56EB" />
                   <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">{POWER[x.power - 1]}</span>
                 </span>
@@ -670,9 +671,9 @@ export function PersonalBrandClient() {
         </BSect>
 
         <section className="mb-14">
-          <div className="rounded-[24px] border border-[var(--v2-ink-300)]/70 bg-[linear-gradient(180deg,#FCFCFD,#F7F8FB)] px-9 py-8">
+          <div className="rounded-[24px] border border-[var(--v2-ink-300)]/70 bg-[linear-gradient(180deg,#FCFCFD,#F7F8FB)] px-5 py-6 sm:px-9 sm:py-8">
             <BK cls="text-[var(--v2-ink-500)]">Что я не хочу потерять</BK>
-            <ul className="mt-4 grid gap-x-10 gap-y-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))" }}>
+            <ul className="mt-4 grid gap-x-10 gap-y-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(220px,100%),1fr))" }}>
               {doc.keep.map((k, i) => (
                 <li key={i} className="v2-tight text-[15px] leading-relaxed text-[var(--v2-ink-800)]">
                   {k}
@@ -690,7 +691,7 @@ export function PersonalBrandClient() {
         </section>
 
         <BSect title="Как бренд сейчас монетизируется">
-          <div className="grid gap-5" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)" }}>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)]">
             {(
               [
                 ["Текущее", doc.money.now],
@@ -735,7 +736,7 @@ export function PersonalBrandClient() {
             </BGhost>
           }
         >
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px,1fr))" }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(320px,100%),1fr))" }}>
             {doc.productHyp.map((p) => (
               <div key={p.name} className="flex flex-col rounded-[20px] bg-white px-6 py-5 shadow-[var(--v2-shadow-card)]">
                 <div className="flex items-center gap-3">
@@ -747,7 +748,7 @@ export function PersonalBrandClient() {
                 <p className="v2-tight mt-3 text-[14.5px] leading-relaxed text-[var(--v2-ink-700)]" style={{ textWrap: "pretty" }}>
                   «{p.text}»
                 </p>
-                <p className="v2-tight mt-3 text-[13px] leading-relaxed text-[var(--v2-ink-500)]">
+                <p className="v2-tight mt-3 text-[14px] leading-relaxed text-[var(--v2-ink-500)] sm:text-[13px]">
                   <span className="text-[var(--v2-ink-400)]">Почему возникло: </span>
                   {p.why}
                 </p>
@@ -763,17 +764,17 @@ export function PersonalBrandClient() {
         </BSect>
 
         <BSect title="Каналы">
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))" }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(240px,100%),1fr))" }}>
             {doc.channels.map((c) => (
               <div key={c.n} className="rounded-[20px] bg-white px-6 py-5 shadow-[var(--v2-shadow-card)]">
                 <h3 className="v2-tight text-[16px] font-medium text-[var(--v2-ink-900)]">{c.n}</h3>
-                <p className="v2-tight mt-1.5 text-[13.5px] leading-relaxed text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
+                <p className="v2-tight mt-1.5 text-[15px] leading-relaxed sm:text-[13.5px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
                   {c.d}
                 </p>
               </div>
             ))}
           </div>
-          <div className="mt-4 rounded-[20px] bg-[var(--v2-ink-100)]/60 px-7 py-5">
+          <div className="mt-4 rounded-[20px] bg-[var(--v2-ink-100)]/60 px-5 py-5 sm:px-7">
             <BK>Правило</BK>
             <p className="v2-tight mt-2 text-[15px] leading-relaxed text-[var(--v2-ink-800)]">
               Не строить три независимые контент-машины. Одна мысль имеет формы:
@@ -857,13 +858,13 @@ function VideoDrawer({
     : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--v2-ink-900)]/35 backdrop-blur-[2px]" />
       <div
-        className="relative h-full w-[680px] max-w-[94vw] overflow-y-auto bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative h-full max-h-[100dvh] w-[680px] max-w-full overflow-y-auto overscroll-contain sm:max-w-[94vw] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start gap-4 border-b border-[var(--v2-ink-100)] bg-white/92 px-10 pb-4 pt-7 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start gap-4 border-b border-[var(--v2-ink-100)] bg-white/92 px-5 pb-4 pt-[calc(env(safe-area-inset-top)+16px)] backdrop-blur sm:px-10 sm:pt-7">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <BK>{dirName(v.dir)}</BK>
@@ -872,7 +873,7 @@ function VideoDrawer({
               </span>
               {v.date !== "—" ? <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{v.date}</span> : null}
             </div>
-            <h2 className="v2-tighter mt-2 text-[29px] font-light leading-[1.12] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
+            <h2 className="v2-tighter mt-2 text-[24px] font-light leading-[1.12] sm:text-[29px] text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
               {v.title}
             </h2>
             {v.sub ? <p className="v2-tight mt-1.5 text-[15px] text-[var(--v2-ink-500)]">{v.sub}</p> : null}
@@ -880,17 +881,17 @@ function VideoDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+            className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9 text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
           >
             <IcClose className="h-[17px] w-[17px]" />
           </button>
         </div>
 
-        <div className="px-10 pb-28 pt-6">
+        <div className="px-5 pb-10 pt-6 sm:px-10 sm:pb-28">
           <section>
             <BK>Показатели</BK>
             {M ? (
-              <div className="mt-3 grid grid-cols-3 gap-x-6 gap-y-4">
+              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3 sm:gap-x-6">
                 {metrics.map(([l, val]) => (
                   <div key={l} className="border-b border-[var(--v2-ink-100)] pb-3">
                     <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">{l}</span>
@@ -928,9 +929,9 @@ function VideoDrawer({
                 value={quoteDraft}
                 onChange={(e) => setQuoteDraft(e.target.value)}
                 placeholder="Цитата"
-                className="v2-tight h-9 min-w-[200px] flex-1 rounded-xl border border-dashed border-[var(--v2-ink-300)] px-3 text-[13px] outline-none"
+                className="v2-tight h-11 w-full min-w-0 flex-1 rounded-xl border border-dashed border-[var(--v2-ink-300)] px-3 text-[16px] sm:h-9 sm:w-auto sm:min-w-[200px] sm:text-[13px] outline-none"
               />
-              <select value={quoteSrc} onChange={(e) => setQuoteSrc(e.target.value)} className="v2-tight h-9 rounded-xl border border-[var(--v2-ink-200)] px-2 text-[12px]">
+              <select value={quoteSrc} onChange={(e) => setQuoteSrc(e.target.value)} className="v2-tight h-11 rounded-xl border border-[var(--v2-ink-200)] px-2 text-[16px] sm:h-9 sm:text-[12px]">
                 {["YouTube", "Telegram", "Instagram", "Личка"].map((s) => (
                   <option key={s}>{s}</option>
                 ))}
@@ -942,7 +943,7 @@ function VideoDrawer({
                   setQuotes((q) => [...q, { t: quoteDraft.trim(), src: quoteSrc }]);
                   setQuoteDraft("");
                 }}
-                className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl border border-dashed border-[var(--v2-ink-300)] px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
+                className="v2-tight inline-flex h-11 items-center gap-1.5 rounded-xl border border-dashed sm:h-9 border-[var(--v2-ink-300)] px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
               >
                 <V2Icons.plus className="h-3.5 w-3.5" /> Сохранить комментарий
               </button>
@@ -968,12 +969,12 @@ function VideoDrawer({
               onChange={(e) => setNext(e.target.value)}
               rows={2}
               placeholder="Что проверить дальше"
-              className="v2-tight mt-2 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[15px] leading-relaxed outline-none focus:border-[var(--v2-brand-400)] focus:bg-white"
+              className="v2-tight mt-2 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[16px] leading-relaxed outline-none sm:text-[15px] focus:border-[var(--v2-brand-400)] focus:bg-white"
             />
           </section>
         </div>
 
-        <div className="sticky bottom-0 flex items-center gap-2 border-t border-[var(--v2-ink-100)] bg-white/92 px-10 py-4 backdrop-blur">
+        <div className="sticky bottom-0 flex items-center gap-2 border-t border-[var(--v2-ink-100)] bg-white/92 px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4 sm:px-10 sm:py-4 backdrop-blur">
           <button
             type="button"
             onClick={() => {
@@ -1019,11 +1020,11 @@ function InsightModal({
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-3 backdrop-blur-sm sm:p-8"
       onClick={onClose}
     >
-      <div className="w-full max-w-[600px] rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
-        <div className="px-8 pb-6 pt-7">
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[600px] overflow-y-auto overscroll-contain rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 pb-6 pt-6 sm:px-8 sm:pt-7">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="v2-tighter text-[24px] font-light leading-tight text-[var(--v2-ink-900)]">Инсайт аудитории</h2>
@@ -1031,7 +1032,7 @@ function InsightModal({
                 Одна реплика не становится истиной об аудитории — отмечайте силу сигнала честно.
               </p>
             </div>
-            <button type="button" onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)]">
+            <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] sm:h-8 sm:w-8">
               <IcClose className="h-[17px] w-[17px]" />
             </button>
           </div>
@@ -1042,10 +1043,10 @@ function InsightModal({
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Что именно вы поняли об аудитории"
-              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14.5px] leading-relaxed outline-none focus:border-[var(--v2-brand-400)] focus:bg-white"
+              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[16px] sm:text-[14.5px] leading-relaxed outline-none focus:border-[var(--v2-brand-400)] focus:bg-white"
             />
           </label>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className={labCls}>На основании чего</span>
               <select value={srcKind} onChange={(e) => setSrcKind(e.target.value)} className={`${fieldCls} cursor-pointer appearance-none`}>
@@ -1068,13 +1069,13 @@ function InsightModal({
           </div>
           <div className="mt-5">
             <span className={labCls}>Сила сигнала</span>
-            <div className="mt-2 inline-flex rounded-xl bg-[var(--v2-ink-100)] p-1">
+            <div className="mt-2 flex flex-wrap rounded-xl bg-[var(--v2-ink-100)] p-1 sm:inline-flex sm:flex-nowrap">
               {POWER.map((p, i) => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setPower(i + 1)}
-                  className={`v2-tight h-8 rounded-lg px-3.5 text-[12.5px] font-medium transition ${
+                  className={`v2-tight h-10 flex-1 rounded-lg px-2.5 text-[12.5px] font-medium transition sm:h-8 sm:flex-none sm:px-3.5 ${
                     power === i + 1
                       ? "bg-white text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)]"
                       : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
@@ -1086,7 +1087,7 @@ function InsightModal({
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-8 py-4">
+        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-5 py-4 sm:px-8">
           <button type="button" onClick={onClose} className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--v2-ink-600)]">
             Отмена
           </button>
@@ -1128,17 +1129,17 @@ function VideoModal({
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-3 backdrop-blur-sm sm:p-8"
       onClick={onClose}
     >
-      <div className="w-full max-w-[520px] rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
-        <div className="px-8 pb-6 pt-7">
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[520px] overflow-y-auto overscroll-contain rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 pb-6 pt-6 sm:px-8 sm:pt-7">
           <h2 className="v2-tighter text-[24px] font-light text-[var(--v2-ink-900)]">Новый ролик</h2>
           <label className="mt-5 block">
             <span className={labCls}>Название</span>
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={fieldCls} placeholder="Название ролика" />
           </label>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className={labCls}>Направление</span>
               <select value={dir} onChange={(e) => setDir(e.target.value)} className={`${fieldCls} cursor-pointer appearance-none`}>
@@ -1159,7 +1160,7 @@ function VideoModal({
             </label>
           </div>
         </div>
-        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-8 py-4">
+        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-5 py-4 sm:px-8">
           <button type="button" onClick={onClose} className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--v2-ink-600)]">
             Отмена
           </button>
@@ -1191,11 +1192,11 @@ function HypModal({ onClose, onSave }: { onClose: () => void; onSave: (main: str
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-3 backdrop-blur-sm sm:p-8"
       onClick={onClose}
     >
-      <div className="w-full max-w-[600px] rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
-        <div className="px-8 pb-6 pt-7">
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[600px] overflow-y-auto overscroll-contain rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 pb-6 pt-6 sm:px-8 sm:pt-7">
           <h2 className="v2-tighter text-[24px] font-light text-[var(--v2-ink-900)]">Новая гипотеза</h2>
           <p className="v2-tight mt-1.5 text-[13px] text-[var(--v2-ink-500)]">
             Попадёт в бэклог. Текущую гипотезу не заменит — поднять можно оттуда.
@@ -1206,7 +1207,7 @@ function HypModal({ onClose, onSave }: { onClose: () => void; onSave: (main: str
               rows={3}
               value={main}
               onChange={(e) => setMain(e.target.value)}
-              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14.5px] outline-none focus:border-[var(--v2-brand-400)] focus:bg-white"
+              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[16px] sm:text-[14.5px] outline-none focus:border-[var(--v2-brand-400)] focus:bg-white"
             />
           </label>
           <label className="mt-4 block">
@@ -1214,7 +1215,7 @@ function HypModal({ onClose, onSave }: { onClose: () => void; onSave: (main: str
             <input value={why} onChange={(e) => setWhy(e.target.value)} className={fieldCls} placeholder="Откуда идея, какие данные" />
           </label>
         </div>
-        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-8 py-4">
+        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-5 py-4 sm:px-8">
           <button type="button" onClick={onClose} className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--v2-ink-600)]">
             Отмена
           </button>
@@ -1249,26 +1250,26 @@ function HypHistory({
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--v2-ink-900)]/35 backdrop-blur-[2px]" />
       <div
-        className="relative h-full w-[560px] max-w-[92vw] overflow-y-auto bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative h-full max-h-[100dvh] w-[560px] max-w-full overflow-y-auto overscroll-contain sm:max-w-[92vw] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--v2-ink-100)] px-9 pb-5 pt-7">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--v2-ink-100)] px-5 pb-5 pt-[calc(env(safe-area-inset-top)+16px)] sm:px-9 sm:pt-7">
           <h2 className="v2-tighter text-[26px] font-light text-[var(--v2-ink-900)]">История гипотез</h2>
-          <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)]">
+          <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] sm:h-9 sm:w-9">
             <IcClose className="h-[17px] w-[17px]" />
           </button>
         </div>
-        <div className="flex flex-col gap-5 px-9 py-6">
+        <div className="flex flex-col gap-5 px-5 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-6 sm:px-9 sm:py-6">
           {[...evolution].reverse().map((e, i) => (
-            <div key={i} className="rounded-2xl bg-[var(--v2-ink-50)] px-6 py-5">
+            <div key={i} className="rounded-2xl bg-[var(--v2-ink-50)] px-4 py-5 sm:px-6">
               <BK cls={e.now ? "text-[var(--v2-brand-600)]" : "text-[var(--v2-ink-400)]"}>{e.period}</BK>
               <p className="v2-tight mt-2 text-[16.5px] font-light leading-snug text-[var(--v2-ink-900)]" style={{ textWrap: "pretty" }}>
                 «{e.text}»
               </p>
-              <p className="v2-tight mt-3 text-[13px] leading-relaxed text-[var(--v2-ink-500)]">{e.why}</p>
+              <p className="v2-tight mt-3 text-[14px] leading-relaxed text-[var(--v2-ink-500)] sm:text-[13px]">{e.why}</p>
             </div>
           ))}
         </div>

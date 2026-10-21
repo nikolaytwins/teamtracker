@@ -64,6 +64,7 @@ function InlineInput({
     return (
       <input
         type="number"
+        inputMode="decimal"
         step="0.01"
         value={tempValue}
         onChange={(e) => setTempValue(e.target.value)}
@@ -123,6 +124,7 @@ function MoveProjectPicker({
   monthNames,
   onClose,
   onMoved,
+  sheet = false,
 }: {
   apiBase: string
   projectId: string
@@ -132,6 +134,7 @@ function MoveProjectPicker({
   monthNames: string[]
   onClose: () => void
   onMoved: () => void
+  sheet?: boolean
 }) {
   const [targetYear, setTargetYear] = useState(currentYear)
   const [targetMonth, setTargetMonth] = useState(currentMonth)
@@ -161,15 +164,19 @@ function MoveProjectPicker({
   const prev = adjacentMonth(currentYear, currentMonth, -1)
   const next = adjacentMonth(currentYear, currentMonth, 1)
 
-  return (
-    <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
-      <div className="mb-2 text-xs font-medium text-[var(--text)]">Перенести в месяц</div>
-      <div className="mb-2 flex gap-1">
+  const ctl = sheet ? 'min-h-11 px-3 text-sm' : 'px-2 py-1 text-xs'
+  const sel = sheet ? 'min-h-11 px-2 text-base' : 'px-1 py-1 text-xs'
+  const gap = sheet ? 'gap-2' : 'gap-1'
+
+  const body = (
+    <>
+      <div className={`mb-2 font-medium text-[var(--text)] ${sheet ? 'text-base' : 'text-xs'}`}>Перенести в месяц</div>
+      <div className={`mb-2 flex ${gap}`}>
         <button
           type="button"
           disabled={moving}
           onClick={() => void handleMove(prev.year, prev.month)}
-          className="flex-1 rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)] disabled:opacity-50"
+          className={`flex-1 rounded border border-[var(--border)] ${ctl} hover:bg-[var(--surface-2)] disabled:opacity-50`}
           title={`${monthNames[prev.month - 1]} ${prev.year}`}
         >
           ← {monthNames[prev.month - 1].slice(0, 3)}
@@ -178,17 +185,17 @@ function MoveProjectPicker({
           type="button"
           disabled={moving}
           onClick={() => void handleMove(next.year, next.month)}
-          className="flex-1 rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)] disabled:opacity-50"
+          className={`flex-1 rounded border border-[var(--border)] ${ctl} hover:bg-[var(--surface-2)] disabled:opacity-50`}
           title={`${monthNames[next.month - 1]} ${next.year}`}
         >
           {monthNames[next.month - 1].slice(0, 3)} →
         </button>
       </div>
-      <div className="mb-2 flex gap-1">
+      <div className={`mb-2 flex ${gap}`}>
         <select
           value={targetYear}
           onChange={(e) => setTargetYear(Number(e.target.value))}
-          className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-1 py-1 text-xs text-[var(--text)]"
+          className={`flex-1 rounded border border-[var(--border)] bg-[var(--surface)] ${sel} text-[var(--text)]`}
         >
           {yearOptions.map((y) => (
             <option key={y} value={y}>{y}</option>
@@ -197,30 +204,49 @@ function MoveProjectPicker({
         <select
           value={targetMonth}
           onChange={(e) => setTargetMonth(Number(e.target.value))}
-          className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-1 py-1 text-xs text-[var(--text)]"
+          className={`flex-1 rounded border border-[var(--border)] bg-[var(--surface)] ${sel} text-[var(--text)]`}
         >
           {monthNames.map((name, index) => (
             <option key={index + 1} value={index + 1}>{name}</option>
           ))}
         </select>
       </div>
-      <div className="flex gap-1">
+      <div className={`flex ${gap}`}>
         <button
           type="button"
           disabled={moving}
           onClick={() => void handleMove(targetYear, targetMonth)}
-          className="flex-1 rounded bg-[var(--primary)] px-2 py-1 text-xs text-white hover:brightness-110 disabled:opacity-50"
+          className={`flex-1 rounded bg-[var(--primary)] ${ctl} text-white hover:brightness-110 disabled:opacity-50`}
         >
           Перенести
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="rounded border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)]"
+          className={`rounded border border-[var(--border)] ${ctl} hover:bg-[var(--surface-2)]`}
         >
-          ✕
+          {sheet ? 'Отмена' : '✕'}
         </button>
       </div>
+    </>
+  )
+
+  if (sheet) {
+    return (
+      <div className="fixed inset-0 z-[90] flex items-end bg-black/40" onClick={onClose}>
+        <div
+          className="max-h-[100dvh] w-full overflow-y-auto rounded-t-2xl bg-[var(--surface)] p-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))] shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {body}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
+      {body}
     </div>
   )
 }
@@ -695,18 +721,184 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
   const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
   const currentYear = new Date().getFullYear()
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear + 1 - i)
+  const nextMonthForCopy = adjacentMonth(selectedYear, selectedMonth, 1)
+
+  const handleCopyProject = async (projectId: string) => {
+    try {
+      const res = await fetch(apiUrl(`${apiBase}/projects/${projectId}/copy`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: nextMonthForCopy.year, month: nextMonthForCopy.month }),
+      })
+      if (res.ok) await fetchProjects()
+      else console.error('Failed to copy project:', await res.json())
+    } catch (err) {
+      console.error('Error copying project:', err)
+    }
+  }
+
+  const statusClass = (status: string) =>
+    status === 'paid' ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' :
+    status === 'prepaid' ? 'bg-amber-50 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' :
+    'bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-300'
+
+  const serviceClass = (serviceType: string) =>
+    serviceType === 'site' ? 'bg-[var(--primary-soft)] text-[var(--primary)]' :
+    serviceType === 'presentation' ? 'bg-purple-50 text-purple-800 dark:bg-violet-500/15 dark:text-violet-200' :
+    serviceType === 'subscription' ? 'bg-emerald-50 text-emerald-800 dark:bg-[var(--success-soft)] dark:text-[var(--success)]' :
+    serviceType === 'ai_development' ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-200' :
+    'bg-[var(--surface-2)] text-[var(--text)]'
+
+  const renderServiceSelect = (project: Project, extra: string) => (
+    <InlineSelect
+      value={project.serviceType}
+      options={serviceOptions}
+      onChange={(value) => handleUpdate(project.id, 'serviceType', value)}
+      className={`text-base ${serviceClass(project.serviceType)} ${extra}`}
+    />
+  )
+
+  const renderClientTypeSelect = (project: Project, extra: string) => (
+    <InlineSelect
+      value={project.clientType ?? ''}
+      options={clientTypeDisplayOptions}
+      onChange={(value) => {
+        if (value === '__add__') {
+          const name = window.prompt('Название категории клиента')
+          if (name?.trim()) handleUpdate(project.id, 'clientType', name.trim())
+          return
+        }
+        handleUpdate(project.id, 'clientType', value || null)
+      }}
+      className={`bg-[var(--surface-2)] text-[var(--text)] truncate max-w-full text-left text-base ${extra}`}
+    />
+  )
+
+  const renderStatusSelect = (project: Project, extra: string) => (
+    <InlineSelect
+      value={project.status}
+      options={statusOptions}
+      onChange={(value) => handleUpdate(project.id, 'status', value)}
+      className={`text-base ${statusClass(project.status)} ${extra}`}
+    />
+  )
+
+  const renderPaymentMethodSelect = (project: Project, extra: string) =>
+    project.paymentMethod ? (
+      <InlineSelect
+        value={project.paymentMethod}
+        options={paymentMethodOptions}
+        onChange={(value) => handleUpdate(project.id, 'paymentMethod', value)}
+        className={`bg-[var(--surface-2)] text-[var(--text)] text-base ${extra}`}
+      />
+    ) : (
+      <InlineSelect
+        value=""
+        options={[{ value: '', label: '—' }, ...paymentMethodOptions]}
+        onChange={(value) => handleUpdate(project.id, 'paymentMethod', value || null)}
+        className={`bg-[var(--surface-2)] text-[var(--text)] text-base ${extra}`}
+      />
+    )
+
+  const renderTotal = (project: Project, extra: string) => (
+    <InlineInput
+      value={project.effectiveTotalAmount ?? project.totalAmount}
+      onChange={(value) => handleUpdate(project.id, 'totalAmount', value)}
+      className={`font-medium text-base tabular-nums ${extra}`}
+    />
+  )
+
+  const renderPaid = (project: Project, extra: string) =>
+    project.status === 'prepaid' ? (
+      <InlineInput
+        value={project.paidAmount}
+        onChange={(value) => handleUpdate(project.id, 'paidAmount', value)}
+        className={`text-green-600 font-medium text-base tabular-nums ${extra}`}
+      />
+    ) : (
+      <div className={`text-green-600 font-medium text-base px-2 py-1 tabular-nums ${extra}`}>
+        {project.paidAmount.toLocaleString('ru-RU')} ₽
+      </div>
+    )
+
+  const renderProjectActions = (project: Project, touch: boolean) => {
+    const iconBtn = touch
+      ? 'flex h-10 w-10 items-center justify-center rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]'
+      : 'p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]'
+    return (
+      <>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            void handleCopyProject(project.id)
+          }}
+          className={`${iconBtn} hover:text-[var(--primary)]`}
+          title={`Копировать на ${monthNames[nextMonthForCopy.month - 1]} ${nextMonthForCopy.year} (с расходами)`}
+          aria-label="Копировать на следующий месяц"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              setMovePickerProjectId(movePickerProjectId === project.id ? null : project.id)
+            }}
+            className={`${iconBtn} hover:text-[var(--primary)]`}
+            title="Перенести в другой месяц"
+            aria-label="Перенести в другой месяц"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </button>
+          {movePickerProjectId === project.id && (
+            <MoveProjectPicker
+              apiBase={apiBase}
+              projectId={project.id}
+              currentYear={selectedYear}
+              currentMonth={selectedMonth}
+              yearOptions={yearOptions}
+              monthNames={monthNames}
+              onClose={() => setMovePickerProjectId(null)}
+              onMoved={fetchProjects}
+              sheet={touch}
+            />
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            handleDeleteProject(project.id)
+          }}
+          className={`${iconBtn} hover:text-[var(--text)]`}
+          title="Удалить проект"
+          aria-label="Удалить проект"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4m-6 0h2m4 0h2m-9 4h10" />
+          </svg>
+        </button>
+      </>
+    )
+  }
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <h1 className="text-2xl font-bold text-[var(--text)]">Проекты</h1>
           {/* Селектор месяца */}
           <div className="flex items-center space-x-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)]"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)] max-sm:min-h-10 max-sm:text-base"
             >
               {yearOptions.map(year => (
                 <option key={year} value={year}>{year}</option>
@@ -715,7 +907,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)]"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)] max-sm:min-h-10 max-sm:text-base"
             >
               {monthNames.map((name, index) => (
                 <option key={index + 1} value={index + 1}>{name}</option>
@@ -730,7 +922,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
                   setSelectedYear(today.getFullYear())
                   setSelectedMonth(today.getMonth() + 1)
                 }}
-                className="px-2 py-1 text-xs text-[var(--primary)] hover:underline"
+                className="px-2 py-1 text-xs text-[var(--primary)] hover:underline max-sm:min-h-10 max-sm:text-sm"
                 title="Вернуться к текущему месяцу"
               >
                 Сегодня
@@ -741,7 +933,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
         <div className="flex space-x-3">
           <Link
             href={appPath(paths.newProjectHref)}
-            className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
+            className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110 max-sm:inline-flex max-sm:min-h-10 max-sm:items-center"
           >
             + Новый проект
           </Link>
@@ -749,7 +941,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <div className="bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
           <div className="text-sm text-[var(--muted-foreground)] mb-1">Предполагаемая выручка</div>
           <div className="text-xl font-bold text-[var(--text)]">{expectedRevenue.toLocaleString('ru-RU')} ₽</div>
@@ -772,7 +964,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
 
       {/* Projects Table — overflow-x-auto: широкая сетка не обрезает «Оплачено» */}
       <div className="bg-[var(--surface)] shadow-[var(--shadow-card)] rounded-lg border border-[var(--border)] overflow-x-auto">
-        <table className="w-full min-w-[68rem] divide-y divide-[var(--border)]">
+        <table className="hidden w-full min-w-[68rem] divide-y divide-[var(--border)] md:table">
           <thead className="bg-[var(--surface-2)]">
             <tr>
               <th className="px-3 py-3 sm:px-6 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
@@ -802,166 +994,42 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
             </tr>
           </thead>
           <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
-            {projects.map((project) => {
-              const nextMonthForCopy = adjacentMonth(selectedYear, selectedMonth, 1)
-              return (
+            {projects.map((project) => (
               <tr key={project.id}>
                 <td className="px-3 py-4 sm:px-6">
                   <div className="flex items-center gap-2">
                     <Link href={appPath(agencyProjectHref(paths, project.id))} className="text-base font-medium text-[var(--primary)] hover:underline">
                       {project.name}
                     </Link>
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.preventDefault()
-                        try {
-                          const res = await fetch(apiUrl(`${apiBase}/projects/${project.id}/copy`), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ year: nextMonthForCopy.year, month: nextMonthForCopy.month }),
-                          })
-                          if (res.ok) await fetchProjects()
-                          else console.error('Failed to copy project:', await res.json())
-                        } catch (err) {
-                          console.error('Error copying project:', err)
-                        }
-                      }}
-                      className="p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--primary)]"
-                      title={`Копировать на ${monthNames[nextMonthForCopy.month - 1]} ${nextMonthForCopy.year} (с расходами)`}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          setMovePickerProjectId(movePickerProjectId === project.id ? null : project.id)
-                        }}
-                        className="p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--primary)]"
-                        title="Перенести в другой месяц"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </button>
-                      {movePickerProjectId === project.id && (
-                        <MoveProjectPicker
-                          apiBase={apiBase}
-                          projectId={project.id}
-                          currentYear={selectedYear}
-                          currentMonth={selectedMonth}
-                          yearOptions={yearOptions}
-                          monthNames={monthNames}
-                          onClose={() => setMovePickerProjectId(null)}
-                          onMoved={fetchProjects}
-                        />
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        handleDeleteProject(project.id)
-                      }}
-                      className="p-1 rounded text-[var(--muted-foreground)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-                      title="Удалить проект"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4m-6 0h2m4 0h2m-9 4h10" />
-                      </svg>
-                    </button>
+                    {renderProjectActions(project, false)}
                   </div>
                   {project.deadline && (
                     <div className="text-xs text-[var(--muted-foreground)] mt-0.5">{formatDate(new Date(project.deadline))}</div>
                   )}
                 </td>
                 <td className="px-3 py-4 sm:px-6 whitespace-nowrap">
-                  <InlineSelect
-                    value={project.serviceType}
-                    options={serviceOptions}
-                    onChange={(value) => handleUpdate(project.id, 'serviceType', value)}
-                    className={`text-base ${
-                      project.serviceType === 'site' ? 'bg-[var(--primary-soft)] text-[var(--primary)]' :
-                      project.serviceType === 'presentation' ? 'bg-purple-50 text-purple-800 dark:bg-violet-500/15 dark:text-violet-200' :
-                      project.serviceType === 'subscription' ? 'bg-emerald-50 text-emerald-800 dark:bg-[var(--success-soft)] dark:text-[var(--success)]' :
-                      project.serviceType === 'ai_development' ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-200' :
-                      'bg-[var(--surface-2)] text-[var(--text)]'
-                    }`}
-                  />
+                  {renderServiceSelect(project, '')}
                 </td>
                 <td className="px-3 py-4 sm:px-6 whitespace-nowrap max-w-[140px] min-w-0">
-                  <InlineSelect
-                    value={project.clientType ?? ''}
-                    options={clientTypeDisplayOptions}
-                    onChange={(value) => {
-                      if (value === '__add__') {
-                        const name = window.prompt('Название категории клиента')
-                        if (name?.trim()) handleUpdate(project.id, 'clientType', name.trim())
-                        return
-                      }
-                      handleUpdate(project.id, 'clientType', value || null)
-                    }}
-                    className="bg-[var(--surface-2)] text-[var(--text)] truncate block w-full max-w-full text-left text-base"
-                  />
+                  {renderClientTypeSelect(project, 'block w-full')}
                 </td>
                 <td className="px-3 py-4 sm:px-6 whitespace-nowrap">
-                  <InlineSelect
-                    value={project.status}
-                    options={statusOptions}
-                    onChange={(value) => handleUpdate(project.id, 'status', value)}
-                    className={`text-base ${
-                      project.status === 'paid' ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' :
-                      project.status === 'prepaid' ? 'bg-amber-50 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' :
-                      'bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-300'
-                    }`}
-                  />
+                  {renderStatusSelect(project, '')}
                 </td>
                 <td className="px-3 py-4 sm:px-6 min-w-[8rem] max-w-[12rem]">
                   <div className="text-base text-[var(--text)] break-words">{project.clientContact || '—'}</div>
                 </td>
                 <td className="px-3 py-4 sm:px-6 whitespace-nowrap">
-                  {project.paymentMethod ? (
-                    <InlineSelect
-                      value={project.paymentMethod}
-                      options={paymentMethodOptions}
-                      onChange={(value) => handleUpdate(project.id, 'paymentMethod', value)}
-                      className="bg-[var(--surface-2)] text-[var(--text)] text-base"
-                    />
-                  ) : (
-                    <InlineSelect
-                      value=""
-                      options={[{ value: '', label: '—' }, ...paymentMethodOptions]}
-                      onChange={(value) => handleUpdate(project.id, 'paymentMethod', value || null)}
-                      className="bg-[var(--surface-2)] text-[var(--text)] text-base"
-                    />
-                  )}
+                  {renderPaymentMethodSelect(project, '')}
                 </td>
                 <td className="px-3 py-4 sm:px-6 whitespace-nowrap text-right tabular-nums">
-                  <InlineInput
-                    value={project.effectiveTotalAmount ?? project.totalAmount}
-                    onChange={(value) => handleUpdate(project.id, 'totalAmount', value)}
-                    className="font-medium text-base tabular-nums"
-                  />
+                  {renderTotal(project, '')}
                 </td>
                 <td className="px-3 py-4 sm:px-6 whitespace-nowrap text-right tabular-nums">
-                  {project.status === 'prepaid' ? (
-                    <InlineInput
-                      value={project.paidAmount}
-                      onChange={(value) => handleUpdate(project.id, 'paidAmount', value)}
-                      className="text-green-600 font-medium text-base tabular-nums"
-                    />
-                  ) : (
-                    <div className="text-green-600 font-medium text-base px-2 py-1 tabular-nums">
-                      {project.paidAmount.toLocaleString('ru-RU')} ₽
-                    </div>
-                  )}
+                  {renderPaid(project, '')}
                 </td>
               </tr>
-            )})}
+            ))}
             {projects.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-3 py-4 sm:px-6 text-center text-sm text-[var(--muted-foreground)]">
@@ -971,13 +1039,56 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
             )}
           </tbody>
         </table>
+        <div className="divide-y divide-[var(--border)] md:hidden">
+          {projects.map((project) => (
+            <div key={project.id} className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 pt-2">
+                  <Link href={appPath(agencyProjectHref(paths, project.id))} className="block break-words text-base font-medium text-[var(--primary)] hover:underline">
+                    {project.name}
+                  </Link>
+                  {project.deadline && (
+                    <div className="text-xs text-[var(--muted-foreground)] mt-0.5">{formatDate(new Date(project.deadline))}</div>
+                  )}
+                </div>
+                <div className="-mr-2 flex shrink-0 items-center">
+                  {renderProjectActions(project, true)}
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs text-[var(--muted-foreground)]">Сумма</div>
+                  {renderTotal(project, '-ml-2 inline-flex min-h-10 items-center')}
+                </div>
+                <div className="min-w-0 text-right">
+                  <div className="text-xs text-[var(--muted-foreground)]">Оплачено</div>
+                  <div className="flex justify-end">{renderPaid(project, '-mr-2 inline-flex min-h-10 items-center')}</div>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {renderStatusSelect(project, 'min-h-10 px-3')}
+                {renderServiceSelect(project, 'min-h-10 px-3')}
+                {renderPaymentMethodSelect(project, 'min-h-10 px-3')}
+                {renderClientTypeSelect(project, 'min-h-10 px-3 max-w-[12rem]')}
+              </div>
+              {project.clientContact ? (
+                <div className="mt-2 break-words text-sm text-[var(--muted-foreground)]">{project.clientContact}</div>
+              ) : null}
+            </div>
+          ))}
+          {projects.length === 0 && (
+            <div className="p-4 text-center text-sm text-[var(--muted-foreground)]">
+              Нет проектов. <Link href={appPath(paths.newProjectHref)} className="text-[var(--primary)] hover:underline">Создать первый проект</Link>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* General Expenses Section */}
-      <div className="mt-8 bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-6">
+      <div className="mt-8 bg-[var(--surface)] rounded-lg shadow-[var(--shadow-card)] border border-[var(--border)] p-4 sm:p-6">
         <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
           <h2 className="text-lg font-semibold text-[var(--text)]">Общие расходы</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:[&>button]:min-h-10 max-sm:[&>button]:flex-1">
             <button
               type="button"
               onClick={async () => {
@@ -1079,6 +1190,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
                 <label className="block text-sm font-medium text-[var(--text)] mb-1">Сумма</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   name="amount"
                   step="0.01"
                   required
@@ -1096,7 +1208,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
                 </div>
               )}
             </div>
-            <div className="mt-4 flex space-x-2">
+            <div className="mt-4 flex space-x-2 max-sm:[&>button]:min-h-11 max-sm:[&>button]:flex-1">
               <button
                 type="submit"
                 className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-medium rounded-md hover:brightness-110"
@@ -1121,44 +1233,45 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
           <table className="min-w-full divide-y divide-[var(--border)]">
             <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Сотрудник</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Роль</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Сумма</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Примечания</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Действия</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Сотрудник</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Роль</th>
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Сумма</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-[var(--muted-foreground)] uppercase">Примечания</th>
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-[var(--muted-foreground)] uppercase">Действия</th>
               </tr>
             </thead>
             <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
               {/* Автоматический расчет налогов */}
               <tr className="bg-amber-50 dark:bg-amber-500/10">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-[var(--text)]">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold text-[var(--text)]">
                   Налоги (автоматически)
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--muted-foreground)]">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-[var(--muted-foreground)]">
                   <span className="text-xs">6916 ₽/мес + 1% от расчетного счета</span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-red-600">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-red-600">
                   {taxAmount.toLocaleString('ru-RU')} ₽
                 </td>
-                <td className="px-6 py-4 text-sm text-[var(--muted-foreground)] italic">
+                <td className="px-3 sm:px-6 py-4 text-sm text-[var(--muted-foreground)] italic">
                   {accountRevenue > 0 ? `1% от ${accountRevenue.toLocaleString('ru-RU')} ₽` : 'Только базовая сумма'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right">
                   <span className="text-xs text-[var(--muted-foreground)]">Автоматически</span>
                 </td>
               </tr>
               {generalExpenses.map((expense) => (
                 <tr key={expense.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text)]">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text)]">
                     {expense.employeeName || '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--muted-foreground)]">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-[var(--muted-foreground)]">
                     {expense.employeeRole ? (roleLabels[expense.employeeRole] || expense.employeeRole) : '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-red-600">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-red-600">
                     {editingExpenseId === expense.id ? (
                       <input
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         value={editingExpenseValue}
                         onChange={(e) => setEditingExpenseValue(e.target.value)}
@@ -1189,10 +1302,10 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
                       </button>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-[var(--muted-foreground)]">
+                  <td className="px-3 sm:px-6 py-4 text-sm text-[var(--muted-foreground)]">
                     {expense.notes || '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       onClick={() => handleDeleteExpense(expense.id)}
                       className="text-red-600 hover:text-red-900"
@@ -1204,7 +1317,7 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
               ))}
               {generalExpenses.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
+                  <td colSpan={5} className="px-3 sm:px-6 py-4 text-center text-sm text-[var(--muted-foreground)]">
                     Нет общих расходов
                   </td>
                 </tr>
@@ -1213,10 +1326,10 @@ export function AgencyFinanceClient({ variant }: { variant: AgencyFinanceVariant
             {generalExpenses.length > 0 && (
               <tfoot className="bg-[var(--surface-2)]">
                 <tr>
-                  <td colSpan={2} className="px-6 py-3 text-sm font-medium text-[var(--text)]">
+                  <td colSpan={2} className="px-3 sm:px-6 py-3 text-sm font-medium text-[var(--text)]">
                     Итого общих расходов:
                   </td>
-                  <td className="px-6 py-3 text-right text-sm font-bold text-red-600">
+                  <td className="px-3 sm:px-6 py-3 text-right text-sm font-bold text-red-600">
                     {generalExpensesTotal.toLocaleString('ru-RU')} ₽
                   </td>
                   <td colSpan={2}></td>

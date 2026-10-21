@@ -3,7 +3,7 @@
 import { PersonalAmt } from "./personal-finance-mask";
 import { formatPersonalRub, formatPersonalRubShort, PERSONAL_MONTH_NAMES } from "@/lib/v2/personal/formatters";
 import type { PersonalMonthSnapshotRow } from "@/lib/v2/personal/types";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type TxCatRow = {
   id: string;
@@ -167,16 +167,29 @@ export function TransactionsTrendChart({
   onPickMonth: (year: number, month: number) => void;
 }) {
   const [tip, setTip] = useState<{ x: number; y: number; html: string } | null>(null);
+  const trendRef = useRef<HTMLDivElement>(null);
+  const [boxW, setBoxW] = useState(1000);
   const points = useMemo(() => {
     const sorted = [...data].sort((a, b) => a.year - b.year || a.month - b.month);
     return sorted.slice(-6);
   }, [data]);
 
+  useEffect(() => {
+    const el = trendRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const w = Math.round(entries[0]?.contentRect.width ?? 0);
+      if (w > 0) setBoxW(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [points.length]);
+
   if (points.length === 0) {
     return <p className="dr-note">Недостаточно данных для графика.</p>;
   }
 
-  const W = 1000;
+  const W = boxW < 640 ? boxW : 1000;
   const H = 250;
   const PL = 54;
   const PR = 16;
@@ -216,7 +229,7 @@ export function TransactionsTrendChart({
         <h2 className="sec-title">Приход и расход по месяцам</h2>
         <span className="sec-sub mini">нажмите на месяц</span>
       </div>
-      <div className="trend">
+      <div className="trend" ref={trendRef}>
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img">
           <defs>
             <linearGradient id="tx-gin" x1="0" y1="0" x2="0" y2="1">
@@ -287,7 +300,7 @@ export function TransactionsTrendChart({
                   const sx = box ? ((x(i) / W) * box.width) : 0;
                   const sy = box ? ((y(Math.max(d.inc, d.out)) / H) * box.height) : 0;
                   setTip({
-                    x: sx,
+                    x: box && box.width < 640 ? Math.min(Math.max(sx, 90), box.width - 90) : sx,
                     y: Math.max(sy - 14, 52),
                     html: `<b>${monthLabel(d.year, d.month)}</b><br/>Приход ${formatPersonalRub(d.inc)}<br/>Расход ${formatPersonalRub(d.out)}<br/>Разница ${formatPersonalRub(d.prof)}`,
                   });

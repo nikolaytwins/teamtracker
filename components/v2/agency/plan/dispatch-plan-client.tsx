@@ -117,6 +117,7 @@ type DrawerState =
   | { type: "create-project" }
   | { type: "item"; itemId: string }
   | { type: "day"; dateKey: string }
+  | { type: "checklist"; id: WeekChecklistId }
   | { type: "project"; projectId: string; estFocus?: boolean };
 
 type CreateKind = "task" | "call" | "personal" | "strategy" | "creative" | "rest";
@@ -183,6 +184,7 @@ function WeekChecklistBar({
   onDragEnd,
   onJump,
   onOpenItem,
+  onAssign,
 }: {
   rows: WeekChecklistStatus[];
   openCount: number;
@@ -191,6 +193,7 @@ function WeekChecklistBar({
   onDragEnd: () => void;
   onJump: (dateKey: string) => void;
   onOpenItem: (id: string) => void;
+  onAssign: (id: WeekChecklistId) => void;
 }) {
   return (
     <div className="week-check">
@@ -237,7 +240,16 @@ function WeekChecklistBar({
                 onDragStart(def.id);
               }}
               onDragEnd={onDragEnd}
-              title="Перетащите на день в календаре"
+              role="button"
+              tabIndex={0}
+              onClick={() => onAssign(def.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onAssign(def.id);
+                }
+              }}
+              title="Перетащите на день в календаре или нажмите, чтобы выбрать дату"
             >
               <span className="week-chip-grip" aria-hidden>
                 ⋮⋮
@@ -346,7 +358,7 @@ export function DispatchPlanClient() {
   if (pageTab === "ideas") {
     return (
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="plan-v3" style={{ padding: "28px 36px 0", maxWidth: 1760, margin: "0 auto" }}>
+        <div className="plan-v3 plan-tabs-wrap">
           <PlanPageTabs tab={pageTab} onTab={setPlanTab} />
         </div>
         <div className="ideas-tasks-v3">
@@ -361,7 +373,7 @@ export function DispatchPlanClient() {
   if (pageTab === "rules") {
     return (
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="plan-v3" style={{ padding: "28px 36px 0", maxWidth: 1760, margin: "0 auto" }}>
+        <div className="plan-v3 plan-tabs-wrap">
           <PlanPageTabs tab={pageTab} onTab={setPlanTab} />
         </div>
         <WorkRulesTab />
@@ -772,6 +784,7 @@ function DispatchPlanCalendar({
                     showToast(`В расписании — ${fmtWeekday(parseYmd(dateKey))}`);
                   }}
                   onOpenItem={(id) => setDrawer({ type: "item", itemId: id })}
+                  onAssign={(id) => setDrawer({ type: "checklist", id })}
                 />
               </div>
               <div className="hero-img">
@@ -953,7 +966,7 @@ function DispatchPlanCalendar({
                     Список
                   </button>
                 </div>
-                <div className="headrow" style={{ marginLeft: "auto", gap: 10 }}>
+                <div className="headrow proj-actions" style={{ marginLeft: "auto", gap: 10 }}>
                   {hiddenCount > 0 ? (
                     <button type="button" className="btn btn--gh" onClick={() => setShowHidden((v) => !v)}>
                       {showHidden ? "Скрыть спрятанные" : `Спрятанные (${hiddenCount})`}
@@ -1074,6 +1087,10 @@ function DispatchPlanCalendar({
           onNavigateWeek={(k) => {
             setCalMode("week");
             setAnchor(mondayOf(parseYmd(k)));
+          }}
+          onAssignChecklist={async (id, day) => {
+            setDrawer(null);
+            await onDropDay(day, null, { kind: "checklist", id });
           }}
         />
       )}
@@ -1197,7 +1214,10 @@ function DayCell({
     >
       {compact ? (
         <>
-          <div className="mday">{date.getDate()}</div>
+          <div className="mday">
+            <span className="mday-n">{date.getDate()}</span>
+            <span className="mday-w">{fmtWeekday(date)}</span>
+          </div>
           {mode ? (
             <button
               type="button"
@@ -1727,6 +1747,7 @@ function PlanDrawer({
   mutate,
   showToast,
   onNavigateWeek,
+  onAssignChecklist,
 }: {
   drawer: DrawerState;
   plan: PlanPayload;
@@ -1739,7 +1760,13 @@ function PlanDrawer({
   mutate: (action: () => Promise<unknown>, message: string, snapshot?: PlanPayload) => Promise<void>;
   showToast: (text: string) => void;
   onNavigateWeek: (k: string) => void;
+  onAssignChecklist: (id: WeekChecklistId, day: string) => Promise<void>;
 }) {
+  if (drawer.type === "checklist") {
+    return (
+      <ChecklistAssignDrawer id={drawer.id} todayKey={todayKey} onClose={onClose} onAssign={onAssignChecklist} />
+    );
+  }
   if (drawer.type === "create") {
     return (
       <CreateDrawer
@@ -1791,6 +1818,63 @@ function PlanDrawer({
       mutate={mutate}
       onCreateTask={() => {}}
     />
+  );
+}
+
+function ChecklistAssignDrawer({
+  id,
+  todayKey,
+  onClose,
+  onAssign,
+}: {
+  id: WeekChecklistId;
+  todayKey: string;
+  onClose: () => void;
+  onAssign: (id: WeekChecklistId, day: string) => Promise<void>;
+}) {
+  const def = weekChecklistDef(id);
+  const [day, setDay] = useState(todayKey);
+  const monday = mondayOf(parseYmd(todayKey));
+  const weekDays = Array.from({ length: 7 }, (_, i) => toYmd(addDays(monday, i))).filter((k) => k >= todayKey);
+
+  return (
+    <aside className="drawer on" aria-hidden="false">
+      <div className="dr-h">
+        <div style={{ flex: 1 }}>
+          <span className="kick">Подсказки недели</span>
+          <h2 className="sec-title" style={{ marginTop: 6 }}>
+            {def.label}
+          </h2>
+        </div>
+        <button type="button" className="wk-btn" onClick={onClose}>
+          ✕
+        </button>
+      </div>
+      <div className="dr-b">
+        <div className="fld">
+          <label>Эта неделя</label>
+          <div className="tsel">
+            {weekDays.map((k) => (
+              <button key={k} type="button" className={day === k ? "on" : ""} onClick={() => setDay(k)}>
+                {fmtWeekday(parseYmd(k))}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="fld">
+          <label>Или другая дата</label>
+          <PlanDateInput value={day} onChange={setDay} />
+        </div>
+      </div>
+      <div className="dr-f">
+        <button type="button" className="btn btn--pri" disabled={!day} onClick={() => void onAssign(id, day)}>
+          Назначить
+        </button>
+        <button type="button" className="btn btn--gh" onClick={onClose}>
+          Отмена
+        </button>
+      </div>
+    </aside>
   );
 }
 

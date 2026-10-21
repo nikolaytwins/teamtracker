@@ -51,6 +51,7 @@ type HomeTaskActions = {
   onToggleRun: (id: string) => void;
   onToggleDone: (id: string) => void;
   onOpenTask: (id: string) => void;
+  onMoveToBucket?: (id: string, bucket: V2TaskBucket) => void;
 };
 
 function HomeKanbanColumn({
@@ -101,7 +102,7 @@ function HomeKanbanColumn({
             }
           : undefined
       }
-      className={`v2-kcol flex w-[280px] shrink-0 flex-col rounded-2xl bg-white/40 backdrop-blur-sm transition-all ${
+      className={`v2-kcol flex w-[280px] shrink-0 snap-start flex-col max-sm:w-[min(84vw,320px)] rounded-2xl bg-white/40 backdrop-blur-sm transition-all ${
         dropActive ? "bg-[var(--v2-brand-50)]/60 ring-2 ring-[var(--v2-brand-400)] ring-offset-2 ring-offset-transparent" : ""
       }`}
     >
@@ -164,6 +165,7 @@ export function HomeDayView({
             onToggleRun={actions.onToggleRun}
             onToggleDone={actions.onToggleDone}
             onOpenTask={actions.onOpenTask}
+            onMoveToBucket={actions.onMoveToBucket}
             hideWhenEmpty={bucket === "overdue"}
             emptyLabel={BUCKET_EMPTY_LABELS[bucket] ?? "Задач нет"}
             dragId={dnd.dragId}
@@ -211,7 +213,7 @@ export function HomeWeekView({
   const todayYmd = weekDates[0] ?? "";
 
   return (
-    <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
+    <div className="-mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto overscroll-x-contain px-3 pb-4 sm:-mx-2 sm:snap-none sm:px-2">
       {weekDates.map((ymd, i) => (
         <HomeKanbanColumn
           key={ymd}
@@ -283,7 +285,7 @@ export function HomeKanbanView({
       <div className="mb-4">
         <InboxHighlightLegend />
       </div>
-      <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
+      <div className="-mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto overscroll-x-contain px-3 pb-4 sm:-mx-2 sm:snap-none sm:px-2">
         {columns.map(({ key, label, dot, dropBucket }) => {
           const list = kanbanColumns[key];
           if (key === "unassigned" && !showUnassigned) return null;

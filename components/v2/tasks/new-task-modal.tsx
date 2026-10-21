@@ -187,16 +187,17 @@ export function NewTaskModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-start justify-center bg-black/35 pt-[10vh] sm:pt-[12vh]">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/35 pt-[env(safe-area-inset-top)] sm:items-start sm:pt-[12vh]">
       <button type="button" className="absolute inset-0" onClick={onClose} aria-label="Закрыть" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-task-title"
-        className="relative flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative flex max-h-full w-full max-w-[560px] flex-col overflow-hidden rounded-t-2xl bg-white shadow-[var(--v2-shadow-pop)] sm:max-h-[88vh] sm:rounded-2xl"
       >
-        <div className="relative border-b border-[var(--v2-ink-100)] px-5 py-4">
+        <div className="relative border-b border-[var(--v2-ink-100)] px-4 py-3 sm:px-5 sm:py-4">
           <div className="v2-dotgrid pointer-events-none absolute inset-0 opacity-40" />
+          <span className="relative mx-auto mb-2 block h-1 w-10 rounded-full bg-[var(--v2-ink-200)] sm:hidden" aria-hidden />
           <div className="relative flex items-center justify-between gap-3">
             <div className="min-w-0">
               <h2 id="new-task-title" className="v2-tight text-[17px] font-semibold text-[var(--v2-ink-900)]">
@@ -217,7 +218,7 @@ export function NewTaskModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xl text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)] sm:h-8 sm:w-8 sm:text-lg"
               aria-label="Закрыть"
             >
               ×
@@ -225,7 +226,10 @@ export function NewTaskModal({
           </div>
         </div>
 
-        <form onSubmit={(e) => void submit(e)} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <form
+          onSubmit={(e) => void submit(e)}
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pt-4 sm:px-5 sm:py-4"
+        >
           {error ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">{error}</div>
           ) : null}
@@ -234,7 +238,7 @@ export function NewTaskModal({
             <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Название</span>
             <input
               autoFocus
-              className="v2-input text-[15px]"
+              className="v2-input text-[16px] sm:text-[15px]"
               placeholder="Например: Презентация концептов · завтра в 16:00"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -247,7 +251,11 @@ export function NewTaskModal({
           {!projectLocked ? (
             <label className="block">
               <span className="mb-1.5 block text-[12px] font-medium text-[var(--v2-ink-600)]">Проект</span>
-              <select className="v2-input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+              <select
+                className="v2-input max-sm:min-h-11 max-sm:text-[16px]"
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+              >
                 <option value="">Без проекта</option>
                 {teamProjects.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -268,23 +276,24 @@ export function NewTaskModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block text-[12px]">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block min-w-0 text-[12px]">
               <span className="text-[var(--v2-ink-600)]">Дата выполнения</span>
               <input
                 type="date"
-                className="v2-input mt-1.5 w-full"
+                className="v2-input mt-1.5 w-full min-w-0 max-sm:min-h-11 max-sm:text-[16px]"
                 value={plannedLocal}
                 onChange={(e) => setPlannedLocal(e.target.value)}
               />
             </label>
-            <label className="block text-[12px]">
+            <label className="block min-w-0 text-[12px]">
               <span className="text-[var(--v2-ink-600)]">Оценка, ч</span>
               <input
                 type="number"
+                inputMode="decimal"
                 min={0}
                 step={0.5}
-                className="v2-input mt-1.5 w-full"
+                className="v2-input mt-1.5 w-full min-w-0 max-sm:min-h-11 max-sm:text-[16px]"
                 placeholder="4"
                 value={estimateHours}
                 onChange={(e) => setEstimateHours(e.target.value)}
@@ -308,7 +317,7 @@ export function NewTaskModal({
                   key={key}
                   type="button"
                   onClick={() => applyPreset(key)}
-                  className={`rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition ${
+                  className={`rounded-lg px-3 py-2.5 text-[13px] font-medium transition sm:px-2.5 sm:py-1.5 sm:text-[12px] ${
                     duePreset === key
                       ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
                       : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
@@ -320,7 +329,7 @@ export function NewTaskModal({
             </div>
             <input
               type="datetime-local"
-              className="v2-input"
+              className="v2-input min-w-0 max-sm:min-h-11 max-sm:text-[16px]"
               value={dueLocal}
               onChange={(e) => {
                 setDueLocal(e.target.value);
@@ -334,14 +343,18 @@ export function NewTaskModal({
             <PriorityFlagPicker value={priority} onChange={(p) => p && setPriority(p)} />
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-[var(--v2-ink-100)] pt-4">
-            <button type="button" onClick={onClose} className="v2-input px-4 py-2 text-[13px]">
+          <div className="sticky bottom-0 -mx-4 flex items-center justify-end gap-2 border-t border-[var(--v2-ink-100)] bg-white px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="v2-input min-h-12 flex-1 px-4 py-2 text-[15px] sm:min-h-0 sm:flex-none sm:text-[13px]"
+            >
               Отмена
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="v2-btn-primary px-4 py-2 text-[13px] disabled:opacity-60"
+              className="v2-btn-primary min-h-12 flex-[2] px-4 py-2 text-[15px] disabled:opacity-60 sm:min-h-0 sm:flex-none sm:text-[13px]"
             >
               {saving ? "Создаём…" : "Создать задачу"}
             </button>

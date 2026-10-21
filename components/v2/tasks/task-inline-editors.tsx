@@ -8,6 +8,7 @@ import { fromDateInputValue, toDateInputValue } from "@/lib/v2/format";
 import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 import type { V2TaskPriority } from "@/lib/v2/types";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export async function patchTask(
   taskId: string,
@@ -51,7 +52,33 @@ export function InlinePopover({
     };
   }, [open, onClose]);
 
+  const [sheet, setSheet] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const sync = () => setSheet(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
   if (!open) return null;
+
+  if (sheet) {
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[130] flex items-end bg-black/30 p-3 pb-[calc(12px+env(safe-area-inset-bottom))]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          ref={ref}
+          className="max-h-[60dvh] w-full overflow-y-auto overscroll-contain rounded-2xl border border-[var(--v2-ink-200)] bg-white p-3 shadow-[var(--v2-shadow-pop)]"
+        >
+          {children}
+        </div>
+      </div>,
+      document.querySelector(".v2-root") ?? document.body
+    );
+  }
 
   return (
     <div

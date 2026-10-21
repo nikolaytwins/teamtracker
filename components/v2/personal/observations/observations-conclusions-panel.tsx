@@ -179,13 +179,13 @@ function ConclusionComposer({
   };
 
   return (
-    <section className="max-w-[62ch] rounded-2xl border border-dashed border-[var(--v2-ink-200)] bg-white px-5 py-4 shadow-[var(--v2-shadow-card)]">
+    <section className="max-w-[62ch] rounded-2xl border border-dashed border-[var(--v2-ink-200)] bg-white px-5 py-4 shadow-[var(--v2-shadow-card)] max-sm:px-4">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onFocus={() => setExpanded(true)}
         placeholder="Заголовок (необязательно)"
-        className="v2-tight mb-2 w-full bg-transparent text-[14px] font-semibold text-[var(--v2-ink-900)] outline-none placeholder:font-normal placeholder:text-[var(--v2-ink-400)]"
+        className="v2-tight mb-2 w-full bg-transparent text-[14px] font-semibold text-[var(--v2-ink-900)] outline-none placeholder:font-normal placeholder:text-[var(--v2-ink-400)] max-lg:min-h-9 max-lg:text-[16px]"
       />
       <textarea
         ref={ref}
@@ -203,7 +203,7 @@ function ConclusionComposer({
             void submit();
           }
         }}
-        className="v2-tight w-full resize-none bg-transparent text-[15px] leading-[1.6] text-[var(--v2-ink-700)] outline-none placeholder:text-[var(--v2-ink-400)]"
+        className="v2-tight w-full resize-none bg-transparent text-[15px] leading-[1.6] text-[var(--v2-ink-700)] outline-none placeholder:text-[var(--v2-ink-400)] max-lg:text-[16px]"
         style={{ minHeight: 52 }}
       />
       {expanded ? (
@@ -215,7 +215,7 @@ function ConclusionComposer({
               setText("");
               setTitle("");
             }}
-            className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
+            className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)] max-lg:h-10 max-lg:text-[14px]"
           >
             Отмена
           </button>
@@ -223,7 +223,7 @@ function ConclusionComposer({
             type="button"
             disabled={!text.trim() || saving}
             onClick={() => void submit()}
-            className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-50"
+            className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-50 max-lg:h-10 max-lg:text-[14px] max-sm:flex-1 max-sm:justify-center"
           >
             <V2Icons.plus className="h-3.5 w-3.5" />
             {saving ? "Сохранение…" : "Добавить вывод"}
@@ -260,26 +260,26 @@ function ConclusionCard({
   const bodyMd = conclusionBody(item);
 
   return (
-    <article className="max-w-[68ch] rounded-2xl bg-white px-6 py-5 shadow-[var(--v2-shadow-soft)]">
-      <div className="flex flex-wrap items-center gap-3">
+    <article className="max-w-[68ch] rounded-2xl bg-white px-6 py-5 shadow-[var(--v2-shadow-soft)] max-sm:px-4 max-sm:py-4">
+      <div className="flex flex-wrap items-center gap-3 max-lg:gap-x-2 max-lg:gap-y-0">
         <span className="inline-flex h-[26px] items-center rounded-lg bg-[var(--v2-brand-50)] px-2.5 text-[11.5px] font-semibold text-[var(--v2-brand-700)]">
           Вывод
         </span>
         {meta ? (
           <span className="v2-tight text-[11px] text-[var(--v2-ink-400)]">редактировалось</span>
         ) : null}
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-3 max-lg:-mr-2 max-lg:gap-0">
           <button
             type="button"
             onClick={() => setEditing((v) => !v)}
-            className="v2-tight text-[11.5px] text-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
+            className="v2-tight text-[11.5px] text-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)] max-lg:min-h-10 max-lg:px-2 max-lg:text-[13px]"
           >
             {editing ? "Закрыть" : "Редактировать"}
           </button>
           <button
             type="button"
             onClick={() => onRemove(item.id)}
-            className="v2-tight text-[11.5px] text-[var(--v2-ink-300)] hover:text-red-600"
+            className="v2-tight text-[11.5px] text-[var(--v2-ink-300)] hover:text-red-600 max-lg:min-h-10 max-lg:px-2 max-lg:text-[13px] max-lg:text-[var(--v2-ink-400)]"
           >
             Удалить
           </button>
@@ -292,14 +292,14 @@ function ConclusionCard({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Заголовок"
-            className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/50 px-3 py-2 text-[15px] font-semibold text-[var(--v2-ink-900)] outline-none focus:border-[var(--v2-brand-400)]"
+            className="v2-tight w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/50 px-3 py-2 text-[15px] font-semibold text-[var(--v2-ink-900)] outline-none focus:border-[var(--v2-brand-400)] max-lg:min-h-11 max-lg:text-[16px]"
           />
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={6}
             placeholder="Markdown: **жирный**, списки, [ссылки](url)"
-            className="v2-tight w-full resize-y rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/50 px-3 py-2 text-[15px] leading-[1.65] text-[var(--v2-ink-700)] outline-none focus:border-[var(--v2-brand-400)]"
+            className="v2-tight w-full resize-y rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/50 px-3 py-2 text-[15px] leading-[1.65] text-[var(--v2-ink-700)] outline-none focus:border-[var(--v2-brand-400)] max-lg:text-[16px]"
           />
           <button
             type="button"
@@ -308,7 +308,7 @@ function ConclusionCard({
               const ok = await onUpdate(item.id, { title: title.trim(), text: text.trim() });
               if (ok) setEditing(false);
             }}
-            className="v2-tight self-end rounded-xl bg-[var(--v2-ink-900)] px-4 py-2 text-[12.5px] font-medium text-white hover:bg-[var(--v2-ink-700)] disabled:opacity-50"
+            className="v2-tight self-end rounded-xl bg-[var(--v2-ink-900)] px-4 py-2 text-[12.5px] font-medium text-white hover:bg-[var(--v2-ink-700)] disabled:opacity-50 max-lg:min-h-10 max-lg:text-[14px] max-sm:self-stretch"
           >
             {saving ? "Сохранение…" : "Сохранить"}
           </button>
@@ -365,8 +365,8 @@ export function ObservationsConclusionsPanel({
   const total = conclusions.length;
 
   return (
-    <div className="flex flex-col gap-10">
-      <section className="max-w-[62ch] rounded-2xl bg-[var(--v2-ink-900)] px-6 py-5 text-white shadow-[var(--v2-shadow-soft)]">
+    <div className="flex flex-col gap-10 max-sm:gap-7">
+      <section className="max-w-[62ch] rounded-2xl bg-[var(--v2-ink-900)] px-6 py-5 text-white shadow-[var(--v2-shadow-soft)] max-sm:px-4 max-sm:py-4">
         <p className="v2-tight text-[15px] leading-relaxed text-white/90">
           Здесь не события, а <span className="font-semibold text-white">выводы месяца</span> — что стало яснее и что
           меняет стратегию. Новый месяц появляется сам, можно добавить несколько карточек.
@@ -382,7 +382,7 @@ export function ObservationsConclusionsPanel({
         return (
           <section key={key} className="flex flex-col gap-4">
             <div className="flex flex-wrap items-baseline gap-3 px-0.5">
-              <h2 className="v2-tighter text-[26px] font-semibold capitalize text-[var(--v2-ink-900)]">
+              <h2 className="v2-tighter text-[26px] font-semibold capitalize max-sm:text-[22px] text-[var(--v2-ink-900)]">
                 {obsMonthLabel(key)}
               </h2>
               {isCurrent ? (

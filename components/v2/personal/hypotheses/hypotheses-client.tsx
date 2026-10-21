@@ -43,6 +43,8 @@ export function HypothesesClient() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const hashDone = useRef(false);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [boardCol, setBoardCol] = useState(0);
   const openHypothesis = useCallback((item: Hypothesis) => {
     router.push(appPath(`/v2/personal/hypotheses/${item.id}`));
   }, [router]);
@@ -90,6 +92,31 @@ export function HypothesesClient() {
   const backlog = items.filter((item) => item.stage === "backlog");
   const done = items.filter((item) => item.stage === "done" && item.sprint_id === sprint?.id);
   const open = items.find((item) => item.id === openId) ?? null;
+  const boardColumns = BOARD_COLUMNS.map((stage) => ({
+    stage,
+    column: items.filter((item) => {
+      if (item.stage !== stage || !inFilter(item)) return false;
+      if (stage === "active" || stage === "done") return item.sprint_id === sprint?.id;
+      return true;
+    }),
+  }));
+
+  const onBoardScroll = () => {
+    const node = boardRef.current;
+    const first = node?.children[0] as HTMLElement | undefined;
+    if (!node || !first) return;
+    const step = first.offsetWidth + 12;
+    const index = Math.max(0, Math.min(BOARD_COLUMNS.length - 1, Math.round(node.scrollLeft / step)));
+    setBoardCol((prev) => (prev === index ? prev : index));
+  };
+
+  const scrollToColumn = (index: number) => {
+    const node = boardRef.current;
+    const target = node?.children[index] as HTMLElement | undefined;
+    if (!node || !target) return;
+    setBoardCol(index);
+    node.scrollTo({ left: target.offsetLeft - node.offsetLeft - parseFloat(getComputedStyle(node).paddingLeft), behavior: "smooth" });
+  };
 
   const patchItem = async (id: string, patch: Record<string, unknown>) => {
     const { hypothesis } = await fetchJson<{ hypothesis: Hypothesis }>(`/api/v2/personal/hypotheses/${id}`, {
@@ -161,20 +188,20 @@ export function HypothesesClient() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex max-w-[1720px] flex-col gap-6 px-9 pb-24 pt-7">
+      <div className="mx-auto flex max-w-[1720px] flex-col gap-4 px-3 pb-8 pt-3.5 sm:px-6 lg:gap-6 lg:px-9 lg:pb-24 lg:pt-7">
         {error ? (
           <div className="v2-tight rounded-xl bg-rose-50 px-4 py-2.5 text-[13px] text-rose-800">{error}</div>
         ) : null}
 
         <section className="v2-card grid overflow-hidden lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,520px)]">
-          <div className="flex min-h-[380px] flex-col justify-center gap-[22px] px-[34px] py-[34px]">
+          <div className="flex flex-col justify-center gap-4 p-5 sm:gap-[22px] sm:p-7 lg:min-h-[380px] lg:p-[34px]">
             <div>
-              <h1 className="v2-tight text-[40px] font-semibold leading-[1.1] tracking-[-0.036em]">Гипотезы</h1>
-              <p className="v2-tight mt-2.5 text-[15.5px] text-[var(--v2-ink-500)]">
+              <h1 className="v2-tight text-[30px] font-semibold leading-[1.1] tracking-[-0.036em] sm:text-[36px] lg:text-[40px]">Гипотезы</h1>
+              <p className="v2-tight mt-2 text-[14.5px] text-[var(--v2-ink-500)] sm:mt-2.5 sm:text-[15.5px]">
                 В работе, очередь и бэклог. В спринте не больше {WIP_LIMIT} гипотез одновременно.
               </p>
             </div>
-            <div className="grid max-w-[820px] grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid max-w-[820px] grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
               <Stat kicker="В работе" value={String(active.length)} extra={`/ ${WIP_LIMIT}`} main />
               <Stat kicker="Очередь" value={String(queue.length)} />
               <Stat kicker="Бэклог" value={String(backlog.length)} />
@@ -195,7 +222,7 @@ export function HypothesesClient() {
                   if (event.target.value === "__new") void addSprint();
                   else setSel(event.target.value);
                 }}
-                className="h-11 cursor-pointer rounded-[13px] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] font-semibold text-[var(--v2-ink-700)] outline-none"
+                className="h-11 min-w-0 max-w-full flex-1 cursor-pointer rounded-[13px] bg-[var(--v2-ink-50)] px-3.5 text-[16px] font-semibold text-[var(--v2-ink-700)] outline-none sm:flex-none lg:text-[14.5px]"
               >
                 {sprints.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -221,9 +248,9 @@ export function HypothesesClient() {
           </div>
         </section>
 
-        <section className="v2-card px-[30px] py-7">
-          <div className="mb-[18px] flex flex-wrap items-baseline gap-3.5">
-            <h2 className="v2-tight text-[26px] font-semibold tracking-[-0.03em]">
+        <section className="v2-card px-4 py-5 sm:px-6 lg:px-[30px] lg:py-7">
+          <div className="mb-3.5 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 lg:mb-[18px]">
+            <h2 className="v2-tight text-[21px] font-semibold tracking-[-0.03em] sm:text-[26px]">
               В работе{sprint ? ` · ${sprint.name}` : ""}
             </h2>
             <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">{sprint?.range_label}</span>
@@ -250,6 +277,7 @@ export function HypothesesClient() {
                   project={projectById.get(item.project_id ?? "")}
                   onOpen={() => openHypothesis(item)}
                   onPatch={patchItem}
+                  onMove={move}
                   onDelete={removeItem}
                 />
               ))}
@@ -258,7 +286,7 @@ export function HypothesesClient() {
                   key={index}
                   type="button"
                   onClick={takeNext}
-                  className="flex min-h-[260px] flex-col items-center justify-center gap-1.5 rounded-[20px] bg-[var(--v2-ink-50)] px-5 text-center text-[15px] font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-brand-50)] hover:text-[#2d5eef]"
+                  className="flex min-h-[104px] flex-col items-center justify-center gap-1.5 rounded-[20px] py-4 lg:min-h-[260px] lg:py-0 bg-[var(--v2-ink-50)] px-5 text-center text-[15px] font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-brand-50)] hover:text-[#2d5eef]"
                 >
                   {queue.length ? "+ Взять из очереди" : "Свободный слот"}
                   <small className="block text-[13.5px] font-medium text-[var(--v2-ink-400)]">
@@ -290,7 +318,7 @@ export function HypothesesClient() {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="-mx-3 flex w-[calc(100%+1.5rem)] gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:-mx-6 sm:w-[calc(100%+3rem)] sm:px-6 lg:mx-0 lg:w-auto lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden">
             <FilterChip active={flt === "all"} label="Все проекты" count={items.length} onClick={() => setFlt("all")} />
             {projects.map((project) => {
               const colors = projectColors(project.hue);
@@ -310,17 +338,32 @@ export function HypothesesClient() {
         </div>
 
         {view === "board" ? (
-          <div className="grid grid-cols-1 items-start gap-3.5 xl:grid-cols-3">
-            {BOARD_COLUMNS.map((stage) => {
-              const column = items.filter((item) => {
-                if (item.stage !== stage || !inFilter(item)) return false;
-                if (stage === "active" || stage === "done") return item.sprint_id === sprint?.id;
-                return true;
-              });
+          <>
+          <div className="sticky top-2 z-10 grid grid-cols-3 gap-0.5 rounded-[14px] bg-white/95 p-1 shadow-[var(--v2-shadow-card)] backdrop-blur lg:hidden">
+            {boardColumns.map(({ stage, column }, index) => (
+              <button
+                key={stage}
+                type="button"
+                onClick={() => scrollToColumn(index)}
+                className={`flex h-10 items-center justify-center gap-1.5 rounded-[10px] px-2 text-[14px] font-semibold ${
+                  boardCol === index ? "bg-[#2d5eef] text-white" : "text-[var(--v2-ink-500)]"
+                }`}
+              >
+                <span className="truncate">{STAGE_LABEL[stage]}</span>
+                <span className={`v2-tnum text-[12px] ${boardCol === index ? "text-white/70" : "text-[var(--v2-ink-400)]"}`}>{column.length}</span>
+              </button>
+            ))}
+          </div>
+          <div
+            ref={boardRef}
+            onScroll={onBoardScroll}
+            className="-mx-3 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto scroll-px-3 px-3 pb-1 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-1 lg:gap-3.5 lg:overflow-visible lg:px-0 lg:pb-0 xl:grid-cols-3 [&::-webkit-scrollbar]:hidden"
+          >
+            {boardColumns.map(({ stage, column }) => {
               return (
                 <div
                   key={stage}
-                  className={`min-h-[240px] rounded-[20px] bg-white/50 p-3 ${stage === "active" ? "ring-0" : ""}`}
+                  className={`min-h-[240px] w-[88%] shrink-0 snap-start rounded-[20px] bg-white/50 p-3 sm:w-[calc(50%-6px)] lg:w-auto ${stage === "active" ? "ring-0" : ""}`}
                   onDragOver={(event) => {
                     event.preventDefault();
                     event.currentTarget.classList.add("bg-[var(--v2-brand-50)]");
@@ -355,11 +398,15 @@ export function HypothesesClient() {
                           project={projectById.get(item.project_id ?? "")}
                           onOpen={() => openHypothesis(item)}
                           onPatch={patchItem}
+                          onMove={move}
                           onDelete={removeItem}
                         />
                       ))
                     ) : (
-                      <div className="px-2.5 py-[22px] text-center text-[13.5px] text-[var(--v2-ink-400)]">Перетащи сюда</div>
+                      <div className="px-2.5 py-[22px] text-center text-[13.5px] text-[var(--v2-ink-400)]">
+                        <span className="lg:hidden">Пока пусто</span>
+                        <span className="hidden lg:inline">Перетащи сюда</span>
+                      </div>
                     )}
                   </div>
                   <form
@@ -379,9 +426,9 @@ export function HypothesesClient() {
                         stage === "active" ? "Быстро в работу…" : stage === "queue" ? "Быстро в очередь…" : "Быстро в бэклог…"
                       }
                       aria-label="Новая гипотеза"
-                      className="h-10 min-w-0 flex-1 rounded-xl bg-white px-3 text-[14px] outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+                      className="h-11 min-w-0 flex-1 rounded-xl bg-white px-3 text-[16px] outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)] lg:h-10 lg:text-[14px]"
                     />
-                    <button type="submit" aria-label="Добавить" className="h-10 w-10 rounded-xl bg-[var(--v2-ink-900)] text-[18px] text-white">
+                    <button type="submit" aria-label="Добавить" className="h-11 w-11 shrink-0 rounded-xl bg-[var(--v2-ink-900)] text-[18px] text-white lg:h-10 lg:w-10">
                       +
                     </button>
                   </form>
@@ -389,6 +436,7 @@ export function HypothesesClient() {
               );
             })}
           </div>
+          </>
         ) : (
           <div className="flex flex-col gap-3.5">
             {projects
@@ -400,11 +448,11 @@ export function HypothesesClient() {
                   .sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage));
                 const count = (stage: HypothesisStage) => rows.filter((item) => item.stage === stage).length;
                 return (
-                  <section key={project.id} className="v2-card px-6 py-[22px]" style={{ ["--c" as string]: colors.c }}>
+                  <section key={project.id} className="v2-card px-3.5 py-4 sm:px-6 sm:py-[22px]" style={{ ["--c" as string]: colors.c }}>
                     <div className="mb-3.5 flex flex-wrap items-center gap-3">
                       <span className="h-3 w-3 rounded" style={{ background: colors.c }} />
                       <h3 className="text-[20px] font-semibold tracking-[-0.025em]">{project.name}</h3>
-                      <div className="ml-auto flex gap-3.5 text-[13px] text-[var(--v2-ink-500)]">
+                      <div className="flex flex-wrap gap-x-3.5 gap-y-1 text-[13px] text-[var(--v2-ink-500)] max-sm:w-full sm:ml-auto">
                         <span>
                           в работе <b className="text-[var(--v2-ink-900)]">{count("active")}</b>
                         </span>
@@ -435,7 +483,7 @@ export function HypothesesClient() {
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") openHypothesis(item);
                               }}
-                              className="grid w-full cursor-pointer grid-cols-1 items-center gap-3 rounded-[14px] bg-[var(--v2-ink-50)] px-4 py-3 text-left hover:bg-[var(--v2-ink-100)] lg:grid-cols-[200px_minmax(0,1.2fr)_minmax(0,1fr)_auto] lg:gap-[18px]"
+                              className="grid w-full cursor-pointer grid-cols-1 items-center gap-2 rounded-[14px] bg-[var(--v2-ink-50)] px-3.5 py-3 text-left sm:gap-3 sm:px-4 hover:bg-[var(--v2-ink-100)] lg:grid-cols-[200px_minmax(0,1.2fr)_minmax(0,1fr)_auto] lg:gap-[18px]"
                             >
                               <span
                                 className={`w-fit rounded-md px-2 py-1 text-[12px] font-semibold whitespace-nowrap ${
@@ -447,7 +495,7 @@ export function HypothesesClient() {
                               </span>
                               <QuickTitle
                                 title={item.title}
-                                className="text-[15px] font-semibold tracking-[-0.015em]"
+                                className="text-[16px] font-semibold tracking-[-0.015em] lg:text-[15px]"
                                 onSave={(title) => patchItem(item.id, { title })}
                               />
                               <span className="flex flex-wrap items-center gap-2 text-[13.5px] leading-snug text-[var(--v2-ink-500)]">
@@ -490,11 +538,11 @@ export function HypothesesClient() {
 
 function Stat({ kicker, value, extra, main }: { kicker: string; value: string; extra?: string; main?: boolean }) {
   return (
-    <div className={`rounded-2xl px-[18px] py-4 text-left ${main ? "bg-[#2d5eef] text-white" : "bg-[var(--v2-ink-50)]"}`}>
+    <div className={`rounded-2xl px-3.5 py-3 text-left sm:px-[18px] sm:py-4 ${main ? "bg-[#2d5eef] text-white" : "bg-[var(--v2-ink-50)]"}`}>
       <div className={`text-[11.5px] font-semibold tracking-[0.13em] uppercase ${main ? "text-white/65" : "text-[var(--v2-ink-400)]"}`}>
         {kicker}
       </div>
-      <b className="v2-tnum mt-2 block text-[30px] font-semibold tracking-[-0.03em]">
+      <b className="v2-tnum mt-1.5 block text-[24px] font-semibold tracking-[-0.03em] sm:mt-2 sm:text-[30px]">
         {value}
         {extra ? <small className={`text-[16px] font-medium ${main ? "text-white/60" : "text-[var(--v2-ink-400)]"}`}>{extra}</small> : null}
       </b>
@@ -519,7 +567,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-[11px] px-3 py-2 text-[14px] ${
+      className={`inline-flex items-center gap-2 rounded-[11px] px-3 py-2.5 text-[14px] max-lg:shrink-0 max-lg:whitespace-nowrap lg:py-2 ${
         active ? "bg-white font-semibold text-[var(--v2-ink-900)] shadow-[var(--v2-shadow-card)]" : "bg-white/70 font-medium text-[var(--v2-ink-600)]"
       }`}
     >
@@ -569,7 +617,7 @@ function QuickDelete({ onDelete }: { onDelete: () => Promise<void> }) {
         stopCardEvent(event);
         void onDelete();
       }}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[16px] text-[var(--v2-ink-400)] hover:bg-[#fee4e2] hover:text-[#b42318]"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[18px] text-[var(--v2-ink-400)] hover:bg-[#fee4e2] hover:text-[#b42318] lg:h-7 lg:w-7 lg:text-[16px]"
     >
       ×
     </button>
@@ -642,7 +690,7 @@ function QuickTitle({
           stopCardEvent(event);
           setEditing(true);
         }}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[13px] text-[var(--v2-ink-400)] hover:bg-white hover:text-[var(--v2-ink-900)]"
+        className="-my-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[15px] text-[var(--v2-ink-400)] hover:bg-white hover:text-[var(--v2-ink-900)] lg:my-0 lg:h-7 lg:w-7 lg:text-[13px]"
       >
         ✎
       </button>
@@ -678,12 +726,14 @@ function FocusCard({
   project,
   onOpen,
   onPatch,
+  onMove,
   onDelete,
 }: {
   item: Hypothesis;
   project?: HypothesisProject;
   onOpen: () => void;
   onPatch: (id: string, patch: Record<string, unknown>) => Promise<Hypothesis>;
+  onMove: (id: string, stage: HypothesisStage) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const colors = projectColors(project?.hue ?? 260);
@@ -695,20 +745,23 @@ function FocusCard({
       onKeyDown={(event) => {
         if (event.key === "Enter") onOpen();
       }}
-      className="flex cursor-pointer flex-col gap-3.5 rounded-[20px] p-6 text-left transition hover:-translate-y-0.5"
+      className="flex cursor-pointer flex-col gap-3 rounded-[20px] p-4 text-left transition hover:-translate-y-0.5 sm:gap-3.5 sm:p-6"
       style={{ background: colors.s, boxShadow: `inset 0 0 0 1.5px color-mix(in oklch, ${colors.c} 18%, transparent)` }}
     >
       <div className="flex flex-wrap items-center gap-2.5">
         <ProjectChip project={project} />
         <RankBadge title={item.title} />
-        <span className="ml-auto text-[12px] font-semibold tracking-[0.1em] uppercase" style={{ color: colors.c }}>
+        <span className="ml-auto text-[12px] font-semibold tracking-[0.1em] uppercase max-lg:hidden" style={{ color: colors.c }}>
           в работе
         </span>
-        <QuickDelete onDelete={() => onDelete(item.id)} />
+        <span className="ml-auto flex items-center gap-1 lg:ml-0">
+          <MoveSelect stage={item.stage} onMove={(stage) => void onMove(item.id, stage)} />
+          <QuickDelete onDelete={() => onDelete(item.id)} />
+        </span>
       </div>
       <QuickTitle
         title={item.title}
-        className="text-[24px] leading-[1.2] font-semibold tracking-[-0.03em]"
+        className="text-[20px] leading-[1.2] font-semibold tracking-[-0.03em] sm:text-[24px]"
         onSave={(title) => onPatch(item.id, { title })}
       />
       <p className="text-[15px] leading-relaxed text-[var(--v2-ink-600)]">{item.body}</p>
@@ -720,17 +773,44 @@ function FocusCard({
   );
 }
 
+function MoveSelect({ stage, onMove }: { stage: HypothesisStage; onMove: (stage: HypothesisStage) => void }) {
+  return (
+    <label
+      onClick={stopCardEvent}
+      className="relative inline-flex h-9 shrink-0 items-center gap-1 rounded-lg bg-[var(--v2-ink-50)] px-2.5 text-[12.5px] font-semibold text-[var(--v2-ink-600)] lg:hidden"
+    >
+      Перенести
+      <span aria-hidden className="text-[10px] text-[var(--v2-ink-400)]">▾</span>
+      <select
+        aria-label="Перенести"
+        value={stage}
+        onClick={stopCardEvent}
+        onChange={(event) => onMove(event.target.value as HypothesisStage)}
+        className="absolute inset-0 cursor-pointer text-[16px] opacity-0"
+      >
+        {STAGES.map((option) => (
+          <option key={option} value={option}>
+            {STAGE_LABEL[option]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function BoardCard({
   item,
   project,
   onOpen,
   onPatch,
+  onMove,
   onDelete,
 }: {
   item: Hypothesis;
   project?: HypothesisProject;
   onOpen: () => void;
   onPatch: (id: string, patch: Record<string, unknown>) => Promise<Hypothesis>;
+  onMove: (id: string, stage: HypothesisStage) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
   return (
@@ -747,20 +827,21 @@ function BoardCard({
       onKeyDown={(event) => {
         if (event.key === "Enter") onOpen();
       }}
-      className="block w-full cursor-grab rounded-[14px] bg-white px-[15px] py-3.5 text-left shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-soft)]"
+      className="block w-full cursor-grab rounded-[14px] bg-white px-3.5 py-3 text-left shadow-[var(--v2-shadow-card)] hover:shadow-[var(--v2-shadow-soft)] lg:px-[15px] lg:py-3.5"
     >
       <span className="flex flex-wrap items-center gap-2">
         <ProjectChip project={project} />
         <RankBadge title={item.title} />
         <VerdictBadge verdict={item.stage === "done" ? item.verdict : null} />
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-1">
+          <MoveSelect stage={item.stage} onMove={(stage) => void onMove(item.id, stage)} />
           <QuickDelete onDelete={() => onDelete(item.id)} />
         </span>
       </span>
       <span className="mt-2 block">
         <QuickTitle
           title={item.title}
-          className="text-[15px] leading-snug font-semibold tracking-[-0.015em]"
+          className="text-[16px] leading-snug font-semibold tracking-[-0.015em] lg:text-[15px]"
           onSave={(title) => onPatch(item.id, { title })}
         />
       </span>
@@ -854,10 +935,10 @@ function HypothesisDrawer({
       : "";
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[90] lg:z-50">
       <button type="button" className="absolute inset-0 bg-[rgba(10,12,20,0.28)]" aria-label="Закрыть" onClick={() => void close()} />
-      <aside className="absolute top-0 right-0 flex h-full w-[min(520px,100vw)] flex-col bg-white shadow-[-20px_0_60px_-20px_rgba(16,24,40,0.3)]">
-        <div className="flex items-center gap-2.5 border-b border-[var(--v2-ink-100)] px-6 py-5">
+      <aside className="absolute top-0 right-0 flex h-full max-h-[100dvh] w-[min(520px,100vw)] flex-col bg-white pt-[env(safe-area-inset-top)] shadow-[-20px_0_60px_-20px_rgba(16,24,40,0.3)] lg:pt-0">
+        <div className="flex items-center gap-2.5 border-b border-[var(--v2-ink-100)] px-4 py-3 sm:px-6 lg:py-5">
           <span className="text-[11.5px] font-semibold tracking-[0.13em] text-[var(--v2-ink-400)] uppercase">
             {STAGE_LABEL[item.stage]}
             {sprintName ? ` · ${sprintName}` : ""}
@@ -866,7 +947,7 @@ function HypothesisDrawer({
             ×
           </button>
         </div>
-        <div className="flex flex-1 flex-col gap-[18px] overflow-y-auto px-6 py-[22px]">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 lg:gap-[18px] lg:py-[22px]">
           <Field label="Название">
             <input
               value={title}
@@ -882,7 +963,7 @@ function HypothesisDrawer({
             <select
               value={item.project_id ?? ""}
               onChange={(event) => void onPatch(item.id, { projectId: event.target.value || null })}
-              className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] outline-none"
+              className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[16px] lg:text-[15px] outline-none"
             >
               <option value="">Без проекта</option>
               {projects.map((project) => (
@@ -901,7 +982,7 @@ function HypothesisDrawer({
                 schedule();
               }}
               placeholder="Если …, то …"
-              className="w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] leading-relaxed outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+              className="w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[16px] lg:text-[15px] leading-relaxed outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
             />
           </Field>
           <Field label="Критерий проверки">
@@ -912,7 +993,7 @@ function HypothesisDrawer({
                 schedule();
               }}
               placeholder="Что должно случиться, чтобы считать подтверждённой"
-              className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+              className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[16px] lg:text-[15px] outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
             />
           </Field>
           <div className="flex flex-col gap-1.5">
@@ -923,7 +1004,7 @@ function HypothesisDrawer({
                   key={stage}
                   type="button"
                   onClick={() => void onMove(item.id, stage)}
-                  className={`rounded-[11px] px-3 py-2 text-[14px] font-semibold ${
+                  className={`min-h-10 rounded-[11px] px-3 py-2 text-[14px] font-semibold lg:min-h-0 ${
                     item.stage === stage ? "bg-[var(--v2-ink-900)] text-white" : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)]"
                   }`}
                 >
@@ -937,7 +1018,7 @@ function HypothesisDrawer({
               <select
                 value={item.sprint_id ?? ""}
                 onChange={(event) => void onPatch(item.id, { stage: item.stage, sprintId: event.target.value || null })}
-                className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] outline-none"
+                className="w-full rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[16px] lg:text-[15px] outline-none"
               >
                 {sprints.map((sprint) => (
                   <option key={sprint.id} value={sprint.id}>
@@ -957,7 +1038,7 @@ function HypothesisDrawer({
                       key={verdict}
                       type="button"
                       onClick={() => void onPatch(item.id, { verdict })}
-                      className={`rounded-[11px] px-3 py-2 text-[14px] font-semibold ${
+                      className={`min-h-10 rounded-[11px] px-3 py-2 text-[14px] font-semibold lg:min-h-0 ${
                         item.verdict === verdict ? "bg-[var(--v2-ink-900)] text-white" : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)]"
                       }`}
                     >
@@ -975,7 +1056,7 @@ function HypothesisDrawer({
                     schedule();
                   }}
                   placeholder="Что узнал, что делаю дальше"
-                  className="w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[15px] leading-relaxed outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
+                  className="w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3 py-2.5 text-[16px] lg:text-[15px] leading-relaxed outline-none focus:bg-white focus:ring-2 focus:ring-[var(--v2-brand-500)]"
                 />
               </Field>
             </>
@@ -986,7 +1067,7 @@ function HypothesisDrawer({
             </div>
           ) : null}
         </div>
-        <div className="flex gap-2.5 border-t border-[var(--v2-ink-100)] px-6 py-4">
+        <div className="flex gap-2.5 border-t border-[var(--v2-ink-100)] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] sm:px-6 lg:py-4">
           <button type="button" onClick={() => void close()} className="inline-flex h-11 items-center rounded-[13px] bg-[#2d5eef] px-[18px] text-[14.5px] font-semibold text-white">
             Готово
           </button>

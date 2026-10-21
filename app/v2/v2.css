@@ -24,6 +24,10 @@
   --v2-shadow-pop: 0 12px 36px -10px rgba(20, 40, 120, 0.18), 0 2px 8px rgba(16, 24, 40, 0.05);
   --v2-shadow-inset: inset 0 0 0 1px rgba(16, 24, 40, 0.04);
   --v2-shadow-glow: 0 0 0 4px rgba(59, 111, 247, 0.1), 0 6px 22px -8px rgba(59, 111, 247, 0.45);
+  --v2-mobnav-h: calc(64px + env(safe-area-inset-bottom, 0px));
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background:
     radial-gradient(1000px 520px at 88% -10%, rgba(59, 111, 247, 0.1), transparent 60%),
     radial-gradient(700px 420px at -10% 22%, rgba(99, 140, 255, 0.06), transparent 55%),
@@ -32,6 +36,27 @@
   font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+@media (min-width: 1024px) {
+  .v2-root {
+    --v2-mobnav-h: 0px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .v2-root {
+    overflow-x: clip;
+  }
+}
+
+@media (max-width: 639px) {
+  .v2-root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .v2-root textarea,
+  .v2-root select,
+  .v2-root [contenteditable="true"] {
+    font-size: max(16px, 1em);
+  }
 }
 
 .v2-tnum {

@@ -10,6 +10,7 @@ import type { PersonalIncomeHistoryRow } from "@/lib/v2/personal/types";
 import { V2Icons } from "@/components/v2/ui/icons";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useCompactChartWidth } from "./personal-finance-charts";
 
 export type IncomeHistoryChartPoint = PersonalIncomeHistoryRow & {
   delta: number | null;
@@ -42,12 +43,13 @@ type ChartLayout = {
   expanded: boolean;
 };
 
-function getChartLayout(pointCount: number, expanded = false): ChartLayout {
+function getChartLayout(pointCount: number, expanded = false, compactW: number | null = null): ChartLayout {
   const count = Math.max(pointCount, 2);
+  const compact = !expanded && compactW != null;
   return {
-    W: expanded ? Math.max(1400, count * 58) : 920,
-    H: expanded ? 380 : 248,
-    padX: 24,
+    W: expanded ? Math.max(1400, count * 58) : compact ? compactW : 920,
+    H: expanded ? 380 : compact ? 210 : 248,
+    padX: compact ? 16 : 24,
     padTop: expanded ? 36 : 28,
     padBot: expanded ? 44 : 36,
     expanded,
@@ -135,8 +137,12 @@ function Tooltip({
   );
 }
 
-function shouldShowLabel(i: number, total: number, expanded: boolean) {
+function shouldShowLabel(i: number, total: number, expanded: boolean, W?: number) {
   if (expanded) return true;
+  if (W != null && W < 640) {
+    const every = Math.ceil(total / Math.max(Math.floor(W / 44), 2));
+    return (total - 1 - i) % every === 0;
+  }
   return i === 0 || i === total - 1 || i % Math.ceil(total / 8) === 0;
 }
 
@@ -144,14 +150,17 @@ function ChartSvgShell({
   layout,
   children,
   onMouseLeave,
+  svgRef,
 }: {
   layout: ChartLayout;
   children: React.ReactNode;
   onMouseLeave?: () => void;
+  svgRef?: (el: SVGSVGElement | null) => void;
 }) {
   const { W, H, expanded } = layout;
   return (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
       width={expanded ? W : undefined}
       height={expanded ? H : undefined}
@@ -172,7 +181,8 @@ export function IncomeHistoryCapitalChart({
   points: IncomeHistoryChartPoint[];
   expanded?: boolean;
 }) {
-  const layout = getChartLayout(points.length, expanded);
+  const [svgRef, compactW] = useCompactChartWidth();
+  const layout = getChartLayout(points.length, expanded, compactW);
   const { W, H, padX, padTop, padBot } = layout;
   const [hover, setHover] = useState(() => Math.max(0, points.length - 1));
   if (points.length < 2) return null;
@@ -194,7 +204,7 @@ export function IncomeHistoryCapitalChart({
   const slotW = (W - padX * 2) / (points.length - 1);
 
   return (
-    <ChartSvgShell layout={layout} onMouseLeave={() => setHover(points.length - 1)}>
+    <ChartSvgShell layout={layout} svgRef={svgRef} onMouseLeave={() => setHover(points.length - 1)}>
       <defs>
         <linearGradient id="ihCapFill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#3B6FF7" stopOpacity="0.22" />
@@ -216,7 +226,7 @@ export function IncomeHistoryCapitalChart({
             style={{ cursor: "pointer" }}
           />
           <circle cx={p.x} cy={p.y} r={i === hover ? 5 : 0} fill="#fff" stroke="#3B6FF7" strokeWidth="2.5" />
-          {shouldShowLabel(i, points.length, expanded) ? (
+          {shouldShowLabel(i, points.length, expanded, W) ? (
             <text
               x={p.x}
               y={H - 12}
@@ -264,7 +274,8 @@ export function IncomeHistoryCapitalDeltaChart({
   expanded?: boolean;
 }) {
   const deltas = points.filter((p) => p.delta != null);
-  const layout = getChartLayout(deltas.length, expanded);
+  const [svgRef, compactW] = useCompactChartWidth();
+  const layout = getChartLayout(deltas.length, expanded, compactW);
   const { W, H, padX, padTop, padBot } = layout;
   const [hover, setHover] = useState(() => Math.max(0, deltas.length - 1));
   if (deltas.length < 1) return null;
@@ -279,7 +290,7 @@ export function IncomeHistoryCapitalDeltaChart({
   const hd = deltas[hover];
 
   return (
-    <ChartSvgShell layout={layout}>
+    <ChartSvgShell layout={layout} svgRef={svgRef}>
       <ChartGrid layout={layout} midY={midY} />
       {deltas.map((d, i) => {
         const v = d.delta!;
@@ -300,7 +311,7 @@ export function IncomeHistoryCapitalDeltaChart({
               fill={up ? "#10B981" : "#EF4444"}
               opacity={on ? 1 : 0.82}
             />
-            {shouldShowLabel(i, deltas.length, expanded) ? (
+            {shouldShowLabel(i, deltas.length, expanded, W) ? (
               <text
                 x={cx}
                 y={H - 12}
@@ -339,7 +350,8 @@ export function IncomeHistoryProfitChart({
   masked?: boolean;
 }) {
   const data = points.filter((p) => p.profit_rub != null);
-  const layout = getChartLayout(data.length, expanded);
+  const [svgRef, compactW] = useCompactChartWidth();
+  const layout = getChartLayout(data.length, expanded, compactW);
   const { W, H, padX, padTop, padBot } = layout;
   const [hover, setHover] = useState(() => Math.max(0, data.length - 1));
   if (data.length < 2) return null;
@@ -361,7 +373,7 @@ export function IncomeHistoryProfitChart({
   const slotW = (W - padX * 2) / (data.length - 1);
 
   return (
-    <ChartSvgShell layout={layout} onMouseLeave={() => setHover(data.length - 1)}>
+    <ChartSvgShell layout={layout} svgRef={svgRef} onMouseLeave={() => setHover(data.length - 1)}>
       <defs>
         <linearGradient id="ihProfitFill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#10B981" stopOpacity="0.22" />
@@ -383,7 +395,7 @@ export function IncomeHistoryProfitChart({
             style={{ cursor: "pointer" }}
           />
           <circle cx={p.x} cy={p.y} r={i === hover ? 5 : 0} fill="#fff" stroke="#10B981" strokeWidth="2.5" />
-          {shouldShowLabel(i, data.length, expanded) ? (
+          {shouldShowLabel(i, data.length, expanded, W) ? (
             <text
               x={p.x}
               y={H - 12}
@@ -459,7 +471,7 @@ function ChartExpandLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)]"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)] max-sm:h-10 max-sm:w-10"
       title={label}
       aria-label={label}
     >
@@ -538,7 +550,7 @@ export function IncomeHistoryChartsSection({
             <button
               type="button"
               onClick={() => onModeChange("capital")}
-              className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition ${
+              className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition max-sm:py-2 ${
                 mode === "capital"
                   ? "bg-white text-[var(--v2-brand-700)] shadow-[var(--v2-shadow-card)]"
                   : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
@@ -549,7 +561,7 @@ export function IncomeHistoryChartsSection({
             <button
               type="button"
               onClick={() => onModeChange("profit")}
-              className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition ${
+              className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition max-sm:py-2 ${
                 mode === "profit"
                   ? "bg-white text-emerald-700 shadow-[var(--v2-shadow-card)]"
                   : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"

@@ -171,11 +171,11 @@ function TSect({
 }) {
   return (
     <section className="mb-14">
-      <div className="mb-5 flex items-end gap-5">
+      <div className="mb-5 flex flex-wrap items-end gap-x-5 gap-y-3">
         <div>
           <h2 className="v2-tight text-[21px] font-medium text-[var(--v2-ink-900)]">{title}</h2>
           {sub ? (
-            <p className="v2-tight mt-1.5 max-w-[74ch] text-[14px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
+            <p className="v2-tight mt-1.5 max-w-[74ch] text-[15px] text-[var(--v2-ink-500)] sm:text-[14px]" style={{ textWrap: "pretty" }}>
               {sub}
             </p>
           ) : null}
@@ -188,10 +188,10 @@ function TSect({
 }
 
 const fieldCls =
-  "mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white v2-tight";
+  "mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[16px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white v2-tight sm:text-[14.5px]";
 const labCls = "text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]";
 const selCls =
-  "h-9 cursor-pointer appearance-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3 text-[13px] text-[var(--v2-ink-800)] outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white v2-tight";
+  "h-11 min-w-0 flex-1 cursor-pointer appearance-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3 text-[16px] sm:h-9 sm:flex-none sm:text-[13px] text-[var(--v2-ink-800)] outline-none transition focus:border-[var(--v2-brand-400)] focus:bg-white v2-tight";
 
 export function PersonalTimeClient() {
   const [doc, setDoc] = useState<TimeDoc | null>(null);
@@ -532,11 +532,11 @@ export function PersonalTimeClient() {
     entryFilter === "all" ? doc.entries : doc.entries.filter((e) => e.projectId === entryFilter);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6" onClick={() => {}}>
+    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-12 pt-4 sm:px-8 sm:pb-24 sm:pt-6" onClick={() => {}}>
       <div className="mx-auto max-w-[1280px]">
         <div className="mb-9 flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
-          <div className="min-w-[280px] max-w-[680px] flex-1">
-            <h1 className="v2-tighter text-[52px] font-light leading-none text-[var(--v2-ink-900)]">
+          <div className="min-w-0 max-w-[680px] flex-1 sm:min-w-[280px]">
+            <h1 className="v2-tighter text-[34px] font-light leading-none sm:text-[52px] text-[var(--v2-ink-900)]">
               Время / Экономика
             </h1>
             {error ? <p className="mt-4 text-[13px] text-red-600">{error}</p> : null}
@@ -545,15 +545,15 @@ export function PersonalTimeClient() {
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            className="v2-tight mt-2 inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] bg-transparent px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:border-[var(--v2-ink-300)] hover:text-[var(--v2-ink-800)]"
+            className="v2-tight mt-0 inline-flex h-10 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] sm:mt-2 sm:h-9 bg-transparent px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:border-[var(--v2-ink-300)] hover:text-[var(--v2-ink-800)]"
           >
             Настройки
           </button>
         </div>
 
         {/* Timer */}
-        <div className="mb-14 rounded-[24px] bg-white px-8 py-7 shadow-[var(--v2-shadow-soft)]">
-          <div className="flex flex-wrap items-center gap-6">
+        <div className="mb-14 rounded-[24px] bg-white px-4 py-5 shadow-[var(--v2-shadow-soft)] sm:px-8 sm:py-7">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
             <button
               type="button"
               onClick={() => void toggleTimer()}
@@ -563,8 +563,8 @@ export function PersonalTimeClient() {
             >
               {running ? <V2Icons.stop className="h-5 w-5" /> : <V2Icons.play className="ml-0.5 h-6 w-6" />}
             </button>
-            <div className="min-w-[220px] flex-1">
-              <p className="v2-tighter v2-tnum text-[38px] font-light leading-none text-[var(--v2-ink-900)]">
+            <div className="min-w-0 flex-1 sm:min-w-[220px]">
+              <p className="v2-tighter v2-tnum text-[34px] font-light leading-none text-[var(--v2-ink-900)] sm:text-[38px]">
                 {hh}:{mm}:{ss}
               </p>
               <p className="v2-tight mt-2 text-[13px] text-[var(--v2-ink-500)]">
@@ -572,7 +572,7 @@ export function PersonalTimeClient() {
                 {projName(running ? doc.running!.projectId : timerProj)}
               </p>
             </div>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
               <select
                 value={running ? doc.running!.projectId : timerProj}
                 disabled={running}
@@ -614,7 +614,7 @@ export function PersonalTimeClient() {
                     type="button"
                     disabled={running}
                     onClick={() => setTimerMode(k)}
-                    className={`v2-tight h-7 rounded-lg px-3 text-[12px] font-medium transition ${
+                    className={`v2-tight h-9 rounded-lg px-3 text-[12px] font-medium transition sm:h-7 ${
                       (running ? doc.running!.mode : timerMode) === k
                         ? k === "reactive"
                           ? "bg-white text-amber-700 shadow-[var(--v2-shadow-card)]"
@@ -629,7 +629,7 @@ export function PersonalTimeClient() {
               <button
                 type="button"
                 onClick={() => setManual(true)}
-                className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-300)] px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-600)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
+                className="v2-tight inline-flex h-11 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-300)] px-3.5 sm:h-9 text-[12.5px] font-medium text-[var(--v2-ink-600)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
               >
                 <V2Icons.plus className="h-4 w-4" /> Время
               </button>
@@ -656,7 +656,7 @@ export function PersonalTimeClient() {
                   else void toggleTimer();
                 }
               }}
-              className="v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[14.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
+              className="v2-tight mt-1.5 h-11 w-full rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 text-[16px] sm:text-[14.5px] text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
               placeholder="Например: звонок с клиентом, сценарий ролика, правки лендинга…"
             />
           </label>
@@ -702,7 +702,7 @@ export function PersonalTimeClient() {
                 key={x.id}
                 type="button"
                 onClick={() => setProj(x.id)}
-                className={`v2-tight h-9 rounded-full px-4 text-[13px] font-medium transition ${
+                className={`v2-tight h-10 rounded-full px-4 text-[13px] font-medium transition sm:h-9 ${
                   proj === x.id
                     ? "bg-[var(--v2-ink-900)] text-white"
                     : "bg-white text-[var(--v2-ink-600)] shadow-[var(--v2-shadow-card)] hover:text-[var(--v2-ink-900)]"
@@ -716,7 +716,7 @@ export function PersonalTimeClient() {
         </TSect>
 
         <TSect title="Моё внимание за месяц" sub="Клик по проекту открывает его экономику выше.">
-          <div className="rounded-[20px] bg-white px-7 py-6 shadow-[var(--v2-shadow-card)]">
+          <div className="rounded-[20px] bg-white px-4 py-5 shadow-[var(--v2-shadow-card)] sm:px-7 sm:py-6">
             <div className="flex items-baseline gap-4">
               <TK>Моё внимание за месяц</TK>
               <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">
@@ -729,8 +729,7 @@ export function PersonalTimeClient() {
                   key={a.id}
                   type="button"
                   onClick={() => setProj(a.id)}
-                  className="group grid items-center gap-4 text-left"
-                  style={{ gridTemplateColumns: "170px minmax(0,1fr) 60px" }}
+                  className="group grid min-h-9 grid-cols-[104px_minmax(0,1fr)_64px] items-center gap-3 text-left sm:min-h-0 sm:grid-cols-[170px_minmax(0,1fr)_60px] sm:gap-4"
                 >
                   <span
                     className={`v2-tight text-[13.5px] transition ${
@@ -764,48 +763,50 @@ export function PersonalTimeClient() {
           title="Экономика внимания"
           sub="Выручка и прибыль из «Проекты и финансы», часы — из записей таймера за текущий месяц."
         >
-          <div className="overflow-hidden rounded-[20px] bg-white shadow-[var(--v2-shadow-card)]">
-            <div
-              className="grid gap-4 border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/60 px-7 py-3.5"
-              style={{ gridTemplateColumns: "minmax(0,1.2fr) 120px 120px 110px 120px 160px" }}
-            >
-              {["Проект", "Выручка", "Прибыль", "Часы", "₽ / час", "Reactive"].map((h) => (
-                <TK key={h}>{h}</TK>
-              ))}
-            </div>
-            {economics.map((e) => (
+          <div className="overflow-x-auto overscroll-x-contain rounded-[20px] bg-white shadow-[var(--v2-shadow-card)]">
+            <div className={economics.length ? "min-w-[760px]" : undefined}>
               <div
-                key={e.id}
-                className="grid items-center gap-4 border-b border-[var(--v2-ink-100)] px-7 py-4 last:border-0"
+                className="grid gap-4 border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/60 px-7 py-3.5"
                 style={{ gridTemplateColumns: "minmax(0,1.2fr) 120px 120px 110px 120px 160px" }}
               >
-                <div className="min-w-0">
-                  <span className="v2-tight block truncate text-[14.5px] font-medium text-[var(--v2-ink-900)]">
-                    {e.name}
-                  </span>
-                  {e.fromFinance ? (
-                    <span className="v2-tight text-[11px] text-[var(--v2-ink-400)]">из финансов месяца</span>
-                  ) : null}
-                </div>
-                <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtRub(e.revenue)}</span>
-                <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtRub(e.profit)}</span>
-                <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtHours(e.hours)}</span>
-                <span className="v2-tnum text-[14px] font-medium text-[var(--v2-brand-700)]">
-                  {e.per == null ? "—" : fmtRub(e.per)}
-                </span>
-                <span className="flex items-center gap-3">
-                  <span className="h-2 w-[72px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
-                    <span className="block h-full rounded-full bg-amber-400" style={{ width: `${e.reactive}%` }} />
-                  </span>
-                  <span className="v2-tnum text-[13px] text-[var(--v2-ink-600)]">{e.reactive}%</span>
-                </span>
+                {["Проект", "Выручка", "Прибыль", "Часы", "₽ / час", "Reactive"].map((h) => (
+                  <TK key={h}>{h}</TK>
+                ))}
               </div>
-            ))}
-            {!economics.length ? (
-              <p className="v2-tight px-7 py-6 text-[14px] text-[var(--v2-ink-500)]">
-                Нет данных: занесите проекты в «Проекты и финансы» или зафиксируйте время.
-              </p>
-            ) : null}
+              {economics.map((e) => (
+                <div
+                  key={e.id}
+                  className="grid items-center gap-4 border-b border-[var(--v2-ink-100)] px-7 py-4 last:border-0"
+                  style={{ gridTemplateColumns: "minmax(0,1.2fr) 120px 120px 110px 120px 160px" }}
+                >
+                  <div className="min-w-0">
+                    <span className="v2-tight block truncate text-[14.5px] font-medium text-[var(--v2-ink-900)]">
+                      {e.name}
+                    </span>
+                    {e.fromFinance ? (
+                      <span className="v2-tight text-[11px] text-[var(--v2-ink-400)]">из финансов месяца</span>
+                    ) : null}
+                  </div>
+                  <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtRub(e.revenue)}</span>
+                  <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtRub(e.profit)}</span>
+                  <span className="v2-tnum text-[13.5px] text-[var(--v2-ink-700)]">{fmtHours(e.hours)}</span>
+                  <span className="v2-tnum text-[14px] font-medium text-[var(--v2-brand-700)]">
+                    {e.per == null ? "—" : fmtRub(e.per)}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <span className="h-2 w-[72px] overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
+                      <span className="block h-full rounded-full bg-amber-400" style={{ width: `${e.reactive}%` }} />
+                    </span>
+                    <span className="v2-tnum text-[13px] text-[var(--v2-ink-600)]">{e.reactive}%</span>
+                  </span>
+                </div>
+              ))}
+              {!economics.length ? (
+                <p className="v2-tight px-7 py-6 text-[14px] text-[var(--v2-ink-500)]">
+                  Нет данных: занесите проекты в «Проекты и финансы» или зафиксируйте время.
+                </p>
+              ) : null}
+            </div>
           </div>
           <p
             className="v2-tight mt-4 max-w-[80ch] text-[14px] leading-relaxed text-[var(--v2-ink-600)]"
@@ -824,7 +825,7 @@ export function PersonalTimeClient() {
               <button
                 type="button"
                 onClick={() => setEntryFilter("all")}
-                className={`v2-tight h-7 rounded-full px-3.5 text-[12px] font-medium transition ${
+                className={`v2-tight h-9 rounded-full px-3.5 text-[12px] sm:h-7 font-medium transition ${
                   entryFilter === "all"
                     ? "bg-[var(--v2-ink-900)] text-white"
                     : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
@@ -836,7 +837,7 @@ export function PersonalTimeClient() {
                 <button
                   type="button"
                   onClick={() => setEntryFilter(p.id)}
-                  className={`v2-tight h-7 rounded-full px-3.5 text-[12px] font-medium transition ${
+                  className={`v2-tight h-9 rounded-full px-3.5 text-[12px] sm:h-7 font-medium transition ${
                     entryFilter === p.id
                       ? "bg-[var(--v2-ink-900)] text-white"
                       : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
@@ -852,12 +853,11 @@ export function PersonalTimeClient() {
             {entryRows.map((e, i) => (
               <div
                 key={e.id}
-                className={`group grid items-center gap-5 px-7 py-4 transition hover:bg-[var(--v2-ink-50)]/60 ${
+                className={`group flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition hover:bg-[var(--v2-ink-50)]/60 md:grid md:grid-cols-[minmax(0,1fr)_150px_130px_120px_110px_36px] md:gap-5 md:px-7 md:py-4 ${
                   i ? "border-t border-[var(--v2-ink-100)]" : ""
                 }`}
-                style={{ gridTemplateColumns: "minmax(0,1fr) 150px 130px 120px 110px 36px" }}
               >
-                <span className="v2-tight truncate text-[14.5px] text-[var(--v2-ink-900)]">
+                <span className="v2-tight w-full text-[16px] text-[var(--v2-ink-900)] md:w-auto md:truncate md:text-[14.5px]">
                   {e.task}
                   {e.agencyProjectName ? (
                     <span className="ml-2 text-[12px] font-normal text-[var(--v2-brand-600)]">→ {e.agencyProjectName}</span>
@@ -874,19 +874,19 @@ export function PersonalTimeClient() {
                     <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">Planned</span>
                   )}
                 </span>
-                <span className="v2-tnum justify-self-end text-[13px] text-[var(--v2-ink-800)]">{fmtDur(e.durationMin)}</span>
+                <span className="v2-tnum text-[13px] text-[var(--v2-ink-800)] md:justify-self-end">{fmtDur(e.durationMin)}</span>
                 <button
                   type="button"
                   title="Удалить"
                   onClick={() => void deleteEntry(e.id)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-300)] opacity-0 transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)] group-hover:opacity-100"
+                  className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--v2-ink-300)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)] focus-visible:opacity-100! group-hover:opacity-100! md:ml-0 md:h-8 md:w-8 [@media(hover:hover)_and_(min-width:1024px)]:opacity-0"
                 >
                   <V2Icons.trash className="h-3.5 w-3.5" />
                 </button>
               </div>
             ))}
             {!entryRows.length ? (
-              <p className="v2-tight px-7 py-6 text-[14px] text-[var(--v2-ink-500)]">Записей по этому проекту пока нет.</p>
+              <p className="v2-tight px-4 py-6 text-[14px] text-[var(--v2-ink-500)] sm:px-7">Записей по этому проекту пока нет.</p>
             ) : null}
           </div>
         </TSect>
@@ -914,10 +914,10 @@ export function PersonalTimeClient() {
 
 function Metric({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
   return (
-    <div className="rounded-2xl bg-white px-5 py-4 shadow-[var(--v2-shadow-card)]">
+    <div className="rounded-2xl bg-white px-4 py-4 shadow-[var(--v2-shadow-card)] sm:px-5">
       <TK>{label}</TK>
       <p
-        className={`v2-tighter v2-tnum mt-2 text-[24px] font-light ${
+        className={`v2-tighter v2-tnum mt-2 text-[19px] font-light sm:text-[24px] ${
           accent ? "text-[var(--v2-brand-700)]" : "text-[var(--v2-ink-900)]"
         }`}
       >
@@ -949,11 +949,11 @@ function ProjectPanel({
             <TK>{p.role}</TK>
             <span className="v2-tnum text-[12px] text-[var(--v2-ink-400)]">{monthLabel()}</span>
           </div>
-          <h2 className="v2-tighter mt-1.5 text-[30px] font-light text-[var(--v2-ink-900)]">{p.name}</h2>
+          <h2 className="v2-tighter mt-1.5 text-[26px] font-light text-[var(--v2-ink-900)] sm:text-[30px]">{p.name}</h2>
         </div>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px,1fr))" }}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] sm:gap-4">
         {p.money ? (
           <Metric
             label="Выручка"
@@ -978,11 +978,11 @@ function ProjectPanel({
         {p.money && revPer != null ? <Metric label="Revenue / founder hour" value={fmtRub(revPer)} /> : null}
       </div>
 
-      <div className="mt-5 rounded-[20px] bg-white px-7 py-6 shadow-[var(--v2-shadow-card)]">
+      <div className="mt-5 rounded-[20px] bg-white px-4 py-5 shadow-[var(--v2-shadow-card)] sm:px-7 sm:py-6">
         <TK>Из чего состоят часы</TK>
         <div className="mt-4 flex flex-col gap-2.5">
           {m.split.map(([l, h]) => (
-            <div key={l} className="grid items-center gap-4" style={{ gridTemplateColumns: "160px minmax(0,1fr) 52px" }}>
+            <div key={l} className="grid grid-cols-[100px_minmax(0,1fr)_64px] items-center gap-3 sm:grid-cols-[160px_minmax(0,1fr)_52px] sm:gap-4">
               <span className="v2-tight text-[13.5px] text-[var(--v2-ink-700)]">{l}</span>
               <span className="h-2.5 overflow-hidden rounded-full bg-[var(--v2-ink-100)]">
                 <span
@@ -1047,25 +1047,25 @@ function ManualModal({
 
   return (
     <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-3 backdrop-blur-sm sm:p-8"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[560px] rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
+        className="max-h-[calc(100dvh-24px)] w-full max-w-[560px] overflow-y-auto overscroll-contain rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-8 pb-6 pt-7">
+        <div className="px-5 pb-6 pt-6 sm:px-8 sm:pt-7">
           <div className="flex items-start justify-between gap-4">
             <h2 className="v2-tighter text-[24px] font-light leading-tight text-[var(--v2-ink-900)]">Добавить время</h2>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition sm:h-8 sm:w-8 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
             >
               <IcClose className="h-[17px] w-[17px]" />
             </button>
           </div>
-          <div className="mt-6 grid grid-cols-2 gap-4">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className={labCls}>Проект</span>
               <select
@@ -1136,7 +1136,7 @@ function ManualModal({
               value={task}
               onChange={(e) => setTask(e.target.value)}
               placeholder="Например: звонок с клиентом по правкам лендинга"
-              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--v2-ink-900)] outline-none transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
+              className="v2-tight mt-1.5 w-full resize-none rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] px-3.5 py-2.5 text-[16px] leading-relaxed text-[var(--v2-ink-900)] outline-none sm:text-[14px] transition placeholder:text-[var(--v2-ink-400)] focus:border-[var(--v2-brand-400)] focus:bg-white"
             />
           </label>
           {showAgencyPicker && agencyProjectsConfigured ? (
@@ -1157,7 +1157,7 @@ function ManualModal({
             </label>
           ) : null}
         </div>
-        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-8 py-4">
+        <div className="flex justify-end gap-2 rounded-b-[24px] bg-[var(--v2-ink-50)] px-5 py-4 sm:px-8">
           <button
             type="button"
             onClick={onClose}
@@ -1268,14 +1268,14 @@ function SettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[55] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--v2-ink-900)]/45 p-3 backdrop-blur-sm sm:p-6"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[min(860px,92vh)] w-full max-w-[920px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
+        className="flex max-h-[calc(100dvh-24px)] w-full max-w-[920px] sm:max-h-[min(860px,92vh)] flex-col overflow-hidden rounded-[24px] bg-white shadow-[var(--v2-shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--v2-ink-100)] px-8 pb-5 pt-7">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--v2-ink-100)] px-5 pb-4 pt-5 sm:px-8 sm:pb-5 sm:pt-7">
           <div>
             <h2 className="v2-tighter text-[24px] font-light text-[var(--v2-ink-900)]">Настройки</h2>
             <p className="v2-tight mt-1.5 text-[13.5px] text-[var(--v2-ink-500)]">
@@ -1285,15 +1285,15 @@ function SettingsModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--v2-ink-400)] transition sm:h-8 sm:w-8 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
           >
             <IcClose className="h-[17px] w-[17px]" />
           </button>
         </div>
 
-        <div className="grid min-h-0 flex-1 overflow-hidden" style={{ gridTemplateColumns: "240px minmax(0,1fr)" }}>
-          <div className="flex flex-col border-r border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/50">
-            <div className="flex-1 overflow-y-auto p-3">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:grid-cols-[240px_minmax(0,1fr)] sm:grid-rows-none">
+          <div className="flex flex-col border-b border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/50 sm:border-b-0 sm:border-r">
+            <div className="max-h-[28dvh] flex-1 overflow-y-auto p-3 sm:max-h-none">
               {projects.map((p) => (
                 <button
                   key={p.id}
@@ -1314,17 +1314,17 @@ function SettingsModal({
               <button
                 type="button"
                 onClick={addProject}
-                className="v2-tight inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--v2-ink-300)] text-[12.5px] font-medium text-[var(--v2-ink-600)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
+                className="v2-tight inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed sm:h-9 border-[var(--v2-ink-300)] text-[12.5px] font-medium text-[var(--v2-ink-600)] transition hover:border-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
               >
                 <V2Icons.plus className="h-4 w-4" /> Проект
               </button>
             </div>
           </div>
 
-          <div className="min-h-0 overflow-y-auto px-8 py-6">
+          <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-5 sm:px-8 sm:py-6">
             {selected ? (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <label className="block">
                     <span className={labCls}>Название</span>
                     <input
@@ -1343,7 +1343,7 @@ function SettingsModal({
                     />
                   </label>
                 </div>
-                <label className="mt-4 flex items-center gap-2 text-[13px] text-[var(--v2-ink-700)]">
+                <label className="mt-4 flex min-h-10 items-center gap-2 text-[14px] sm:min-h-0 sm:text-[13px] text-[var(--v2-ink-700)]">
                   <input
                     type="checkbox"
                     checked={selected.money}
@@ -1369,7 +1369,7 @@ function SettingsModal({
                     .
                   </p>
                 ) : selected.money ? (
-                  <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <label className="block">
                       <span className={labCls}>Выручка</span>
                       <input
@@ -1448,7 +1448,7 @@ function SettingsModal({
                   <button
                     type="button"
                     onClick={() => removeProject(selected.id)}
-                    className="v2-tight mt-8 text-[12.5px] font-medium text-red-600/80 transition hover:text-red-700"
+                    className="v2-tight mt-8 min-h-10 text-[12.5px] font-medium text-red-600/80 sm:min-h-0 transition hover:text-red-700"
                   >
                     Удалить проект
                   </button>
@@ -1460,7 +1460,7 @@ function SettingsModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)] px-8 py-4">
+        <div className="flex justify-end gap-2 border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)] px-5 py-4 sm:px-8">
           <button
             type="button"
             onClick={onClose}

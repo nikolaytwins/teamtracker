@@ -261,7 +261,7 @@ function InboxBucketColumn({
           e.preventDefault();
           onDrop();
         }}
-        className="v2-kcol flex w-[300px] shrink-0 flex-col rounded-2xl bg-white/40 backdrop-blur-sm"
+        className="v2-kcol flex w-[300px] shrink-0 snap-start flex-col rounded-2xl bg-white/40 backdrop-blur-sm max-sm:w-[84vw]"
       >
         <div className="v2-kcol-head sticky top-0 z-10 flex items-center gap-2 rounded-t-2xl border-b border-[var(--v2-ink-100)]/70 bg-white/70 px-3.5 py-3 backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: dot ?? meta.dot }} />

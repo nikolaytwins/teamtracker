@@ -87,20 +87,30 @@ export function V2NotificationsBell({
       </IconBtn>
 
       {open ? (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[360px] overflow-hidden rounded-2xl border border-[var(--v2-ink-100)] bg-white shadow-[var(--v2-shadow-pop)]">
-          <div className="flex items-center justify-between border-b border-[var(--v2-ink-100)] px-4 py-3">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[360px] overflow-hidden rounded-2xl border border-[var(--v2-ink-100)] bg-white shadow-[var(--v2-shadow-pop)] max-sm:fixed max-sm:inset-x-2 max-sm:top-[calc(8px+env(safe-area-inset-top))] max-sm:z-[95] max-sm:mt-0 max-sm:w-auto">
+          <div className="flex items-center justify-between border-b border-[var(--v2-ink-100)] px-4 py-3 max-sm:py-1.5 max-sm:pr-1">
             <span className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Уведомления</span>
-            {unread > 0 ? (
+            <div className="flex items-center">
+              {unread > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void markAllRead()}
+                  className="text-[12px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)] max-sm:min-h-10 max-sm:px-2 max-sm:text-[13px]"
+                >
+                  Прочитать все
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={() => void markAllRead()}
-                className="text-[12px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)]"
+                onClick={() => setOpen(false)}
+                aria-label="Закрыть"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--v2-ink-500)] sm:hidden"
               >
-                Прочитать все
+                ✕
               </button>
-            ) : null}
+            </div>
           </div>
-          <div className="max-h-[420px] overflow-y-auto">
+          <div className="max-h-[420px] overflow-y-auto overscroll-contain max-sm:max-h-[calc(100dvh-var(--v2-mobnav-h,0px)-80px-env(safe-area-inset-top))]">
             {items.length === 0 ? (
               <p className="px-4 py-8 text-center text-[13px] text-[var(--v2-ink-500)]">Пока нет уведомлений</p>
             ) : (

@@ -244,6 +244,92 @@
 .gls .gc-img,.gls .w-img,.gls .m-img{overflow:hidden}
 .gls .w-img .ph{position:absolute;inset:8px 8px 0;width:auto;height:auto}
 .gls .m-img .ph{height:240px;border-radius:18px}
+.gls .ph.ph-tall{height:240px;border-radius:18px}
 .gls .w-img img.fit{position:absolute;inset:8px 8px 0;width:calc(100% - 16px);height:calc(100% - 8px);border-radius:14px}
 .gls .gc-img img.fit{height:100%;min-height:190px;border-radius:14px}
 .gls .m-img img.fit{height:240px;border-radius:18px}
+@media(hover:none){.gls .ti-set{opacity:1}.gls .fr:hover,.gls .w:hover{transform:none}}
+@media(max-width:1023px){
+.gls .page{padding:14px 12px 32px;gap:26px}
+.gls .hero.hx .hero-l{padding:20px 16px;gap:18px}
+.gls .h1{font-size:30px}
+.gls .h-row{gap:10px 14px}
+.gls .fslink{display:inline-flex;align-items:center;min-height:32px}
+.gls .h-head{gap:12px}
+.gls .bubble{max-width:none;width:100%;padding:12px 14px;gap:12px;font-size:14px;border-radius:16px;margin-top:0}
+.gls .bubble i{width:36px;height:36px}
+.gls .funds{gap:10px}
+.gls .fr{padding:14px;border-radius:18px}
+.gls .fr-n{font-size:16px}
+.gls .sh{gap:6px 12px;margin-bottom:12px}
+.gls .sh h2{font-size:22px}
+.gls .addl{display:inline-flex;align-items:center;min-height:40px;padding:8px 12px;background:var(--brand-50)}
+.gls .gc-img{min-height:0;height:180px}
+.gls .gc-img img.fit{min-height:0}
+.gls .gc-b,.gls .gc.noimg .gc-b{padding:16px 18px 20px}
+.gls .gc-n{font-size:18px}
+.gls .gc-cur{font-size:30px}
+.gls .gc-v{margin-top:12px}
+.gls .gc-bar{margin-top:14px}
+.gls .feed{gap:12px}
+.gls .w-img{height:240px}
+.gls .feed:not(.sm) .w-b{padding:14px 16px 16px}
+.gls .add{min-height:120px}
+.gls .fs{padding:20px 16px}
+.gls .fs-h{margin-bottom:16px}
+.gls .fs-h h2{font-size:22px}
+.gls .leg{flex-wrap:wrap;gap:8px 14px}
+.gls .now{padding:16px;gap:12px}
+.gls .now-l b{font-size:24px}
+.gls .now-r,.gls .calc-out{grid-template-columns:1fr}
+.gls .now-r{gap:6px}
+.gls .nr{flex-direction:row;align-items:center;justify-content:space-between;padding:10px 12px}
+.gls .nr b{font-size:20px}
+.gls .ti{padding:12px;gap:10px;border-radius:16px}
+.gls .ti-n b,.gls .ti-v b{font-size:17px}
+.gls .calc{margin-top:16px;padding-top:16px}
+.gls .calc-in .m-in input{font-size:26px}
+.gls .co{flex-direction:row;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:14px}
+.gls .co b{font-size:20px}
+.gls .co-go{height:52px;justify-content:center;border-radius:16px}
+.gls .scrim{z-index:90}
+.gls .dr{top:auto;bottom:0;left:0;right:0;width:100%;max-height:calc(100dvh - 12px);border-radius:24px 24px 0 0;transform:translateY(100%);z-index:91}
+.gls .dr.on{transform:none}
+.gls .dr-x{top:12px;right:12px}
+.gls .dr-b{overscroll-behavior:contain}
+.gls .m-img{height:auto;padding:8px 8px 0}
+.gls .m-img img.fit,.gls .m-img .ph,.gls .ph.ph-tall{height:180px;border-radius:16px}
+.gls .m-body{display:flex;flex-direction:column;gap:16px;padding:18px 16px 8px}
+.gls .m-title{font-size:24px}
+.gls .m-nums{gap:8px}
+.gls .m-num{padding:12px 14px;border-radius:16px}
+.gls .m-in input{font-size:22px}
+.gls .m-num.ro b{font-size:22px}
+.gls .m-seg button{min-height:44px;font-size:13.5px}
+.gls .in{font-size:16px}
+.gls .fu-add input{height:48px;font-size:16px}
+.gls .fu-add button{height:48px}
+.gls .m-note{margin-top:0}
+.gls .dr-f{padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--ink-100)}
+.gls .dr-f .btn{flex:1;justify-content:center;height:48px}
+.gls .del{min-height:48px}
+.gls .toast{left:12px;right:12px;bottom:calc(var(--v2-mobnav-h, 0px) + 12px);transform:translateY(16px);justify-content:space-between}
+.gls .toast.on{transform:none}
+.gls .toast button{min-height:36px;flex-shrink:0}
+}
+@media(max-width:640px){
+.gls .feed.sm{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.gls .feed.sm .w-img{height:130px}
+.gls .feed.sm .w-b{padding:10px 12px 12px;gap:6px}
+.gls .feed.sm .w-t{font-size:14.5px}
+.gls .feed.sm .w-p{font-size:14px}
+.gls .feed.sm .w-r{flex-wrap:wrap;gap:2px 8px}
+.gls .feed.sm .w-f{margin-left:0}
+.gls .feed.sm .w-done,.gls .feed.sm .w-can{top:14px;left:14px;font-size:11.5px;padding:4px 8px}
+.gls .feed.sm .add{min-height:0;grid-column:1/-1;flex-direction:row;height:56px}
+.gls .feed.sm .add b{font-size:22px}
+.gls .w-img{height:220px}
+.gls .gc-img{height:160px}
+.gls .m-seg{grid-template-columns:repeat(3,auto)}
+.gls .m-seg button{font-size:13px;padding:10px 6px}
+}

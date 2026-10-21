@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { CommandPalette } from "@/components/v2/shell/command-palette";
 import { NewTaskModal, type LockedProjectHint } from "@/components/v2/tasks/new-task-modal";
 import { V2ShellSidebar } from "@/components/v2/shell/v2-shell-sidebar";
+import { V2MobileNav } from "@/components/v2/shell/v2-mobile-nav";
 import type { V2ShellUser } from "@/components/v2/shell/v2-user-account-menu";
 
 type Me = V2ShellUser & { role: string };
@@ -258,7 +259,19 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
           onOpenProfile={() => setProfileOpen(true)}
           onLogout={logout}
         />
-        <main className="flex min-w-0 flex-1 flex-col">
+        <V2MobileNav
+          nav={nav}
+          personalNav={personalNav}
+          footerNav={footerNav}
+          me={me}
+          roleLabel={roleLabel}
+          canCreateTask={!isClient}
+          onOpenSearch={() => setPaletteOpen(true)}
+          onNewTask={() => openNewTask()}
+          onOpenProfile={() => setProfileOpen(true)}
+          onLogout={logout}
+        />
+        <main className="flex min-w-0 flex-1 flex-col pb-[var(--v2-mobnav-h)]">
           {bootError ? (
             <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[12.5px] text-amber-900">
               {bootError}.{" "}

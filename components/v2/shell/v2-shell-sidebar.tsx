@@ -202,12 +202,12 @@ export function V2ShellSidebar({
   const showProjectsNav = false;
 
   if (!hydrated) {
-    return <aside className="w-[244px] shrink-0 bg-white shadow-[var(--v2-shadow-soft)]" aria-hidden />;
+    return <aside className="hidden w-[244px] shrink-0 bg-white shadow-[var(--v2-shadow-soft)] lg:block" aria-hidden />;
   }
 
   if (collapsed) {
     return (
-      <>
+      <div className="hidden lg:contents">
         <button
           type="button"
           onClick={toggleCollapsed}
@@ -253,12 +253,12 @@ export function V2ShellSidebar({
             />
           </div>
         ) : null}
-      </>
+      </div>
     );
   }
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[244px] shrink-0 flex-col gap-1 overflow-y-auto bg-white px-3 pb-3 pt-4 shadow-[var(--v2-shadow-soft)]">
+    <aside className="sticky top-0 hidden h-screen w-[244px] lg:flex shrink-0 flex-col gap-1 overflow-y-auto bg-white px-3 pb-3 pt-4 shadow-[var(--v2-shadow-soft)]">
       <div className="mb-2 flex items-center gap-1">
         <Link
           href={appPath("/v2/home")}

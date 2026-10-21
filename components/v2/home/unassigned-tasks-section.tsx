@@ -59,7 +59,7 @@ export function UnassignedTasksSection({
           <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
           <h3 className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Нераспределённые задачи</h3>
         </span>
-        <span className="text-[12.5px] text-[var(--v2-ink-500)]">без исполнителя или без даты</span>
+        <span className="text-[12.5px] text-[var(--v2-ink-500)] max-sm:hidden">без исполнителя или без даты</span>
         <span className="ml-auto v2-tnum rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
           {tasks.length}
         </span>
@@ -68,7 +68,10 @@ export function UnassignedTasksSection({
       {open ? (
         <div className="overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-b from-amber-50/40 to-white shadow-[var(--v2-shadow-soft)]">
           <div className="border-b border-amber-100/80 px-4 py-2.5 text-[12px] text-[var(--v2-ink-500)]">
-            Перетащите задачу в «Сегодня», «Завтра» или другой раздел — или откройте карточку для деталей
+            <span className="max-lg:hidden">
+              Перетащите задачу в «Сегодня», «Завтра» или другой раздел — или откройте карточку для деталей
+            </span>
+            <span className="lg:hidden">Нажмите на задачу, чтобы назначить исполнителя и дату</span>
           </div>
           <div className="divide-y divide-[var(--v2-ink-100)]/70">
             {tasks.map((task) => {

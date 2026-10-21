@@ -242,6 +242,7 @@ function ContextPanel({
   error,
   onRetry,
   onToggle,
+  inSheet = false,
 }: {
   context: SofiaContextPanel | null;
   collapsed: boolean;
@@ -249,14 +250,23 @@ function ContextPanel({
   error: string | null;
   onRetry: () => void;
   onToggle: () => void;
+  inSheet?: boolean;
 }) {
+  const asideClass = `card ctx${collapsed ? " collapsed" : ""}${inSheet ? " ctx-sheet" : ""}`;
+  const sheetClose = inSheet ? (
+    <button type="button" className="tgl" style={{ marginLeft: "auto" }} title="Закрыть" onClick={onToggle}>
+      ×
+    </button>
+  ) : null;
+
   if (loading && !context) {
     return (
-      <aside className={`card ctx${collapsed ? " collapsed" : ""}`}>
+      <aside className={asideClass}>
         <div className="ctx-h">
           <span className="sec-title" style={{ fontSize: 17 }}>
             Контекст решения
           </span>
+          {sheetClose}
         </div>
         {!collapsed ? (
           <div className="ctx-b text-[13px] leading-snug text-[var(--ink-500)]">
@@ -269,11 +279,12 @@ function ContextPanel({
 
   if (error && !context) {
     return (
-      <aside className={`card ctx${collapsed ? " collapsed" : ""}`}>
+      <aside className={asideClass}>
         <div className="ctx-h">
           <span className="sec-title" style={{ fontSize: 17 }}>
             Контекст решения
           </span>
+          {sheetClose}
         </div>
         {!collapsed ? (
           <div className="ctx-b space-y-2 text-[13px] leading-snug">
@@ -289,18 +300,19 @@ function ContextPanel({
 
   if (!context) {
     return (
-      <aside className={`card ctx${collapsed ? " collapsed" : ""}`}>
+      <aside className={asideClass}>
         <div className="ctx-h">
           <span className="sec-title" style={{ fontSize: 17 }}>
             Контекст решения
           </span>
+          {sheetClose}
         </div>
       </aside>
     );
   }
 
   return (
-    <aside className={`card ctx${collapsed ? " collapsed" : ""}`} id="ctx">
+    <aside className={asideClass} id={inSheet ? undefined : "ctx"}>
       <div className="ctx-h">
         <span className="sec-title" style={{ fontSize: 17 }}>
           Контекст решения
@@ -316,10 +328,10 @@ function ContextPanel({
           type="button"
           className="tgl"
           style={{ marginLeft: collapsed ? 0 : "auto" }}
-          title={collapsed ? "Развернуть" : "Свернуть"}
+          title={inSheet ? "Закрыть" : collapsed ? "Развернуть" : "Свернуть"}
           onClick={onToggle}
         >
-          {collapsed ? "‹" : "›"}
+          {inSheet ? "×" : collapsed ? "‹" : "›"}
         </button>
       </div>
       {!collapsed ? (
@@ -506,7 +518,10 @@ export function SofiaChatClient() {
   const [replanPreviews, setReplanPreviews] = useState<Record<string, ReplanPreviewPayload>>({});
   const [applying, setApplying] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [ctxSheetOpen, setCtxSheetOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const showToast = useCallback((t: string) => {
@@ -544,6 +559,34 @@ export function SofiaChatClient() {
   useEffect(() => {
     scrollDown();
   }, [messages, loading, scrollDown]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    if (!window.matchMedia("(max-width: 1023.98px)").matches) {
+      el.style.height = "";
+      return;
+    }
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const root = rootRef.current;
+    if (!vv || !root) return;
+    const sync = () => {
+      const mobile = window.matchMedia("(max-width: 1023.98px)").matches;
+      const keyboardOpen = mobile && document.activeElement === inputRef.current && vv.height < window.innerHeight - 120;
+      root.style.height = keyboardOpen ? `${Math.round(vv.height)}px` : "";
+      if (keyboardOpen) scrollDown();
+    };
+    vv.addEventListener("resize", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      root.style.height = "";
+    };
+  }, [scrollDown]);
 
   const historyFromMessages = useCallback((): SofiaChatTurn[] => {
     const out: SofiaChatTurn[] = [];
@@ -670,7 +713,7 @@ export function SofiaChatClient() {
   }, [activePreview, refreshContext, showToast]);
 
   return (
-    <div className="sofia-v3 flex min-h-0 flex-1 flex-col">
+    <div className="sofia-v3 flex min-h-0 flex-1 flex-col" ref={rootRef}>
       <div className="shell flex min-h-0 flex-1 flex-col">
         <main className="main flex min-h-0 flex-1 flex-col">
           <div className="page">
@@ -706,10 +749,37 @@ export function SofiaChatClient() {
                     <div className="chat-r">Рабочий помощник</div>
                   </div>
                   <span className="chat-on">
-                    <i /> {loading ? "Думаю…" : "На связи"}
+                    <i /> <span className="chat-on-t">{loading ? "Думаю…" : "На связи"}</span>
                   </span>
+                  <button type="button" className="ctx-open" onClick={() => setCtxSheetOpen(true)}>
+                    <svg className="svgi" viewBox="0 0 18 18" aria-hidden>
+                      <rect x="2.8" y="3.4" width="12.4" height="11.2" rx="2.4" />
+                      <path d="M6 7.2h6M6 10.6h3.6" />
+                    </svg>
+                    Контекст
+                  </button>
                 </div>
                 <div className="thread" ref={threadRef}>
+                  {!messages.length && !loading ? (
+                    <div className="m-empty">
+                      <div className="msg">
+                        <SofiaAvatar size={32} />
+                        <div className="msg-body">
+                          <div className="bub">
+                            Я София. Помогу принять новый проект, разрешить конфликт сроков и перестроить план.
+                          </div>
+                        </div>
+                      </div>
+                      <span className="ask">Что сейчас нужно решить?</span>
+                      <div className="chips">
+                        {HERO_CHIPS.map((c) => (
+                          <button key={c} type="button" className="chip" onClick={() => void send(c)}>
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {messages.map((m) => (
                     <MessageRow key={m.id} msg={m} onChip={onChip} onAction={onAction} />
                   ))}
@@ -724,8 +794,10 @@ export function SofiaChatClient() {
                 </div>
                 <div className="compose">
                   <textarea
+                    ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    onFocus={() => setTimeout(scrollDown, 300)}
                     placeholder="Опишите ситуацию обычным сообщением…"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(input);
@@ -741,8 +813,12 @@ export function SofiaChatClient() {
                       className="btn btn--pri"
                       disabled={loading || !input.trim()}
                       onClick={() => void send(input)}
+                      aria-label="Отправить Софии"
                     >
-                      Отправить Софии
+                      <span className="send-l">Отправить Софии</span>
+                      <svg className="svgi send-i" viewBox="0 0 18 18" aria-hidden>
+                        <path d="M9 14.6V3.6M4.4 8.2 9 3.6l4.6 4.6" />
+                      </svg>
                     </button>
                   </div>
                 </div>
@@ -760,6 +836,21 @@ export function SofiaChatClient() {
           </div>
         </main>
       </div>
+
+      {ctxSheetOpen ? (
+        <>
+          <div className="scrim on m-scrim" onClick={() => setCtxSheetOpen(false)} aria-hidden />
+          <ContextPanel
+            context={context}
+            collapsed={false}
+            loading={contextLoading}
+            error={contextError}
+            onRetry={refreshContext}
+            onToggle={() => setCtxSheetOpen(false)}
+            inSheet
+          />
+        </>
+      ) : null}
 
       <ConfirmModal
         open={modalOpen}

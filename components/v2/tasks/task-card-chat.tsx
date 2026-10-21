@@ -76,7 +76,7 @@ function CommentBubble({
           <button
             type="button"
             onClick={() => onReply(comment)}
-            className="v2-tight mt-1 text-[11.5px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)]"
+            className="v2-tight mt-1 text-[11.5px] font-medium text-[var(--v2-brand-600)] hover:text-[var(--v2-brand-700)] max-sm:-ml-2 max-sm:mt-0 max-sm:min-h-9 max-sm:px-2 max-sm:text-[12.5px]"
           >
             Ответить
           </button>
@@ -119,14 +119,14 @@ export function TaskCardChat({
   }, [comments.length]);
 
   return (
-    <section className="flex min-h-0 flex-col border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/40">
-      <div className="flex items-center gap-2 border-b border-[var(--v2-ink-100)]/80 px-5 py-3">
+    <section className="flex min-h-0 flex-col border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/40 max-lg:shrink-0">
+      <div className="flex items-center gap-2 border-b border-[var(--v2-ink-100)]/80 px-4 py-3 sm:px-5">
         <V2Icons.chat className="h-4 w-4 text-[var(--v2-ink-500)]" />
         <h3 className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Обсуждение</h3>
         <span className="v2-tnum ml-1 text-[12px] text-[var(--v2-ink-400)]">{comments.length}</span>
       </div>
 
-      <div ref={scrollRef} className="max-h-[280px] min-h-[120px] flex-1 overflow-y-auto px-5 py-2">
+      <div ref={scrollRef} className="max-h-[280px] min-h-[120px] flex-1 overflow-y-auto px-4 py-2 max-lg:max-h-none max-lg:overflow-visible sm:px-5">
         {tree.length === 0 ? (
           <p className="py-8 text-center text-[13px] text-[var(--v2-ink-400)]">Начните обсуждение — задайте вопрос или оставьте заметку</p>
         ) : (
@@ -134,14 +134,21 @@ export function TaskCardChat({
         )}
       </div>
 
-      <form onSubmit={onSubmit} className="border-t border-[var(--v2-ink-100)] bg-white p-4">
+      <form
+        onSubmit={onSubmit}
+        className="border-t border-[var(--v2-ink-100)] bg-white p-4 max-lg:sticky max-lg:bottom-0 max-lg:z-10 max-sm:px-3 max-sm:pb-[calc(12px+env(safe-area-inset-bottom))] max-sm:pt-3"
+      >
         {error ? <p className="mb-2 text-[12px] text-red-600">{error}</p> : null}
         {replyTo ? (
           <div className="mb-2 flex items-center justify-between rounded-lg bg-[var(--v2-brand-50)] px-3 py-1.5 text-[12px] text-[var(--v2-brand-700)]">
             <span>
               Ответ для <strong>{replyTo.author_name}</strong>
             </span>
-            <button type="button" onClick={onCancelReply} className="text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-800)]">
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className="text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-800)] max-sm:-my-1.5 max-sm:-mr-2 max-sm:min-h-9 max-sm:min-w-9"
+            >
               ✕
             </button>
           </div>

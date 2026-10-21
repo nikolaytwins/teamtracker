@@ -17,20 +17,22 @@ function SpSetCell({
   i: number;
 }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] bg-white py-1.5 pl-2 pr-1.5 transition focus-within:border-[var(--v2-brand-400)] focus-within:shadow-[0_0_0_3px_rgba(59,111,247,0.10)]">
+    <div className="flex items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] bg-white py-1.5 pl-2 pr-1.5 transition focus-within:border-[var(--v2-brand-400)] focus-within:shadow-[0_0_0_3px_rgba(59,111,247,0.10)] max-lg:min-h-11 max-lg:py-1">
       <span className="v2-tnum text-[10.5px] font-semibold text-[var(--v2-ink-300)]">{i + 1}</span>
       <input
         value={v?.w || ""}
         onChange={(e) => onW(e.target.value)}
+        inputMode="decimal"
         placeholder="кг"
-        className="v2-tnum w-[38px] bg-transparent text-right text-[14px] font-semibold text-[var(--v2-ink-900)] outline-none"
+        className="v2-tnum w-[38px] bg-transparent text-right text-[14px] font-semibold text-[var(--v2-ink-900)] outline-none max-lg:h-9 max-lg:w-[44px] max-lg:text-[16px]"
       />
       <span className="text-[12px] text-[var(--v2-ink-300)]">×</span>
       <input
         value={v?.r || ""}
         onChange={(e) => onR(e.target.value)}
+        inputMode="numeric"
         placeholder="—"
-        className="v2-tnum w-[30px] bg-transparent text-[14px] font-semibold text-[var(--v2-ink-900)] outline-none"
+        className="v2-tnum w-[30px] bg-transparent text-[14px] font-semibold text-[var(--v2-ink-900)] outline-none max-lg:h-9 max-lg:w-[34px] max-lg:text-[16px]"
       />
     </div>
   );
@@ -56,7 +58,7 @@ function SpExerciseCard({
 
   return (
     <div className="group overflow-hidden rounded-2xl border border-[var(--v2-ink-100)] bg-white">
-      <div className="flex items-start gap-3 px-4 pb-3 pt-3.5">
+      <div className="flex items-start gap-3 px-4 pb-3 pt-3.5 max-sm:gap-2.5">
         <span className="v2-tnum mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--v2-ink-100)] text-[12.5px] font-semibold text-[var(--v2-ink-600)]">
           {no}
         </span>
@@ -112,17 +114,18 @@ function SpExerciseCard({
             <button
               type="button"
               onClick={del}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+              aria-label="Удалить упражнение"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 max-lg:h-9 max-lg:w-9 max-lg:opacity-100 [@media(hover:none)]:opacity-100"
             >
               <V2Icons.trash className="h-4 w-4" />
             </button>
           </div>
         </div>
       </div>
-      <div className="px-4 pb-2 pl-[60px]">
+      <div className="px-4 pb-2 pl-[60px] max-sm:pl-4">
         <SpArea value={ex.note || ""} onChange={(v) => setEx("note", v)} ph="Техника, замена, на что акцент…" rows={2} className="!text-[13px] !text-[var(--v2-ink-500)]" />
       </div>
-      <div className="flex flex-wrap items-center gap-2 px-4 pb-3.5 pl-[60px]">
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-3.5 pl-[60px] max-sm:pl-4">
         {Array.from({ length: sets }).map((_, i) => (
           <SpSetCell
             key={i}
@@ -134,7 +137,7 @@ function SpExerciseCard({
         ))}
       </div>
       {ex.log && ex.log.length > 0 ? (
-        <div className="flex flex-col gap-1 border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/70 px-4 py-2.5 pl-[60px]">
+        <div className="flex flex-col gap-1 border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/70 px-4 py-2.5 pl-[60px] max-sm:pl-4">
           {ex.log.map((l, i) => (
             <div key={i} className="v2-tnum text-[12.5px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
               {l}
@@ -202,7 +205,7 @@ export function SportProgram({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1 rounded-2xl bg-white p-1 shadow-[var(--v2-shadow-soft)]">
+        <div className="flex items-center gap-1 rounded-2xl bg-white p-1 shadow-[var(--v2-shadow-soft)] max-lg:max-w-full max-lg:overflow-x-auto max-lg:[scrollbar-width:none] max-lg:[&>button]:shrink-0">
           {program.map((t) => (
             <button
               key={t.id}
@@ -224,7 +227,7 @@ export function SportProgram({
           <select
             value={wid}
             onChange={(e) => setWid(e.target.value)}
-            className="h-10 rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[13px] text-[var(--v2-ink-800)] outline-none focus:border-[var(--v2-brand-400)]"
+            className="h-10 rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[13px] text-[var(--v2-ink-800)] outline-none focus:border-[var(--v2-brand-400)] max-lg:text-[16px]"
           >
             {weeks.map((w) => (
               <option key={w.id} value={w.id}>
@@ -235,8 +238,8 @@ export function SportProgram({
         </div>
       </div>
 
-      <SpCard className="p-6">
-        <div className="flex items-start gap-4 border-b border-[var(--v2-ink-100)] pb-5">
+      <SpCard className="p-6 max-sm:p-3">
+        <div className="flex items-start gap-4 border-b border-[var(--v2-ink-100)] pb-5 max-sm:flex-wrap max-sm:gap-3 max-sm:px-1 max-sm:pb-4 max-sm:pt-1">
           <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--v2-brand-500)] to-[var(--v2-brand-700)] text-[19px] font-semibold text-white">
             {tr.id}
           </span>
@@ -250,7 +253,7 @@ export function SportProgram({
               className="!mt-0.5 !text-[var(--v2-ink-500)]"
             />
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 max-sm:basis-full max-sm:pl-16">
             <SpChip tint="#18181B" bg="#F4F4F5">
               {tr.ex.length} упражнений
             </SpChip>
@@ -259,7 +262,7 @@ export function SportProgram({
             </SpChip>
           </div>
         </div>
-        <div className="flex flex-col gap-3 pt-5">
+        <div className="flex flex-col gap-3 pt-5 max-sm:gap-2.5 max-sm:pt-3">
           {tr.ex.length ? (
             tr.ex.map((e, i) => (
               <SpExerciseCard
@@ -299,19 +302,20 @@ export function SportStrategy({
   return (
     <div className="flex max-w-[880px] flex-col gap-4">
       {str.map((s, i) => (
-        <SpCard key={s.id || i} className="group px-8 py-7">
+        <SpCard key={s.id || i} className="group px-8 py-7 max-sm:px-4 max-sm:py-5">
           <div className="flex items-start gap-3">
             <input
               value={s.h}
               onChange={(e) => setStr(str.map((x, j) => (j === i ? { ...x, h: e.target.value } : x)))}
               placeholder="Заголовок раздела"
-              className="v2-tighter -mx-2 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-[22px] font-semibold text-[var(--v2-ink-900)] outline-none transition hover:border-[var(--v2-ink-200)] focus:border-[var(--v2-brand-400)]"
+              className="v2-tighter -mx-2 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-[22px] font-semibold max-sm:text-[19px] text-[var(--v2-ink-900)] outline-none transition hover:border-[var(--v2-ink-200)] focus:border-[var(--v2-brand-400)]"
             />
             {str.length > 1 ? (
               <button
                 type="button"
                 onClick={() => setStr(str.filter((_, j) => j !== i))}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                aria-label="Удалить раздел"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-300)] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 max-lg:h-10 max-lg:w-10 max-lg:opacity-100 [@media(hover:none)]:opacity-100"
               >
                 <V2Icons.trash className="h-4 w-4" />
               </button>
@@ -322,7 +326,7 @@ export function SportStrategy({
             onChange={(e) => setStr(str.map((x, j) => (j === i ? { ...x, t: e.target.value } : x)))}
             rows={14}
             placeholder="Вставь текст стратегии. Пустая строка между абзацами — и читается как документ."
-            className="-mx-3 mt-3 w-full resize-y rounded-xl border border-transparent bg-transparent px-3 py-2 text-[15px] leading-[1.7] text-[var(--v2-ink-700)] outline-none transition hover:border-[var(--v2-ink-200)] focus:border-[var(--v2-brand-400)] focus:bg-white"
+            className="-mx-3 mt-3 w-full resize-y rounded-xl border border-transparent bg-transparent px-3 py-2 text-[15px] leading-[1.7] max-lg:text-[16px] text-[var(--v2-ink-700)] outline-none transition hover:border-[var(--v2-ink-200)] focus:border-[var(--v2-brand-400)] focus:bg-white"
             style={{ textWrap: "pretty" }}
           />
         </SpCard>

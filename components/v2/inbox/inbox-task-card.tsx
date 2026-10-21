@@ -116,7 +116,7 @@ export function InboxTaskCard({
         {onPromote ? (
           <button
             type="button"
-            className="mt-2.5 text-[11px] font-medium text-[var(--v2-brand-600)] opacity-0 transition hover:underline group-hover:opacity-100"
+            className="mt-2.5 text-[11px] font-medium text-[var(--v2-brand-600)] opacity-0 transition hover:underline group-hover:opacity-100 max-lg:min-h-9 max-lg:text-[13px] max-lg:opacity-100 [@media(hover:none)]:opacity-100"
             onClick={onPromote}
           >
             → В список задач

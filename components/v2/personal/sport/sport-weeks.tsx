@@ -70,7 +70,7 @@ function EditableNumCell({
             setEditing(false);
           }
         }}
-        className="v2-tnum rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 py-1.5 text-right text-[15px] font-semibold text-[var(--v2-ink-900)] shadow-[0_0_0_3px_rgba(59,111,247,0.10)] outline-none"
+        className="v2-tnum rounded-lg border border-[var(--v2-brand-400)] bg-white px-2 py-1.5 text-right text-[15px] font-semibold max-lg:text-[16px] text-[var(--v2-ink-900)] shadow-[0_0_0_3px_rgba(59,111,247,0.10)] outline-none"
         style={{ width: w }}
       />
     );
@@ -81,7 +81,7 @@ function EditableNumCell({
       type="button"
       onClick={() => setEditing(true)}
       title="Нажми, чтобы изменить"
-      className={`v2-tnum inline-block rounded-lg px-2 py-1.5 text-right text-[15px] font-semibold transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-brand-700)] ${
+      className={`v2-tnum inline-block rounded-lg px-2 py-1.5 text-right text-[15px] font-semibold transition max-lg:min-h-10 hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-brand-700)] ${
         display === "—" ? "text-[var(--v2-ink-300)]" : "text-[var(--v2-ink-900)]"
       }`}
       style={{ minWidth: w }}
@@ -157,7 +157,7 @@ function SpWeekRow({
               type="button"
               onClick={del}
               title="Удалить неделю"
-              className="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--v2-ink-300)] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+              className="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--v2-ink-300)] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 max-lg:h-9 max-lg:w-9 max-lg:opacity-100 [@media(hover:none)]:opacity-100"
             >
               <V2Icons.trash className="h-4 w-4" />
             </button>
@@ -259,25 +259,24 @@ function SpWeekRow({
   );
 }
 
-function SpDraftRow({
-  nextLabel,
-  commit,
-  lastKcal,
-  lastProtein,
-}: {
+type WeekDraftCommit = (d: {
+  w: number | null;
+  f: number | null;
+  kcal: number | null;
+  protein: number | null;
+  wn: number | null;
+  ww: number | null;
+  note: string;
+}) => void;
+
+type WeekDraftProps = {
   nextLabel: string;
-  commit: (d: {
-    w: number | null;
-    f: number | null;
-    kcal: number | null;
-    protein: number | null;
-    wn: number | null;
-    ww: number | null;
-    note: string;
-  }) => void;
+  commit: WeekDraftCommit;
   lastKcal?: number | null;
   lastProtein?: number | null;
-}) {
+};
+
+function useWeekDraft(commit: WeekDraftCommit) {
   const [d, setD] = useState<Record<string, string>>({});
   const s = (k: string, v: string) => setD({ ...d, [k]: v });
   const ready = num(d.w) != null;
@@ -294,12 +293,66 @@ function SpDraftRow({
     });
     setD({});
   };
+  return { d, s, ready, go };
+}
+
+function SpDraftCard({ nextLabel, commit, lastKcal, lastProtein }: WeekDraftProps) {
+  const { d, s, ready, go } = useWeekDraft(commit);
+  const field = (k: string, label: string, ph = "—") => (
+    <label className="flex min-w-0 flex-col gap-0.5 rounded-xl bg-[var(--v2-ink-50)] px-3 py-2 focus-within:bg-white focus-within:shadow-[inset_0_0_0_1.5px_var(--v2-brand-400)]">
+      <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-400)]">{label}</span>
+      <input
+        inputMode="decimal"
+        value={d[k] ?? ""}
+        onChange={(e) => s(k, e.target.value)}
+        placeholder={ph}
+        className="v2-tnum w-full min-w-0 bg-transparent text-[16px] font-semibold text-[var(--v2-ink-900)] outline-none placeholder:font-normal placeholder:text-[var(--v2-ink-300)]"
+      />
+    </label>
+  );
+
+  return (
+    <SpCard className="mb-3 p-4 lg:hidden">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">{nextLabel}</span>
+        <span className="text-[12px] text-[var(--v2-ink-400)]">средние за неделю</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {field("w", "Вес, кг", "вес")}
+        {field("f", "Жир, кг", "жир")}
+        {field("wn", "Пупок")}
+        {field("ww", "Широк.")}
+        {field("kcal", "Ккал", lastKcal ? String(lastKcal) : "ккал")}
+        {field("protein", "Белок", lastProtein ? String(lastProtein) : "г")}
+      </div>
+      <textarea
+        value={d.note ?? ""}
+        onChange={(e) => s("note", e.target.value)}
+        rows={2}
+        placeholder="Заметка к неделе…"
+        className="mt-2 w-full resize-y rounded-xl bg-[var(--v2-ink-50)] px-3 py-2 text-[16px] leading-[1.5] text-[var(--v2-ink-700)] outline-none placeholder:text-[var(--v2-ink-400)] focus:bg-white focus:shadow-[inset_0_0_0_1.5px_var(--v2-brand-400)]"
+      />
+      <button
+        type="button"
+        onClick={go}
+        disabled={!ready}
+        className={`mt-3 inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl text-[14px] font-medium transition ${ready ? "bg-[var(--v2-ink-900)] text-white" : "cursor-default bg-[var(--v2-ink-100)] text-[var(--v2-ink-400)]"}`}
+      >
+        <V2Icons.plus className="h-4 w-4" />
+        Добавить неделю
+      </button>
+    </SpCard>
+  );
+}
+
+function SpDraftRow({ nextLabel, commit, lastKcal, lastProtein }: WeekDraftProps) {
+  const { d, s, ready, go } = useWeekDraft(commit);
   const kd = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") go();
   };
 
   return (
-    <tr className="border-t border-dashed border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/40">
+    <tr className="border-t border-dashed border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/40 max-lg:hidden">
       <Td className="pl-4">
         <div className="flex items-center gap-2 text-[var(--v2-ink-400)]">
           <V2Icons.plus className="h-[15px] w-[15px] shrink-0" />
@@ -386,8 +439,10 @@ export function SportWeeksTable({
   const lastW = weeks[weeks.length - 1] || {};
 
   return (
+    <>
+    <SpDraftCard nextLabel={`Неделя ${nextN}`} commit={commitWeek} lastKcal={lastW.kcal} lastProtein={lastW.protein} />
     <SpCard className="overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overscroll-x-contain">
         <table className="w-full border-collapse" style={{ minWidth: 1180 }}>
           <thead>
             <tr className="bg-[var(--v2-ink-50)]/70">
@@ -453,5 +508,6 @@ export function SportWeeksTable({
         </table>
       </div>
     </SpCard>
+    </>
   );
 }

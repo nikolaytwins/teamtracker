@@ -64,7 +64,7 @@ function FinanceSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="v2-tight h-10 cursor-pointer appearance-none rounded-xl bg-white pl-3.5 pr-9 text-[13.5px] font-medium text-[var(--v2-ink-800)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]/40"
+        className="v2-tight h-10 cursor-pointer appearance-none rounded-xl bg-white pl-3.5 pr-9 text-[13.5px] font-medium max-sm:h-11 max-sm:text-[16px] text-[var(--v2-ink-800)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]/40"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -92,7 +92,7 @@ function InlineMoney({
   useEffect(() => setTemp(String(value)), [value]);
 
   const commit = () => {
-    onChange(parseFloat(temp) || 0);
+    onChange(parseFloat(temp.replace(/\s/g, "").replace(",", ".")) || 0);
     setEditing(false);
   };
 
@@ -106,8 +106,8 @@ function InlineMoney({
   if (editing) {
     return (
       <input
-        type="number"
-        step="0.01"
+        type="text"
+        inputMode="decimal"
         value={temp}
         autoFocus
         onBlur={commit}
@@ -119,7 +119,7 @@ function InlineMoney({
             setEditing(false);
           }
         }}
-        className="v2-tnum w-28 max-w-full rounded border border-[var(--v2-brand-500)] bg-white px-2 py-1 text-right text-sm"
+        className="v2-tnum w-28 max-w-full rounded border border-[var(--v2-brand-500)] bg-white px-2 py-1 text-right text-sm max-sm:py-2 max-sm:text-[16px]"
       />
     );
   }
@@ -128,7 +128,7 @@ function InlineMoney({
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className={`v2-tnum v2-tight whitespace-nowrap rounded px-2 py-1 text-right text-[14px] font-semibold hover:bg-[var(--v2-ink-50)] ${toneClass}`}
+      className={`v2-tnum v2-tight whitespace-nowrap rounded px-2 py-1 text-right text-[14px] font-semibold hover:bg-[var(--v2-ink-50)] max-sm:py-2.5 ${toneClass}`}
     >
       {formatRub(value)}
     </button>
@@ -203,7 +203,7 @@ function KpiCard({
   const toneClass =
     tone === "red" ? "text-red-500" : tone === "green" ? "text-emerald-600" : "text-[var(--v2-ink-900)]";
   return (
-    <FinanceCard className="p-5">
+    <FinanceCard className="min-w-0 p-4 sm:p-5">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
         <span
           className="inline-flex h-6 w-6 items-center justify-center rounded-lg"
@@ -213,7 +213,7 @@ function KpiCard({
         </span>
         {label}
       </div>
-      <div className={`v2-tnum v2-tighter mt-3 text-[28px] font-semibold leading-none ${toneClass}`}>{value}</div>
+      <div className={`v2-tnum v2-tighter mt-3 text-[21px] font-semibold leading-none sm:text-[28px] ${toneClass}`}>{value}</div>
       {sub ? <div className="v2-tight mt-2 text-[12px] text-[var(--v2-ink-500)]">{sub}</div> : null}
     </FinanceCard>
   );
@@ -355,7 +355,7 @@ export function V2FinanceClient() {
   };
 
   const handleSaveExpense = async () => {
-    const amount = parseFloat(expenseAmount);
+    const amount = parseFloat(expenseAmount.replace(/\s/g, "").replace(",", "."));
     if (!expenseWho.trim() || !Number.isFinite(amount)) return;
     try {
       setActionError(null);
@@ -433,11 +433,11 @@ export function V2FinanceClient() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="flex h-14 items-center gap-3 border-b border-[var(--v2-ink-100)]/70 px-7">
-        <div className="v2-tight flex items-center gap-2 text-[13px] text-[var(--v2-ink-500)]">
-          <span className="text-[var(--v2-ink-400)]">Студия</span>
-          <span className="text-[var(--v2-ink-300)]">/</span>
-          <span className="font-medium text-[var(--v2-ink-900)]">Проекты и финансы</span>
+      <header className="flex h-14 items-center gap-3 border-b border-[var(--v2-ink-100)]/70 px-4 sm:px-7">
+        <div className="v2-tight flex min-w-0 items-center gap-2 text-[13px] text-[var(--v2-ink-500)]">
+          <span className="text-[var(--v2-ink-400)] max-sm:hidden">Студия</span>
+          <span className="text-[var(--v2-ink-300)] max-sm:hidden">/</span>
+          <span className="truncate font-medium text-[var(--v2-ink-900)]">Проекты и финансы</span>
         </div>
         <div className="ml-auto">
           <button
@@ -446,7 +446,7 @@ export function V2FinanceClient() {
               setNewProjectLine(lineTab);
               setNewProjectOpen(true);
             }}
-            className="v2-tight inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
+            className="v2-tight inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)] max-sm:h-10 max-sm:text-[13.5px]"
           >
             <V2Icons.plus className="h-4 w-4 shrink-0" />
             Новый проект
@@ -455,8 +455,8 @@ export function V2FinanceClient() {
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1280px] px-6 pb-24 pt-7 lg:px-10">
-          <div className="mb-6 flex items-center gap-6 border-b border-[var(--v2-ink-200)]/70">
+        <div className="mx-auto max-w-[1280px] px-3 pb-24 pt-4 sm:px-6 sm:pt-7 lg:px-10">
+          <div className="mb-5 flex items-center gap-6 border-b border-[var(--v2-ink-200)]/70 sm:mb-6">
             {(
               [
                 ["projects", "Проекты"],
@@ -467,7 +467,7 @@ export function V2FinanceClient() {
                 key={k}
                 type="button"
                 onClick={() => setTab(k)}
-                className={`v2-tight relative pb-3 text-[14px] font-medium transition ${
+                className={`v2-tight relative pb-3 text-[14px] font-medium transition max-sm:pt-2 max-sm:text-[15px] ${
                   tab === k ? "text-[var(--v2-ink-900)]" : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-800)]"
                 }`}
               >
@@ -479,9 +479,9 @@ export function V2FinanceClient() {
             ))}
           </div>
 
-          <div className="mb-6 flex flex-wrap items-center gap-4">
-            <h1 className="v2-tighter text-[34px] font-semibold leading-none text-[var(--v2-ink-900)]">Проекты</h1>
-            <div className="flex items-center gap-2 pl-2">
+          <div className="mb-5 flex flex-wrap items-center gap-3 sm:mb-6 sm:gap-4">
+            <h1 className="v2-tighter text-[28px] font-semibold leading-none text-[var(--v2-ink-900)] sm:text-[34px]">Проекты</h1>
+            <div className="flex flex-wrap items-center gap-2 max-sm:w-full sm:pl-2">
               <FinanceSelect
                 value={year}
                 options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
@@ -492,7 +492,7 @@ export function V2FinanceClient() {
                 options={FINANCE_MONTH_NAMES.map((name, i) => ({ value: i + 1, label: name }))}
                 onChange={(v) => setMonth(Number(v))}
               />
-              <span className="v2-tight max-w-[150px] text-[12px] leading-tight text-[var(--v2-ink-500)]">
+              <span className="v2-tight max-w-[150px] text-[12px] leading-tight text-[var(--v2-ink-500)] max-sm:hidden">
                 Фильтр по месяцу создания проекта
               </span>
               <button
@@ -501,7 +501,7 @@ export function V2FinanceClient() {
                   setYear(today.getFullYear());
                   setMonth(today.getMonth() + 1);
                 }}
-                className="v2-tight text-[13px] font-medium text-[var(--v2-brand-600)] transition hover:text-[var(--v2-brand-700)]"
+                className="v2-tight text-[13px] font-medium text-[var(--v2-brand-600)] transition hover:text-[var(--v2-brand-700)] max-sm:h-11 max-sm:px-2 max-sm:text-[14px]"
               >
                 Сегодня
               </button>
@@ -515,7 +515,7 @@ export function V2FinanceClient() {
           ) : null}
 
           {summary ? (
-            <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               <KpiCard
                 label="Предполагаемая выручка"
                 value={formatRub(summary.expectedRevenue)}
@@ -560,7 +560,7 @@ export function V2FinanceClient() {
                   <h2 className="v2-tighter text-[22px] font-semibold leading-none text-[var(--v2-ink-900)]">
                     {FINANCE_BUSINESS_LINE_META[lineTab].label}
                   </h2>
-                  <div className="inline-flex items-center rounded-full bg-white p-1 shadow-[var(--v2-shadow-card)]">
+                  <div className="inline-flex max-w-full items-center overflow-x-auto rounded-full bg-white p-1 shadow-[var(--v2-shadow-card)]">
                     {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => {
                       const active = lineTab === k;
                       return (
@@ -568,7 +568,7 @@ export function V2FinanceClient() {
                           key={k}
                           type="button"
                           onClick={() => setLineTab(k)}
-                          className={`v2-tight h-8 rounded-full px-3.5 text-[12.5px] font-medium transition ${
+                          className={`v2-tight h-8 shrink-0 whitespace-nowrap rounded-full px-3.5 text-[12.5px] font-medium transition max-sm:h-10 max-sm:text-[13.5px] ${
                             active
                               ? "bg-[var(--v2-ink-900)] text-white"
                               : "text-[var(--v2-ink-600)] hover:text-[var(--v2-ink-900)]"
@@ -589,255 +589,259 @@ export function V2FinanceClient() {
                 ) : null}
               </div>
               <FinanceCard className="mb-7 overflow-hidden">
-                <div
-                  className={`${PROJECT_COLS} border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
-                >
-                  <div>Проект</div>
-                  <div>Услуга</div>
-                  <div>Тип клиента</div>
-                  <div>Статус</div>
-                  <div>Контакт</div>
-                  <div>Способ оплаты</div>
-                  <div className="text-right">Сумма</div>
-                  <div className="text-right">Оплачено</div>
-                </div>
-                <div className="divide-y divide-[var(--v2-ink-100)]/70">
-                  {projects.length === 0 ? (
-                    <div className="px-5 py-10 text-center text-sm text-[var(--v2-ink-500)]">
-                      Нет проектов «{FINANCE_BUSINESS_LINE_META[lineTab].label}» за выбранный месяц
+                <div className="overflow-x-auto overscroll-x-contain">
+                  <div className="min-w-[980px] lg:min-w-0">
+                    <div
+                      className={`${PROJECT_COLS} border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
+                    >
+                      <div>Проект</div>
+                      <div>Услуга</div>
+                      <div>Тип клиента</div>
+                      <div>Статус</div>
+                      <div>Контакт</div>
+                      <div>Способ оплаты</div>
+                      <div className="text-right">Сумма</div>
+                      <div className="text-right">Оплачено</div>
                     </div>
-                  ) : (
-                    projects.map((p, i) => {
-                      const tint = financeAvatarTint(p.name, i);
-                      const statusMeta = FINANCE_STATUS_META[p.status];
-                      const paidTone =
-                        p.paid_amount >= p.effective_total_amount
-                          ? "green"
-                          : p.paid_amount > 0
-                            ? "amber"
-                            : "ink";
-                      return (
-                        <div
-                          key={p.id}
-                          className={`group ${PROJECT_COLS} items-center border-l-[3px] px-5 py-3.5 transition hover:brightness-[0.99]`}
-                          style={{
-                            borderLeftColor: statusMeta.dot,
-                            backgroundColor: statusMeta.bg,
-                          }}
-                        >
-                          <div className="flex min-w-0 items-center gap-2.5 pr-2">
-                            <span
-                              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold"
-                              style={{ background: `${tint}1A`, color: tint }}
-                            >
-                              {p.name[0]}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <Link
-                                href={appPath(`/v2/agency/projects/${p.id}`)}
-                                className="v2-tight block truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline"
-                                title="Открыть проект и детализацию"
-                              >
-                                {p.name}
-                              </Link>
-                              <select
-                                value={p.business_line}
-                                onChange={(e) =>
-                                  void patchProject(p.id, {
-                                    businessLine: e.target.value as V2FinanceBusinessLine,
-                                  })
-                                }
-                                className="v2-tight mt-0.5 max-w-full rounded border-0 bg-transparent py-0 pl-0 text-[11px] font-medium text-[var(--v2-ink-500)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
-                                title="Направление"
-                              >
-                                {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map(
-                                  (k) => (
-                                    <option key={k} value={k}>
-                                      {FINANCE_BUSINESS_LINE_META[k].label}
-                                    </option>
-                                  )
-                                )}
-                              </select>
-                            </div>
-                            <span className="ml-0.5 hidden items-center gap-0.5 group-hover:flex">
-                              <Link
-                                href={appPath(`/v2/agency/projects/${p.id}`)}
-                                title="Детализация"
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
-                              >
-                                <V2Icons.list className="h-3.5 w-3.5" />
-                              </Link>
-                              <button
-                                type="button"
-                                title="Дублировать в след. месяц"
-                                onClick={() =>
-                                  void fetchJson(`/api/v2/finance/projects/${p.id}/copy`, {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ currentYear: year, currentMonth: month }),
-                                  }).then(reload)
-                                }
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
-                              >
-                                <V2Icons.link className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                title="Перенести"
-                                onClick={() => setMoveProjectId(moveProjectId === p.id ? null : p.id)}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
-                              >
-                                <V2Icons.cal className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                title="Удалить"
-                                onClick={() => {
-                                  if (!confirm(`Удалить «${p.name}»?`)) return;
-                                  void fetchJson(`/api/v2/finance/projects/${p.id}`, { method: "DELETE" }).then(reload);
-                                }}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-red-50 hover:text-red-500"
-                              >
-                                <V2Icons.trash className="h-3.5 w-3.5" />
-                              </button>
-                            </span>
-                          </div>
-                          <div>
-                            <select
-                              value={p.service_type}
-                              onChange={(e) =>
-                                void patchProject(p.id, { serviceType: e.target.value })
-                              }
-                              className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] font-medium text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
-                            >
-                              {(Object.keys(FINANCE_SERVICE_META) as V2FinanceServiceType[]).map((k) => (
-                                <option key={k} value={k}>
-                                  {FINANCE_SERVICE_META[k].label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <select
-                              value={p.client_type ?? ""}
-                              onChange={(e) =>
-                                void patchProject(p.id, {
-                                  clientType: e.target.value || null,
-                                })
-                              }
-                              className="v2-tight max-w-full rounded-lg border-0 bg-transparent text-[12.5px] text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
-                            >
-                              <option value="">—</option>
-                              {FINANCE_CLIENT_TYPE_OPTIONS.map((o) => (
-                                <option key={o} value={o}>
-                                  {o}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <FinanceStatusSelect
-                              value={p.status}
-                              onChange={(status) => {
-                                const patch: Record<string, unknown> = { status };
-                                if (status === "paid") patch.paidAmount = p.effective_total_amount;
-                                if (status === "not_paid") patch.paidAmount = 0;
-                                void patchProject(p.id, patch);
-                              }}
-                            />
-                          </div>
-                          <div className="v2-tight truncate text-[13px] text-[var(--v2-ink-600)]">
-                            {p.client_contact || <Dash />}
-                          </div>
-                          <div>
-                            <select
-                              value={p.payment_method ?? ""}
-                              onChange={(e) =>
-                                void patchProject(p.id, {
-                                  paymentMethod: e.target.value || null,
-                                })
-                              }
-                              className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
-                            >
-                              <option value="">—</option>
-                              {FINANCE_PAYMENT_METHOD_OPTIONS.map((o) => (
-                                <option key={o.value} value={o.value}>
-                                  {o.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="text-right">
-                            <InlineMoney
-                              value={p.effective_total_amount}
-                              onChange={(n) => void patchProject(p.id, { totalAmount: n })}
-                            />
-                          </div>
-                          <div className="text-right">
-                            <InlineMoney
-                              value={p.paid_amount}
-                              tone={paidTone}
-                              onChange={(n) => void patchProject(p.id, { paidAmount: n })}
-                            />
-                          </div>
-                          {moveProjectId === p.id ? (
-                            <div className="col-span-full mt-1 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] p-3">
-                              <p className="v2-tight mb-2 text-xs font-medium text-[var(--v2-ink-700)]">
-                                Перенести в месяц
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {([-1, 1] as const).map((delta) => {
-                                  const t = adjacentFinanceMonth(year, month, delta);
-                                  return (
-                                    <button
-                                      key={delta}
-                                      type="button"
-                                      onClick={() =>
-                                        void fetchJson(`/api/v2/finance/projects/${p.id}/move`, {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ year: t.year, month: t.month }),
-                                        }).then(() => {
-                                          setMoveProjectId(null);
-                                          void reload();
-                                        })
-                                      }
-                                      className="rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-1.5 text-xs hover:bg-[var(--v2-ink-100)]"
-                                    >
-                                      {FINANCE_MONTH_NAMES[t.month - 1]} {t.year}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ) : null}
+                    <div className="divide-y divide-[var(--v2-ink-100)]/70">
+                      {projects.length === 0 ? (
+                        <div className="px-5 py-10 text-center text-sm text-[var(--v2-ink-500)]">
+                          Нет проектов «{FINANCE_BUSINESS_LINE_META[lineTab].label}» за выбранный месяц
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-                {summary ? (
-                  <div
-                    className={`${PROJECT_COLS} border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-5 py-3.5 text-[13px]`}
-                  >
-                    <div className="v2-tight col-span-6 flex items-center gap-2 font-semibold text-[var(--v2-ink-900)]">
-                      Итого по проектам
-                      <span className="text-[12px] font-normal text-[var(--v2-ink-500)]">
-                        · {projects.length} шт.
-                      </span>
+                      ) : (
+                        projects.map((p, i) => {
+                          const tint = financeAvatarTint(p.name, i);
+                          const statusMeta = FINANCE_STATUS_META[p.status];
+                          const paidTone =
+                            p.paid_amount >= p.effective_total_amount
+                              ? "green"
+                              : p.paid_amount > 0
+                                ? "amber"
+                                : "ink";
+                          return (
+                            <div
+                              key={p.id}
+                              className={`group ${PROJECT_COLS} items-center border-l-[3px] px-5 py-3.5 transition hover:brightness-[0.99]`}
+                              style={{
+                                borderLeftColor: statusMeta.dot,
+                                backgroundColor: statusMeta.bg,
+                              }}
+                            >
+                              <div className="flex min-w-0 items-center gap-2.5 pr-2">
+                                <span
+                                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold"
+                                  style={{ background: `${tint}1A`, color: tint }}
+                                >
+                                  {p.name[0]}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <Link
+                                    href={appPath(`/v2/agency/projects/${p.id}`)}
+                                    className="v2-tight block truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline"
+                                    title="Открыть проект и детализацию"
+                                  >
+                                    {p.name}
+                                  </Link>
+                                  <select
+                                    value={p.business_line}
+                                    onChange={(e) =>
+                                      void patchProject(p.id, {
+                                        businessLine: e.target.value as V2FinanceBusinessLine,
+                                      })
+                                    }
+                                    className="v2-tight mt-0.5 max-w-full rounded border-0 bg-transparent py-0 pl-0 text-[11px] font-medium text-[var(--v2-ink-500)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                                    title="Направление"
+                                  >
+                                    {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map(
+                                      (k) => (
+                                        <option key={k} value={k}>
+                                          {FINANCE_BUSINESS_LINE_META[k].label}
+                                        </option>
+                                      )
+                                    )}
+                                  </select>
+                                </div>
+                                <span className="ml-0.5 hidden items-center gap-0.5 group-hover:flex [@media(hover:none)]:flex">
+                                  <Link
+                                    href={appPath(`/v2/agency/projects/${p.id}`)}
+                                    title="Детализация"
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition [@media(hover:none)]:h-9 [@media(hover:none)]:w-9 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                                  >
+                                    <V2Icons.list className="h-3.5 w-3.5" />
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    title="Дублировать в след. месяц"
+                                    onClick={() =>
+                                      void fetchJson(`/api/v2/finance/projects/${p.id}/copy`, {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ currentYear: year, currentMonth: month }),
+                                      }).then(reload)
+                                    }
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition [@media(hover:none)]:h-9 [@media(hover:none)]:w-9 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                                  >
+                                    <V2Icons.link className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Перенести"
+                                    onClick={() => setMoveProjectId(moveProjectId === p.id ? null : p.id)}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition [@media(hover:none)]:h-9 [@media(hover:none)]:w-9 hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                                  >
+                                    <V2Icons.cal className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Удалить"
+                                    onClick={() => {
+                                      if (!confirm(`Удалить «${p.name}»?`)) return;
+                                      void fetchJson(`/api/v2/finance/projects/${p.id}`, { method: "DELETE" }).then(reload);
+                                    }}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition [@media(hover:none)]:h-9 [@media(hover:none)]:w-9 hover:bg-red-50 hover:text-red-500"
+                                  >
+                                    <V2Icons.trash className="h-3.5 w-3.5" />
+                                  </button>
+                                </span>
+                              </div>
+                              <div>
+                                <select
+                                  value={p.service_type}
+                                  onChange={(e) =>
+                                    void patchProject(p.id, { serviceType: e.target.value })
+                                  }
+                                  className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] font-medium text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                                >
+                                  {(Object.keys(FINANCE_SERVICE_META) as V2FinanceServiceType[]).map((k) => (
+                                    <option key={k} value={k}>
+                                      {FINANCE_SERVICE_META[k].label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <select
+                                  value={p.client_type ?? ""}
+                                  onChange={(e) =>
+                                    void patchProject(p.id, {
+                                      clientType: e.target.value || null,
+                                    })
+                                  }
+                                  className="v2-tight max-w-full rounded-lg border-0 bg-transparent text-[12.5px] text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                                >
+                                  <option value="">—</option>
+                                  {FINANCE_CLIENT_TYPE_OPTIONS.map((o) => (
+                                    <option key={o} value={o}>
+                                      {o}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <FinanceStatusSelect
+                                  value={p.status}
+                                  onChange={(status) => {
+                                    const patch: Record<string, unknown> = { status };
+                                    if (status === "paid") patch.paidAmount = p.effective_total_amount;
+                                    if (status === "not_paid") patch.paidAmount = 0;
+                                    void patchProject(p.id, patch);
+                                  }}
+                                />
+                              </div>
+                              <div className="v2-tight truncate text-[13px] text-[var(--v2-ink-600)]">
+                                {p.client_contact || <Dash />}
+                              </div>
+                              <div>
+                                <select
+                                  value={p.payment_method ?? ""}
+                                  onChange={(e) =>
+                                    void patchProject(p.id, {
+                                      paymentMethod: e.target.value || null,
+                                    })
+                                  }
+                                  className="v2-tight rounded-lg border-0 bg-transparent text-[12.5px] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                                >
+                                  <option value="">—</option>
+                                  {FINANCE_PAYMENT_METHOD_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>
+                                      {o.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="text-right">
+                                <InlineMoney
+                                  value={p.effective_total_amount}
+                                  onChange={(n) => void patchProject(p.id, { totalAmount: n })}
+                                />
+                              </div>
+                              <div className="text-right">
+                                <InlineMoney
+                                  value={p.paid_amount}
+                                  tone={paidTone}
+                                  onChange={(n) => void patchProject(p.id, { paidAmount: n })}
+                                />
+                              </div>
+                              {moveProjectId === p.id ? (
+                                <div className="col-span-full mt-1 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] p-3">
+                                  <p className="v2-tight mb-2 text-xs font-medium text-[var(--v2-ink-700)]">
+                                    Перенести в месяц
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {([-1, 1] as const).map((delta) => {
+                                      const t = adjacentFinanceMonth(year, month, delta);
+                                      return (
+                                        <button
+                                          key={delta}
+                                          type="button"
+                                          onClick={() =>
+                                            void fetchJson(`/api/v2/finance/projects/${p.id}/move`, {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ year: t.year, month: t.month }),
+                                            }).then(() => {
+                                              setMoveProjectId(null);
+                                              void reload();
+                                            })
+                                          }
+                                          className="rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-1.5 text-xs hover:bg-[var(--v2-ink-100)]"
+                                        >
+                                          {FINANCE_MONTH_NAMES[t.month - 1]} {t.year}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
-                    <div className="v2-tnum v2-tight text-right font-semibold text-[var(--v2-ink-900)]">
-                      {formatRub(lineTotals.expected)}
-                    </div>
-                    <div className="v2-tnum v2-tight text-right font-semibold text-emerald-600">
-                      {formatRub(lineTotals.actual)}
-                    </div>
+                    {summary ? (
+                      <div
+                        className={`${PROJECT_COLS} border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-5 py-3.5 text-[13px]`}
+                      >
+                        <div className="v2-tight col-span-6 flex items-center gap-2 font-semibold text-[var(--v2-ink-900)]">
+                          Итого по проектам
+                          <span className="text-[12px] font-normal text-[var(--v2-ink-500)]">
+                            · {projects.length} шт.
+                          </span>
+                        </div>
+                        <div className="v2-tnum v2-tight text-right font-semibold text-[var(--v2-ink-900)]">
+                          {formatRub(lineTotals.expected)}
+                        </div>
+                        <div className="v2-tnum v2-tight text-right font-semibold text-emerald-600">
+                          {formatRub(lineTotals.actual)}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                </div>
               </FinanceCard>
 
               <FinanceCard className="overflow-hidden">
-                <div className="flex items-center justify-between gap-4 px-5 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:flex-nowrap sm:gap-4 sm:px-5">
                   <div>
                     <h3 className="v2-tighter text-[16px] font-semibold text-[var(--v2-ink-900)]">
                       Общие расходы
@@ -849,7 +853,7 @@ export function V2FinanceClient() {
                       </span>
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 max-sm:w-full">
                     <button
                       type="button"
                       onClick={() => {
@@ -865,10 +869,11 @@ export function V2FinanceClient() {
                           }),
                         }).then(reload);
                       }}
-                      className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+                      className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] max-sm:h-11 max-sm:flex-1 max-sm:justify-center max-sm:px-2"
                     >
-                      <V2Icons.link className="h-4 w-4 text-[var(--v2-ink-500)]" />
-                      Скопировать с прошлого месяца
+                      <V2Icons.link className="h-4 w-4 shrink-0 text-[var(--v2-ink-500)]" />
+                      <span className="sm:hidden">С прошлого месяца</span>
+                      <span className="max-sm:hidden">Скопировать с прошлого месяца</span>
                     </button>
                     <button
                       type="button"
@@ -876,35 +881,35 @@ export function V2FinanceClient() {
                         if (expenseFormOpen) closeExpenseForm();
                         else setExpenseFormOpen(true);
                       }}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] max-sm:h-11 max-sm:flex-1 max-sm:justify-center max-sm:px-2"
                     >
-                      <V2Icons.plus className="h-4 w-4" />
+                      <V2Icons.plus className="h-4 w-4 shrink-0" />
                       Добавить расход
                     </button>
                   </div>
                 </div>
 
                 {expenseFormOpen ? (
-                  <div className="mx-5 mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/60 p-4">
+                  <div className="mx-3 mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/60 p-3 sm:mx-5 sm:p-4">
                     {editingExpenseId ? (
                       <div className="v2-tight w-full text-[13px] font-semibold text-[var(--v2-ink-800)]">
                         Редактирование расхода
                       </div>
                     ) : null}
-                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)] max-sm:w-full">
                       Сотрудник
                       <input
                         value={expenseWho}
                         onChange={(e) => setExpenseWho(e.target.value)}
-                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-sm:h-11 max-sm:text-[16px]"
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)] max-sm:min-w-0 max-sm:flex-1">
                       Роль
                       <select
                         value={expenseRole}
                         onChange={(e) => setExpenseRole(e.target.value)}
-                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-sm:h-11 max-sm:text-[16px]"
                       >
                         {FINANCE_EMPLOYEE_ROLES.map((r) => (
                           <option key={r.value} value={r.label}>
@@ -913,27 +918,28 @@ export function V2FinanceClient() {
                         ))}
                       </select>
                     </label>
-                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)] max-sm:min-w-0 max-sm:flex-1">
                       Сумма
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={expenseAmount}
                         onChange={(e) => setExpenseAmount(e.target.value)}
-                        className="v2-tnum h-9 w-32 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                        className="v2-tnum h-9 w-32 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-sm:h-11 max-sm:w-full max-sm:text-[16px]"
                       />
                     </label>
-                    <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                    <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs text-[var(--v2-ink-500)] max-sm:w-full max-sm:min-w-0 max-sm:flex-none">
                       Примечание
                       <input
                         value={expenseNotes}
                         onChange={(e) => setExpenseNotes(e.target.value)}
-                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-sm:h-11 max-sm:text-[16px]"
                       />
                     </label>
                     <button
                       type="button"
                       onClick={() => void handleSaveExpense()}
-                      className="h-9 rounded-xl bg-[var(--v2-brand-600)] px-4 text-sm font-medium text-white"
+                      className="h-9 rounded-xl bg-[var(--v2-brand-600)] px-4 text-sm font-medium text-white max-sm:h-11 max-sm:flex-1"
                     >
                       {editingExpenseId ? "Сохранить изменения" : "Сохранить"}
                     </button>
@@ -941,7 +947,7 @@ export function V2FinanceClient() {
                       <button
                         type="button"
                         onClick={closeExpenseForm}
-                        className="h-9 rounded-xl px-3 text-sm text-[var(--v2-ink-600)] hover:bg-white"
+                        className="h-9 rounded-xl px-3 text-sm text-[var(--v2-ink-600)] hover:bg-white max-sm:h-11"
                       >
                         Отмена
                       </button>
@@ -949,122 +955,126 @@ export function V2FinanceClient() {
                   </div>
                 ) : null}
 
-                <div
-                  className={`${EXPENSE_COLS} border-y border-[var(--v2-ink-100)]/70 bg-[var(--v2-ink-50)]/40 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
-                >
-                  <div>Сотрудник</div>
-                  <div>Роль</div>
-                  <div className="text-right">Сумма</div>
-                  <div className="pl-3">Примечания</div>
-                  <div className="text-right">Действия</div>
-                </div>
+                <div className="overflow-x-auto overscroll-x-contain">
+                  <div className="min-w-[720px] md:min-w-0">
+                    <div
+                      className={`${EXPENSE_COLS} border-y border-[var(--v2-ink-100)]/70 bg-[var(--v2-ink-50)]/40 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
+                    >
+                      <div>Сотрудник</div>
+                      <div>Роль</div>
+                      <div className="text-right">Сумма</div>
+                      <div className="pl-3">Примечания</div>
+                      <div className="text-right">Действия</div>
+                    </div>
 
-                {summary ? (
-                  <div className={`${EXPENSE_COLS} items-center bg-amber-50/60 px-5 py-3.5`}>
-                    <div className="flex items-center gap-2.5">
-                      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                        <V2Icons.spark className="h-4 w-4" />
-                      </span>
-                      <span className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Налоги</span>
-                    </div>
-                    <div className="v2-tight pr-3 text-[12.5px] text-[var(--v2-ink-500)]">
-                      6 916 ₽/мес + 1% от расчётного счёта
-                    </div>
-                    <div className="v2-tnum v2-tight text-right text-[14px] font-semibold text-red-500">
-                      {formatRub(summary.taxAmount)}
-                    </div>
-                    <div className="v2-tight pl-3 text-[12.5px] italic text-[var(--v2-ink-500)]">
-                      6916 ₽ + 1% с оплат на р/с
-                    </div>
-                    <div className="text-right">
-                      <span className="v2-tight inline-flex items-center gap-1 text-[12px] font-medium text-[var(--v2-ink-400)]">
-                        <V2Icons.spark className="h-3.5 w-3.5" />
-                        Авто
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="divide-y divide-[var(--v2-ink-100)]/70">
-                  {generalExpenses.map((e, i) => {
-                    const tint = financeAvatarTint(e.employee_name, i + 2);
-                    return (
-                      <div
-                        key={e.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => startEditingExpense(e)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            startEditingExpense(e);
-                          }
-                        }}
-                        className={`group ${EXPENSE_COLS} cursor-pointer items-center px-5 py-3.5 transition hover:bg-[var(--v2-ink-50)]/60`}
-                      >
+                    {summary ? (
+                      <div className={`${EXPENSE_COLS} items-center bg-amber-50/60 px-5 py-3.5`}>
                         <div className="flex items-center gap-2.5">
-                          <span
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold"
-                            style={{ background: `${tint}1A`, color: tint }}
-                          >
-                            {e.employee_name[0]}
+                          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                            <V2Icons.spark className="h-4 w-4" />
                           </span>
-                          <span className="v2-tight text-[14px] font-medium text-[var(--v2-ink-900)]">
-                            {e.employee_name}
-                          </span>
+                          <span className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Налоги</span>
                         </div>
-                        <div className="v2-tight flex items-center gap-2 text-[13px] text-[var(--v2-ink-600)]">
-                          {e.employee_role}
-                          <span
-                            className="rounded-full px-2 py-0.5 text-[11px] font-medium"
-                            style={{
-                              background: FINANCE_BUSINESS_LINE_META[e.business_line].bg,
-                              color: FINANCE_BUSINESS_LINE_META[e.business_line].tint,
-                            }}
-                          >
-                            {FINANCE_BUSINESS_LINE_META[e.business_line].label}
-                          </span>
+                        <div className="v2-tight pr-3 text-[12.5px] text-[var(--v2-ink-500)]">
+                          6 916 ₽/мес + 1% от расчётного счёта
                         </div>
                         <div className="v2-tnum v2-tight text-right text-[14px] font-semibold text-red-500">
-                          {formatRub(e.amount)}
+                          {formatRub(summary.taxAmount)}
                         </div>
-                        <div className="v2-tight pl-3 text-[13px] text-[var(--v2-ink-400)]">
-                          {e.notes || <Dash />}
+                        <div className="v2-tight pl-3 text-[12.5px] italic text-[var(--v2-ink-500)]">
+                          6916 ₽ + 1% с оплат на р/с
                         </div>
                         <div className="text-right">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void fetchJson(`/api/v2/finance/general-expenses?id=${e.id}`, {
-                                method: "DELETE",
-                              }).then(reload);
-                            }}
-                            className="v2-tight text-[12.5px] font-medium text-[var(--v2-ink-400)] opacity-0 transition hover:text-red-500 group-hover:opacity-100"
-                          >
-                            Удалить
-                          </button>
+                          <span className="v2-tight inline-flex items-center gap-1 text-[12px] font-medium text-[var(--v2-ink-400)]">
+                            <V2Icons.spark className="h-3.5 w-3.5" />
+                            Авто
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    ) : null}
 
-                {summary ? (
-                  <div
-                    className={`${EXPENSE_COLS} items-center border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-5 py-3.5`}
-                  >
-                    <div className="v2-tight col-span-2 text-[13px] font-semibold text-[var(--v2-ink-900)]">
-                      Итого общих расходов
+                    <div className="divide-y divide-[var(--v2-ink-100)]/70">
+                      {generalExpenses.map((e, i) => {
+                        const tint = financeAvatarTint(e.employee_name, i + 2);
+                        return (
+                          <div
+                            key={e.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => startEditingExpense(e)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                startEditingExpense(e);
+                              }
+                            }}
+                            className={`group ${EXPENSE_COLS} cursor-pointer items-center px-5 py-3.5 transition hover:bg-[var(--v2-ink-50)]/60`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold"
+                                style={{ background: `${tint}1A`, color: tint }}
+                              >
+                                {e.employee_name[0]}
+                              </span>
+                              <span className="v2-tight text-[14px] font-medium text-[var(--v2-ink-900)]">
+                                {e.employee_name}
+                              </span>
+                            </div>
+                            <div className="v2-tight flex items-center gap-2 text-[13px] text-[var(--v2-ink-600)]">
+                              {e.employee_role}
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                                style={{
+                                  background: FINANCE_BUSINESS_LINE_META[e.business_line].bg,
+                                  color: FINANCE_BUSINESS_LINE_META[e.business_line].tint,
+                                }}
+                              >
+                                {FINANCE_BUSINESS_LINE_META[e.business_line].label}
+                              </span>
+                            </div>
+                            <div className="v2-tnum v2-tight text-right text-[14px] font-semibold text-red-500">
+                              {formatRub(e.amount)}
+                            </div>
+                            <div className="v2-tight pl-3 text-[13px] text-[var(--v2-ink-400)]">
+                              {e.notes || <Dash />}
+                            </div>
+                            <div className="text-right">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void fetchJson(`/api/v2/finance/general-expenses?id=${e.id}`, {
+                                    method: "DELETE",
+                                  }).then(reload);
+                                }}
+                                className="v2-tight text-[12.5px] font-medium text-[var(--v2-ink-400)] opacity-0 transition hover:text-red-500 group-hover:opacity-100 [@media(hover:none)]:-my-2 [@media(hover:none)]:px-2 [@media(hover:none)]:py-2.5 [@media(hover:none)]:opacity-100"
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="v2-tnum text-right text-[15px] font-semibold text-red-500">
-                      {formatRub(summary.manualGeneralExpenses)}
-                    </div>
-                    <div className="v2-tight col-span-2 text-right text-[12px] text-[var(--v2-ink-400)]">
-                      без учёта налога
-                    </div>
+
+                    {summary ? (
+                      <div
+                        className={`${EXPENSE_COLS} items-center border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-5 py-3.5`}
+                      >
+                        <div className="v2-tight col-span-2 text-[13px] font-semibold text-[var(--v2-ink-900)]">
+                          Итого общих расходов
+                        </div>
+                        <div className="v2-tnum text-right text-[15px] font-semibold text-red-500">
+                          {formatRub(summary.manualGeneralExpenses)}
+                        </div>
+                        <div className="v2-tight col-span-2 text-right text-[12px] text-[var(--v2-ink-400)]">
+                          без учёта налога
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                </div>
               </FinanceCard>
             </>
           ) : (
@@ -1078,8 +1088,8 @@ export function V2FinanceClient() {
       </div>
 
       {newProjectOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/30 sm:items-center sm:p-4">
+          <div className="max-h-[94dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-[var(--v2-shadow-pop)] sm:max-h-[90vh] sm:rounded-2xl sm:p-6">
             <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">Новый проект</h2>
             <label className="mt-4 block">
               <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--v2-ink-500)]">
@@ -1091,7 +1101,7 @@ export function V2FinanceClient() {
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void handleCreateProject()}
                 placeholder="Название проекта"
-                className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+                className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm max-sm:h-11 max-sm:text-[16px]"
               />
             </label>
             <label className="mt-3 block">
@@ -1105,7 +1115,7 @@ export function V2FinanceClient() {
                 onChange={(e) => setNewProjectAmount(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void handleCreateProject()}
                 placeholder="0"
-                className="v2-tnum h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+                className="v2-tnum h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm max-sm:h-11 max-sm:text-[16px]"
               />
             </label>
             <div className="mt-3">
@@ -1142,14 +1152,14 @@ export function V2FinanceClient() {
                   setNewProjectAmount("");
                   setNewProjectLine(lineTab);
                 }}
-                className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
+                className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] max-sm:h-12"
               >
                 Отмена
               </button>
               <button
                 type="button"
                 onClick={() => void handleCreateProject()}
-                className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-sm font-medium text-white"
+                className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-sm font-medium text-white max-sm:h-12 max-sm:flex-1"
               >
                 Создать
               </button>
@@ -1181,7 +1191,7 @@ function StatsTab({
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <FinanceCard className="p-6">
+      <FinanceCard className="p-5 sm:p-6">
         <h3 className="v2-tight mb-4 text-[15px] font-semibold text-[var(--v2-ink-900)]">Выручка по услугам</h3>
         <div className="space-y-4">
           {byService.map((s) => (
@@ -1204,7 +1214,7 @@ function StatsTab({
           </span>
         </div>
       </FinanceCard>
-      <FinanceCard className="p-6">
+      <FinanceCard className="p-5 sm:p-6">
         <h3 className="v2-tight mb-4 text-[15px] font-semibold text-[var(--v2-ink-900)]">Куда уходит выручка</h3>
         <div className="space-y-4">
           {comp.map((c) => (

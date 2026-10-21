@@ -446,3 +446,107 @@
 @media (max-width:720px){
   .plan-v3 .week-chip{border-radius:14px;width:100%;justify-content:flex-start}
 }
+
+.plan-v3.plan-tabs-wrap{padding:28px 36px 0;max-width:1760px;margin:0 auto}
+.plan-v3 .mday-w{display:none}
+
+@media (hover:none){
+  .plan-v3 .tip:hover::after{display:none}
+  .plan-v3 .ev-x{opacity:.55}
+  .plan-v3 .kbc,.plan-v3 .plc{cursor:pointer}
+}
+
+@media (max-width:1023px){
+  .plan-v3 .scrim{z-index:94}
+  .plan-v3 .drawer{z-index:95}
+  .plan-v3 .toast{bottom:calc(var(--v2-mobnav-h,0px) + 12px)}
+  .plan-v3 .done-tog,.plan-v3 .ev-x{position:relative}
+  .plan-v3 .done-tog::after,.plan-v3 .ev-x::after{content:"";position:absolute;inset:-11px}
+  .plan-v3 .kb-scroll{scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+  .plan-v3 .place{scroll-snap-type:x mandatory}
+  .plan-v3 .plc{scroll-snap-align:start}
+}
+
+@media (max-width:640px){
+  .plan-v3.plan-tabs-wrap{padding:14px 12px 0}
+  .plan-v3 .page{padding:14px 12px 28px;gap:14px}
+  .plan-v3 .card{border-radius:18px}
+  .plan-v3 .pad{padding:16px 14px}
+  .plan-v3 .hero-l{padding:16px 14px;gap:8px}
+  .plan-v3 .hero-h1{font-size:24px}
+  .plan-v3 .big-title{font-size:22px}
+  .plan-v3 .sec-title{font-size:20px}
+  .plan-v3 .sec-sub{font-size:13.5px}
+  .plan-v3 .headrow{gap:10px}
+  .plan-v3 .seg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .plan-v3 .seg::-webkit-scrollbar{display:none}
+  .plan-v3 .seg button{padding:10px 14px;font-size:14px}
+  .plan-v3 .btn{height:44px;padding:0 16px;font-size:14.5px}
+  .plan-v3 .btn--sm{height:40px}
+  .plan-v3 .status{padding:10px 14px}
+  .plan-v3 .status-n{font-size:20px}
+
+  .plan-v3 .hero .week-check{padding:10px 10px 8px}
+  .plan-v3 .week-check-row{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -10px;padding:0 10px 2px;scroll-snap-type:x proximity}
+  .plan-v3 .week-check-row::-webkit-scrollbar{display:none}
+  .plan-v3 .week-chip{width:auto;flex:0 0 auto;border-radius:999px;min-height:40px;padding:8px 12px 8px 10px;scroll-snap-align:start;white-space:nowrap}
+
+  .plan-v3 .cal-head{gap:12px;margin-bottom:14px}
+  .plan-v3 .cal-head-l{gap:10px;width:100%;justify-content:space-between}
+  .plan-v3 .cal-head-c{width:100%;justify-content:space-between}
+  .plan-v3 .cal-head-r{width:100%;flex-wrap:nowrap}
+  .plan-v3 .cal-head-r .btn{flex:1 1 0;justify-content:center;min-width:0}
+  .plan-v3 .wk-label{min-width:0;font-size:16px}
+  .plan-v3 .wk-btn{width:44px;height:44px}
+  .plan-v3 .hint{font-size:12.5px;margin-top:10px}
+
+  .plan-v3 .month-heads{display:none}
+  .plan-v3 .month-scroll{max-height:min(70dvh,900px);gap:6px}
+  .plan-v3 .month-week{grid-template-columns:minmax(0,1fr);gap:6px}
+  .plan-v3 .mcell{min-height:0;padding:10px 12px;gap:6px}
+  .plan-v3 .mcell.out{display:none}
+  .plan-v3 .mday-n{display:none}
+  .plan-v3 .mday-w{display:inline;font-size:14px;color:var(--ink-700)}
+  .plan-v3 .mchip,.plan-v3 .mev{padding:10px 10px;font-size:14px}
+  .plan-v3 .mmore,.plan-v3 .mfree{min-height:32px;font-size:13px}
+  .plan-v3 .madd{min-height:40px;font-size:13.5px}
+
+  .plan-v3 .place{gap:10px;margin:0 -14px;padding:0 14px 6px;scroll-padding:0 14px}
+  .plan-v3 .plc{flex:0 0 82%;padding:14px 16px}
+  .plan-v3 .plc-n{font-size:16px}
+  .plan-v3 .plc-v{font-size:22px}
+
+  .plan-v3 .proj-actions{margin-left:0!important;width:100%}
+  .plan-v3 .proj-actions .btn{flex:1 1 calc(50% - 5px);justify-content:center;min-width:0;padding:0 10px;font-size:13.5px}
+  .plan-v3 .kb-scroll{margin:0 -14px;padding:0 14px 8px;scroll-padding:0 14px}
+  .plan-v3 .kb{min-height:0;gap:10px}
+  .plan-v3 .kbcol,.plan-v3 .kbcol--done,.plan-v3 .kbcol--perm{flex:0 0 84vw;width:84vw;min-width:84vw;max-width:84vw;min-height:280px}
+  .plan-v3 .kbc{padding:14px 15px}
+  .plan-v3 .kbc-n{font-size:15.5px}
+
+  .plan-v3 .prow{grid-template-columns:10px minmax(0,1fr) auto 24px;gap:6px 10px;padding:14px;min-height:0}
+  .plan-v3 .prow>.dot{grid-column:1;grid-row:1}
+  .plan-v3 .prow-mid{grid-column:2;grid-row:1}
+  .plan-v3 .prow-st{grid-column:3;grid-row:1}
+  .plan-v3 .prow .chev{grid-column:4;grid-row:1;width:24px}
+  .plan-v3 .prow-cell{grid-column:2 / -1;display:flex;align-items:baseline;gap:8px}
+  .plan-v3 .prow-cell .kick{flex-shrink:0}
+  .plan-v3 .prow-cell b{margin-top:0;font-size:14px;white-space:normal}
+  .plan-v3 .prow-n{font-size:15.5px;white-space:normal}
+  .plan-v3 .ptasks{padding:2px 10px 12px}
+  .plan-v3 .ptask{grid-template-columns:64px minmax(0,1fr) auto;gap:10px;padding:12px;min-height:44px}
+
+  .plan-v3 .drawer{width:100vw;max-width:100vw;box-shadow:none}
+  .plan-v3 .dr-h{padding:calc(14px + env(safe-area-inset-top,0px)) 16px 12px}
+  .plan-v3 .dr-b{padding:16px;gap:16px}
+  .plan-v3 .dr-f{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+  .plan-v3 .dr-f .btn{flex:1 1 auto;justify-content:center}
+  .plan-v3 .fld input,.plan-v3 .fld select{font-size:16px;min-height:48px}
+  .plan-v3 .tsel button{padding:11px 14px;min-height:44px}
+  .plan-v3 .prio-opt{min-height:44px;font-size:14px}
+  .plan-v3 .done-row{min-height:48px;font-size:14.5px}
+  .plan-v3 .dr-act{min-height:48px}
+  .plan-v3 .toast{left:12px;right:12px;transform:translateY(180%);max-width:none;padding:12px 14px;font-size:14px;gap:12px;justify-content:space-between}
+  .plan-v3 .toast.on{transform:none}
+  .plan-v3 .toast button{min-height:36px}
+}

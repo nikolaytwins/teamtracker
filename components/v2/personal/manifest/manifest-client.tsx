@@ -10,7 +10,7 @@ import type {
 import type { MyCodeDoc, MyCodePattern, MyCodeRule } from "@/lib/v2/personal/seeds/mycode-seed";
 import { seedMyCodeDoc } from "@/lib/v2/personal/seeds/mycode-seed";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 const HERO_BLUE = "#2d5eef";
 
@@ -60,8 +60,8 @@ function Kicker({ children, tint }: { children: ReactNode; tint?: string }) {
 function Quote({ text, dark }: { text: string; dark?: boolean }) {
   if (dark) {
     return (
-      <blockquote className="rounded-[20px] bg-white/[0.07] px-7 py-6 ring-1 ring-inset ring-white/10">
-        <p className="v2-tight text-[19px] font-medium leading-[1.45] tracking-[-0.02em] text-white">
+      <blockquote className="rounded-[20px] bg-white/[0.07] px-5 py-5 sm:px-7 sm:py-6 ring-1 ring-inset ring-white/10">
+        <p className="v2-tight text-[18px] font-medium leading-[1.45] sm:text-[19px] tracking-[-0.02em] text-white">
           <Inline text={text} />
         </p>
       </blockquote>
@@ -69,10 +69,10 @@ function Quote({ text, dark }: { text: string; dark?: boolean }) {
   }
   return (
     <blockquote
-      className="rounded-[20px] bg-[var(--v2-brand-50)] px-7 py-6"
+      className="rounded-[20px] bg-[var(--v2-brand-50)] px-5 py-5 sm:px-7 sm:py-6"
       style={{ boxShadow: "inset 4px 0 0 var(--v2-brand-600)" }}
     >
-      <p className="v2-tight text-[19px] font-medium leading-[1.45] tracking-[-0.02em] text-[var(--v2-brand-800)]">
+      <p className="v2-tight text-[18px] font-medium leading-[1.45] sm:text-[19px] tracking-[-0.02em] text-[var(--v2-brand-800)]">
         <Inline text={text} />
       </p>
     </blockquote>
@@ -96,7 +96,7 @@ function BulletTiles({ items, dark }: { items: string[]; dark?: boolean }) {
             style={{ background: dark ? "rgba(255,255,255,.45)" : "var(--v2-brand-500)" }}
           />
           <span
-            className={`v2-tight text-[15px] leading-[1.5] ${
+            className={`v2-tight text-[16px] leading-[1.5] sm:text-[15px] ${
               dark ? "text-white/80" : "text-[var(--v2-ink-700)]"
             }`}
           >
@@ -114,7 +114,7 @@ function NumberedRows({ items, dark }: { items: string[]; dark?: boolean }) {
       {items.map((item, i) => (
         <li
           key={i}
-          className={`flex items-start gap-4 rounded-2xl px-5 py-[15px] ${
+          className={`flex items-start gap-4 rounded-2xl px-4 py-[15px] sm:px-5 ${
             dark ? "bg-white/[0.06]" : "bg-[var(--v2-ink-50)]"
           }`}
         >
@@ -147,7 +147,7 @@ function TodoTiles({ items }: { items: string[] }) {
           className="flex items-start gap-3.5 rounded-[16px] bg-white px-4 py-4 ring-1 ring-inset ring-[var(--v2-ink-200)]"
         >
           <span className="mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] border-[1.5px] border-[var(--v2-brand-400)] bg-[var(--v2-brand-50)]" />
-          <span className="v2-tight text-[15px] leading-[1.5] text-[var(--v2-ink-700)]">
+          <span className="v2-tight text-[16px] leading-[1.5] sm:text-[15px] text-[var(--v2-ink-700)]">
             <Inline text={item} />
           </span>
         </li>
@@ -166,7 +166,7 @@ function CompareTable({ head, rows }: { head: [string, string]; rows: [string, s
       {rows.map(([oldWay, newWay], i) => (
         <div key={i} className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-[16px] bg-[#FEF3F2] px-4 py-3.5">
-            <span className="v2-tight text-[14.5px] leading-[1.5] text-[#912018]">
+            <span className="v2-tight text-[16px] sm:text-[14.5px] leading-[1.5] text-[#912018]">
               <Inline text={oldWay} />
             </span>
           </div>
@@ -174,7 +174,7 @@ function CompareTable({ head, rows }: { head: [string, string]; rows: [string, s
             className="rounded-[16px] bg-[var(--v2-brand-50)] px-4 py-3.5"
             style={{ boxShadow: "inset 0 0 0 1px rgba(59,111,247,.16)" }}
           >
-            <span className="v2-tight text-[14.5px] font-medium leading-[1.5] text-[var(--v2-brand-800)]">
+            <span className="v2-tight text-[16px] sm:text-[14.5px] font-medium leading-[1.5] text-[var(--v2-brand-800)]">
               <Inline text={newWay} />
             </span>
           </div>
@@ -245,7 +245,7 @@ function ChapterCard({ chapter, dark }: { chapter: ManifestChapter; dark?: boole
   return (
     <section
       id={chapter.id}
-      className={`scroll-mt-[76px] rounded-2xl px-8 py-7 ${dark ? "text-white" : "v2-card"}`}
+      className={`scroll-mt-[76px] rounded-2xl px-4 py-6 sm:px-8 sm:py-7 ${dark ? "text-white" : "v2-card"}`}
       style={
         dark
           ? {
@@ -261,7 +261,7 @@ function ChapterCard({ chapter, dark }: { chapter: ManifestChapter; dark?: boole
           Глава {String(chapter.index).padStart(2, "0")}
         </Kicker>
         <h2
-          className={`v2-tight mt-2 text-[26px] font-semibold tracking-[-0.03em] ${
+          className={`v2-tight mt-2 text-[23px] font-semibold tracking-[-0.03em] sm:text-[26px] ${
             dark ? "text-white" : "text-[var(--v2-ink-900)]"
           }`}
         >
@@ -275,19 +275,19 @@ function ChapterCard({ chapter, dark }: { chapter: ManifestChapter; dark?: boole
 
 function PatternCard({ p }: { p: MyCodePattern }) {
   return (
-    <article className="grid gap-5 rounded-[20px] bg-[var(--v2-ink-50)] p-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(240px,0.9fr)]">
+    <article className="grid gap-5 rounded-[20px] bg-[var(--v2-ink-50)] p-4 sm:p-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(240px,0.9fr)]">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">{p.code}</span>
         </div>
-        <h3 className="v2-tight mt-2 text-[22px] font-semibold tracking-[-0.028em] text-[var(--v2-ink-900)]">
+        <h3 className="v2-tight mt-2 text-[20px] font-semibold tracking-[-0.028em] sm:text-[22px] text-[var(--v2-ink-900)]">
           {p.name}
         </h3>
         <p className="v2-tight mt-3 max-w-[62ch] text-[16px] leading-relaxed text-[var(--v2-ink-700)]">
           «{p.core}»
         </p>
         {p.phrase ? (
-          <p className="v2-tight mt-2 text-[13.5px] text-[var(--v2-ink-500)]">
+          <p className="v2-tight mt-2 text-[15px] text-[var(--v2-ink-500)] sm:text-[13.5px]">
             <span className="text-[var(--v2-ink-400)]">Типичная фраза: </span>«{p.phrase}»
           </p>
         ) : null}
@@ -296,7 +296,7 @@ function PatternCard({ p }: { p: MyCodePattern }) {
             <Kicker>Как узнаю</Kicker>
             <ul className="mt-2 flex flex-col gap-1.5">
               {p.recognize.map((r) => (
-                <li key={r} className="v2-tight flex gap-2 text-[14px] leading-snug text-[var(--v2-ink-600)]">
+                <li key={r} className="v2-tight flex gap-2 text-[15px] leading-snug sm:text-[14px] text-[var(--v2-ink-600)]">
                   <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--v2-ink-300)]" />
                   {r}
                 </li>
@@ -305,13 +305,13 @@ function PatternCard({ p }: { p: MyCodePattern }) {
           </div>
         ) : null}
       </div>
-      <div className="flex flex-col rounded-[18px] bg-white px-5 py-5 shadow-[var(--v2-shadow-card)]">
+      <div className="flex flex-col rounded-[18px] bg-white px-4 py-4 sm:px-5 sm:py-5 shadow-[var(--v2-shadow-card)]">
         <Kicker tint="var(--v2-brand-600)">→ Новая реакция</Kicker>
         <p className="v2-tight mt-2 text-[15.5px] font-medium leading-snug text-[var(--v2-ink-900)]">
           «{p.reaction}»
         </p>
         {p.reactionSub ? (
-          <p className="v2-tight mt-3 text-[13.5px] leading-relaxed text-[var(--v2-ink-500)]">{p.reactionSub}</p>
+          <p className="v2-tight mt-3 text-[15px] leading-relaxed sm:text-[13.5px] text-[var(--v2-ink-500)]">{p.reactionSub}</p>
         ) : null}
       </div>
     </article>
@@ -320,13 +320,13 @@ function PatternCard({ p }: { p: MyCodePattern }) {
 
 function RuleCard({ r }: { r: MyCodeRule }) {
   return (
-    <article className="flex flex-col rounded-[20px] bg-[var(--v2-ink-50)] px-6 py-5">
+    <article className="flex flex-col rounded-[20px] bg-[var(--v2-ink-50)] px-4 py-5 sm:px-6">
       <h3 className="v2-tight text-[18px] font-semibold tracking-[-0.02em] text-[var(--v2-ink-900)]">{r.title}</h3>
       <div className="mt-4 flex gap-4">
         <span className="w-9 shrink-0 pt-[3px] font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-ink-400)]">
           если
         </span>
-        <p className="v2-tight text-[14.5px] leading-relaxed text-[var(--v2-ink-600)]">{r.ifs}</p>
+        <p className="v2-tight text-[16px] sm:text-[14.5px] leading-relaxed text-[var(--v2-ink-600)]">{r.ifs}</p>
       </div>
       <div className="mt-3 flex gap-4">
         <span className="w-9 shrink-0 pt-[3px] font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--v2-brand-600)]">
@@ -347,7 +347,7 @@ function RuleCard({ r }: { r: MyCodeRule }) {
             </ul>
           ) : null}
           {r.extra ? (
-            <p className="v2-tight mt-3 text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">
+            <p className="v2-tight mt-3 text-[15px] leading-relaxed sm:text-[13.5px] text-[var(--v2-ink-600)]">
               {r.extraLabel ? <span className="text-[var(--v2-ink-400)]">{r.extraLabel} </span> : null}
               {r.extra}
             </p>
@@ -377,7 +377,7 @@ function RuleCard({ r }: { r: MyCodeRule }) {
           <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-rose-500">
             Запрещённый сценарий
           </span>
-          <p className="v2-tight mt-1.5 text-[13.5px] leading-relaxed text-[var(--v2-ink-600)]">«{r.forbid}»</p>
+          <p className="v2-tight mt-1.5 text-[15px] leading-relaxed sm:text-[13.5px] text-[var(--v2-ink-600)]">«{r.forbid}»</p>
         </div>
       ) : null}
     </article>
@@ -387,6 +387,7 @@ function RuleCard({ r }: { r: MyCodeRule }) {
 export function ManifestClient({ doc }: { doc: ManifestDoc }) {
   const [active, setActive] = useState(doc.chapters[0]?.id ?? "");
   const [code, setCode] = useState<MyCodeDoc | null>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -423,6 +424,14 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
     return () => obs.disconnect();
   }, [doc.chapters, code]);
 
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || nav.scrollWidth <= nav.clientWidth) return;
+    const el = nav.querySelector<HTMLElement>(`a[href="#${active}"]`);
+    if (!el) return;
+    nav.scrollTo({ left: el.offsetLeft - (nav.clientWidth - el.offsetWidth) / 2, behavior: "smooth" });
+  }, [active]);
+
   const lastIndex = doc.chapters.length - 1;
   const patterns = code?.patterns ?? [];
   const rules = code?.rules ?? [];
@@ -430,28 +439,28 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex max-w-[1720px] flex-col gap-7 px-9 pb-24 pt-7">
+      <div className="mx-auto flex max-w-[1720px] flex-col gap-5 px-3 pb-12 pt-3 sm:gap-7 sm:px-6 sm:pb-24 sm:pt-7 lg:px-9">
         <div className="flex flex-col gap-5">
           <Link
             href={appPath("/v2/personal/articles")}
-            className="text-[13px] font-medium text-[var(--v2-ink-400)] transition hover:text-[var(--v2-brand-700)]"
+            className="inline-flex min-h-10 items-center self-start text-[13px] font-medium text-[var(--v2-ink-400)] transition sm:min-h-0 hover:text-[var(--v2-brand-700)]"
           >
             ← Все статьи
           </Link>
-          <section className="v2-card px-8 py-8">
+          <section className="v2-card px-4 py-6 sm:px-8 sm:py-8">
             <Kicker>Еженедельный код · личный план</Kicker>
-            <h1 className="v2-tight mt-1 text-[40px] font-semibold leading-[1.08] tracking-[-0.036em] text-[var(--v2-ink-900)]">
+            <h1 className="v2-tight mt-1 text-[30px] font-semibold leading-[1.08] sm:text-[40px] tracking-[-0.036em] text-[var(--v2-ink-900)]">
               {doc.title}
             </h1>
             {doc.lead ? (
               <div
-                className="mt-5 max-w-[920px] rounded-[20px] px-7 py-6 text-white"
+                className="mt-5 max-w-[920px] rounded-[20px] px-5 py-5 sm:px-7 sm:py-6 text-white"
                 style={{ background: HERO_BLUE, boxShadow: "0 16px 40px -18px rgba(45,94,239,0.85)" }}
               >
                 <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-white/60">
                   Главное обещание себе
                 </span>
-                <p className="v2-tight mt-3 text-[23px] font-medium leading-[1.32] tracking-[-0.028em]">
+                <p className="v2-tight mt-3 text-[20px] font-medium leading-[1.32] sm:text-[23px] tracking-[-0.028em]">
                   <Inline text={doc.lead} />
                 </p>
               </div>
@@ -469,21 +478,21 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
         </div>
 
         <section
-          className="rounded-[20px] px-8 py-7 text-white"
+          className="rounded-[20px] px-5 py-6 text-white sm:px-8 sm:py-7"
           style={{ background: HERO_BLUE, boxShadow: "0 16px 40px -18px rgba(45,94,239,0.85)" }}
         >
-          <p className="v2-tight text-[26px] font-semibold leading-[1.3] tracking-[-0.03em] sm:text-[30px]">
+          <p className="v2-tight text-[22px] font-semibold leading-[1.3] tracking-[-0.03em] sm:text-[30px]">
             Манифест заканчивается действием. Иначе он не работает.
           </p>
         </section>
 
-        <nav className="v2-card sticky top-0 z-10 flex flex-wrap gap-1.5 px-4 py-3">
+        <nav ref={navRef} className="v2-card sticky top-0 z-10 flex gap-1.5 overflow-x-auto px-2 py-2 [scrollbar-width:none] sm:flex-wrap sm:px-4 sm:py-3">
           {doc.chapters.map((c) => (
             <a
               key={c.id}
               href={`#${c.id}`}
               onClick={() => setActive(c.id)}
-              className={`v2-tight rounded-[10px] px-3 py-1.5 text-[13px] font-medium transition ${
+              className={`v2-tight shrink-0 whitespace-nowrap rounded-[10px] px-3 py-2.5 text-[13px] font-medium transition sm:shrink sm:whitespace-normal sm:py-1.5 ${
                 active === c.id
                   ? "bg-[var(--v2-brand-600)] text-white"
                   : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
@@ -496,7 +505,7 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
           <a
             href="#manifest-patterns"
             onClick={() => setActive("manifest-patterns")}
-            className={`v2-tight rounded-[10px] px-3 py-1.5 text-[13px] font-medium transition ${
+            className={`v2-tight shrink-0 whitespace-nowrap rounded-[10px] px-3 py-2.5 text-[13px] font-medium transition sm:shrink sm:whitespace-normal sm:py-1.5 ${
               active === "manifest-patterns"
                 ? "bg-[var(--v2-brand-600)] text-white"
                 : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
@@ -507,7 +516,7 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
           <a
             href="#manifest-rules"
             onClick={() => setActive("manifest-rules")}
-            className={`v2-tight rounded-[10px] px-3 py-1.5 text-[13px] font-medium transition ${
+            className={`v2-tight shrink-0 whitespace-nowrap rounded-[10px] px-3 py-2.5 text-[13px] font-medium transition sm:shrink sm:whitespace-normal sm:py-1.5 ${
               active === "manifest-rules"
                 ? "bg-[var(--v2-brand-600)] text-white"
                 : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
@@ -521,10 +530,10 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
           <ChapterCard key={c.id} chapter={c} dark={i === lastIndex} />
         ))}
 
-        <section id="manifest-patterns" className="v2-card scroll-mt-[76px] px-8 py-7">
+        <section id="manifest-patterns" className="v2-card scroll-mt-[76px] px-4 py-6 sm:px-8 sm:py-7">
           <div className="mb-6">
             <Kicker tint="var(--v2-brand-600)">Из моего кода</Kicker>
-            <h2 className="v2-tight mt-2 text-[26px] font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)]">
+            <h2 className="v2-tight mt-2 text-[23px] font-semibold tracking-[-0.03em] sm:text-[26px] text-[var(--v2-ink-900)]">
               Паттерны
             </h2>
             <p className="v2-tight mt-2 max-w-[62ch] text-[15px] text-[var(--v2-ink-500)]">
@@ -558,10 +567,10 @@ export function ManifestClient({ doc }: { doc: ManifestDoc }) {
           )}
         </section>
 
-        <section id="manifest-rules" className="v2-card scroll-mt-[76px] px-8 py-7">
+        <section id="manifest-rules" className="v2-card scroll-mt-[76px] px-4 py-6 sm:px-8 sm:py-7">
           <div className="mb-6">
             <Kicker tint="var(--v2-brand-600)">Из моего кода</Kicker>
-            <h2 className="v2-tight mt-2 text-[26px] font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)]">
+            <h2 className="v2-tight mt-2 text-[23px] font-semibold tracking-[-0.03em] sm:text-[26px] text-[var(--v2-ink-900)]">
               Правила
             </h2>
             <p className="v2-tight mt-2 max-w-[62ch] text-[15px] text-[var(--v2-ink-500)]">

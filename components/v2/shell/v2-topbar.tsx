@@ -15,9 +15,9 @@ export function V2Topbar({
   onOpenTask?: (taskId: string) => void;
 }) {
   return (
-    <div className="flex h-14 items-center gap-3 px-7">
-      <div className="flex items-center gap-2 text-[13px]">
-        <span className="v2-tight font-medium text-[var(--v2-ink-900)]">{pageTitle}</span>
+    <div className="flex h-14 items-center gap-3 px-3 sm:px-7">
+      <div className="flex min-w-0 items-center gap-2 text-[13px] max-lg:text-[15px]">
+        <span className="v2-tight truncate font-medium text-[var(--v2-ink-900)]">{pageTitle}</span>
       </div>
       <div className="ml-auto flex items-center gap-1.5">
         <button
@@ -34,11 +34,12 @@ export function V2Topbar({
         <button
           type="button"
           onClick={onNewTask}
-          className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
+          aria-label="Новая задача"
+          className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)] max-lg:h-10 max-lg:text-[14px]"
         >
           <V2Icons.plus className="h-4 w-4" />
-          Новая задача
-          <span className="ml-1 rounded border border-white/20 px-1 py-px font-mono text-[10.5px] tracking-wider text-white/60">
+          <span className="max-[380px]:hidden">Новая задача</span>
+          <span className="ml-1 rounded border border-white/20 px-1 py-px font-mono text-[10.5px] tracking-wider text-white/60 max-lg:hidden">
             N
           </span>
         </button>

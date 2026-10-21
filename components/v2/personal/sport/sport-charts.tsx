@@ -166,7 +166,12 @@ function SportChartSvg({
       </svg>
       <div className="mt-2 flex justify-between text-[10.5px] text-[var(--v2-ink-400)]">
         {pts.map((p, i) => (
-          <span key={i} className={i === hi ? "v2-tnum font-semibold text-[var(--v2-ink-800)]" : ""}>
+          <span
+            key={i}
+            className={`${i === hi ? "v2-tnum font-semibold text-[var(--v2-ink-800)]" : ""} ${
+              pts.length > 6 && i !== 0 && i !== pts.length - 1 && i !== hi ? "max-sm:hidden" : ""
+            }`}
+          >
             {p.x}
           </span>
         ))}
@@ -241,11 +246,11 @@ function SportChartModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4 lg:z-50 max-sm:items-end max-sm:p-0"
       onClick={onClose}
     >
       <div
-        className="v2-card max-h-[90vh] w-full max-w-[760px] overflow-auto p-6"
+        className="v2-card max-h-[90vh] w-full max-w-[760px] overflow-auto overscroll-contain p-6 max-sm:max-h-[calc(100dvh-env(safe-area-inset-top)-8px)] max-sm:rounded-b-none max-sm:px-4 max-sm:pb-[calc(16px+env(safe-area-inset-bottom))] max-sm:pt-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
@@ -268,7 +273,7 @@ function SportChartModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-[13px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)]"
+            className="shrink-0 rounded-lg px-3 py-1.5 text-[13px] text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-50)] max-lg:min-h-10 max-lg:bg-[var(--v2-ink-50)]"
           >
             Закрыть
           </button>
@@ -278,8 +283,7 @@ function SportChartModal({
           <>
             <svg
               viewBox={`0 0 ${W} ${H}`}
-              className="w-full"
-              style={{ height: 300 }}
+              className="h-auto w-full lg:h-[300px]"
               onMouseLeave={() => setHover(pts.length - 1)}
             >
               <defs>
@@ -342,6 +346,7 @@ function SportChartModal({
                     height={H}
                     fill="transparent"
                     onMouseEnter={() => setHover(i)}
+                    onClick={() => setHover(i)}
                     style={{ cursor: "pointer" }}
                   />
                 )

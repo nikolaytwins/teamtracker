@@ -18,7 +18,7 @@ import type {
 } from "@/lib/v2/personal/finance-assistant/types";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 const FINANCE_CHIPS = [
   "Заработал 170 000",
@@ -267,6 +267,8 @@ function FinanceContextPanel({
   error,
   onRetry,
   onToggle,
+  inSheet,
+  header,
 }: {
   context: FinanceAssistantContext | null;
   collapsed: boolean;
@@ -274,8 +276,10 @@ function FinanceContextPanel({
   error: string | null;
   onRetry: () => void;
   onToggle: () => void;
+  inSheet?: boolean;
+  header?: ReactNode;
 }) {
-  if (collapsed) {
+  if (collapsed && !inSheet) {
     return (
       <section className="card ctx collapsed">
         <button type="button" className="tgl" onClick={onToggle} aria-label="Развернуть">
@@ -287,13 +291,20 @@ function FinanceContextPanel({
   }
 
   return (
-    <section className="card ctx">
+    <section className={`card ctx${inSheet ? " ctx-sheet" : ""}`}>
       <div className="ctx-h">
         <span className="kick">Сейчас</span>
-        <button type="button" className="tgl" style={{ marginLeft: "auto" }} onClick={onToggle}>
-          →
+        <button
+          type="button"
+          className="tgl"
+          style={{ marginLeft: "auto" }}
+          onClick={onToggle}
+          aria-label={inSheet ? "Закрыть" : "Свернуть"}
+        >
+          {inSheet ? "×" : "→"}
         </button>
       </div>
+      {header}
       {loading && !context ? <p className="sec-sub">Загрузка…</p> : null}
       {error ? (
         <div>
@@ -348,6 +359,8 @@ function DayContextPanel({
   error,
   onRetry,
   onToggle,
+  inSheet,
+  header,
 }: {
   context: DayPlanContext | null;
   collapsed: boolean;
@@ -355,8 +368,10 @@ function DayContextPanel({
   error: string | null;
   onRetry: () => void;
   onToggle: () => void;
+  inSheet?: boolean;
+  header?: ReactNode;
 }) {
-  if (collapsed) {
+  if (collapsed && !inSheet) {
     return (
       <section className="card ctx collapsed">
         <button type="button" className="tgl" onClick={onToggle} aria-label="Развернуть">
@@ -368,13 +383,20 @@ function DayContextPanel({
   }
 
   return (
-    <section className="card ctx">
+    <section className={`card ctx${inSheet ? " ctx-sheet" : ""}`}>
       <div className="ctx-h">
         <span className="kick">Неделя</span>
-        <button type="button" className="tgl" style={{ marginLeft: "auto" }} onClick={onToggle}>
-          →
+        <button
+          type="button"
+          className="tgl"
+          style={{ marginLeft: "auto" }}
+          onClick={onToggle}
+          aria-label={inSheet ? "Закрыть" : "Свернуть"}
+        >
+          {inSheet ? "×" : "→"}
         </button>
       </div>
+      {header}
       {loading && !context ? <p className="sec-sub">Загрузка…</p> : null}
       {error ? (
         <div>
@@ -436,6 +458,7 @@ export function FinanceAssistantClient() {
   const [contextLoading, setContextLoading] = useState(true);
   const [contextError, setContextError] = useState<string | null>(null);
   const [ctxCollapsed, setCtxCollapsed] = useState(false);
+  const [ctxSheetOpen, setCtxSheetOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -623,6 +646,25 @@ export function FinanceAssistantClient() {
       ? "После одобрения поставлю режимы дней и события в календарь Плана."
       : "После одобрения пополню одежду, подарки, Леру и подушку. Платежи и свободные — подскажу отдельно.";
 
+  const domainChips = (
+    <div className="chips">
+      <button
+        type="button"
+        className={`chip${domain === "finance" ? " chip--q" : ""}`}
+        onClick={() => switchDomain("finance")}
+      >
+        Финансы
+      </button>
+      <button
+        type="button"
+        className={`chip${domain === "day" ? " chip--q" : ""}`}
+        onClick={() => switchDomain("day")}
+      >
+        План дня
+      </button>
+    </div>
+  );
+
   return (
     <div className="sofia-v3 flex min-h-0 flex-1 flex-col">
       <div className="shell flex min-h-0 flex-1 flex-col">
@@ -680,10 +722,36 @@ export function FinanceAssistantClient() {
                     <div className="chat-r">{role}</div>
                   </div>
                   <span className="chat-on">
-                    <i /> {loading || applying ? "Думаю…" : "На связи"}
+                    <i /> <span className="chat-on-t">{loading || applying ? "Думаю…" : "На связи"}</span>
                   </span>
+                  <button type="button" className="ctx-open" onClick={() => setCtxSheetOpen(true)}>
+                    <svg className="svgi" viewBox="0 0 18 18" aria-hidden>
+                      <rect x="2.8" y="3.4" width="12.4" height="11.2" rx="2.4" />
+                      <path d="M6 7.2h6M6 10.6h3.6" />
+                    </svg>
+                    {domain === "day" ? "Неделя" : "Контекст"}
+                  </button>
                 </div>
                 <div className="thread" ref={threadRef}>
+                  {!messages.length && !loading ? (
+                    <div className="m-empty">
+                      <div className="msg">
+                        <SofiaAvatar size={32} />
+                        <div className="msg-body">
+                          <div className="bub">{heroSub}</div>
+                        </div>
+                      </div>
+                      {domainChips}
+                      <span className="ask">{ask}</span>
+                      <div className="chips">
+                        {chips.map((c) => (
+                          <button key={c} type="button" className="chip" onClick={() => void send(c)}>
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {messages.map((m) => (
                     <MessageRow
                       key={m.id}
@@ -718,8 +786,12 @@ export function FinanceAssistantClient() {
                       className="btn btn--pri"
                       disabled={loading || !input.trim()}
                       onClick={() => void send(input)}
+                      aria-label="Отправить Софии"
                     >
-                      Отправить Софии
+                      <span className="send-l">Отправить Софии</span>
+                      <svg className="svgi send-i" viewBox="0 0 18 18" aria-hidden>
+                        <path d="M9 14.6V3.6M4.4 8.2 9 3.6l4.6 4.6" />
+                      </svg>
                     </button>
                   </div>
                 </div>
@@ -748,6 +820,35 @@ export function FinanceAssistantClient() {
           </div>
         </main>
       </div>
+
+      {ctxSheetOpen ? (
+        <>
+          <div className="scrim on m-scrim" onClick={() => setCtxSheetOpen(false)} aria-hidden />
+          {domain === "day" ? (
+            <DayContextPanel
+              context={dayContext}
+              collapsed={false}
+              loading={contextLoading}
+              error={contextError}
+              onRetry={() => refreshContext("day")}
+              onToggle={() => setCtxSheetOpen(false)}
+              inSheet
+              header={domainChips}
+            />
+          ) : (
+            <FinanceContextPanel
+              context={financeContext}
+              collapsed={false}
+              loading={contextLoading}
+              error={contextError}
+              onRetry={() => refreshContext("finance")}
+              onToggle={() => setCtxSheetOpen(false)}
+              inSheet
+              header={domainChips}
+            />
+          )}
+        </>
+      ) : null}
 
       <div className={`toast${toast ? " on" : ""}`} role="status">
         {toast}

@@ -113,7 +113,7 @@ function PriorityPicker({
           title={`Приоритет: ${meta.label}`}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition hover:brightness-95"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold transition hover:brightness-95 sm:px-1.5 sm:py-0.5 sm:text-[10px]"
           style={{ background: meta.soft, color: meta.ink }}
         >
           <i className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
@@ -126,7 +126,7 @@ function PriorityPicker({
           onClick={toggle}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className="v2-input flex h-10 w-full items-center gap-2 text-left text-[14px]"
+          className="v2-input flex h-11 w-full items-center gap-2 text-left text-[14px] sm:h-10"
         >
           <i className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: meta.color }} />
           <span className="min-w-0 flex-1 truncate font-medium text-[var(--v2-ink-800)]">
@@ -141,7 +141,7 @@ function PriorityPicker({
           ref={menuRef}
           role="listbox"
           style={{ top: menu.top, left: menu.left, width: menu.width }}
-          className="fixed z-[60] overflow-hidden rounded-xl border border-[var(--v2-ink-100)] bg-white p-1 shadow-[0_16px_40px_rgba(15,23,42,0.18)]"
+          className="fixed z-[100] overflow-hidden rounded-xl border border-[var(--v2-ink-100)] bg-white p-1 shadow-[0_16px_40px_rgba(15,23,42,0.18)]"
         >
           {PRIORITY_ORDER.map((key) => {
             const option = PRIORITY_META[key];
@@ -156,7 +156,7 @@ function PriorityPicker({
                   setMenu(null);
                   if (key !== value) onSelect(key);
                 }}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[13px] transition ${
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-3 text-left text-[14px] transition sm:py-2 sm:text-[13px] ${
                   active ? "bg-[var(--v2-ink-100)]" : "hover:bg-[var(--v2-ink-50)]"
                 }`}
               >
@@ -243,6 +243,7 @@ function CalendarEventCard({
   item,
   onComplete,
   onDelete,
+  onMove,
   onDragStart,
   onDragEnd,
   dragging,
@@ -251,6 +252,7 @@ function CalendarEventCard({
   item: PersonalCalendarItem;
   onComplete: (item: PersonalCalendarItem) => void;
   onDelete?: (item: PersonalCalendarItem) => void;
+  onMove?: (item: PersonalCalendarItem, date: string) => void;
   onDragStart?: (item: PersonalCalendarItem) => void;
   onDragEnd?: () => void;
   dragging?: boolean;
@@ -315,12 +317,29 @@ function CalendarEventCard({
         >
           <V2Icons.check className="h-4 w-4" />
         </button>
+        {onMove ? (
+          <label
+            title="Перенести на другой день"
+            className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-[var(--v2-ink-200)] text-[var(--v2-ink-400)] [@media(hover:hover)_and_(min-width:1024px)]:hidden"
+          >
+            <V2Icons.cal className="h-4 w-4" />
+            <input
+              type="date"
+              value={item.date}
+              aria-label="Перенести на другой день"
+              onChange={(e) => {
+                if (e.target.value) onMove(item, e.target.value);
+              }}
+              className="absolute inset-0 h-full w-full cursor-pointer text-[16px] opacity-0"
+            />
+          </label>
+        ) : null}
         {onDelete ? (
           <button
             type="button"
             title="Удалить дедлайн"
             onClick={() => onDelete(item)}
-            className="hidden h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 group-hover:flex! sm:h-7 sm:w-7 [@media(hover:hover)_and_(min-width:1024px)]:hidden"
           >
             <V2Icons.trash className="h-3.5 w-3.5" />
           </button>
@@ -620,7 +639,7 @@ export function PersonalCalendarClient() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-auto px-4 py-5 sm:px-6">
+    <div className="flex min-h-0 flex-1 flex-col overflow-auto px-3 py-4 sm:px-6 sm:py-5">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--v2-brand-600)]">
@@ -644,7 +663,7 @@ export function PersonalCalendarClient() {
           <button
             type="button"
             onClick={goToday}
-            className="rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[12px] font-semibold text-[var(--v2-ink-700)] shadow-sm transition hover:border-[var(--v2-brand-200)] hover:text-[var(--v2-brand-700)]"
+            className="min-h-10 rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 py-2 text-[12px] font-semibold sm:min-h-0 text-[var(--v2-ink-700)] shadow-sm transition hover:border-[var(--v2-brand-200)] hover:text-[var(--v2-brand-700)]"
           >
             Сегодня
           </button>
@@ -657,15 +676,16 @@ export function PersonalCalendarClient() {
         </div>
       ) : null}
 
-      <div className="flex min-h-[650px] flex-none flex-col gap-4 lg:min-h-0 lg:flex-row lg:items-start">
-        <section className="v2-card flex min-h-[650px] min-w-0 flex-col overflow-hidden lg:h-[calc(100vh-190px)] lg:min-h-[560px] lg:shrink lg:grow-0 lg:basis-[820px]">
+      <div className="flex flex-none flex-col gap-4 sm:min-h-[650px] lg:min-h-0 lg:flex-row lg:items-start">
+        <section className="v2-card flex min-w-0 flex-col overflow-hidden sm:min-h-[650px] lg:h-[calc(100vh-190px)] lg:min-h-[560px] lg:shrink lg:grow-0 lg:basis-[820px]">
           <div className="flex items-center justify-between border-b border-[var(--v2-ink-100)] px-4 py-3 sm:px-5">
             <div>
               <h2 className="v2-tight text-[18px] font-bold text-[var(--v2-ink-900)]">
                 {MONTHS[view.month]} {view.year}
               </h2>
               <p className="mt-0.5 text-[11px] text-[var(--v2-ink-400)]">
-                Перетащи дедлайн на день · клик — детали
+                <span className="[@media(hover:none)]:hidden">Перетащи дедлайн на день · клик — детали</span>
+                <span className="hidden [@media(hover:none)]:inline">Нажми на день — дедлайны ниже</span>
                 {loading ? " · обновление…" : ""}
               </p>
             </div>
@@ -674,7 +694,7 @@ export function PersonalCalendarClient() {
                 type="button"
                 onClick={() => moveMonth(-1)}
                 aria-label="Предыдущий месяц"
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--v2-ink-200)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-50)]"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--v2-ink-200)] text-[var(--v2-ink-600)] sm:h-9 sm:w-9 transition hover:bg-[var(--v2-ink-50)]"
               >
                 <V2Icons.chevL className="h-4 w-4" />
               </button>
@@ -682,7 +702,7 @@ export function PersonalCalendarClient() {
                 type="button"
                 onClick={() => moveMonth(1)}
                 aria-label="Следующий месяц"
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--v2-ink-200)] text-[var(--v2-ink-600)] transition hover:bg-[var(--v2-ink-50)]"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--v2-ink-200)] text-[var(--v2-ink-600)] sm:h-9 sm:w-9 transition hover:bg-[var(--v2-ink-50)]"
               >
                 <V2Icons.chevR className="h-4 w-4" />
               </button>
@@ -729,7 +749,7 @@ export function PersonalCalendarClient() {
                     setDropDate(null);
                     selectDay(day.ymd, day.outside, { year: day.year, month: day.month });
                   }}
-                  className={`relative min-h-[82px] overflow-hidden border-b border-r border-[var(--v2-ink-100)] p-2 text-left align-top transition sm:min-h-[94px] ${
+                  className={`relative min-h-[58px] overflow-hidden border-b border-r border-[var(--v2-ink-100)] p-1 text-left sm:p-2 align-top transition sm:min-h-[94px] ${
                     selected
                       ? "z-[1] bg-[var(--v2-brand-50)] shadow-[inset_0_0_0_1px_var(--v2-brand-300)]"
                       : inFocusWeek
@@ -750,7 +770,16 @@ export function PersonalCalendarClient() {
                   >
                     {day.day}
                   </span>
-                  <div className="mt-1.5 space-y-1">
+                  <div className="mt-1 flex flex-wrap gap-[3px] px-1 sm:hidden">
+                    {dayItems.slice(0, 4).map((item) => (
+                      <i
+                        key={item.id}
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: item.completed_at ? "#D4D4D8" : item.color }}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-1.5 hidden space-y-1 sm:block">
                     {dayItems.slice(0, 2).map((item) => (
                       <div
                         key={item.id}
@@ -815,6 +844,7 @@ export function PersonalCalendarClient() {
                     key={item.id}
                     item={item}
                     onComplete={toggleComplete}
+                    onMove={(row, date) => void moveDeadline(row.id, date)}
                     dragging={dragId === item.id}
                     onDragStart={(row) => setDragId(row.id)}
                     onDragEnd={() => {
@@ -843,7 +873,7 @@ export function PersonalCalendarClient() {
                     <button
                       type="button"
                       onClick={() => setWeekAnchor(today)}
-                      className="rounded-lg bg-white/15 px-2 py-1 text-[10px] font-semibold text-white transition hover:bg-white/25"
+                      className="min-h-9 rounded-lg bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-white/25 sm:min-h-0 sm:px-2 sm:text-[10px]"
                     >
                       Текущая
                     </button>
@@ -855,7 +885,7 @@ export function PersonalCalendarClient() {
                   <button
                     type="button"
                     onClick={() => openAdd("goal")}
-                    className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--v2-brand-700)] shadow-sm transition hover:bg-white/90"
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-white px-3 py-1 text-[12px] font-semibold sm:min-h-0 sm:px-2.5 sm:text-[11px] text-[var(--v2-brand-700)] shadow-sm transition hover:bg-white/90"
                   >
                     <V2Icons.plus className="h-3.5 w-3.5" />
                     Добавить
@@ -868,7 +898,7 @@ export function PersonalCalendarClient() {
                   type="button"
                   onClick={() => shiftWeek(-1)}
                   aria-label="Предыдущая неделя"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition hover:bg-white/25"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 sm:h-8 sm:w-8 text-white transition hover:bg-white/25"
                 >
                   <V2Icons.chevL className="h-4 w-4" />
                 </button>
@@ -885,7 +915,7 @@ export function PersonalCalendarClient() {
                   type="button"
                   onClick={() => shiftWeek(1)}
                   aria-label="Следующая неделя"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition hover:bg-white/25"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 sm:h-8 sm:w-8 text-white transition hover:bg-white/25"
                 >
                   <V2Icons.chevR className="h-4 w-4" />
                 </button>
@@ -951,7 +981,7 @@ export function PersonalCalendarClient() {
                             <V2Icons.check className="h-3 w-3" />
                           </span>
                           <span
-                            className={`v2-tight text-[13px] font-medium leading-snug ${
+                            className={`v2-tight text-[15px] font-medium leading-snug sm:text-[13px] ${
                               done
                                 ? "text-[var(--v2-ink-400)] line-through decoration-[1.5px]"
                                 : "text-[var(--v2-ink-800)]"
@@ -970,7 +1000,7 @@ export function PersonalCalendarClient() {
                             type="button"
                             title="Удалить"
                             onClick={() => void deleteGoal(goal.id)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-300)] transition hover:bg-red-50 hover:text-red-500 sm:h-7 sm:w-7"
                           >
                             <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                               <path d="m6.5 6.5 11 11m0-11-11 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -995,13 +1025,14 @@ export function PersonalCalendarClient() {
                     Дедлайны недели
                   </p>
                   <p className="mt-0.5 text-[11px] text-[var(--v2-ink-400)]">
-                    Перетащи карточку на день слева
+                    <span className="[@media(hover:none)]:hidden">Перетащи карточку на день слева</span>
+                    <span className="hidden [@media(hover:none)]:inline">Иконка календаря — перенести на другой день</span>
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => openAdd("deadline")}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] bg-white px-2.5 text-[12px] font-semibold text-[var(--v2-ink-700)] transition hover:border-[var(--v2-brand-200)] hover:text-[var(--v2-brand-700)]"
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--v2-ink-200)] bg-white px-3 text-[12px] sm:h-8 sm:px-2.5 font-semibold text-[var(--v2-ink-700)] transition hover:border-[var(--v2-brand-200)] hover:text-[var(--v2-brand-700)]"
                 >
                   <V2Icons.plus className="h-3.5 w-3.5" />
                   Дедлайн
@@ -1046,6 +1077,7 @@ export function PersonalCalendarClient() {
                               item={item}
                               onComplete={toggleComplete}
                               onDelete={(row) => void deleteDeadline(row.id)}
+                              onMove={(row, date) => void moveDeadline(row.id, date)}
                               dragging={dragId === item.id}
                               onDragStart={(row) => setDragId(row.id)}
                               onDragEnd={() => {
@@ -1072,11 +1104,11 @@ export function PersonalCalendarClient() {
 
       {addOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-3 backdrop-blur-sm sm:p-4"
           onClick={() => setAddOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"
+            className="max-h-[calc(100dvh-24px)] w-full max-w-md overflow-y-auto overscroll-contain rounded-3xl bg-white p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -1092,7 +1124,7 @@ export function PersonalCalendarClient() {
                 type="button"
                 onClick={() => setAddOpen(false)}
                 aria-label="Закрыть"
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-[18px] leading-none text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[18px] sm:h-8 sm:w-8 leading-none text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)]"
               >
                 ×
               </button>
@@ -1109,7 +1141,7 @@ export function PersonalCalendarClient() {
                   key={tab.key}
                   type="button"
                   onClick={() => setAddKind(tab.key)}
-                  className={`rounded-xl px-3 py-2 text-[13px] font-semibold transition ${
+                  className={`rounded-xl px-3 py-2.5 text-[14px] font-semibold transition sm:py-2 sm:text-[13px] ${
                     addKind === tab.key
                       ? "bg-white text-[var(--v2-ink-900)] shadow-sm"
                       : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-700)]"
@@ -1138,7 +1170,7 @@ export function PersonalCalendarClient() {
                   placeholder={
                     addKind === "goal" ? "Модуль 3 готов и загружен" : "Монтаж и загрузка модуля"
                   }
-                  className="v2-input h-10 w-full text-[14px]"
+                  className="v2-input h-11 w-full text-[14px] max-sm:text-[16px]! sm:h-10"
                 />
               </div>
 
@@ -1151,7 +1183,7 @@ export function PersonalCalendarClient() {
                     type="date"
                     value={addDate}
                     onChange={(e) => setAddDate(e.target.value)}
-                    className="v2-input h-10 w-full text-[14px]"
+                    className="v2-input h-11 w-full text-[14px] max-sm:text-[16px]! sm:h-10"
                   />
                 </div>
               ) : null}

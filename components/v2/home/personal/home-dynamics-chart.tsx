@@ -358,9 +358,9 @@ export function HomeDynamicsChart() {
         : null;
 
   return (
-    <section className="v2-card px-7 py-6">
-      <div className="flex flex-wrap items-end gap-7">
-        <div>
+    <section className="v2-card px-4 py-5 sm:px-7 sm:py-6">
+      <div className="flex flex-wrap items-end gap-4 sm:gap-7">
+        <div className="min-w-0">
           <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-[var(--v2-ink-400)]">
             {kick}
           </span>
@@ -369,10 +369,10 @@ export function HomeDynamicsChart() {
             {viewHint}
             {rateHint}
           </p>
-          <div className="v2-tnum mt-2.5 text-[44px] font-semibold leading-none tracking-[-0.04em] text-[var(--v2-ink-900)]">
+          <div className="v2-tnum mt-2.5 text-[34px] font-semibold leading-none tracking-[-0.04em] text-[var(--v2-ink-900)] sm:text-[44px]">
             {fmtMoney(curVal, currency)}
           </div>
-          <div className="mt-2.5 flex items-center gap-2.5">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
             <span
               className={`v2-tight inline-flex items-center gap-1 rounded-[9px] px-2.5 py-1 text-[15px] font-semibold ${
                 monthDeltaPositive === false
@@ -385,7 +385,7 @@ export function HomeDynamicsChart() {
             <span className="v2-tight text-[13.5px] text-[var(--v2-ink-400)]">к предыдущему месяцу</span>
           </div>
         </div>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:ml-auto sm:w-auto sm:justify-end">
           <div className="inline-flex rounded-[14px] bg-[var(--v2-ink-100)] p-[3px]">
             {(["rub", "usd"] as const).map((c) => (
               <button
@@ -486,9 +486,15 @@ export function HomeDynamicsChart() {
             <svg
               viewBox={`0 0 ${chart.W} ${CHART_H}`}
               className="block"
-              style={{ width: chart.W, height: CHART_H }}
+              style={{ width: chart.W, height: CHART_H, touchAction: scrollable ? "pan-x pan-y" : "pan-y" }}
               onMouseLeave={() => setHoverIdx(null)}
               onMouseMove={(e) => setHoverIdx(pickIndexFromClientX(e.clientX))}
+              onPointerDown={(e) => {
+                if (e.pointerType !== "mouse") setHoverIdx(pickIndexFromClientX(e.clientX));
+              }}
+              onPointerMove={(e) => {
+                if (e.pointerType !== "mouse") setHoverIdx(pickIndexFromClientX(e.clientX));
+              }}
             >
               <defs>
                 <linearGradient id="home-chart-g" x1="0" y1="0" x2="0" y2="1">
@@ -552,7 +558,9 @@ export function HomeDynamicsChart() {
 
             {activePt ? (
               <div
-                className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[130%] rounded-xl bg-[var(--v2-ink-900)] px-3 py-2 text-[15px] font-semibold text-white shadow-lg"
+                className={`pointer-events-none absolute z-10 -translate-y-[130%] whitespace-nowrap rounded-xl bg-[var(--v2-ink-900)] px-3 py-2 text-[15px] font-semibold text-white shadow-lg ${
+                  activePt[0] < 80 ? "translate-x-0" : activePt[0] > chart.W - 80 ? "-translate-x-full" : "-translate-x-1/2"
+                }`}
                 style={{ left: activePt[0], top: activePt[1] }}
               >
                 {fmtMoney(series.values[activeIdx] ?? 0, currency)}
@@ -568,13 +576,13 @@ export function HomeDynamicsChart() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 gap-2.5 sm:mt-6 sm:grid-cols-3 sm:gap-3.5">
         {stats.map(([label, value, chip]) => (
-          <div key={label} className="rounded-2xl bg-[var(--v2-ink-50)] px-5 py-[18px]">
+          <div key={label} className="min-w-0 rounded-2xl bg-[var(--v2-ink-50)] px-4 py-3.5 sm:px-5 sm:py-[18px]">
             <span className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-[var(--v2-ink-400)]">
               {label}
             </span>
-            <b className="v2-tnum mt-2 flex items-center gap-2 text-[26px] font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)]">
+            <b className="v2-tnum mt-2 flex flex-wrap items-center gap-2 text-[22px] font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)] sm:text-[26px]">
               {value}
               {chip && chip !== "—" ? (
                 <span className="rounded-[7px] bg-emerald-50 px-[7px] py-[3px] text-[12.5px] font-semibold text-emerald-700">

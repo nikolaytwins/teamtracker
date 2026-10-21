@@ -63,8 +63,28 @@ type AnalyticsPayload = {
 };
 
 const PROJECT_COLS =
-  "grid grid-cols-[minmax(0,1.7fr)_minmax(0,0.95fr)_minmax(0,0.95fr)_minmax(0,0.95fr)_minmax(0,0.8fr)_minmax(0,0.95fr)_2.75rem_minmax(0,0.95fr)_minmax(0,0.95fr)]";
-const EXPENSE_COLS = "grid grid-cols-[1.3fr_2fr_1fr_1.7fr_0.9fr]";
+  "lg:grid-cols-[minmax(0,1.7fr)_minmax(0,0.95fr)_minmax(0,0.95fr)_minmax(0,0.95fr)_minmax(0,0.8fr)_minmax(0,0.95fr)_2.75rem_minmax(0,0.95fr)_minmax(0,0.95fr)]";
+const EXPENSE_COLS = "lg:grid-cols-[1.3fr_2fr_1fr_1.7fr_0.9fr]";
+const MOBILE_SELECT = "max-lg:h-10 max-lg:w-full max-lg:rounded-lg max-lg:bg-white/70 max-lg:px-2";
+
+function ProjectCell({
+  label,
+  className = "",
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`flex min-w-0 flex-col gap-1 lg:h-8 lg:flex-row lg:items-center lg:gap-0 ${className}`}>
+      <span className="v2-tight text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)] lg:hidden">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
 
 function MonthCertainCheckbox({
   checked,
@@ -88,7 +108,7 @@ function MonthCertainCheckbox({
         if (disabled) return;
         onChange(!checked);
       }}
-      className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition ${
+      className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition max-lg:my-2 max-lg:h-6 max-lg:w-6 max-lg:rounded-md ${
         checked
           ? "border-[var(--v2-brand-600)] bg-[var(--v2-brand-600)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
           : "border-[var(--v2-ink-300)] bg-white hover:border-[var(--v2-brand-400)]"
@@ -176,6 +196,7 @@ function InlineMoney({
     return (
       <input
         type="number"
+        inputMode="decimal"
         step="0.01"
         value={temp}
         autoFocus
@@ -188,7 +209,7 @@ function InlineMoney({
             setEditing(false);
           }
         }}
-        className="v2-tnum w-28 max-w-full rounded border border-[var(--v2-brand-500)] bg-white px-2 py-1 text-right text-sm"
+        className="v2-tnum w-28 max-w-full rounded border border-[var(--v2-brand-500)] bg-white px-2 py-1 text-right text-sm max-lg:h-10 max-lg:w-full max-lg:rounded-lg max-lg:text-left"
       />
     );
   }
@@ -197,7 +218,7 @@ function InlineMoney({
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className={`v2-tnum v2-tight whitespace-nowrap rounded px-2 py-1 text-right text-[14px] font-semibold hover:bg-[var(--v2-ink-50)] ${toneClass}`}
+      className={`v2-tnum v2-tight whitespace-nowrap rounded px-2 py-1 text-right text-[14px] font-semibold hover:bg-[var(--v2-ink-50)] max-lg:-ml-2 max-lg:min-h-10 max-lg:text-left max-lg:text-[17px] ${toneClass}`}
     >
       {formatRub(value)}
     </button>
@@ -217,7 +238,7 @@ function FinanceStatusSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as V2FinancePaymentStatus)}
-        className="v2-tight h-8 cursor-pointer appearance-none rounded-full py-0 pl-3 pr-8 text-[12px] font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+        className="v2-tight h-8 cursor-pointer appearance-none rounded-full py-0 pl-3 pr-8 text-[12px] font-semibold max-lg:h-10 focus:outline-none focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
         style={{ background: meta.bg, color: meta.tint }}
       >
         {(Object.keys(FINANCE_STATUS_META) as V2FinancePaymentStatus[]).map((k) => (
@@ -268,17 +289,21 @@ function KpiCard({
   const toneClass =
     tone === "red" ? "text-red-500" : tone === "green" ? "text-emerald-600" : "text-[var(--v2-ink-900)]";
   return (
-    <Card className="p-5">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
+    <Card className="min-w-0 p-4 sm:p-5">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)] max-sm:text-[10px] max-sm:tracking-[0.06em]">
         <span
-          className="inline-flex h-6 w-6 items-center justify-center rounded-lg"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
           style={{ background: `${accent}14`, color: accent }}
         >
           <Icon className="h-[15px] w-[15px]" />
         </span>
         {label}
       </div>
-      <div className={`v2-tnum v2-tighter mt-3 text-[28px] font-semibold leading-none ${toneClass}`}>{value}</div>
+      <div
+        className={`v2-tnum v2-tighter mt-3 break-words text-[28px] font-semibold leading-none max-sm:text-[20px] ${toneClass}`}
+      >
+        {value}
+      </div>
       {sub ? <div className="v2-tight mt-2 text-[12px] text-[var(--v2-ink-500)]">{sub}</div> : null}
       {note ? <div className="mt-2">{note}</div> : null}
     </Card>
@@ -507,8 +532,8 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="flex h-14 items-center gap-3 border-b border-[var(--v2-ink-100)]/70 px-7">
+    <div className="flex min-h-full min-w-0 flex-col max-lg:[&_input]:text-base max-lg:[&_select]:text-base">
+      <header className="flex h-14 items-center gap-3 border-b border-[var(--v2-ink-100)]/70 px-4 lg:px-7">
         <div className="v2-tight flex items-center gap-2 text-[13px] text-[var(--v2-ink-500)]">
           <span className="text-[var(--v2-ink-400)]">Студия</span>
           <span className="text-[var(--v2-ink-300)]">/</span>
@@ -518,7 +543,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
           <button
             type="button"
             onClick={() => setNewProjectOpen(true)}
-            className="v2-tight inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)]"
+            className="v2-tight inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white shadow-[var(--v2-shadow-card)] transition hover:bg-[var(--v2-ink-700)] max-lg:h-10 max-lg:text-[14px]"
           >
             <V2Icons.plus className="h-4 w-4 shrink-0" />
             Новый проект
@@ -527,8 +552,8 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1280px] px-6 pb-24 pt-7 lg:px-10">
-          <div className="mb-6 flex items-center gap-6 border-b border-[var(--v2-ink-200)]/70">
+        <div className="mx-auto max-w-[1280px] px-4 pb-24 pt-5 sm:px-6 lg:px-10 lg:pt-7">
+          <div className="mb-5 flex items-center gap-6 border-b border-[var(--v2-ink-200)]/70 lg:mb-6">
             {(
               [
                 ["projects", "Проекты"],
@@ -539,7 +564,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                 key={k}
                 type="button"
                 onClick={() => setTab(k)}
-                className={`v2-tight relative pb-3 text-[14px] font-medium transition ${
+                className={`v2-tight relative pb-3 text-[14px] font-medium transition max-lg:pt-2 max-lg:text-[15px] ${
                   tab === k ? "text-[var(--v2-ink-900)]" : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-800)]"
                 }`}
               >
@@ -553,11 +578,11 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
 
           {tab === "projects" ? (
             <>
-              <div className="mb-6 flex flex-wrap items-center gap-4">
-                <h1 className="v2-tighter text-[34px] font-semibold leading-none text-[var(--v2-ink-900)]">
+              <div className="mb-5 flex flex-wrap items-center gap-3 lg:mb-6 lg:gap-4">
+                <h1 className="v2-tighter text-[26px] font-semibold leading-none text-[var(--v2-ink-900)] lg:text-[34px]">
                   {lineMeta.label}
                 </h1>
-                <div className="flex items-center gap-2 pl-2">
+                <div className="flex flex-wrap items-center gap-2 lg:pl-2">
                   <FinanceSelect
                     value={year}
                     options={yearOptions.map((y) => ({ value: y, label: String(y) }))}
@@ -577,7 +602,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                       setYear(today.getFullYear());
                       setMonth(today.getMonth() + 1);
                     }}
-                    className="v2-tight text-[13px] font-medium text-[var(--v2-brand-600)] transition hover:text-[var(--v2-brand-700)]"
+                    className="v2-tight text-[13px] font-medium text-[var(--v2-brand-600)] transition hover:text-[var(--v2-brand-700)] max-lg:h-10 max-lg:px-2 max-lg:text-[14px]"
                   >
                     Сегодня
                   </button>
@@ -591,7 +616,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
               ) : null}
 
               {summary ? (
-                <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                   <KpiCard
                     label="Предполагаемая выручка"
                     value={formatRub(summary.expectedRevenue)}
@@ -676,7 +701,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
 
               <Card className="mb-7 overflow-hidden">
                 <div
-                  className={`${PROJECT_COLS} border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
+                  className={`hidden lg:grid ${PROJECT_COLS} border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
                 >
                   <div>Проект</div>
                   <div>Услуга</div>
@@ -706,10 +731,10 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                       return (
                         <div
                           key={p.id}
-                          className={`group ${PROJECT_COLS} items-center border-l-[3px] px-5 py-3.5 transition hover:brightness-[0.99]`}
+                          className={`group grid grid-cols-2 items-start gap-x-3 gap-y-2.5 border-l-[3px] px-4 py-3.5 transition hover:brightness-[0.99] lg:items-center lg:gap-0 lg:px-5 ${PROJECT_COLS}`}
                           style={{ borderLeftColor: statusMeta.dot, backgroundColor: statusMeta.bg }}
                         >
-                          <div className="flex min-w-0 items-center gap-2.5 pr-2">
+                          <div className="col-span-2 flex min-w-0 items-center gap-2.5 pr-2 lg:col-span-1">
                             <span
                               className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold"
                               style={{ background: `${tint}1A`, color: tint }}
@@ -719,7 +744,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                             <div className="min-w-0 flex-1">
                               <Link
                                 href={appPath(`/v2/agency/projects/${p.id}`)}
-                                className="v2-tight block truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline"
+                                className="v2-tight block truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline max-lg:py-0.5 max-lg:text-[15.5px] max-lg:font-semibold"
                                 title="Открыть проект и детализацию"
                               >
                                 {p.name}
@@ -741,13 +766,13 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                 ))}
                               </select>
                             </div>
-                            <span className="ml-0.5 hidden items-center gap-0.5 group-hover:flex">
+                            <span className="ml-0.5 flex shrink-0 items-center gap-0.5 pointer-fine:hidden pointer-fine:group-hover:flex">
                               <Link
                                 href={appPath(`/v2/agency/projects/${p.id}`)}
                                 title="Детализация"
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-md lg:h-6 lg:w-6 text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
                               >
-                                <V2Icons.list className="h-3.5 w-3.5" />
+                                <V2Icons.list className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
                               </Link>
                               <button
                                 type="button"
@@ -759,17 +784,17 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                     body: JSON.stringify({ currentYear: year, currentMonth: month }),
                                   }).then(reload)
                                 }
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-md lg:h-6 lg:w-6 text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
                               >
-                                <V2Icons.link className="h-3.5 w-3.5" />
+                                <V2Icons.link className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
                               </button>
                               <button
                                 type="button"
                                 title="Перенести"
                                 onClick={() => setMoveProjectId(moveProjectId === p.id ? null : p.id)}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-md lg:h-6 lg:w-6 text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-800)]"
                               >
-                                <V2Icons.cal className="h-3.5 w-3.5" />
+                                <V2Icons.cal className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
                               </button>
                               <button
                                 type="button"
@@ -780,17 +805,17 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                     reload
                                   );
                                 }}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-red-50 hover:text-red-500"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-md lg:h-6 lg:w-6 text-[var(--v2-ink-400)] transition hover:bg-red-50 hover:text-red-500"
                               >
-                                <V2Icons.trash className="h-3.5 w-3.5" />
+                                <V2Icons.trash className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
                               </button>
                             </span>
                           </div>
-                          <div className="flex h-8 items-center">
+                          <ProjectCell label="Услуга" className="order-5 lg:order-none">
                             <select
                               value={p.service_type}
                               onChange={(e) => void patchProject(p.id, { serviceType: e.target.value })}
-                              className="v2-tight h-8 rounded-lg border-0 bg-transparent text-[12.5px] font-medium text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                              className={`v2-tight h-8 rounded-lg border-0 bg-transparent text-[12.5px] font-medium text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30 ${MOBILE_SELECT}`}
                             >
                               {(Object.keys(FINANCE_SERVICE_META) as V2FinanceServiceType[]).map((k) => (
                                 <option key={k} value={k}>
@@ -798,12 +823,12 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                 </option>
                               ))}
                             </select>
-                          </div>
-                          <div className="flex h-8 items-center">
+                          </ProjectCell>
+                          <ProjectCell label="Тип клиента" className="order-6 lg:order-none">
                             <select
                               value={p.client_type ?? ""}
                               onChange={(e) => void patchProject(p.id, { clientType: e.target.value || null })}
-                              className="v2-tight h-8 max-w-full rounded-lg border-0 bg-transparent text-[12.5px] text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                              className={`v2-tight h-8 max-w-full rounded-lg border-0 bg-transparent text-[12.5px] text-[var(--v2-ink-700)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30 ${MOBILE_SELECT}`}
                             >
                               <option value="">—</option>
                               {FINANCE_CLIENT_TYPE_OPTIONS.map((o) => (
@@ -812,8 +837,8 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                 </option>
                               ))}
                             </select>
-                          </div>
-                          <div className="flex h-8 items-center">
+                          </ProjectCell>
+                          <ProjectCell label="Статус" className="order-3 lg:order-none">
                             <FinanceStatusSelect
                               value={p.status}
                               onChange={(status) => {
@@ -826,17 +851,17 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                 void patchProject(p.id, patch);
                               }}
                             />
-                          </div>
-                          <div className="flex h-8 items-center">
-                            <span className="v2-tight truncate text-[13px] text-[var(--v2-ink-600)]">
+                          </ProjectCell>
+                          <ProjectCell label="Контакт" className="order-8 lg:order-none">
+                            <span className="v2-tight truncate text-[13px] text-[var(--v2-ink-600)] max-lg:flex max-lg:min-h-10 max-lg:items-center max-lg:text-[14px]">
                               {p.client_contact || <Dash />}
                             </span>
-                          </div>
-                          <div className="flex h-8 items-center">
+                          </ProjectCell>
+                          <ProjectCell label="Способ оплаты" className="order-7 lg:order-none">
                             <select
                               value={p.payment_method ?? ""}
                               onChange={(e) => void patchProject(p.id, { paymentMethod: e.target.value || null })}
-                              className="v2-tight h-8 rounded-lg border-0 bg-transparent text-[12.5px] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                              className={`v2-tight h-8 rounded-lg border-0 bg-transparent text-[12.5px] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30 ${MOBILE_SELECT}`}
                             >
                               <option value="">—</option>
                               {FINANCE_PAYMENT_METHOD_OPTIONS.map((o) => (
@@ -845,8 +870,8 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                 </option>
                               ))}
                             </select>
-                          </div>
-                          <div className="flex h-8 items-center justify-center">
+                          </ProjectCell>
+                          <ProjectCell label="Точно в месяце" className="order-4 lg:order-none lg:justify-center">
                             <MonthCertainCheckbox
                               checked={p.status === "paid" || p.payment_certain_this_month}
                               disabled={p.status === "paid"}
@@ -859,22 +884,22 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                 void patchProject(p.id, { paymentCertainThisMonth: next })
                               }
                             />
-                          </div>
-                          <div className="flex h-8 items-center justify-end">
+                          </ProjectCell>
+                          <ProjectCell label="Сумма" className="order-1 lg:order-none lg:justify-end">
                             <InlineMoney
                               value={p.effective_total_amount}
                               onChange={(n) => void patchProject(p.id, { totalAmount: n })}
                             />
-                          </div>
-                          <div className="flex h-8 items-center justify-end">
+                          </ProjectCell>
+                          <ProjectCell label="Оплачено" className="order-2 lg:order-none lg:justify-end">
                             <InlineMoney
                               value={p.paid_amount}
                               tone={paidTone}
                               onChange={(n) => void patchProject(p.id, { paidAmount: n })}
                             />
-                          </div>
+                          </ProjectCell>
                           {moveProjectId === p.id ? (
-                            <div className="col-span-full mt-1 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] p-3">
+                            <div className="order-last col-span-full mt-1 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)] p-3 lg:order-none">
                               <p className="v2-tight mb-2 text-xs font-medium text-[var(--v2-ink-700)]">
                                 Перенести в месяц
                               </p>
@@ -895,7 +920,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                           void reload();
                                         })
                                       }
-                                      className="rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-1.5 text-xs hover:bg-[var(--v2-ink-100)]"
+                                      className="rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 py-1.5 text-xs hover:bg-[var(--v2-ink-100)] max-lg:h-10 max-lg:flex-1 max-lg:text-[14px]"
                                     >
                                       {FINANCE_MONTH_NAMES[t.month - 1]} {t.year}
                                     </button>
@@ -911,18 +936,24 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                 </div>
                 {summary ? (
                   <div
-                    className={`${PROJECT_COLS} border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-5 py-3.5 text-[13px]`}
+                    className={`grid grid-cols-2 gap-x-3 gap-y-2 border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-4 py-3.5 text-[13px] lg:gap-0 lg:px-5 ${PROJECT_COLS}`}
                   >
-                    <div className="v2-tight col-span-7 flex items-center gap-2 font-semibold text-[var(--v2-ink-900)]">
+                    <div className="v2-tight col-span-2 flex items-center gap-2 font-semibold text-[var(--v2-ink-900)] lg:col-span-7">
                       Итого по проектам
                       <span className="text-[12px] font-normal text-[var(--v2-ink-500)]">
                         · {projects.length} шт.
                       </span>
                     </div>
-                    <div className="v2-tnum v2-tight text-right font-semibold text-[var(--v2-ink-900)]">
+                    <div className="v2-tnum v2-tight font-semibold text-[var(--v2-ink-900)] max-lg:text-[16px] lg:text-right">
+                      <span className="block text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)] lg:hidden">
+                        Сумма
+                      </span>
                       {formatRub(lineTotals.expected)}
                     </div>
-                    <div className="v2-tnum v2-tight text-right font-semibold text-emerald-600">
+                    <div className="v2-tnum v2-tight font-semibold text-emerald-600 max-lg:text-[16px] lg:text-right">
+                      <span className="block text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)] lg:hidden">
+                        Оплачено
+                      </span>
                       {formatRub(lineTotals.actual)}
                     </div>
                   </div>
@@ -930,7 +961,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
               </Card>
 
               <Card className="overflow-hidden">
-                <div className="flex items-center justify-between gap-4 px-5 py-4">
+                <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 lg:px-5">
                   <div>
                     <h3 className="v2-tighter text-[16px] font-semibold text-[var(--v2-ink-900)]">
                       Расходы · {lineMeta.label}
@@ -942,7 +973,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                       </span>
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -959,7 +990,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                           }),
                         }).then(reload);
                       }}
-                      className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)]"
+                      className="v2-tight inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] transition hover:shadow-[var(--v2-shadow-cardHv)] max-lg:h-10 max-lg:text-[13.5px]"
                     >
                       <V2Icons.link className="h-4 w-4 text-[var(--v2-ink-500)]" />
                       Скопировать с прошлого месяца
@@ -970,7 +1001,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                         if (expenseFormOpen) closeExpenseForm();
                         else setExpenseFormOpen(true);
                       }}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)]"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--v2-ink-900)] px-3.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] max-lg:h-10 max-lg:text-[13.5px]"
                     >
                       <V2Icons.plus className="h-4 w-4" />
                       Добавить расход
@@ -979,26 +1010,26 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                 </div>
 
                 {expenseFormOpen ? (
-                  <div className="mx-5 mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/60 p-4">
+                  <div className="mx-4 mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/60 p-4 lg:mx-5">
                     {editingExpenseId ? (
                       <div className="v2-tight w-full text-[13px] font-semibold text-[var(--v2-ink-800)]">
                         Редактирование расхода
                       </div>
                     ) : null}
-                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)] max-sm:w-full">
                       Сотрудник
                       <input
                         value={expenseWho}
                         onChange={(e) => setExpenseWho(e.target.value)}
-                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-lg:h-11"
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)] max-sm:w-full">
                       Роль
                       <select
                         value={expenseRole}
                         onChange={(e) => setExpenseRole(e.target.value)}
-                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-lg:h-11"
                       >
                         {FINANCE_EMPLOYEE_ROLES.map((r) => (
                           <option key={r.value} value={r.label}>
@@ -1007,27 +1038,28 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                         ))}
                       </select>
                     </label>
-                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--v2-ink-500)] max-sm:w-full">
                       Сумма
                       <input
                         type="number"
+                        inputMode="decimal"
                         value={expenseAmount}
                         onChange={(e) => setExpenseAmount(e.target.value)}
-                        className="v2-tnum h-9 w-32 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                        className="v2-tnum h-9 w-32 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-lg:h-11 max-sm:w-full"
                       />
                     </label>
-                    <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs text-[var(--v2-ink-500)]">
+                    <label className="flex flex-1 flex-col gap-1 text-xs text-[var(--v2-ink-500)] max-sm:w-full max-sm:flex-none sm:min-w-[220px]">
                       Примечание
                       <input
                         value={expenseNotes}
                         onChange={(e) => setExpenseNotes(e.target.value)}
-                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm"
+                        className="h-9 rounded-lg border border-[var(--v2-ink-200)] bg-white px-3 text-sm max-lg:h-11"
                       />
                     </label>
                     <button
                       type="button"
                       onClick={() => void handleSaveExpense()}
-                      className="h-9 rounded-xl bg-[var(--v2-brand-600)] px-4 text-sm font-medium text-white"
+                      className="h-9 rounded-xl bg-[var(--v2-brand-600)] px-4 text-sm font-medium text-white max-lg:h-11 max-sm:flex-1"
                     >
                       {editingExpenseId ? "Сохранить изменения" : "Сохранить"}
                     </button>
@@ -1035,7 +1067,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                       <button
                         type="button"
                         onClick={closeExpenseForm}
-                        className="h-9 rounded-xl px-3 text-sm text-[var(--v2-ink-600)] hover:bg-white"
+                        className="h-9 rounded-xl px-3 text-sm text-[var(--v2-ink-600)] hover:bg-white max-lg:h-11"
                       >
                         Отмена
                       </button>
@@ -1044,7 +1076,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                 ) : null}
 
                 <div
-                  className={`${EXPENSE_COLS} border-y border-[var(--v2-ink-100)]/70 bg-[var(--v2-ink-50)]/40 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
+                  className={`hidden lg:grid ${EXPENSE_COLS} border-y border-[var(--v2-ink-100)]/70 bg-[var(--v2-ink-50)]/40 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]`}
                 >
                   <div>Сотрудник</div>
                   <div>Роль</div>
@@ -1054,25 +1086,27 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                 </div>
 
                 {summary ? (
-                  <div className={`${EXPENSE_COLS} items-center bg-amber-50/60 px-5 py-3.5`}>
-                    <div className="flex items-center gap-2.5">
+                  <div
+                    className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 bg-amber-50/60 px-4 py-3.5 lg:gap-0 lg:px-5 ${EXPENSE_COLS}`}
+                  >
+                    <div className="order-1 flex items-center gap-2.5 lg:order-none">
                       <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
                         <V2Icons.spark className="h-4 w-4" />
                       </span>
                       <span className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">Налоги</span>
                     </div>
-                    <div className="v2-tight pr-3 text-[12.5px] text-[var(--v2-ink-500)]">
+                    <div className="v2-tight order-3 pr-3 text-[12.5px] text-[var(--v2-ink-500)] lg:order-none">
                       {line === "agency" ? "6 916 ₽/мес + 1% от расчётного счёта" : "1% от расчётного счёта"}
                     </div>
-                    <div className="v2-tnum v2-tight text-right text-[14px] font-semibold text-red-500">
+                    <div className="v2-tnum v2-tight order-2 text-right text-[14px] font-semibold text-red-500 max-lg:text-[16px] lg:order-none">
                       {formatRub(summary.taxAmount)}
                     </div>
-                    <div className="v2-tight pl-3 text-[12.5px] italic text-[var(--v2-ink-500)]">
+                    <div className="v2-tight order-5 col-span-2 text-[12.5px] italic text-[var(--v2-ink-500)] lg:order-none lg:col-span-1 lg:pl-3">
                       {line === "agency"
                         ? "6916 ₽ + 1% с оплат на р/с"
                         : "1% с оплат на р/с · взносы ИП учтены в агентстве"}
                     </div>
-                    <div className="text-right">
+                    <div className="order-4 text-right lg:order-none">
                       <span className="v2-tight inline-flex items-center gap-1 text-[12px] font-medium text-[var(--v2-ink-400)]">
                         <V2Icons.spark className="h-3.5 w-3.5" />
                         Авто
@@ -1083,7 +1117,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
 
                 <div className="divide-y divide-[var(--v2-ink-100)]/70">
                   {generalExpenses.length === 0 ? (
-                    <div className="px-5 py-8 text-center text-sm text-[var(--v2-ink-500)]">
+                    <div className="px-4 py-8 text-center text-sm text-[var(--v2-ink-500)] lg:px-5">
                       Нет расходов «{lineMeta.label}» за {FINANCE_MONTH_NAMES[month - 1]?.toLowerCase()}
                     </div>
                   ) : null}
@@ -1101,27 +1135,33 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                             startEditingExpense(e);
                           }
                         }}
-                        className={`group ${EXPENSE_COLS} cursor-pointer items-center px-5 py-3.5 transition hover:bg-[var(--v2-ink-50)]/60`}
+                        className={`group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3.5 transition hover:bg-[var(--v2-ink-50)]/60 lg:gap-0 lg:px-5 ${EXPENSE_COLS}`}
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div className="order-1 flex min-w-0 items-center gap-2.5 lg:order-none">
                           <span
                             className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold"
                             style={{ background: `${tint}1A`, color: tint }}
                           >
                             {e.employee_name[0]}
                           </span>
-                          <span className="v2-tight text-[14px] font-medium text-[var(--v2-ink-900)]">
+                          <span className="v2-tight text-[14px] font-medium text-[var(--v2-ink-900)] max-lg:truncate max-lg:text-[15px]">
                             {e.employee_name}
                           </span>
                         </div>
-                        <div className="v2-tight text-[13px] text-[var(--v2-ink-600)]">{e.employee_role}</div>
-                        <div className="v2-tnum v2-tight text-right text-[14px] font-semibold text-red-500">
+                        <div className="v2-tight order-3 text-[13px] text-[var(--v2-ink-600)] max-lg:pl-[38px] lg:order-none">
+                          {e.employee_role}
+                        </div>
+                        <div className="v2-tnum v2-tight order-2 text-right text-[14px] font-semibold text-red-500 max-lg:text-[16px] lg:order-none">
                           {formatRub(e.amount)}
                         </div>
-                        <div className="v2-tight pl-3 text-[13px] text-[var(--v2-ink-400)]">
+                        <div
+                          className={`v2-tight order-5 col-span-2 text-[13px] text-[var(--v2-ink-400)] max-lg:pl-[38px] lg:order-none lg:col-span-1 lg:pl-3 ${
+                            e.notes ? "" : "max-lg:hidden"
+                          }`}
+                        >
                           {e.notes || <Dash />}
                         </div>
-                        <div className="text-right">
+                        <div className="order-4 text-right lg:order-none">
                           <button
                             type="button"
                             onClick={(event) => {
@@ -1130,7 +1170,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                                 method: "DELETE",
                               }).then(reload);
                             }}
-                            className="v2-tight text-[12.5px] font-medium text-[var(--v2-ink-400)] opacity-0 transition hover:text-red-500 group-hover:opacity-100"
+                            className="v2-tight text-[12.5px] font-medium text-[var(--v2-ink-400)] transition hover:text-red-500 max-lg:-mr-2 max-lg:h-9 max-lg:px-2 max-lg:text-[13.5px] pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100"
                           >
                             Удалить
                           </button>
@@ -1142,15 +1182,15 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
 
                 {summary ? (
                   <div
-                    className={`${EXPENSE_COLS} items-center border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-5 py-3.5`}
+                    className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 border-t border-[var(--v2-ink-200)]/60 bg-[var(--v2-ink-50)]/50 px-4 py-3.5 lg:gap-0 lg:px-5 ${EXPENSE_COLS}`}
                   >
-                    <div className="v2-tight col-span-2 text-[13px] font-semibold text-[var(--v2-ink-900)]">
+                    <div className="v2-tight text-[13px] font-semibold text-[var(--v2-ink-900)] lg:col-span-2">
                       Итого расходов · {lineMeta.label}
                     </div>
-                    <div className="v2-tnum text-right text-[15px] font-semibold text-red-500">
+                    <div className="v2-tnum text-right text-[15px] font-semibold text-red-500 max-lg:text-[16px]">
                       {formatRub(summary.manualGeneralExpenses)}
                     </div>
-                    <div className="v2-tight col-span-2 text-right text-[12px] text-[var(--v2-ink-400)]">
+                    <div className="v2-tight col-span-2 text-[12px] text-[var(--v2-ink-400)] lg:text-right">
                       без учёта налога
                     </div>
                   </div>
@@ -1169,8 +1209,8 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
       </div>
 
       {newProjectOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]">
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/30 sm:items-center sm:p-4">
+          <div className="max-h-[100dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[var(--v2-shadow-pop)] sm:rounded-2xl sm:p-6">
             <h2 className="v2-tight text-lg font-semibold text-[var(--v2-ink-900)]">
               Новый проект · {lineMeta.label}
             </h2>
@@ -1184,7 +1224,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void handleCreateProject()}
                 placeholder="Название проекта"
-                className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+                className="h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm max-lg:h-11"
               />
             </label>
             <label className="mt-3 block">
@@ -1198,10 +1238,10 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                 onChange={(e) => setNewProjectAmount(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void handleCreateProject()}
                 placeholder="0"
-                className="v2-tnum h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm"
+                className="v2-tnum h-10 w-full rounded-xl border border-[var(--v2-ink-200)] px-3 text-sm max-lg:h-11"
               />
             </label>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 flex justify-end gap-2 max-sm:mt-5">
               <button
                 type="button"
                 onClick={() => {
@@ -1209,14 +1249,14 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                   setNewProjectName("");
                   setNewProjectAmount("");
                 }}
-                className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
+                className="h-9 rounded-xl px-4 text-sm text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] max-sm:h-11 max-sm:flex-1 max-sm:bg-[var(--v2-ink-100)]"
               >
                 Отмена
               </button>
               <button
                 type="button"
                 onClick={() => void handleCreateProject()}
-                className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-sm font-medium text-white"
+                className="h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-sm font-medium text-white max-sm:h-11 max-sm:flex-1"
               >
                 Создать
               </button>
@@ -1230,7 +1270,7 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
 
 function TotalNote({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="v2-tight flex items-baseline gap-1.5 border-t border-[var(--v2-ink-100)] pt-2 text-[12px] text-[var(--v2-ink-500)]">
+    <div className="v2-tight flex flex-wrap items-baseline gap-x-1.5 border-t border-[var(--v2-ink-100)] pt-2 text-[12px] text-[var(--v2-ink-500)]">
       <span>{label}:</span>
       <span className="v2-tnum font-semibold text-[var(--v2-ink-700)]">{value}</span>
       {hint ? <span className="text-[11px] text-[var(--v2-ink-400)]">· {hint}</span> : null}
@@ -1268,14 +1308,16 @@ function AnalyticsTab({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-4">
-        <h1 className="v2-tighter text-[34px] font-semibold leading-none text-[var(--v2-ink-900)]">Аналитика</h1>
+      <div className="flex flex-wrap items-center gap-3 lg:gap-4">
+        <h1 className="v2-tighter text-[26px] font-semibold leading-none text-[var(--v2-ink-900)] lg:text-[34px]">
+          Аналитика
+        </h1>
         <span className="v2-tight text-[13px] text-[var(--v2-ink-500)]">
           {lineLabel} · вся история{months.length ? ` · ${months.length} мес.` : ""}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard
           label="Выручка за всё время"
           value={formatRub(totals.actualRevenue)}
@@ -1315,7 +1357,7 @@ function AnalyticsTab({
         />
       </div>
 
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
           <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">Выручка по услугам</h3>
           <span className="v2-tight text-[12px] text-[var(--v2-ink-500)]">
@@ -1338,12 +1380,12 @@ function AnalyticsTab({
         </div>
       </Card>
 
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
           <h3 className="v2-tight text-[15px] font-semibold text-[var(--v2-ink-900)]">
             Выручка и прибыль по месяцам
           </h3>
-          <div className="flex items-center gap-4 text-[12px] text-[var(--v2-ink-500)]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[var(--v2-ink-500)]">
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-sm bg-[#3B6FF7]" />
               Выручка
@@ -1362,34 +1404,41 @@ function AnalyticsTab({
       </Card>
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-[1fr_1fr_1fr_1fr_0.7fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)]">
-          <div>Месяц</div>
-          <div className="text-right">Выручка</div>
-          <div className="text-right">Расходы</div>
-          <div className="text-right">Прибыль</div>
-          <div className="text-right">Проектов</div>
-        </div>
-        <div className="divide-y divide-[var(--v2-ink-100)]/70">
-          {[...months].reverse().map((m) => (
-            <div key={m.key} className="grid grid-cols-[1fr_1fr_1fr_1fr_0.7fr] items-center px-5 py-3 text-[13px]">
-              <div className="v2-tight font-medium text-[var(--v2-ink-900)]">
-                {FINANCE_MONTH_NAMES[m.month - 1]} {m.year}
-              </div>
-              <div className="v2-tnum text-right text-[var(--v2-ink-800)]">{formatRub(m.actualRevenue)}</div>
-              <div className="v2-tnum text-right text-red-500">{formatRub(m.totalExpenses)}</div>
-              <div
-                className={`v2-tnum text-right font-semibold ${
-                  m.profit >= 0 ? "text-emerald-600" : "text-red-500"
-                }`}
-              >
-                {formatRub(m.profit)}
-              </div>
-              <div className="v2-tnum text-right text-[var(--v2-ink-500)]">{m.projectCount}</div>
+        <div className="overflow-x-auto overscroll-x-contain">
+          <div className="max-lg:min-w-[560px]">
+            <div className="grid grid-cols-[1fr_1fr_1fr_1fr_0.7fr] border-b border-[var(--v2-ink-100)]/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--v2-ink-400)] max-lg:pl-0">
+              <div className="max-lg:sticky max-lg:left-0 max-lg:z-[1] max-lg:bg-white max-lg:pl-4">Месяц</div>
+              <div className="text-right">Выручка</div>
+              <div className="text-right">Расходы</div>
+              <div className="text-right">Прибыль</div>
+              <div className="text-right">Проектов</div>
             </div>
-          ))}
-          {months.length === 0 ? (
-            <div className="px-5 py-10 text-center text-sm text-[var(--v2-ink-500)]">Пока нет истории</div>
-          ) : null}
+            <div className="divide-y divide-[var(--v2-ink-100)]/70">
+              {[...months].reverse().map((m) => (
+                <div
+                  key={m.key}
+                  className="grid grid-cols-[1fr_1fr_1fr_1fr_0.7fr] items-center px-5 py-3 text-[13px] max-lg:pl-0"
+                >
+                  <div className="v2-tight font-medium text-[var(--v2-ink-900)] max-lg:sticky max-lg:left-0 max-lg:z-[1] max-lg:bg-white max-lg:py-1 max-lg:pl-4">
+                    {FINANCE_MONTH_NAMES[m.month - 1]} {m.year}
+                  </div>
+                  <div className="v2-tnum text-right text-[var(--v2-ink-800)]">{formatRub(m.actualRevenue)}</div>
+                  <div className="v2-tnum text-right text-red-500">{formatRub(m.totalExpenses)}</div>
+                  <div
+                    className={`v2-tnum text-right font-semibold ${
+                      m.profit >= 0 ? "text-emerald-600" : "text-red-500"
+                    }`}
+                  >
+                    {formatRub(m.profit)}
+                  </div>
+                  <div className="v2-tnum text-right text-[var(--v2-ink-500)]">{m.projectCount}</div>
+                </div>
+              ))}
+              {months.length === 0 ? (
+                <div className="px-5 py-10 text-center text-sm text-[var(--v2-ink-500)]">Пока нет истории</div>
+              ) : null}
+            </div>
+          </div>
         </div>
       </Card>
     </div>

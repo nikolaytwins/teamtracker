@@ -1,9 +1,84 @@
 "use client";
 
 import { fmtDuration, formatDueLabel } from "@/lib/v2/format";
-import type { V2TaskWithMeta } from "@/lib/v2/types";
+import { BUCKET_LABELS, HOME_DROP_BUCKETS } from "@/lib/v2/tasks/task-buckets";
+import type { V2TaskBucket, V2TaskWithMeta } from "@/lib/v2/types";
 import { PRIORITY_META, V2Icons } from "@/components/v2/ui/icons";
 import { IconBtn, PriorityDot, ProjectChip, TaskCheckbox, TimerButton } from "@/components/v2/ui/primitives";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+
+type MenuPos = { top: number; right: number };
+
+function MoveMenu({
+  title,
+  currentBucket,
+  pos,
+  onPick,
+  onClose,
+}: {
+  title: string;
+  currentBucket?: V2TaskBucket;
+  pos: MenuPos;
+  onPick: (bucket: V2TaskBucket) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const host = typeof document !== "undefined" ? (document.querySelector(".v2-root") ?? document.body) : null;
+  if (!host) return null;
+
+  return createPortal(
+    <div
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape") e.stopPropagation();
+      }}
+    >
+      <div className="fixed inset-0 z-[80] bg-black/30 lg:bg-transparent" onClick={onClose} aria-hidden />
+      <div
+        role="menu"
+        className="fixed inset-x-2 bottom-[calc(var(--v2-mobnav-h,0px)+8px)] z-[81] max-h-[min(70dvh,420px)] overflow-y-auto rounded-2xl border border-[var(--v2-ink-100)] bg-white p-2 shadow-[var(--v2-shadow-pop)] lg:inset-x-auto lg:bottom-auto lg:right-[var(--mm-right)] lg:top-[var(--mm-top)] lg:w-[220px] lg:rounded-xl lg:p-1"
+        style={{ ["--mm-top" as string]: `${pos.top}px`, ["--mm-right" as string]: `${pos.right}px` } as CSSProperties}
+      >
+        <div className="px-3 pb-2 pt-1.5 lg:pb-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--v2-ink-400)]">Перенести</div>
+          <div className="v2-tight mt-0.5 truncate text-[14px] font-medium text-[var(--v2-ink-900)] lg:hidden">{title}</div>
+        </div>
+        {HOME_DROP_BUCKETS.map((bucket) => (
+          <button
+            key={bucket}
+            type="button"
+            role="menuitem"
+            disabled={bucket === currentBucket}
+            onClick={() => {
+              onPick(bucket);
+              onClose();
+            }}
+            className="v2-tight flex h-12 w-full items-center rounded-xl px-3 text-left text-[15px] text-[var(--v2-ink-800)] transition hover:bg-[var(--v2-ink-50)] active:bg-[var(--v2-ink-100)] disabled:text-[var(--v2-ink-300)] lg:h-9 lg:rounded-lg lg:text-[13px]"
+          >
+            {BUCKET_LABELS[bucket]}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={onClose}
+          className="v2-tight mt-1 flex h-12 w-full items-center justify-center rounded-xl bg-[var(--v2-ink-50)] text-[15px] font-medium text-[var(--v2-ink-600)] lg:hidden"
+        >
+          Отмена
+        </button>
+      </div>
+    </div>,
+    host
+  );
+}
 
 export function TaskRow({
   task,
@@ -12,6 +87,8 @@ export function TaskRow({
   onToggleRun,
   onToggleDone,
   onOpen,
+  currentBucket,
+  onMoveToBucket,
   draggable = false,
   isDragging = false,
   onDragStart,
@@ -23,11 +100,15 @@ export function TaskRow({
   onToggleRun: (id: string) => void;
   onToggleDone: (id: string) => void;
   onOpen: (id: string) => void;
+  currentBucket?: V2TaskBucket;
+  onMoveToBucket?: (bucket: V2TaskBucket) => void;
   draggable?: boolean;
   isDragging?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
 }) {
+  const [menuPos, setMenuPos] = useState<MenuPos | null>(null);
+  const moreRef = useRef<HTMLSpanElement>(null);
   const completed = !!task.completed_at;
   const live = isRunning ? elapsed : 0;
   const totalOnTask = task.logged_seconds + live;
@@ -57,7 +138,7 @@ export function TaskRow({
           onOpen(task.id);
         }
       }}
-      className={`group relative flex cursor-pointer items-center gap-4 py-3 pl-4 pr-3 transition-colors duration-200 ${
+      className={`group relative flex cursor-pointer items-center gap-3 py-3 pl-3 pr-2 transition-colors sm:gap-4 sm:pl-4 sm:pr-3 duration-200 ${
         isRunning ? "bg-[var(--v2-brand-50)]/50" : "hover:bg-[var(--v2-ink-50)]/70"
       } ${completed ? "opacity-60" : ""} ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${
         isDragging ? "opacity-40" : ""
@@ -71,19 +152,26 @@ export function TaskRow({
         style={{ background: isRunning ? "#3B6FF7" : priority.dot }}
       />
 
-      <span onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+      <span
+        className="-m-2.5 inline-flex shrink-0 p-2.5 sm:m-0 sm:p-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.target === e.currentTarget) onToggleDone(task.id);
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <TaskCheckbox checked={completed} onChange={() => onToggleDone(task.id)} />
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-sm:flex-wrap max-sm:gap-y-1">
           {isMeeting ? (
-            <span className="inline-flex items-center gap-1 rounded-md border border-[var(--v2-brand-100)] bg-[var(--v2-brand-50)] px-1.5 py-[2px] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-brand-700)]">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--v2-brand-100)] bg-[var(--v2-brand-50)] px-1.5 py-[2px] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-brand-700)]">
               Встреча
             </span>
           ) : null}
           <h4
-            className={`v2-tight truncate text-[14.5px] font-medium text-[var(--v2-ink-900)] ${
+            className={`v2-tight min-w-0 text-[14.5px] font-medium max-sm:line-clamp-2 max-sm:break-words sm:truncate text-[var(--v2-ink-900)] ${
               completed ? "text-[var(--v2-ink-500)] line-through" : ""
             }`}
           >
@@ -120,11 +208,37 @@ export function TaskRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
         <TimerButton running={isRunning} onClick={() => onToggleRun(task.id)} />
-        <IconBtn title="Ещё" className="opacity-0 transition group-hover:opacity-100">
-          <V2Icons.more className="h-4 w-4" />
-        </IconBtn>
+        <span ref={moreRef} className="inline-flex">
+          <IconBtn
+            title={onMoveToBucket ? "Перенести" : "Ещё"}
+            className={`transition ${menuPos ? "opacity-100" : "opacity-0 group-hover:opacity-100"} ${
+              onMoveToBucket ? "max-lg:h-10 max-lg:w-10 max-lg:opacity-100 [@media(hover:none)]:opacity-100" : "max-lg:hidden"
+            }`}
+            onClick={
+              onMoveToBucket
+                ? () => {
+                    const rect = moreRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+                    const top = rect.bottom + 6 + 260 > window.innerHeight ? Math.max(8, rect.top - 6 - 260) : rect.bottom + 6;
+                    setMenuPos({ top, right: Math.max(8, window.innerWidth - rect.right) });
+                  }
+                : undefined
+            }
+          >
+            <V2Icons.more className="h-4 w-4" />
+          </IconBtn>
+        </span>
+        {menuPos && onMoveToBucket ? (
+          <MoveMenu
+            title={task.title}
+            currentBucket={currentBucket}
+            pos={menuPos}
+            onPick={onMoveToBucket}
+            onClose={() => setMenuPos(null)}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -142,7 +256,7 @@ function TaskRowMeta({
   priority: V2TaskWithMeta["priority"];
 }) {
   return (
-    <div className="mt-1.5 flex items-center gap-2.5 text-[12px] text-[var(--v2-ink-500)]">
+    <div className="mt-1.5 flex items-center gap-2.5 text-[12px] text-[var(--v2-ink-500)] max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-1">
       {task.project_name ? (
         <ProjectChip
           name={task.project_name}

@@ -32,19 +32,19 @@ function SectionHeader({
   onToggle: () => void;
 }) {
   return (
-    <button type="button" onClick={onToggle} className="group flex w-full items-center gap-3 py-3">
+    <button type="button" onClick={onToggle} className="group flex min-h-11 w-full min-w-0 items-center gap-2.5 py-3 text-left sm:gap-3">
       <V2Icons.chev className={`h-4 w-4 text-[var(--v2-ink-400)] transition-transform ${open ? "" : "-rotate-90"}`} />
-      <span className="inline-flex items-center gap-2">
+      <span className="inline-flex shrink-0 items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
         <h3 className="v2-tight text-[14px] font-semibold text-[var(--v2-ink-900)]">{title}</h3>
       </span>
-      {subtitle ? <span className="text-[12.5px] text-[var(--v2-ink-500)]">{subtitle}</span> : null}
-      <span className="ml-auto flex items-center gap-3 text-[12px] text-[var(--v2-ink-500)]">
+      {subtitle ? <span className="truncate text-[12.5px] text-[var(--v2-ink-500)]">{subtitle}</span> : null}
+      <span className="ml-auto flex shrink-0 items-center gap-3 text-[12px] text-[var(--v2-ink-500)]">
         <span>
           <span className="v2-tnum font-medium text-[var(--v2-ink-700)]">{count}</span> {pluralTasks(count)}
         </span>
-        <span className="text-[var(--v2-ink-300)]">·</span>
-        <span className="inline-flex items-center gap-1">
+        <span className="text-[var(--v2-ink-300)] max-sm:hidden">·</span>
+        <span className="inline-flex items-center gap-1 max-sm:hidden">
           <V2Icons.clock className="h-[13px] w-[13px]" />
           <span className="v2-tnum font-medium text-[var(--v2-ink-700)]">{fmtDuration(hours)}</span> план
         </span>
@@ -64,6 +64,7 @@ export function TaskSection({
   onToggleRun,
   onToggleDone,
   onOpenTask,
+  onMoveToBucket,
   hideWhenEmpty = false,
   emptyLabel = "Задач нет",
   dragId,
@@ -83,6 +84,7 @@ export function TaskSection({
   onToggleRun: (id: string) => void;
   onToggleDone: (id: string) => void;
   onOpenTask: (id: string) => void;
+  onMoveToBucket?: (id: string, bucket: V2TaskBucket) => void;
   hideWhenEmpty?: boolean;
   emptyLabel?: string;
   dragId: string | null;
@@ -138,6 +140,8 @@ export function TaskSection({
                     onToggleRun={onToggleRun}
                     onToggleDone={onToggleDone}
                     onOpen={onOpenTask}
+                    currentBucket={bucket}
+                    onMoveToBucket={onMoveToBucket && isHomeTaskDraggable(t) ? (target) => onMoveToBucket(t.id, target) : undefined}
                     draggable={isHomeTaskDraggable(t)}
                     isDragging={dragId === t.id}
                     onDragStart={() => onDragStart(t.id)}

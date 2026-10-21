@@ -63,7 +63,16 @@ export function MoscowPage({ title, body }: { title: string; body: string }) {
         </header>
 
         <article className="msk-article msk-prose">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              table: ({ node: _node, ...props }) => (
+                <div className="msk-table-scroll">
+                  <table {...props} />
+                </div>
+              ),
+            }}
+          >
             {preserveSourceLineBreaks(body)}
           </ReactMarkdown>
         </article>

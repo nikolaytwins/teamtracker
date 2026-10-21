@@ -109,7 +109,9 @@ function MonthNav({
   return (
     <div
       className={`flex items-center ${
-        dark ? "w-full gap-1.5" : "ml-auto h-10 gap-0.5 rounded-xl bg-[var(--v2-ink-900)] px-1 shadow-[var(--v2-shadow-card)]"
+        dark
+          ? "w-full gap-1.5"
+          : "ml-auto h-10 gap-0.5 rounded-xl bg-[var(--v2-ink-900)] px-1 shadow-[var(--v2-shadow-card)] max-sm:ml-0 max-sm:w-full"
       }`}
     >
       <button
@@ -130,8 +132,8 @@ function MonthNav({
         onChange={(e) => onPick(e.target.value)}
         className={`v2-tight cursor-pointer appearance-none bg-transparent text-center font-semibold outline-none ${
           dark
-            ? "h-9 min-w-[10.5rem] flex-1 text-[15px] text-white"
-            : "h-8 min-w-[11rem] text-[13.5px] text-white"
+            ? "h-9 min-w-[10.5rem] flex-1 text-[15px] text-white max-lg:text-[16px]"
+            : "h-8 min-w-[11rem] text-[13.5px] text-white max-lg:min-w-0 max-lg:flex-1 max-lg:text-[16px]"
         }`}
       >
         <option value="all" className="text-[var(--v2-ink-900)]">
@@ -540,28 +542,28 @@ export function PersonalObservationsClient() {
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6">
+    <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-24 pt-6 max-lg:px-3 max-lg:pb-8 max-lg:pt-4 sm:max-lg:px-6">
       <div className="mx-auto max-w-[1240px]">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-6 max-lg:mb-4 max-lg:gap-3">
           <div className="min-w-0 max-w-[62ch]">
-            <h1 className="v2-tighter text-[42px] font-semibold leading-[1.02] text-[var(--v2-ink-900)]">
+            <h1 className="v2-tighter text-[42px] font-semibold leading-[1.02] text-[var(--v2-ink-900)] max-sm:text-[32px]">
               Дневник
             </h1>
-            <p className="v2-tight mt-2.5 text-[14.5px] text-[var(--v2-ink-500)]" style={{ textWrap: "pretty" }}>
+            <p className="v2-tight mt-2.5 text-[14.5px] text-[var(--v2-ink-500)] max-sm:mt-1.5 max-sm:text-[14px]" style={{ textWrap: "pretty" }}>
               {tab === "entries"
                 ? "Не выводы о всей жизни. Просто то, что реально произошло и может оказаться значимым."
                 : "Месячные выводы — что стало яснее и что меняет стратегию. Лента по месяцам."}
             </p>
           </div>
           {tab === "entries" ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <div className="flex h-10 w-[210px] items-center gap-2 rounded-xl bg-white px-3 shadow-[var(--v2-shadow-card)]">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 max-sm:w-full">
+            <div className="flex h-10 w-[210px] items-center gap-2 rounded-xl bg-white px-3 shadow-[var(--v2-shadow-card)] max-sm:min-w-0 max-sm:flex-1">
               <V2Icons.search className="h-[15px] w-[15px] shrink-0 text-[var(--v2-ink-400)]" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Поиск"
-                className="v2-tight min-w-0 flex-1 bg-transparent text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+                className="v2-tight min-w-0 flex-1 bg-transparent text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)] max-lg:text-[16px]"
               />
             </div>
             <button
@@ -585,12 +587,12 @@ export function PersonalObservationsClient() {
           ) : null}
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 rounded-xl bg-white p-1 shadow-[var(--v2-shadow-card)]">
+        <div className="mb-6 flex flex-wrap items-center gap-2 max-lg:mb-4">
+          <div className="flex items-center gap-1 rounded-xl bg-white p-1 shadow-[var(--v2-shadow-card)] max-sm:w-full max-sm:[&>button]:flex-1">
             <button
               type="button"
               onClick={() => setTab("entries")}
-              className={`v2-tight h-8 rounded-lg px-3.5 text-[13px] font-medium transition ${
+              className={`v2-tight h-8 rounded-lg px-3.5 text-[13px] font-medium transition max-lg:h-10 max-lg:text-[14px] ${
                 tab === "entries"
                   ? "bg-[var(--v2-ink-900)] text-white"
                   : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-900)]"
@@ -601,7 +603,7 @@ export function PersonalObservationsClient() {
             <button
               type="button"
               onClick={() => setTab("conclusions")}
-              className={`v2-tight h-8 rounded-lg px-3.5 text-[13px] font-medium transition ${
+              className={`v2-tight h-8 rounded-lg px-3.5 text-[13px] font-medium transition max-lg:h-10 max-lg:text-[14px] ${
                 tab === "conclusions"
                   ? "bg-[var(--v2-ink-900)] text-white"
                   : "text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-900)]"
@@ -630,11 +632,11 @@ export function PersonalObservationsClient() {
         ) : (
           <>
         <div className="mb-6 flex flex-wrap items-center gap-2">
-          <div className="relative">
+          <div className="relative max-sm:w-full">
             <select
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              className="v2-tight h-8 cursor-pointer appearance-none rounded-full bg-white pl-3 pr-8 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] outline-none"
+              className="v2-tight h-8 cursor-pointer appearance-none rounded-full bg-white pl-3 pr-8 text-[12.5px] font-medium text-[var(--v2-ink-700)] shadow-[var(--v2-shadow-card)] outline-none max-lg:h-10 max-lg:text-[16px] max-sm:w-full"
             >
               <option value="all">Проект: все</option>
               {Object.entries(OBSERVATION_LINKS).map(([k, v]) => (
@@ -657,7 +659,7 @@ export function PersonalObservationsClient() {
           />
         </div>
 
-        <div className="grid items-start gap-6" style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}>
+        <div className="grid grid-cols-1 items-start gap-6 max-lg:gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="flex min-w-0 flex-col gap-4">
               <Composer
                 knownTags={knownTags}
@@ -668,7 +670,7 @@ export function PersonalObservationsClient() {
               {loading && !board ? (
                 <p className="v2-tight px-1 text-[14px] text-[var(--v2-ink-500)]">Загрузка…</p>
               ) : (
-              <section className="rounded-2xl bg-white px-7 py-3 shadow-[var(--v2-shadow-soft)]">
+              <section className="rounded-2xl bg-white px-7 py-3 shadow-[var(--v2-shadow-soft)] max-sm:px-4 max-sm:py-1">
               <div className="relative">
                 <span className="absolute bottom-8 left-[4.5px] top-8 w-px bg-[var(--v2-ink-200)]" />
                 <div className="relative divide-y divide-[var(--v2-ink-100)]">
@@ -680,24 +682,24 @@ export function PersonalObservationsClient() {
                     const shown = open ? paras : paras.slice(0, 1);
                     const editing = editingId === it.id;
                     return (
-                      <article key={it.id} className="relative py-7 pl-7 pr-1" style={{ animationDelay: `${Math.min(i, 10) * 28}ms` }}>
-                        <span className="absolute left-0 top-[34px] h-2.5 w-2.5 rounded-full bg-[var(--v2-ink-400)] ring-4 ring-white" />
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)]">
+                      <article key={it.id} className="relative py-7 pl-7 pr-1 max-sm:py-5 max-sm:pl-5 max-sm:pr-0" style={{ animationDelay: `${Math.min(i, 10) * 28}ms` }}>
+                        <span className="absolute left-0 top-[34px] h-2.5 w-2.5 rounded-full bg-[var(--v2-ink-400)] ring-4 ring-white max-sm:top-[35px] sm:max-lg:top-[43px]" />
+                        <div className="flex flex-wrap items-center gap-3 max-lg:gap-x-1 max-lg:gap-y-0">
+                          <span className="v2-tight text-[11.5px] text-[var(--v2-ink-400)] max-lg:text-[12.5px]">
                             {formatDateFull(it.observed_at)}
                           </span>
-                          <div className="ml-auto flex items-center gap-3">
+                          <div className="ml-auto flex items-center gap-3 max-lg:-mr-2 max-lg:gap-0">
                             <button
                               type="button"
                               onClick={() => setEditingId(editing ? null : it.id)}
-                              className="v2-tight text-[11.5px] text-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)]"
+                              className="v2-tight text-[11.5px] text-[var(--v2-ink-400)] hover:text-[var(--v2-ink-900)] max-lg:min-h-10 max-lg:px-2 max-lg:text-[13px]"
                             >
                               {editing ? "Закрыть" : "Редактировать"}
                             </button>
                             <button
                               type="button"
                               onClick={() => void remove(it.id)}
-                              className="v2-tight text-[11.5px] text-[var(--v2-ink-300)] hover:text-red-600"
+                              className="v2-tight text-[11.5px] text-[var(--v2-ink-300)] hover:text-red-600 max-lg:min-h-10 max-lg:px-2 max-lg:text-[13px] max-lg:text-[var(--v2-ink-400)]"
                             >
                               Удалить
                             </button>
@@ -753,7 +755,7 @@ export function PersonalObservationsClient() {
                                 onClick={() =>
                                   setOpenIds((p) => (p.includes(it.id) ? p.filter((x) => x !== it.id) : [...p, it.id]))
                                 }
-                                className="v2-tight mt-2.5 text-[12.5px] font-medium text-[var(--v2-brand-700)] hover:text-[var(--v2-brand-800)]"
+                                className="v2-tight mt-2.5 text-[12.5px] font-medium text-[var(--v2-brand-700)] hover:text-[var(--v2-brand-800)] max-lg:mt-1 max-lg:min-h-10 max-lg:text-[14px]"
                               >
                                 {open ? "Свернуть" : "Читать дальше"}
                               </button>
@@ -769,7 +771,7 @@ export function PersonalObservationsClient() {
                                   key={tg}
                                   type="button"
                                   onClick={() => setTag(tag === tg ? null : tg)}
-                                  className={`v2-tight inline-flex h-[26px] items-center gap-1 rounded-md px-2 text-[11.5px] font-medium transition ${
+                                  className={`v2-tight inline-flex h-[26px] items-center gap-1 rounded-md px-2 text-[11.5px] font-medium transition max-lg:h-8 max-lg:px-2.5 max-lg:text-[13px] ${
                                     tag === tg
                                       ? "bg-[var(--v2-ink-900)] text-white"
                                       : "bg-[var(--v2-ink-100)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-200)]/70 hover:text-[var(--v2-ink-900)]"
@@ -802,7 +804,7 @@ export function PersonalObservationsClient() {
               )}
             </div>
 
-            <div className="sticky top-4 flex flex-col gap-5">
+            <div className="flex flex-col gap-5 max-lg:gap-4 lg:sticky lg:top-4">
               <section className="rounded-2xl bg-white p-5 shadow-[var(--v2-shadow-card)]">
                 <div className="flex items-center gap-2">
                   <IcTag className="h-[15px] w-[15px] text-[var(--v2-ink-400)]" />
@@ -811,7 +813,7 @@ export function PersonalObservationsClient() {
                     <button
                       type="button"
                       onClick={() => setTag(null)}
-                      className="v2-tight ml-auto text-[11.5px] text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-900)]"
+                      className="v2-tight ml-auto text-[11.5px] text-[var(--v2-ink-500)] hover:text-[var(--v2-ink-900)] max-lg:-my-2 max-lg:min-h-9 max-lg:px-2 max-lg:text-[13px]"
                     >
                       сбросить
                     </button>
@@ -827,7 +829,7 @@ export function PersonalObservationsClient() {
                       return (
                         <div
                           key={name}
-                          className={`-mx-1 flex h-8 items-center gap-0.5 rounded-lg ${
+                          className={`-mx-1 flex h-8 items-center gap-0.5 rounded-lg max-lg:h-10 ${
                             active ? "bg-[var(--v2-ink-900)] text-white" : "text-[var(--v2-ink-700)] hover:bg-[var(--v2-ink-50)]"
                           }`}
                         >
@@ -846,7 +848,7 @@ export function PersonalObservationsClient() {
                             type="button"
                             title="Удалить тег"
                             onClick={() => setTagToDelete(name)}
-                            className={`mr-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                            className={`mr-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md max-lg:h-9 max-lg:w-9 ${
                               active
                                 ? "text-white/50 hover:bg-white/10 hover:text-white"
                                 : "text-[var(--v2-ink-300)] hover:bg-white hover:text-red-600"
@@ -1021,7 +1023,7 @@ function Composer({
   };
 
   return (
-    <section className="rounded-2xl bg-white px-5 py-4 shadow-[var(--v2-shadow-soft)]">
+    <section className="rounded-2xl bg-white px-5 py-4 shadow-[var(--v2-shadow-soft)] max-sm:px-4">
       <textarea
         ref={areaRef}
         value={text}
@@ -1037,7 +1039,7 @@ function Composer({
             void submit();
           }
         }}
-        className="v2-tight w-full resize-none bg-transparent text-[15.5px] leading-[1.55] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+        className="v2-tight w-full resize-none bg-transparent text-[15.5px] leading-[1.55] max-lg:text-[16px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
         style={{ minHeight: 52 }}
       />
       {catalog.length ? (
@@ -1049,7 +1051,7 @@ function Composer({
                 key={t}
                 type="button"
                 onClick={() => toggleTag(t)}
-                className={`v2-tight inline-flex h-8 items-center rounded-lg px-2 text-[12px] font-medium transition ${
+                className={`v2-tight inline-flex h-8 items-center rounded-lg px-2 text-[12px] font-medium transition max-lg:h-9 max-lg:px-2.5 max-lg:text-[13px] ${
                   on ? "bg-[var(--v2-ink-900)] text-white" : "bg-[var(--v2-ink-50)] text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)]"
                 }`}
               >
@@ -1060,7 +1062,7 @@ function Composer({
         </div>
       ) : null}
       <div className={`flex flex-wrap items-center gap-2 ${catalog.length ? "mt-2.5" : "mt-3 border-t border-[var(--v2-ink-100)] pt-3"}`}>
-        <div className="flex min-h-[36px] min-w-[180px] flex-1 items-center rounded-xl bg-[var(--v2-ink-50)] px-2.5 py-1.5">
+        <div className="flex min-h-[36px] min-w-[180px] flex-1 items-center rounded-xl bg-[var(--v2-ink-50)] px-2.5 py-1.5 max-lg:min-h-10 max-sm:min-w-0">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -1073,7 +1075,7 @@ function Composer({
               }
             }}
             placeholder="Новый тег… можно с эмодзи"
-            className="v2-tight h-6 min-w-[80px] flex-1 bg-transparent text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+            className="v2-tight h-6 min-w-[80px] flex-1 bg-transparent text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)] max-lg:h-7 max-lg:text-[16px]"
           />
         </div>
         <button
@@ -1081,14 +1083,14 @@ function Composer({
           onClick={() => {
             if (draft.trim()) addTag(draft);
           }}
-          className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-800)]"
+          className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-800)] max-lg:h-10 max-lg:text-[14px]"
         >
           + тег
         </button>
         <button
           type="button"
           onClick={() => setMore((v) => !v)}
-          className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-800)]"
+          className="v2-tight h-9 rounded-xl px-3 text-[12.5px] font-medium text-[var(--v2-ink-500)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-800)] max-lg:h-10 max-lg:text-[14px]"
         >
           {more ? "Свернуть" : "Ещё"}
         </button>
@@ -1096,7 +1098,7 @@ function Composer({
           type="button"
           disabled={!text.trim() || saving}
           onClick={() => void submit()}
-          className="v2-tight ml-auto h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-35 disabled:hover:bg-[var(--v2-ink-900)]"
+          className="v2-tight ml-auto h-9 rounded-xl bg-[var(--v2-ink-900)] px-4 text-[13px] font-medium text-white transition hover:bg-[var(--v2-ink-700)] disabled:opacity-35 disabled:hover:bg-[var(--v2-ink-900)] max-lg:h-10 max-lg:text-[14px] max-sm:h-11 max-sm:w-full"
         >
           {saving ? "…" : submitLabel}
         </button>
@@ -1107,13 +1109,13 @@ function Composer({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Заголовок — необязательно"
-            className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-50)] px-3 text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)] sm:col-span-2"
+            className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-50)] px-3 text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)] sm:col-span-2 max-lg:h-11 max-lg:text-[16px]"
           />
           <div className="relative">
             <select
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              className="v2-tight h-9 w-full cursor-pointer appearance-none rounded-xl bg-[var(--v2-ink-50)] pl-3 pr-8 text-[13px] text-[var(--v2-ink-800)] outline-none"
+              className="v2-tight h-9 w-full cursor-pointer appearance-none rounded-xl bg-[var(--v2-ink-50)] pl-3 pr-8 text-[13px] text-[var(--v2-ink-800)] outline-none max-lg:h-11 max-lg:text-[16px]"
             >
               <option value="">Без связи</option>
               {Object.entries(OBSERVATION_LINKS).map(([k, v]) => (
@@ -1128,7 +1130,7 @@ function Composer({
             value={why}
             onChange={(e) => setWhy(e.target.value)}
             placeholder="Почему интересно"
-            className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-50)] px-3 text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+            className="v2-tight h-9 rounded-xl bg-[var(--v2-ink-50)] px-3 text-[13px] text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)] max-lg:h-11 max-lg:text-[16px]"
           />
         </div>
       ) : null}
@@ -1150,10 +1152,10 @@ function TagDeleteModal({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-6 lg:z-50 max-sm:items-end max-sm:p-0" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--v2-ink-900)]/30 backdrop-blur-sm" />
       <div
-        className="relative w-[420px] max-w-full rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]"
+        className="relative w-[420px] max-w-full rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)] max-sm:w-full max-sm:rounded-b-none max-sm:px-5 max-sm:pb-[calc(20px+env(safe-area-inset-bottom))] max-sm:[&_button]:flex-1"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="v2-tight text-[18px] font-semibold text-[var(--v2-ink-900)]">Удалить тег?</h3>
@@ -1198,10 +1200,10 @@ function ExportModal({
   count: number;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-6 lg:z-50 max-sm:items-end max-sm:p-0" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--v2-ink-900)]/30 backdrop-blur-sm" />
       <div
-        className="relative w-[440px] max-w-full rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)]"
+        className="relative w-[440px] max-w-full rounded-2xl bg-white p-6 shadow-[var(--v2-shadow-pop)] max-sm:w-full max-sm:rounded-b-none max-sm:px-5 max-sm:pb-[calc(20px+env(safe-area-inset-bottom))]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
@@ -1214,7 +1216,7 @@ function ExportModal({
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)]"
+            className="ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] max-lg:h-10 max-lg:w-10"
           >
             <IcClose className="h-4 w-4" />
           </button>

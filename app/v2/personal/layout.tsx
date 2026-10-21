@@ -225,15 +225,16 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="shrink-0 border-b border-[var(--v2-ink-100)] bg-white px-6">
-        <div className="flex gap-1 py-2">
+      <div className="sticky top-0 z-30 shrink-0 border-b border-[var(--v2-ink-100)] bg-white/95 backdrop-blur lg:static lg:bg-white lg:px-6 lg:backdrop-blur-none">
+        <div className="v2-no-scrollbar flex snap-x gap-1 overflow-x-auto px-3 py-2 lg:overflow-visible lg:px-0">
           {tabs.map((tab) => {
             const active = tab.match(pathname);
             return (
               <Link
                 key={tab.href}
                 href={appPath(tab.href)}
-                className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition ${
+                ref={active ? (node) => node?.scrollIntoView({ block: "nearest", inline: "center" }) : undefined}
+                className={`shrink-0 snap-start whitespace-nowrap rounded-lg px-3.5 py-2.5 text-[14px] font-medium transition lg:px-3 lg:py-1.5 lg:text-[13px] ${
                   active
                     ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)]"
                     : "text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-ink-900)]"

@@ -470,3 +470,128 @@
     gap: 8px;
   }
 }
+
+@media (max-width: 640px) {
+  .tt-gm-main {
+    padding: 12px 12px 48px;
+    gap: 56px;
+    overflow-wrap: break-word;
+  }
+  .tt-gm-top {
+    gap: 8px;
+  }
+  .tt-gm-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+  .tt-gm-banner {
+    border-radius: 18px;
+  }
+  .tt-gm-nav {
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin: 0 -12px;
+    padding: 0 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tt-gm-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .tt-gm-nav button {
+    flex: none;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: var(--gm-card);
+    white-space: nowrap;
+  }
+  .tt-gm-nav button.on {
+    background: #ece8fb;
+  }
+  .tt-gm-hero h1 {
+    font-size: clamp(26px, 8vw, 34px);
+  }
+  .tt-gm-hero p {
+    margin-top: 18px;
+  }
+  .tt-gm-sec {
+    scroll-margin-top: 24px;
+  }
+  .tt-gm-sec h2 {
+    font-size: 24px;
+  }
+  .tt-gm-sub {
+    margin-top: 36px;
+  }
+  .tt-gm-steps article,
+  .tt-gm-pillars article,
+  .tt-gm-rules article,
+  .tt-gm-practice article,
+  .tt-gm-formula,
+  .tt-gm-pray,
+  .tt-gm-code,
+  .tt-gm-swap > div {
+    padding: 20px 18px;
+    border-radius: 18px;
+  }
+  .tt-gm-steps h3,
+  .tt-gm-rules h3,
+  .tt-gm-practice h3,
+  .tt-gm-env h3 {
+    font-size: 18px;
+  }
+  .tt-gm-steps p,
+  .tt-gm-pillars p,
+  .tt-gm-rules p,
+  .tt-gm-practice p,
+  .tt-gm-env p,
+  .tt-gm-list li,
+  .tt-gm-swap p,
+  .tt-gm-tr div:last-child {
+    font-size: 16px;
+  }
+  .tt-gm-code p {
+    font-size: 17px;
+  }
+  .tt-gm-code p.last {
+    font-size: 19px;
+  }
+  .tt-gm-week {
+    padding: 4px 4px 16px;
+    border-radius: 18px;
+  }
+  .tt-gm-week-head {
+    padding: 16px 14px 0;
+  }
+  .tt-gm-week-bar {
+    margin: 14px;
+  }
+  .tt-gm-week > button {
+    width: calc(100% - 8px);
+    margin: 0 4px;
+    min-height: 48px;
+  }
+  .tt-gm-check {
+    width: 22px;
+    height: 22px;
+    margin-top: 0;
+  }
+  .tt-gm-hint {
+    padding: 8px 14px 0;
+  }
+  .tt-gm-tr {
+    padding: 14px 16px;
+  }
+  .tt-gm-env article,
+  .tt-gm-table {
+    border-radius: 18px;
+  }
+  .tt-gm-env div {
+    padding: 16px 18px 18px;
+  }
+  .tt-gm-skills div {
+    padding: 16px 18px;
+  }
+}

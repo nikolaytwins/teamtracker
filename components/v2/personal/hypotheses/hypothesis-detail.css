@@ -158,4 +158,55 @@
 .hypd .nf{padding:60px;text-align:center}@media(max-width:1300px){.hypd .grid{grid-template-columns:1fr}}
 @media(max-width:1200px){.hypd .hero{grid-template-columns:1fr}.hypd .hero-img{display:none}}
 @media(max-width:1000px){.hypd .page{padding:20px 16px 100px}.hypd .h-meta{grid-template-columns:1fr}.hypd .h1{font-size:32px}.hypd .x,.hypd .ia{opacity:1}.hypd .econ-pair{grid-template-columns:1fr}.hypd .econ-rest{flex-direction:column}}
+@media(hover:none){.hypd .x,.hypd .ia{opacity:1}}
+@media(max-width:1023px){
+.hypd .page{padding:14px 12px 32px;gap:16px}
+.hypd .colm{gap:16px}
+.hypd .grid{gap:16px}
+.hypd .hero-l{padding:20px 18px 22px;gap:16px}
+.hypd .back{min-height:36px}
+.hypd .h1{font-size:26px;letter-spacing:-.03em}
+.hypd .h-d{font-size:15.5px}
+.hypd .mbox{padding:14px 16px}
+.hypd .pg-n b{font-size:26px}
+.hypd .h-act .btn{flex:1;justify-content:center}
+.hypd .sec{padding:20px 16px}
+.hypd .sec-t{font-size:20px}
+.hypd .sec-h{margin-bottom:14px}
+.hypd .econ-pair b{font-size:24px}
+.hypd .stg{padding:14px 12px 12px;border-radius:16px}
+.hypd .stg-h{gap:8px}
+.hypd .stg-t{font-size:17px}
+.hypd .x{width:40px;height:40px;font-size:20px}
+.hypd .tks{margin-top:8px}
+.hypd .tk{gap:8px;padding:4px 0 4px 0;align-items:flex-start}
+.hypd .cb,.hypd .cb.on,.hypd .cb:hover{width:40px;height:40px;margin:-2px 0 0 -6px;border-radius:10px;font-size:15px;background:transparent;box-shadow:none;position:relative;isolation:isolate}
+.hypd .cb::before{content:"";position:absolute;inset:8px;border-radius:7px;background:#fff;box-shadow:inset 0 0 0 1.75px var(--ink-300);z-index:-1}
+.hypd .cb.on::before{background:var(--blue);box-shadow:none}
+.hypd .tk-b{padding-top:7px}
+.hypd .tk-t{font-size:16px}
+.hypd .tk-d{font-size:16px}
+.hypd .ctr{gap:8px;margin-top:8px}
+.hypd .ctr button{width:44px;height:44px;border-radius:12px;font-size:20px}
+.hypd .ctr-n{font-size:14px;min-width:56px;text-align:center}
+.hypd .stg-note{margin:8px 0 2px;font-size:16px}
+.hypd .addt{margin:6px 0 0}
+.hypd .addt input{height:44px;font-size:16px;background:rgba(255,255,255,.7)}
+.hypd .stg-add{height:52px}
+.hypd .fi{padding:10px 8px 10px 12px;gap:10px}
+.hypd .fi-go{display:none}
+.hypd .tag{min-height:40px;padding:8px 14px}
+.hypd .in{font-size:16px}
+.hypd .cf-r .btn{height:44px;flex:1;justify-content:center}
+.hypd .cn{padding:10px 6px 10px 12px;gap:10px}
+.hypd .cn-t{font-size:16px}
+.hypd .seg button{min-height:36px}
+.hypd .iadd input{height:44px;font-size:16px}
+.hypd .iadd button{height:44px;width:44px}
+.hypd .idea{padding:6px 0 6px 8px;gap:6px;align-items:center}
+.hypd .idea::before{margin-top:0}
+.hypd .idea-t{font-size:16px;padding:4px 0}
+.hypd .ia{min-height:36px;padding:6px 10px;background:var(--ink-50)}
+.hypd .nf{padding:40px 20px}
+}
 

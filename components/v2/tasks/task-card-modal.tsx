@@ -301,18 +301,18 @@ export function TaskCardModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 max-lg:z-[100] sm:p-6">
       <button type="button" className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={onClose} aria-label="Закрыть" />
 
       <div
         role="dialog"
         aria-modal="true"
-        className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-[var(--v2-shadow-pop)]"
+        className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-4xl flex-col overflow-hidden overscroll-contain rounded-none bg-white shadow-[var(--v2-shadow-pop)] max-lg:overflow-y-auto sm:h-auto sm:max-h-[92vh] sm:rounded-3xl"
       >
         {/* Header */}
-        <div className="relative border-b border-[var(--v2-ink-100)] px-6 py-5">
+        <div className="relative border-b border-[var(--v2-ink-100)] bg-white px-4 pb-3 pt-[calc(10px+env(safe-area-inset-top))] max-lg:sticky max-lg:top-0 max-lg:z-20 max-lg:shrink-0 sm:px-6 sm:py-5">
           <div className="v2-dotgrid pointer-events-none absolute inset-0 opacity-50" />
-          <div className="relative flex items-start gap-3">
+          <div className="relative flex flex-wrap items-start gap-3 sm:flex-nowrap">
             {t ? (
               <TaskCheckbox checked={completed} onChange={() => void toggleComplete()} />
             ) : (
@@ -322,7 +322,7 @@ export function TaskCardModal({
               {t ? (
                 <>
                   <input
-                    className="v2-tight w-full border-0 bg-transparent text-[22px] font-semibold leading-tight text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)]"
+                    className="v2-tight w-full border-0 bg-transparent text-[19px] font-semibold leading-tight text-[var(--v2-ink-900)] outline-none placeholder:text-[var(--v2-ink-400)] sm:text-[22px]"
                     defaultValue={t.title}
                     onBlur={(e) => e.target.value !== t.title && void patch({ title: e.target.value })}
                   />
@@ -359,14 +359,14 @@ export function TaskCardModal({
                 <p className="text-[var(--v2-ink-500)]">{loading ? "Загрузка…" : "Задача не найдена"}</p>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="order-first flex w-full shrink-0 items-center justify-end gap-2 sm:order-none sm:w-auto sm:justify-start">
               {t && t.project_id ? (
                 <button
                   type="button"
                   disabled={linkBusy || personalLinked}
                   title={personalLinked ? "Уже связана с личными входящими" : "Создать дубль во входящих личных задач"}
                   onClick={() => void cloneToPersonal()}
-                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition ${
+                  className={`mr-auto inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition sm:mr-0 sm:h-9 ${
                     personalLinked
                       ? "bg-emerald-50 text-emerald-700"
                       : "text-[var(--v2-ink-600)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-900)]"
@@ -379,7 +379,7 @@ export function TaskCardModal({
               {t ? (
                 <>
                   <TimerButton running={runningTaskId === t.id} onClick={() => onToggleTimer(t.id)} />
-                  <span className="v2-tnum hidden text-[12px] text-[var(--v2-ink-500)] sm:inline">
+                  <span className="v2-tnum inline text-[12px] text-[var(--v2-ink-500)]">
                     {fmtDuration(
                       t.logged_seconds + (runningTaskId === t.id ? runningElapsedSeconds : 0)
                     )}
@@ -390,7 +390,8 @@ export function TaskCardModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+                aria-label="Закрыть"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)] sm:h-9 sm:w-9"
               >
                 ✕
               </button>
@@ -401,11 +402,11 @@ export function TaskCardModal({
         {t && detail ? (
           <>
             {actionError ? (
-              <div className="border-b border-red-200 bg-red-50 px-6 py-2 text-[13px] text-red-800">{actionError}</div>
+              <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-[13px] text-red-800 max-lg:shrink-0 sm:px-6">{actionError}</div>
             ) : null}
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden max-lg:flex-none max-lg:shrink-0 max-lg:overflow-visible lg:flex-row">
               {/* Main column */}
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 max-lg:flex-none max-lg:overflow-visible sm:px-6 sm:py-5">
                 <section className="mb-6">
                   <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--v2-ink-500)]">
                     Описание
@@ -450,7 +451,12 @@ export function TaskCardModal({
                         value={subtaskTitle}
                         onChange={(e) => setSubtaskTitle(e.target.value)}
                       />
-                      <button type="submit" disabled={!subtaskTitle.trim()} className="v2-btn-primary shrink-0 px-3 disabled:opacity-40">
+                      <button
+                        type="submit"
+                        disabled={!subtaskTitle.trim()}
+                        aria-label="Добавить подзадачу"
+                        className="v2-btn-primary shrink-0 px-3 disabled:opacity-40 max-sm:inline-flex max-sm:min-h-11 max-sm:min-w-11 max-sm:items-center max-sm:justify-center"
+                      >
                         <V2Icons.plus className="h-4 w-4" />
                       </button>
                     </form>
@@ -466,7 +472,7 @@ export function TaskCardModal({
                     <button
                       type="button"
                       onClick={() => setLinkFormOpen((v) => !v)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+                      className="inline-flex h-10 w-10 items-center sm:h-7 sm:w-7 justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
                       title="Добавить ссылку"
                     >
                       <V2Icons.plus className="h-4 w-4" />
@@ -515,7 +521,7 @@ export function TaskCardModal({
                     <button
                       type="button"
                       onClick={() => setFileFormOpen((v) => !v)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
+                      className="inline-flex h-10 w-10 items-center sm:h-7 sm:w-7 justify-center rounded-lg text-[var(--v2-ink-500)] hover:bg-[var(--v2-ink-100)]"
                       title="Добавить файл"
                     >
                       <V2Icons.plus className="h-4 w-4" />
@@ -560,7 +566,7 @@ export function TaskCardModal({
               </div>
 
               {/* Sidebar */}
-              <aside className="w-full shrink-0 border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/30 px-6 py-5 lg:w-[280px] lg:border-l lg:border-t-0">
+              <aside className="w-full shrink-0 border-t border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/30 px-4 py-4 sm:px-6 sm:py-5 lg:w-[280px] lg:border-l lg:border-t-0">
                 <div className="space-y-5">
                   {!lockedProjectId && (
                     <div>
