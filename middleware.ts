@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { canAccessAgencyRoutes, canAccessPmBoard, isClientRole, isMemberRestrictedRole, sessionRole } from "@/lib/roles";
+import { isAdminRole, sessionRole } from "@/lib/roles";
 import { getAuthSecret, verifySession } from "@/lib/session-token";
+import { sessionCookieSecure } from "@/lib/session-cookie";
 
 /**
  * За nginx `request.url` часто даёт http://127.0.0.1:PORT — редиректы превращаются в https://localhost:3005/...
@@ -77,6 +78,7 @@ export async function middleware(request: NextRequest) {
   const secret = getAuthSecret();
   const session = token && secret ? await verifySession(token, secret) : null;
 
+  /** Публично: вход/выход, клиентские сметы. Регистрация закрыта. */
   const isPublicApi =
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/logout" ||
@@ -89,7 +91,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === "/login") {
-    if (session) {
+    if (session && isAdminRole(sessionRole(session))) {
       return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
     }
     return NextResponse.next();
@@ -106,67 +108,22 @@ export async function middleware(request: NextRequest) {
 
   const role = sessionRole(session);
 
-  if (isClientRole(role)) {
-    if (pathname.startsWith("/api/v2/personal")) {
+  /** Весь тимтрекер — только админ. Исключение: /c/* и /api/public/* выше. */
+  if (!isAdminRole(role)) {
+    if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (pathname.startsWith("/v2/personal")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/projects"));
-    }
-  }
-
-  if (isMemberRestrictedRole(role)) {
-    if (pathname.startsWith("/board")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
-    }
-    if (pathname.startsWith("/api/board/")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (pathname.startsWith("/api/time-analytics/")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (pathname.startsWith("/api/team/")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
-
-  if (!canAccessPmBoard(role)) {
-    const isProjectsBoardPath =
-      pathname === "/board" ||
-      (pathname.startsWith("/board/") && !pathname.startsWith("/board/team-load"));
-    if (isProjectsBoardPath) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
-    }
-    if (pathname.startsWith("/api/board/")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (pathname.startsWith("/api/time-analytics/")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
-
-  if (!canAccessAgencyRoutes(role)) {
-    if (pathname.startsWith("/api/agency") || pathname.startsWith("/api/v2/agency") || pathname.startsWith("/api/admin")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (pathname.startsWith("/api/v2/finance")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (pathname.startsWith("/api/time-analytics/team-week")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (
-      pathname.startsWith("/agency") ||
-      pathname.startsWith("/sales") ||
-      pathname.startsWith("/admin") ||
-      pathname.startsWith("/v2/agency") ||
-      pathname.startsWith("/v2/impulse")
-    ) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
-    }
-    if (pathname.startsWith("/board/team-load")) {
-      return NextResponse.redirect(appAbsoluteUrl(request, "/v2/home"));
-    }
+    const login = appAbsoluteUrl(request, "/login");
+    login.searchParams.set("error", "admin_only");
+    const res = NextResponse.redirect(login);
+    res.cookies.set("tt_session", "", {
+      httpOnly: true,
+      path: "/",
+      maxAge: 0,
+      sameSite: "lax",
+      secure: sessionCookieSecure(request),
+    });
+    return res;
   }
 
   return NextResponse.next();

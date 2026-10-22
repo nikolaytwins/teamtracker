@@ -3,6 +3,7 @@ import { isSupabasePasswordLoginConfigured } from "@/lib/auth-supabase-config";
 import { sessionCookieSecure } from "@/lib/session-cookie";
 import { signSession, getAuthSecret } from "@/lib/session-token";
 import { signInWithSupabaseEmailPassword } from "@/lib/supabase-password-auth";
+import { isAdminRole, normalizeTtUserRole } from "@/lib/roles";
 import {
   syncUsersFromEnv,
   getUserByLogin,
@@ -57,6 +58,12 @@ export async function POST(request: NextRequest) {
       }
     } else if (!verifyPassword(password, user)) {
       return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
+    }
+    if (!isAdminRole(normalizeTtUserRole(user.role))) {
+      return NextResponse.json(
+        { error: "Доступ только для администратора" },
+        { status: 403 }
+      );
     }
     const exp = Math.floor(Date.now() / 1000) + MAX_AGE;
     const token = await signSession(

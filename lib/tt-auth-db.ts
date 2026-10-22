@@ -418,59 +418,13 @@ const SELF_REG_MIN_LOGIN = 2;
 const SELF_REG_MIN_PASSWORD = 8;
 
 /** Новая учётка с ролью `member` (саморегистрация). */
-export function registerSelfServeMember(params: {
+export function registerSelfServeMember(_params: {
   login: string;
   password: string;
   display_name: string;
   job_title?: string;
 }): { ok: true; user: TtUserRow } | { ok: false; error: string } {
-  ensureTtUsersSchema();
-  const login = params.login.trim();
-  if (login.length < SELF_REG_MIN_LOGIN) {
-    return { ok: false, error: "Логин слишком короткий" };
-  }
-  if (params.password.length < SELF_REG_MIN_PASSWORD) {
-    return { ok: false, error: `Пароль не короче ${SELF_REG_MIN_PASSWORD} символов` };
-  }
-  const display_name = params.display_name.trim();
-  if (!display_name) return { ok: false, error: "Укажите имя" };
-  if (getUserByLogin(login)) return { ok: false, error: "Такой логин уже занят" };
-
-  const { password_hash, salt } = hashNewPassword(params.password);
-  const id = `u_${randomBytes(12).toString("hex")}`;
-  let authEmail: string | null = null;
-  if (login.includes("@")) {
-    try {
-      authEmail = normalizeAuthEmailInput(login);
-    } catch {
-      authEmail = null;
-    }
-  }
-  const db = getDb();
-  try {
-    db.prepare(
-      `INSERT INTO tt_users (id, login, password_hash, salt, display_name, job_title, avatar_url, role, weekly_capacity_hours, auth_email, work_hours_per_day, work_days_json) VALUES (?, ?, ?, ?, ?, ?, NULL, 'member', 40, ?, ?, ?)`
-    ).run(
-      id,
-      login,
-      password_hash,
-      salt,
-      display_name,
-      (params.job_title ?? "").trim(),
-      authEmail,
-      8,
-      DEFAULT_WORK_DAYS_JSON
-    );
-  } catch (e) {
-    const msg = String(e);
-    if (msg.includes("UNIQUE") || msg.includes("unique")) {
-      return { ok: false, error: "Такой логин или email уже занят" };
-    }
-    throw e;
-  }
-  const row = getUserById(id);
-  if (!row) return { ok: false, error: "Не удалось создать учётку" };
-  return { ok: true, user: row };
+  return { ok: false, error: "Регистрация отключена" };
 }
 
 /** После успешного Supabase signIn: записать supabase_id, если не занят другой учёткой. */
