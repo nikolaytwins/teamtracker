@@ -4,6 +4,7 @@ import {
   computeFinanceMonthSummary,
   computeFinanceServiceStats,
   computeFinanceSummaryByLine,
+  ensureRecurringFinanceProjectsForMonth,
   listFinanceGeneralExpenses,
   listFinanceProjectsForMonth,
 } from "@/lib/v2/finance/finance-repo";
@@ -23,6 +24,12 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     year = now.getFullYear();
     month = now.getMonth() + 1;
+  }
+
+  try {
+    await ensureRecurringFinanceProjectsForMonth(auth.ctx, year, month);
+  } catch (e) {
+    console.error("v2 finance ensure recurring:", e);
   }
 
   const [projects, generalExpenses] = await Promise.all([

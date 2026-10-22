@@ -166,6 +166,70 @@ function FinanceSelect({
   );
 }
 
+function InlineName({
+  value,
+  href,
+  onChange,
+}: {
+  value: string;
+  href: string;
+  onChange: (name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [temp, setTemp] = useState(value);
+
+  useEffect(() => setTemp(value), [value]);
+
+  const commit = () => {
+    const next = temp.trim();
+    setEditing(false);
+    if (!next || next === value) {
+      setTemp(value);
+      return;
+    }
+    onChange(next);
+  };
+
+  if (editing) {
+    return (
+      <input
+        value={temp}
+        autoFocus
+        onBlur={commit}
+        onChange={(e) => setTemp(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") {
+            setTemp(value);
+            setEditing(false);
+          }
+        }}
+        className="v2-tight w-full min-w-0 rounded border border-[var(--v2-brand-500)] bg-white px-2 py-1 text-[14px] font-medium text-[var(--v2-ink-900)] max-lg:h-10 max-lg:rounded-lg max-lg:text-[15.5px]"
+      />
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        title="Нажмите, чтобы переименовать"
+        className="v2-tight min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left text-[14px] font-medium text-[var(--v2-ink-900)] hover:bg-[var(--v2-ink-50)] max-lg:min-h-10 max-lg:py-1.5 max-lg:text-[15.5px] max-lg:font-semibold"
+      >
+        {value}
+      </button>
+      <Link
+        href={href}
+        title="Открыть проект"
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-brand-700)] max-lg:h-9 max-lg:w-9"
+      >
+        <V2Icons.arrowR className="h-3.5 w-3.5" />
+      </Link>
+    </div>
+  );
+}
+
 function InlineMoney({
   value,
   onChange,
@@ -742,29 +806,47 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                               {p.name[0]}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <Link
+                              <InlineName
+                                value={p.name}
                                 href={appPath(`/v2/agency/projects/${p.id}`)}
-                                className="v2-tight block truncate text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:text-[var(--v2-brand-700)] hover:underline max-lg:py-0.5 max-lg:text-[15.5px] max-lg:font-semibold"
-                                title="Открыть проект и детализацию"
-                              >
-                                {p.name}
-                              </Link>
-                              <select
-                                value={p.business_line}
-                                onChange={(e) =>
-                                  void patchProject(p.id, {
-                                    businessLine: e.target.value as V2FinanceBusinessLine,
-                                  })
-                                }
-                                className="v2-tight mt-0.5 max-w-full rounded border-0 bg-transparent py-0 pl-0 text-[11px] font-medium text-[var(--v2-ink-500)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
-                                title="Направление"
-                              >
-                                {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => (
-                                  <option key={k} value={k}>
-                                    {FINANCE_BUSINESS_LINE_META[k].label}
-                                  </option>
-                                ))}
-                              </select>
+                                onChange={(name) => void patchProject(p.id, { name })}
+                              />
+                              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                <select
+                                  value={p.business_line}
+                                  onChange={(e) =>
+                                    void patchProject(p.id, {
+                                      businessLine: e.target.value as V2FinanceBusinessLine,
+                                    })
+                                  }
+                                  className="v2-tight max-w-full rounded border-0 bg-transparent py-0 pl-0 text-[11px] font-medium text-[var(--v2-ink-500)] focus:ring-2 focus:ring-[var(--v2-brand-500)]/30"
+                                  title="Направление"
+                                >
+                                  {(Object.keys(FINANCE_BUSINESS_LINE_META) as V2FinanceBusinessLine[]).map((k) => (
+                                    <option key={k} value={k}>
+                                      {FINANCE_BUSINESS_LINE_META[k].label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  role="checkbox"
+                                  aria-checked={p.is_recurring}
+                                  title={
+                                    p.is_recurring
+                                      ? "Постоянный: копируется в следующий месяц. Клиент видит все месяцы по одной ссылке."
+                                      : "Сделать постоянным: будет копироваться в следующий месяц автоматически"
+                                  }
+                                  onClick={() => void patchProject(p.id, { isRecurring: !p.is_recurring })}
+                                  className={`v2-tight inline-flex h-6 items-center rounded-md px-1.5 text-[10.5px] font-semibold transition max-lg:h-8 max-lg:px-2.5 max-lg:text-[12px] ${
+                                    p.is_recurring
+                                      ? "bg-[var(--v2-brand-50)] text-[var(--v2-brand-700)] ring-1 ring-[var(--v2-brand-200)]"
+                                      : "text-[var(--v2-ink-400)] hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-ink-700)]"
+                                  }`}
+                                >
+                                  {p.is_recurring ? "Постоянный" : "Разовый"}
+                                </button>
+                              </div>
                             </div>
                             <span className="ml-0.5 flex shrink-0 items-center gap-0.5 pointer-fine:hidden pointer-fine:group-hover:flex">
                               <Link

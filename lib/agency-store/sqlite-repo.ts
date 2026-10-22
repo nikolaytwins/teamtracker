@@ -209,6 +209,20 @@ export class SqliteAgencyRepo implements AgencyRepo {
           id
         );
       }
+      if (typeof body.paymentCertainThisMonth === "boolean") {
+        try {
+          db.exec(`ALTER TABLE AgencyProject ADD COLUMN paymentCertainThisMonth INTEGER NOT NULL DEFAULT 0`);
+        } catch {
+          /* exists */
+        }
+        db.prepare(`UPDATE AgencyProject SET paymentCertainThisMonth = ? WHERE id = ?`).run(
+          body.paymentCertainThisMonth ? 1 : 0,
+          id
+        );
+      }
+      if (typeof body.isRecurring === "boolean") {
+        db.prepare(`UPDATE AgencyProject SET isRecurring = ? WHERE id = ?`).run(body.isRecurring ? 1 : 0, id);
+      }
       const project = db.prepare("SELECT * FROM AgencyProject WHERE id = ?").get(id) as
         | Record<string, unknown>
         | undefined;
@@ -265,6 +279,9 @@ export class SqliteAgencyRepo implements AgencyRepo {
           project.clientShareToken,
           newProjectId
         );
+      }
+      if (project.isRecurring) {
+        db.prepare(`UPDATE AgencyProject SET isRecurring = 1 WHERE id = ?`).run(newProjectId);
       }
       const expenses = db.prepare("SELECT * FROM AgencyExpense WHERE projectId = ?").all(id) as any[];
       for (const exp of expenses) {

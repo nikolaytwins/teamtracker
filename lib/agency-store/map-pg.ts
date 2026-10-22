@@ -27,6 +27,7 @@ export function mapProjectRow(r: Record<string, unknown>): Record<string, unknow
     plannedHoursRemaining:
       r.planned_hours_remaining == null ? null : Number(r.planned_hours_remaining),
     paymentCertainThisMonth: r.payment_certain_this_month === true,
+    isRecurring: r.is_recurring === true,
     workModelType: r.work_model_type ?? "other",
     planHidden: r.plan_hidden === true,
     createdAt: r.created_at,

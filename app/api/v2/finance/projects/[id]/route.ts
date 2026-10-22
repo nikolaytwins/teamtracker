@@ -40,6 +40,9 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     if (typeof body.paymentCertainThisMonth === "boolean") {
       patch.payment_certain_this_month = body.paymentCertainThisMonth;
     }
+    if (typeof body.isRecurring === "boolean") {
+      patch.is_recurring = body.isRecurring;
+    }
 
     const project = await updateFinanceProject(auth.ctx, id, patch);
     if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });

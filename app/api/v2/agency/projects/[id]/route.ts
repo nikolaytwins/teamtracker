@@ -47,8 +47,14 @@ export async function PUT(
     const notes = body.notes != null ? String(body.notes) : null;
     const hourlyRateRub =
       body.hourlyRateRub != null ? Number(body.hourlyRateRub) || 0 : undefined;
+    const isRecurring = typeof body.isRecurring === "boolean" ? body.isRecurring : undefined;
 
-    const project = await getAgencyRepoV2().updateProjectById(params.id, {
+    const repo = getAgencyRepoV2();
+    if (isRecurring === true) {
+      await repo.ensureClientShareToken(params.id);
+    }
+
+    const project = await repo.updateProjectById(params.id, {
       name,
       totalAmount,
       paidAmount,
@@ -61,13 +67,41 @@ export async function PUT(
       clientContact,
       notes,
       ...(hourlyRateRub !== undefined ? { hourlyRateRub } : {}),
+      ...(isRecurring !== undefined ? { isRecurring } : {}),
     });
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, project });
+    const token = String(project.clientShareToken ?? "").trim();
+    if (token && (body.name != null || isRecurring !== undefined)) {
+      const siblings = await repo.listProjectsByClientShareToken(token);
+      for (const sibling of siblings) {
+        const sid = String(sibling.id);
+        if (sid === params.id) continue;
+        await repo.updateProjectById(sid, {
+          name: body.name != null ? name : String(sibling.name ?? name),
+          totalAmount: Number(sibling.totalAmount) || 0,
+          paidAmount: Number(sibling.paidAmount) || 0,
+          deadline: sibling.deadline ?? null,
+          status: String(sibling.status ?? "not_paid"),
+          serviceType: String(sibling.serviceType ?? "site"),
+          businessLine:
+            sibling.businessLine === "impulse" || sibling.businessLine === "qmagic"
+              ? String(sibling.businessLine)
+              : "agency",
+          clientType: (sibling.clientType as string | null) ?? null,
+          paymentMethod: (sibling.paymentMethod as string | null) ?? null,
+          clientContact: (sibling.clientContact as string | null) ?? null,
+          notes: (sibling.notes as string | null) ?? null,
+          ...(isRecurring !== undefined ? { isRecurring } : {}),
+        });
+      }
+    }
+
+    const fresh = (await repo.getProjectById(params.id)) ?? project;
+    return NextResponse.json({ success: true, project: fresh });
   } catch (error: unknown) {
     console.error("Error updating project:", error);
     const message = error instanceof Error ? error.message : String(error);

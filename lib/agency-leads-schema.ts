@@ -125,4 +125,9 @@ export function ensureAgencyProjectsColumns(db: Database.Database) {
   } catch {
     /* column exists */
   }
+  try {
+    db.exec(`ALTER TABLE AgencyProject ADD COLUMN isRecurring INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    /* column exists */
+  }
 }

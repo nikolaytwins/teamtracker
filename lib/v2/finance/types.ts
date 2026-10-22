@@ -21,6 +21,8 @@ export type V2FinanceProjectRow = {
   source_lead_id: string | null;
   /** Sofia Plan: пользователь подтвердил поступление в этом месяце */
   payment_certain_this_month: boolean;
+  /** Постоянный: копируется в следующий месяц; клиент видит серию по одной ссылке */
+  is_recurring: boolean;
   created_at: string;
   updated_at: string;
 };

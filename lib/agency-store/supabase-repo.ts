@@ -129,6 +129,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     if (typeof body.paymentCertainThisMonth === "boolean") {
       patch.payment_certain_this_month = body.paymentCertainThisMonth;
     }
+    if (typeof body.isRecurring === "boolean") {
+      patch.is_recurring = body.isRecurring;
+    }
     const { error } = await this.sb.from("agency_project").update(patch).eq("id", id);
     if (error) throw error;
     return this.getProjectById(id);
@@ -168,6 +171,9 @@ export class SupabaseAgencyRepo implements AgencyRepo {
     (ins as Record<string, unknown>).hourly_rate_rub = Number(cur.hourlyRateRub) || 0;
     if (cur.clientShareToken) {
       (ins as Record<string, unknown>).client_share_token = String(cur.clientShareToken);
+    }
+    if (cur.isRecurring === true) {
+      (ins as Record<string, unknown>).is_recurring = true;
     }
     const { error: e1 } = await this.sb.from("agency_project").insert(ins);
     if (e1) throw e1;

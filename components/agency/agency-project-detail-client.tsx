@@ -35,6 +35,7 @@ interface Project {
   hourlyRateRub?: number
   createdAt: string
   clientShareToken?: string | null
+  isRecurring?: boolean | number
 }
 
 interface Expense {
@@ -374,6 +375,9 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [hourlyRateDraft, setHourlyRateDraft] = useState('')
   const [savingRate, setSavingRate] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [savingName, setSavingName] = useState(false)
   const [sharePath, setSharePath] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -392,7 +396,10 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
       
       const proj = projectRes.find((p: Project) => p.id === id)
       setProject(proj || null)
-      if (proj) setHourlyRateDraft(String(Number(proj.hourlyRateRub) || 0))
+      if (proj) {
+        setHourlyRateDraft(String(Number(proj.hourlyRateRub) || 0))
+        setNameDraft(String(proj.name ?? ''))
+      }
       setExpenses(expensesRes)
       setDetails(Array.isArray(detailsRes) ? detailsRes : [])
     } catch (error) {
@@ -635,43 +642,94 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
     }
   }
 
+  const putProject = async (patch: Partial<Project> & { hourlyRateRub?: number; isRecurring?: boolean }) => {
+    if (!project) return null
+    const res = await fetch(apiUrl(`${apiBase}/projects/${project.id}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: patch.name ?? project.name,
+        totalAmount: patch.totalAmount ?? project.totalAmount,
+        paidAmount: patch.paidAmount ?? project.paidAmount,
+        deadline: patch.deadline !== undefined ? patch.deadline : project.deadline,
+        status: patch.status ?? project.status,
+        serviceType: patch.serviceType ?? project.serviceType,
+        businessLine: patch.businessLine ?? project.businessLine ?? 'agency',
+        clientType: patch.clientType !== undefined ? patch.clientType : project.clientType,
+        paymentMethod: patch.paymentMethod !== undefined ? patch.paymentMethod : project.paymentMethod,
+        clientContact: patch.clientContact !== undefined ? patch.clientContact : project.clientContact,
+        notes: patch.notes !== undefined ? patch.notes : project.notes,
+        hourlyRateRub: patch.hourlyRateRub ?? (Number(project.hourlyRateRub) || 0),
+        ...(typeof patch.isRecurring === 'boolean' ? { isRecurring: patch.isRecurring } : {}),
+      }),
+    })
+    if (!res.ok) return null
+    const json = await res.json().catch(() => null)
+    return (json?.project as Project | undefined) ?? null
+  }
+
   const handleSaveHourlyRate = async () => {
     if (!project) return
     const rate = parseFloat(hourlyRateDraft.replace(',', '.'))
     if (isNaN(rate) || rate < 0) return
     setSavingRate(true)
     try {
-      const res = await fetch(apiUrl(`${apiBase}/projects/${project.id}`), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: project.name,
-          totalAmount: project.totalAmount,
-          paidAmount: project.paidAmount,
-          deadline: project.deadline,
-          status: project.status,
-          serviceType: project.serviceType,
-          businessLine: project.businessLine ?? 'agency',
-          clientType: project.clientType,
-          paymentMethod: project.paymentMethod,
-          clientContact: project.clientContact,
-          notes: project.notes,
-          hourlyRateRub: rate,
-        }),
-      })
-      if (res.ok) {
-        const json = await res.json()
-        if (json.project) {
-          setProject({ ...project, ...json.project, hourlyRateRub: rate })
-        } else {
-          setProject({ ...project, hourlyRateRub: rate })
-        }
+      const next = await putProject({ hourlyRateRub: rate })
+      if (next) {
+        setProject({ ...project, ...next, hourlyRateRub: rate })
         showToast('Ставка сохранена')
       }
     } catch (error) {
       console.error('Error saving hourly rate:', error)
     } finally {
       setSavingRate(false)
+    }
+  }
+
+  const handleSaveName = async () => {
+    if (!project) return
+    const nextName = nameDraft.trim()
+    setEditingName(false)
+    if (!nextName || nextName === project.name) {
+      setNameDraft(project.name)
+      return
+    }
+    setSavingName(true)
+    try {
+      const next = await putProject({ name: nextName })
+      if (next) {
+        setProject({ ...project, ...next, name: nextName })
+        setNameDraft(nextName)
+        showToast('Название сохранено')
+      } else {
+        setNameDraft(project.name)
+      }
+    } catch (error) {
+      console.error('Error saving name:', error)
+      setNameDraft(project.name)
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  const handleToggleRecurring = async () => {
+    if (!project) return
+    const nextVal = !Boolean(project.isRecurring)
+    try {
+      const next = await putProject({ isRecurring: nextVal })
+      if (next) {
+        setProject({ ...project, ...next, isRecurring: nextVal })
+        if (nextVal && !sharePath) {
+          const shareRes = await fetch(apiUrl(`${apiBase}/projects/${project.id}/client-share`))
+          if (shareRes.ok) {
+            const data = await shareRes.json()
+            if (data.path) setSharePath(String(data.path))
+          }
+        }
+        showToast(nextVal ? 'Постоянный проект: будет копироваться по месяцам' : 'Снят флаг постоянного проекта')
+      }
+    } catch (error) {
+      console.error('Error toggling recurring:', error)
     }
   }
 
@@ -907,7 +965,35 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
         <section className="card head">
           <div>
             <span className="kick">Проект агентства</span>
-            <h1 className="big-title">{project.name}</h1>
+            {editingName ? (
+              <input
+                className="big-title-inp"
+                value={nameDraft}
+                autoFocus
+                disabled={savingName}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={() => void handleSaveName()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleSaveName()
+                  if (e.key === 'Escape') {
+                    setNameDraft(project.name)
+                    setEditingName(false)
+                  }
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="big-title big-title--edit"
+                title="Нажмите, чтобы переименовать"
+                onClick={() => {
+                  setNameDraft(project.name)
+                  setEditingName(true)
+                }}
+              >
+                {project.name}
+              </button>
+            )}
             <div className="chips">
               <span className="chip">Ставка <b>{hourlyRate.toLocaleString('ru-RU')} ₽/ч</b></span>
               <span className="chip">Работа <b>{project.clientType ? (clientTypeLabels[project.clientType] || project.clientType) : '—'}</b></span>
@@ -915,6 +1001,18 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
               <span className={`chip ${unpaid ? 'chip--warn' : 'chip--ok'}`}>
                 Оплата <b>{statusLabels[project.status] || project.status}</b>
               </span>
+              <button
+                type="button"
+                className={`chip chip--btn${project.isRecurring ? ' chip--ok' : ''}`}
+                title={
+                  project.isRecurring
+                    ? 'Постоянный: копируется в следующий месяц. Клиент видит все месяцы по одной ссылке.'
+                    : 'Сделать постоянным — будет копироваться в следующий месяц автоматически'
+                }
+                onClick={() => void handleToggleRecurring()}
+              >
+                {project.isRecurring ? 'Постоянный' : 'Разовый'}
+              </button>
             </div>
           </div>
           <div className="head-a">
@@ -1199,7 +1297,12 @@ export function AgencyProjectDetailClient({ variant }: { variant: AgencyFinanceV
           <div>
             <span className="kick">Клиентский доступ</span>
             <h3>Ссылка для клиента</h3>
-            <p>Клиент видит услуги, суммы и историю по месяцам. Часы, ставка и внутренние заметки не показываются.</p>
+            <p>
+              Клиент видит услуги, суммы и историю по месяцам. Часы, ставка и внутренние заметки не показываются.
+              {project.isRecurring
+                ? ' У постоянного проекта одна ссылка на все месяцы.'
+                : ' Отметьте проект «Постоянный», чтобы он копировался каждый месяц и клиент видел всю серию.'}
+            </p>
             <div className="linkbox">{shareUrl || 'Создаём ссылку…'}</div>
           </div>
           <div className="share-a">

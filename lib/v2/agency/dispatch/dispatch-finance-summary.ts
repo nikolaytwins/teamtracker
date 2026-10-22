@@ -37,6 +37,7 @@ export function buildDispatchFinanceSnapshotFromLoaded(
     notes: null,
     source_lead_id: null,
     payment_certain_this_month: p.paymentCertainThisMonth,
+    is_recurring: false,
     created_at: p.createdAt,
     updated_at: p.createdAt,
     total_expenses: p.totalExpenses,

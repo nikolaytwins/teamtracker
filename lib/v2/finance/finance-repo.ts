@@ -51,9 +51,18 @@ function mapAgencyProject(raw: Record<string, unknown>, workspaceId: string): V2
     notes: raw.notes ? String(raw.notes) : null,
     source_lead_id: raw.source_lead_id ? String(raw.source_lead_id) : null,
     payment_certain_this_month: raw.paymentCertainThisMonth === true,
+    is_recurring: raw.isRecurring === true || raw.isRecurring === 1,
     created_at: String(raw.createdAt),
     updated_at: String(raw.updatedAt),
   };
+}
+
+function projectSeriesKey(p: { clientShareToken?: unknown; name?: unknown; clientContact?: unknown; client_share_token?: unknown; client_contact?: unknown }) {
+  const token = String(p.clientShareToken ?? p.client_share_token ?? "").trim();
+  if (token) return `t:${token}`;
+  const name = String(p.name ?? "").trim().toLowerCase();
+  const contact = String(p.clientContact ?? p.client_contact ?? "").trim().toLowerCase();
+  return `n:${name}\0${contact}`;
 }
 
 function mapAgencyGeneralExpense(
@@ -345,6 +354,7 @@ export async function updateFinanceProject(
     client_contact: string | null;
     notes: string | null;
     payment_certain_this_month?: boolean;
+    is_recurring?: boolean;
   }>
 ): Promise<V2FinanceProjectRow | null> {
   const cur = await repo().getProjectById(id);
@@ -361,8 +371,18 @@ export async function updateFinanceProject(
   }
   if (patch.status === "not_paid") paidAmount = 0;
 
+  let nextName = patch.name ?? String(cur.name);
+  if (typeof patch.name === "string") {
+    nextName = patch.name.trim();
+    if (!nextName) nextName = String(cur.name);
+  }
+
+  if (patch.is_recurring === true) {
+    await repo().ensureClientShareToken(id);
+  }
+
   const updated = await repo().updateProjectById(id, {
-    name: patch.name ?? String(cur.name),
+    name: nextName,
     totalAmount,
     paidAmount,
     deadline: cur.deadline ?? null,
@@ -385,9 +405,70 @@ export async function updateFinanceProject(
     ...(paymentCertainThisMonth !== undefined
       ? { paymentCertainThisMonth }
       : {}),
+    ...(patch.is_recurring !== undefined ? { isRecurring: patch.is_recurring } : {}),
   });
   if (!updated) return null;
-  return mapAgencyProject(updated, ctx.workspaceId);
+
+  const token = String(updated.clientShareToken ?? "").trim();
+  if (token && (typeof patch.name === "string" || typeof patch.is_recurring === "boolean")) {
+    const siblings = await repo().listProjectsByClientShareToken(token);
+    for (const sibling of siblings) {
+      const sid = String(sibling.id);
+      if (sid === id) continue;
+      await repo().updateProjectById(sid, {
+        name: typeof patch.name === "string" ? nextName : String(sibling.name ?? nextName),
+        totalAmount: Number(sibling.totalAmount) || 0,
+        paidAmount: Number(sibling.paidAmount) || 0,
+        deadline: sibling.deadline ?? null,
+        status: String(sibling.status ?? "not_paid"),
+        serviceType: String(sibling.serviceType ?? "site"),
+        businessLine: isFinanceBusinessLine(sibling.businessLine) ? sibling.businessLine : "agency",
+        clientType: (sibling.clientType as string | null) ?? null,
+        paymentMethod: (sibling.paymentMethod as string | null) ?? null,
+        clientContact: (sibling.clientContact as string | null) ?? null,
+        notes: (sibling.notes as string | null) ?? null,
+        ...(typeof patch.is_recurring === "boolean" ? { isRecurring: patch.is_recurring } : {}),
+      });
+    }
+  }
+
+  const fresh = await repo().getProjectById(id);
+  return fresh ? mapAgencyProject(fresh, ctx.workspaceId) : mapAgencyProject(updated, ctx.workspaceId);
+}
+
+/** Создаёт копии постоянных проектов в выбранный месяц, если их ещё нет. */
+export async function ensureRecurringFinanceProjectsForMonth(
+  ctx: V2SessionContext,
+  year: number,
+  month: number
+): Promise<number> {
+  const all = await repo().listProjectsWithTotalExpenses();
+  const monthStart = new Date(year, month - 1, 1).getTime();
+  const inMonth = all.filter((p) => isInFinanceMonth(String(p.createdAt), year, month));
+  const present = new Set(inMonth.map((p) => projectSeriesKey(p)));
+
+  const latestBefore = new Map<string, { id: string; at: number }>();
+  for (const p of all) {
+    if (p.isRecurring !== true) continue;
+    const at = new Date(String(p.createdAt)).getTime();
+    if (!Number.isFinite(at) || at >= monthStart) continue;
+    const key = projectSeriesKey(p);
+    const prev = latestBefore.get(key);
+    if (!prev || at > prev.at) latestBefore.set(key, { id: String(p.id), at });
+  }
+
+  let created = 0;
+  for (const [key, src] of latestBefore) {
+    if (present.has(key)) continue;
+    try {
+      await repo().ensureClientShareToken(src.id);
+      await repo().copyProjectToMonth(src.id, year, month);
+      created += 1;
+    } catch (e) {
+      console.error("ensure recurring project", src.id, e);
+    }
+  }
+  return created;
 }
 
 export async function deleteFinanceProject(_ctx: V2SessionContext, id: string): Promise<boolean> {

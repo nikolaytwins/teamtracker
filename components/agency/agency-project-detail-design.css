@@ -15,7 +15,11 @@
 .agency-proj-v3 .card{background:#fff;border-radius:20px;box-shadow:var(--shadow-card)}
 .agency-proj-v3 .pad{padding:26px 28px}
 .agency-proj-v3 .kick{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-400)}
-.agency-proj-v3 .big-title{font-size:34px;font-weight:600;letter-spacing:-.035em;margin-top:8px}
+.agency-proj-v3 .big-title{font-size:34px;font-weight:600;letter-spacing:-.035em;margin-top:8px;text-align:left}
+.agency-proj-v3 .big-title--edit{display:block;width:100%;background:none;border:none;padding:0;cursor:text;border-radius:8px}
+.agency-proj-v3 .big-title--edit:hover{color:var(--brand-700,#2a56eb)}
+.agency-proj-v3 .big-title-inp{display:block;width:100%;margin-top:8px;font:inherit;font-size:34px;font-weight:600;letter-spacing:-.035em;border:1.5px solid var(--brand-500,#3b6ff7);border-radius:12px;padding:6px 12px;background:#fff;color:inherit}
+.agency-proj-v3 .chip--btn{cursor:pointer;border:none;font:inherit}
 .agency-proj-v3 .sec-title{font-size:20px;font-weight:600;letter-spacing:-.025em}
 .agency-proj-v3 .sec-sub{font-size:14.5px;color:var(--ink-500)}
 .agency-proj-v3 .headrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -130,6 +134,7 @@
   .agency-proj-v3 .back{display:inline-flex;align-items:center;min-height:40px;align-self:flex-start}
   .agency-proj-v3 .head{padding:20px 16px;gap:16px}
   .agency-proj-v3 .big-title{font-size:24px;overflow-wrap:anywhere}
+  .agency-proj-v3 .big-title-inp{font-size:24px;padding:5px 10px}
   .agency-proj-v3 .chips{margin-top:12px;gap:6px}
   .agency-proj-v3 .chip{padding:7px 11px;font-size:13px}
   .agency-proj-v3 .head-a{flex-direction:column;align-items:stretch}
