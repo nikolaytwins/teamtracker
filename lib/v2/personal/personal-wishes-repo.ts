@@ -97,6 +97,7 @@ const TWINSHOTEL_DESCRIPTION =
 const TWINSHOTEL_IMAGES = [
   { url: "/wishes/twinshotel-1.jpg", name: "twinshotel-1.jpg" },
   { url: "/wishes/twinshotel-2.jpg", name: "twinshotel-2.jpg" },
+  { url: "/wishes/twinshotel-3.jpg", name: "twinshotel-3.jpg" },
 ] as const;
 
 /** Идемпотентно добавляет Twinshotel в глобальные желания (вместе с миграцией 096). */
@@ -130,7 +131,7 @@ async function ensureTwinshotelWish(userId: string): Promise<void> {
       categories: ["material", "create", "life", "intimacy"],
       scale: "lifestyle",
       is_near: false,
-      grid_col: 1,
+      grid_col: 2,
       grid_row: 7,
       sort_order: nextSort,
       created_at: now,
@@ -152,20 +153,27 @@ async function ensureTwinshotelWish(userId: string): Promise<void> {
   const { data: imgs } = await sb.from("v2_personal_wish_images").select("url").eq("wish_id", wishId);
   const have = new Set((imgs ?? []).map((r) => String((r as { url: string }).url)));
   const missing = TWINSHOTEL_IMAGES.filter((i) => !have.has(i.url));
-  if (!missing.length) return;
+  if (missing.length) {
+    const { error: imgErr } = await sb.from("v2_personal_wish_images").insert(
+      missing.map((f, i) => ({
+        id: newV2Id(),
+        wish_id: wishId,
+        url: f.url,
+        name: f.name,
+        media_type: "image" as const,
+        sort_order: have.size + i,
+        created_at: nowIso(),
+      }))
+    );
+    if (imgErr) console.error("ensureTwinshotelWish images:", imgErr);
+  }
 
-  const { error: imgErr } = await sb.from("v2_personal_wish_images").insert(
-    missing.map((f, i) => ({
-      id: newV2Id(),
-      wish_id: wishId,
-      url: f.url,
-      name: f.name,
-      media_type: "image" as const,
-      sort_order: have.size + i,
-      created_at: nowIso(),
-    }))
-  );
-  if (imgErr) console.error("ensureTwinshotelWish images:", imgErr);
+  const size = gridSizeForWish(TWINSHOTEL_IMAGES.length, true);
+  await sb
+    .from("v2_personal_wishes")
+    .update({ grid_col: size.col, grid_row: size.row, updated_at: nowIso() })
+    .eq("id", wishId)
+    .eq("user_id", userId);
 }
 
 export async function loadPersonalWishes(ctx: V2SessionContext): Promise<PersonalWish[]> {

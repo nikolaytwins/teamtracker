@@ -24,7 +24,7 @@ SELECT
   ARRAY['material', 'create', 'life', 'intimacy']::text[],
   'lifestyle',
   false,
-  1,
+  2,
   7,
   COALESCE(
     (
@@ -74,7 +74,8 @@ FROM v2_personal_wishes AS w
 CROSS JOIN (
   VALUES
     (1, '/wishes/twinshotel-1.jpg', 'twinshotel-1.jpg', 0),
-    (2, '/wishes/twinshotel-2.jpg', 'twinshotel-2.jpg', 1)
+    (2, '/wishes/twinshotel-2.jpg', 'twinshotel-2.jpg', 1),
+    (3, '/wishes/twinshotel-3.jpg', 'twinshotel-3.jpg', 2)
 ) AS s(slot, url, name, sort_order)
 WHERE lower(w.title) = 'twinshotel'
   AND NOT EXISTS (
