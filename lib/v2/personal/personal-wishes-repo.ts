@@ -91,8 +91,86 @@ export async function ownWish(userId: string, id: string): Promise<boolean> {
   return Boolean(data);
 }
 
+const TWINSHOTEL_DESCRIPTION =
+  "Создать ультрапремиум пространство, объединяющее отель, джаз-пространство, бар, ресторан, коворкинг и стриптиз-клуб на нижних этажах.";
+
+const TWINSHOTEL_IMAGES = [
+  { url: "/wishes/twinshotel-1.jpg", name: "twinshotel-1.jpg" },
+  { url: "/wishes/twinshotel-2.jpg", name: "twinshotel-2.jpg" },
+] as const;
+
+/** Идемпотентно добавляет Twinshotel в глобальные желания (вместе с миграцией 096). */
+async function ensureTwinshotelWish(userId: string): Promise<void> {
+  const sb = getV2Supabase();
+  const { data: existing } = await sb
+    .from("v2_personal_wishes")
+    .select("id")
+    .eq("user_id", userId)
+    .ilike("title", "twinshotel")
+    .limit(1)
+    .maybeSingle();
+
+  let wishId = existing ? String(existing.id) : "";
+  if (!wishId) {
+    const now = nowIso();
+    const { data: minRow } = await sb
+      .from("v2_personal_wishes")
+      .select("sort_order")
+      .eq("user_id", userId)
+      .order("sort_order", { ascending: true })
+      .limit(1);
+    const nextSort = minRow?.[0] ? Number(minRow[0].sort_order) - 1 : 0;
+    wishId = newV2Id();
+    const { error } = await sb.from("v2_personal_wishes").insert({
+      id: wishId,
+      user_id: userId,
+      title: "Twinshotel",
+      description: TWINSHOTEL_DESCRIPTION,
+      note: "",
+      categories: ["material", "create", "life", "intimacy"],
+      scale: "lifestyle",
+      is_near: false,
+      grid_col: 1,
+      grid_row: 7,
+      sort_order: nextSort,
+      created_at: now,
+      updated_at: now,
+    });
+    if (error) {
+      const { data: again } = await sb
+        .from("v2_personal_wishes")
+        .select("id")
+        .eq("user_id", userId)
+        .ilike("title", "twinshotel")
+        .limit(1)
+        .maybeSingle();
+      if (!again) throw error;
+      wishId = String(again.id);
+    }
+  }
+
+  const { data: imgs } = await sb.from("v2_personal_wish_images").select("url").eq("wish_id", wishId);
+  const have = new Set((imgs ?? []).map((r) => String((r as { url: string }).url)));
+  const missing = TWINSHOTEL_IMAGES.filter((i) => !have.has(i.url));
+  if (!missing.length) return;
+
+  const { error: imgErr } = await sb.from("v2_personal_wish_images").insert(
+    missing.map((f, i) => ({
+      id: newV2Id(),
+      wish_id: wishId,
+      url: f.url,
+      name: f.name,
+      media_type: "image" as const,
+      sort_order: have.size + i,
+      created_at: nowIso(),
+    }))
+  );
+  if (imgErr) console.error("ensureTwinshotelWish images:", imgErr);
+}
+
 export async function loadPersonalWishes(ctx: V2SessionContext): Promise<PersonalWish[]> {
   const userId = uid(ctx);
+  await ensureTwinshotelWish(userId);
   const sb = getV2Supabase();
   const { data: rows, error } = await sb
     .from("v2_personal_wishes")
