@@ -219,6 +219,12 @@ export function findHypothesisCatalogSeed(title: string): HypothesisSeed | null 
   );
 }
 
+export function hypothesisCatalogOrder(title: string): number {
+  const seed = findHypothesisCatalogSeed(title);
+  if (!seed) return 10_000;
+  return DESIGN_HYPOTHESES.findIndex((item) => item.title === seed.title);
+}
+
 export type NearestPlanWave = "now" | "next";
 
 export type NearestPlanItem = {

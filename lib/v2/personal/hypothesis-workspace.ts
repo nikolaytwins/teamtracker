@@ -1,3 +1,5 @@
+import { DESIGN_HYPOTHESES, findHypothesisCatalogSeed } from "@/lib/v2/personal/hypotheses-meta";
+
 export const ROSTOV_HYPOTHESIS_TITLE = "Колбаса через контент";
 export const ROSTOV_HYPOTHESIS_ALIASES = ["Запуск Ростовских колбас через контент"];
 export const ROSTOV_HYPOTHESIS_BODY =
@@ -135,9 +137,6 @@ export const ADS_HYPOTHESIS_BODY =
   "Мне нужен директолог-партнёр на субподряде с оплатой за клиентский проект.";
 export const ADS_HYPOTHESIS_CRITERION = "Директолог-партнёр и сообщения старым клиентам";
 
-export const COLD_SITES_HYPOTHESIS_TITLE = "Холодные сайты";
-const COLD_SITES_HYPOTHESIS_ALIASES = ["Холодные предложения сайтов"];
-
 function matchesHypothesisTitle(value: string, title: string, aliases: string[] = []) {
   return value === title || aliases.includes(value);
 }
@@ -173,38 +172,15 @@ export function hypothesisHero(title: string): { src: string; pos: string } {
 }
 
 export function hypothesisRank(title: string): HypothesisRank | null {
-  const value = title.trim();
-  const must = [
-    "Повторные точечные продажи клиентам",
-    "AI-субподряд для студий",
-    "Личные кабинеты онлайн-школ",
-    ROSTOV_HYPOTHESIS_TITLE,
-    ...ROSTOV_HYPOTHESIS_ALIASES,
-  ];
-  const want = [
-    ADS_HYPOTHESIS_TITLE,
-    TWINLABS_HYPOTHESIS_TITLE,
-    ...TWINLABS_HYPOTHESIS_ALIASES,
-    MEDIA_HYPOTHESIS_TITLE,
-    ...MEDIA_HYPOTHESIS_ALIASES,
-    COLD_SITES_HYPOTHESIS_TITLE,
-    ...COLD_SITES_HYPOTHESIS_ALIASES,
-  ];
-  if (must.includes(value)) {
-    const order = [
-      "Повторные точечные продажи клиентам",
-      "AI-субподряд для студий",
-      "Личные кабинеты онлайн-школ",
-      ROSTOV_HYPOTHESIS_TITLE,
-    ];
-    const idx = matchesHypothesisTitle(value, ROSTOV_HYPOTHESIS_TITLE, ROSTOV_HYPOTHESIS_ALIASES)
-      ? 3
-      : order.indexOf(value);
+  const seed = findHypothesisCatalogSeed(title);
+  if (!seed || (seed.tier !== "must" && seed.tier !== "want")) return null;
+  const peers = DESIGN_HYPOTHESES.filter((item) => item.tier === seed.tier);
+  const idx = Math.max(0, peers.findIndex((item) => item.title === seed.title));
+  if (seed.tier === "must") {
     const tones: HypothesisRankTone[] = ["main", "two", "three", "four"];
-    return { label: `Обязательная · ${idx + 1}`, tone: tones[Math.max(0, idx)] ?? "main" };
+    return { label: `Обязательная · ${idx + 1}`, tone: tones[idx] ?? "main" };
   }
-  if (want.includes(value)) return { label: "Желательная", tone: "side" };
-  return null;
+  return { label: `Желательная · ${idx + 1}`, tone: "side" };
 }
 
 export function hypothesisPage(title: string): HypothesisPageProfile | null {

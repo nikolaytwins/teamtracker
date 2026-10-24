@@ -142,37 +142,38 @@ async function ensureDesignBoard(userId: string) {
   }
 
   let projects = await listProjects(userId);
+  const drop = projects.filter((project) => LEGACY_EMPTY_PROJECTS.includes(project.name));
+  if (drop.length) {
+    const { error } = await sb
+      .from("v2_personal_hypothesis_projects")
+      .delete()
+      .eq("user_id", userId)
+      .in(
+        "id",
+        drop.map((project) => project.id),
+      );
+    if (error) throw error;
+    projects = projects.filter((project) => !LEGACY_EMPTY_PROJECTS.includes(project.name));
+  }
+  const missingProjects = DESIGN_PROJECTS.filter((seed) => !projects.some((project) => project.name === seed.name));
+  if (missingProjects.length) {
+    const rows = missingProjects.map((seed) => ({
+      id: newV2Id(),
+      user_id: userId,
+      name: seed.name,
+      color: "#71717A",
+      hue: seed.hue,
+      sort_order: DESIGN_PROJECTS.findIndex((item) => item.key === seed.key),
+      created_at: now,
+      updated_at: now,
+    }));
+    const { error } = await sb.from("v2_personal_hypothesis_projects").insert(rows);
+    if (error) throw error;
+    projects = await listProjects(userId);
+  }
+
   let hypotheses = await listHypotheses(userId);
   if (!hypotheses.length) {
-    const drop = projects.filter((project) => LEGACY_EMPTY_PROJECTS.includes(project.name));
-    if (drop.length) {
-      const { error } = await sb
-        .from("v2_personal_hypothesis_projects")
-        .delete()
-        .eq("user_id", userId)
-        .in(
-          "id",
-          drop.map((project) => project.id),
-        );
-      if (error) throw error;
-      projects = projects.filter((project) => !LEGACY_EMPTY_PROJECTS.includes(project.name));
-    }
-    const missing = DESIGN_PROJECTS.filter((seed) => !projects.some((project) => project.name === seed.name));
-    if (missing.length) {
-      const rows = missing.map((seed) => ({
-        id: newV2Id(),
-        user_id: userId,
-        name: seed.name,
-        color: "#71717A",
-        hue: seed.hue,
-        sort_order: DESIGN_PROJECTS.findIndex((item) => item.key === seed.key),
-        created_at: now,
-        updated_at: now,
-      }));
-      const { error } = await sb.from("v2_personal_hypothesis_projects").insert(rows);
-      if (error) throw error;
-      projects = await listProjects(userId);
-    }
     const byName = new Map(projects.map((project) => [project.name, project]));
     const sprintByName = new Map(sprints.map((sprint) => [sprint.name, sprint]));
     const rows = DESIGN_HYPOTHESES.map((seed, index) => {
@@ -246,8 +247,15 @@ async function syncHypothesisCatalog(
       claimed.add(existing.id);
       const patch: Record<string, unknown> = {};
       if (existing.title !== seed.title) patch.title = seed.title;
-      if (existing.stage !== seed.stage) patch.stage = seed.stage;
-      if ((existing.sprint_id ?? null) !== (sprintId ?? null)) patch.sprint_id = sprintId;
+      // Не возвращаем проверенные гипотезы обратно в каталог-стадию.
+      if (existing.stage !== "done" && existing.stage !== seed.stage) patch.stage = seed.stage;
+      const nextSprintId =
+        existing.stage === "done"
+          ? existing.sprint_id
+          : seed.stage === "active" || seed.stage === "done"
+            ? sprintId
+            : null;
+      if ((existing.sprint_id ?? null) !== (nextSprintId ?? null)) patch.sprint_id = nextSprintId;
       if (existing.sort_order !== index) patch.sort_order = index;
       if (project && existing.project_id !== project.id) patch.project_id = project.id;
       if (seed.body && !existing.body.trim()) patch.body = seed.body;

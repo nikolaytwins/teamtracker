@@ -11,6 +11,8 @@ import {
   NEAREST_TASK_PLAN,
   WIP_LIMIT,
   currentSprintId,
+  findHypothesisCatalogSeed,
+  hypothesisCatalogOrder,
   projectColors,
   type Hypothesis,
   type HypothesisProject,
@@ -88,8 +90,22 @@ export function HypothesesClient() {
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
   const inFilter = (item: Hypothesis) => flt === "all" || item.project_id === flt;
-  const active = items.filter((item) => item.stage === "active" && item.sprint_id === sprint?.id);
-  const queue = items.filter((item) => item.stage === "queue");
+  const byCatalog = (a: Hypothesis, b: Hypothesis) =>
+    hypothesisCatalogOrder(a.title) - hypothesisCatalogOrder(b.title) || a.sort_order - b.sort_order;
+  const active = items
+    .filter((item) => item.stage === "active" && item.sprint_id === sprint?.id)
+    .slice()
+    .sort(byCatalog);
+  const activeMust = active.filter((item) => findHypothesisCatalogSeed(item.title)?.tier === "must");
+  const activeWant = active.filter((item) => findHypothesisCatalogSeed(item.title)?.tier === "want");
+  const activeOther = active.filter((item) => {
+    const tier = findHypothesisCatalogSeed(item.title)?.tier;
+    return tier !== "must" && tier !== "want";
+  });
+  const queue = items
+    .filter((item) => item.stage === "queue")
+    .slice()
+    .sort(byCatalog);
   const backlog = items.filter((item) => item.stage === "backlog");
   const done = items.filter((item) => item.stage === "done" && item.sprint_id === sprint?.id);
   const open = items.find((item) => item.id === openId) ?? null;
@@ -270,31 +286,91 @@ export function HypothesesClient() {
           {loading ? (
             <div className="h-40 animate-pulse rounded-[20px] bg-[var(--v2-ink-50)]" />
           ) : (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-              {active.map((item) => (
-                <FocusCard
-                  key={item.id}
-                  item={item}
-                  project={projectById.get(item.project_id ?? "")}
-                  onOpen={() => openHypothesis(item)}
-                  onPatch={patchItem}
-                  onMove={move}
-                  onDelete={removeItem}
-                />
+            <div className="flex flex-col gap-7">
+              {(
+                [
+                  {
+                    key: "must",
+                    label: "Обязательные",
+                    hint: "Главный фокус спринта",
+                    list: activeMust,
+                    tone: "must" as const,
+                  },
+                  {
+                    key: "want",
+                    label: "Желательные",
+                    hint: "Делаем, если есть ресурс",
+                    list: activeWant,
+                    tone: "want" as const,
+                  },
+                  ...(activeOther.length
+                    ? [
+                        {
+                          key: "other",
+                          label: "Прочие в работе",
+                          hint: "Вне каталога",
+                          list: activeOther,
+                          tone: "other" as const,
+                        },
+                      ]
+                    : []),
+                ] as const
+              ).map((group) => (
+                <div key={group.key}>
+                  <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <h3
+                      className={`v2-tight text-[15px] font-semibold uppercase tracking-[0.14em] ${
+                        group.tone === "must"
+                          ? "text-[#2d5eef]"
+                          : group.tone === "want"
+                            ? "text-[var(--v2-ink-600)]"
+                            : "text-[var(--v2-ink-400)]"
+                      }`}
+                    >
+                      {group.label}
+                    </h3>
+                    <span className="v2-tight text-[13.5px] text-[var(--v2-ink-400)]">{group.hint}</span>
+                    <span className="v2-tnum ml-auto text-[13px] font-semibold text-[var(--v2-ink-400)]">
+                      {group.list.length}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-4">
+                    {group.list.map((item) => (
+                      <FocusCard
+                        key={item.id}
+                        item={item}
+                        project={projectById.get(item.project_id ?? "")}
+                        onOpen={() => openHypothesis(item)}
+                        onPatch={patchItem}
+                        onMove={move}
+                        onDelete={removeItem}
+                      />
+                    ))}
+                    {group.list.length === 0 ? (
+                      <div className="rounded-[20px] border border-dashed border-[var(--v2-ink-200)] bg-[var(--v2-ink-50)]/70 px-5 py-8 text-[14px] font-medium text-[var(--v2-ink-400)]">
+                        Пока пусто
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               ))}
-              {Array.from({ length: Math.max(0, WIP_LIMIT - active.length) }, (_, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={takeNext}
-                  className="flex min-h-[104px] flex-col items-center justify-center gap-1.5 rounded-[20px] py-4 lg:min-h-[260px] lg:py-0 bg-[var(--v2-ink-50)] px-5 text-center text-[15px] font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-brand-50)] hover:text-[#2d5eef]"
-                >
-                  {queue.length ? "+ Взять из очереди" : "Свободный слот"}
-                  <small className="block text-[13.5px] font-medium text-[var(--v2-ink-400)]">
-                    {queue.length ? `следующая: ${queue[0]?.title}` : "очередь пуста — добавь из бэклога"}
-                  </small>
-                </button>
-              ))}
+              {WIP_LIMIT - active.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-4">
+                  {Array.from({ length: Math.max(0, WIP_LIMIT - active.length) }, (_, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={takeNext}
+                      className="flex min-h-[104px] flex-col items-center justify-center gap-1.5 rounded-[20px] bg-[var(--v2-ink-50)] px-5 py-4 text-center text-[15px] font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-brand-50)] hover:text-[#2d5eef]"
+                    >
+                      {queue.length ? "+ Взять из очереди" : "Свободный слот"}
+                      <small className="block text-[13.5px] font-medium text-[var(--v2-ink-400)]">
+                        {queue.length ? `следующая: ${queue[0]?.title}` : "очередь пуста — добавь из бэклога"}
+                      </small>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
         </section>
