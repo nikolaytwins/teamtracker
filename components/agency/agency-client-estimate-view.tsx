@@ -122,7 +122,6 @@ export function AgencyClientEstimateView({ data }: { data: PublicClientEstimate 
                 <tr key={`${line.title}-${i}`}>
                   <td className="c-name">
                     <div className="t-name">{line.title}</div>
-                    {line.package ? <div className="sub">пакет</div> : null}
                   </td>
                   <td className="right c-qty" data-label="Кол-во">{line.package ? 1 : line.quantity}</td>
                   <td className="right c-price" data-label="Стоимость">{money(line.unitPrice)}</td>
