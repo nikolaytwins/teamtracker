@@ -541,6 +541,13 @@ export const LIFE_ARTICLES: LifeArticleCard[] = [
     hero: "/life/hero-game.png",
   },
   {
+    href: "/v2/personal/life-important",
+    label: "Важное о жизни",
+    title: "Важное о жизни",
+    lead: "Стратегия до октября 2029: капитал, дом, семья и созидание — без повторения прошлых десяти лет.",
+    cover: "До октября 2029",
+  },
+  {
     href: "/v2/personal/important",
     label: "Важное 2.0",
     title: "Из ручного труда — в системы и капитал",
