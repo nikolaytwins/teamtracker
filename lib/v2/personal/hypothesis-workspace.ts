@@ -1,4 +1,5 @@
-export const ROSTOV_HYPOTHESIS_TITLE = "Запуск Ростовских колбас через контент";
+export const ROSTOV_HYPOTHESIS_TITLE = "Колбаса через контент";
+export const ROSTOV_HYPOTHESIS_ALIASES = ["Запуск Ростовских колбас через контент"];
 export const ROSTOV_HYPOTHESIS_BODY =
   "Если проверить рилсы, UGC и партнерскую программу, то хотя бы один канал даст первый доход.";
 export const ROSTOV_HYPOTHESIS_CRITERION = "Первый доход или ≥ 1 партнёр";
@@ -76,19 +77,22 @@ export function emptyHypothesisWorkspace(): HypothesisWorkspace {
   return { stages: [], files: [], notes: [], ideas: [], copies: [], econ: null };
 }
 
-export const TWINLABS_HYPOTHESIS_TITLE = "TwinLabs Plus — запустить продажи дизайн-поддержки";
+export const TWINLABS_HYPOTHESIS_TITLE = "Дизайн-поддержка";
 export const TWINLABS_HYPOTHESIS_BODY =
   "Онлайн-школам, продюсерам и экспертам выгодно передать регулярные дизайн-задачи одной внешней команде вместо поиска отдельных исполнителей.";
 export const TWINLABS_HYPOTHESIS_CRITERION = "1–2 платных пилота";
 export const TWINLABS_HYPOTHESIS_PRIORITY = "высокий";
 
-const TWINLABS_HYPOTHESIS_ALIASES = ["Запуск подписки Твинлабс:Плюс + найм"];
+const TWINLABS_HYPOTHESIS_ALIASES = [
+  "TwinLabs Plus — запустить продажи дизайн-поддержки",
+  "Запуск подписки Твинлабс:Плюс + найм",
+];
 
-export const QMAGIC_HYPOTHESIS_TITLE = "Qmagic — проверить одну продуктовую гипотезу";
+export const QMAGIC_HYPOTHESIS_TITLE = "Qmagic";
 export const QMAGIC_HYPOTHESIS_BODY =
   "Пользователям нужен инструмент, который позволяет быстро создавать или редактировать дизайн через ИИ, в том числе внутри Figma.";
 
-const QMAGIC_HYPOTHESIS_ALIASES = ["Мини-запуск Qmagic"];
+const QMAGIC_HYPOTHESIS_ALIASES = ["Qmagic — проверить одну продуктовую гипотезу", "Мини-запуск Qmagic"];
 
 export function qmagicPageBrief(title: string): { title: string; text: string }[] | null {
   const value = title.trim();
@@ -117,16 +121,26 @@ export function qmagicPageBrief(title: string): { title: string; text: string }[
   ];
 }
 
-export const MEDIA_HYPOTHESIS_TITLE = "Личная медийка — начать строить долгосрочный актив";
+export const MEDIA_HYPOTHESIS_TITLE = "YouTube (личная медийка)";
 export const MEDIA_HYPOTHESIS_BODY =
   "Твой реальный путь из дизайнера в создателя ИИ-продуктов и предпринимателя может привлечь аудиторию, которая в будущем станет источником клиентов, партнёрств и покупателей собственных продуктов.";
 
-const MEDIA_HYPOTHESIS_ALIASES = ["Запуск контента в соц.сетях"];
+const MEDIA_HYPOTHESIS_ALIASES = [
+  "Личная медийка — начать строить долгосрочный актив",
+  "Запуск контента в соц.сетях",
+];
 
 export const ADS_HYPOTHESIS_TITLE = "Запустить услугу продвижения сайтов";
 export const ADS_HYPOTHESIS_BODY =
   "Мне нужен директолог-партнёр на субподряде с оплатой за клиентский проект.";
 export const ADS_HYPOTHESIS_CRITERION = "Директолог-партнёр и сообщения старым клиентам";
+
+export const COLD_SITES_HYPOTHESIS_TITLE = "Холодные сайты";
+const COLD_SITES_HYPOTHESIS_ALIASES = ["Холодные предложения сайтов"];
+
+function matchesHypothesisTitle(value: string, title: string, aliases: string[] = []) {
+  return value === title || aliases.includes(value);
+}
 
 export type HypothesisPageProfile = {
   body: string;
@@ -145,12 +159,14 @@ export type HypothesisRank = { label: string; tone: HypothesisRankTone };
 
 export function hypothesisHero(title: string): { src: string; pos: string } {
   const value = title.trim();
-  if (value === ROSTOV_HYPOTHESIS_TITLE) return { src: "/hypotheses/rostov-hero.jpg", pos: "42% 24%" };
+  if (matchesHypothesisTitle(value, ROSTOV_HYPOTHESIS_TITLE, ROSTOV_HYPOTHESIS_ALIASES)) {
+    return { src: "/hypotheses/rostov-hero.jpg", pos: "42% 24%" };
+  }
   if (value === ADS_HYPOTHESIS_TITLE) return { src: "/hypotheses/ads-hero.jpg", pos: "62% 18%" };
-  if (value === MEDIA_HYPOTHESIS_TITLE || MEDIA_HYPOTHESIS_ALIASES.includes(value)) {
+  if (matchesHypothesisTitle(value, MEDIA_HYPOTHESIS_TITLE, MEDIA_HYPOTHESIS_ALIASES)) {
     return { src: "/hypotheses/media-hero.jpg", pos: "66% 16%" };
   }
-  if (value === TWINLABS_HYPOTHESIS_TITLE || TWINLABS_HYPOTHESIS_ALIASES.includes(value)) {
+  if (matchesHypothesisTitle(value, TWINLABS_HYPOTHESIS_TITLE, TWINLABS_HYPOTHESIS_ALIASES)) {
     return { src: "/hypotheses/twinlabs-hero.jpg", pos: "60% 20%" };
   }
   return { src: "/hypotheses/sofia-rules.png", pos: "50% 18%" };
@@ -158,33 +174,49 @@ export function hypothesisHero(title: string): { src: string; pos: string } {
 
 export function hypothesisRank(title: string): HypothesisRank | null {
   const value = title.trim();
-  if (value === ROSTOV_HYPOTHESIS_TITLE) return { label: "Главный тест", tone: "main" };
-  if (value === ADS_HYPOTHESIS_TITLE) return { label: "Тест №2", tone: "two" };
-  if (
-    value === TWINLABS_HYPOTHESIS_TITLE ||
-    TWINLABS_HYPOTHESIS_ALIASES.includes(value) ||
-    value === MEDIA_HYPOTHESIS_TITLE ||
-    MEDIA_HYPOTHESIS_ALIASES.includes(value)
-  ) {
-    return { label: "Тест №3", tone: "three" };
+  const must = [
+    "Повторные точечные продажи клиентам",
+    "AI-субподряд для студий",
+    "Личные кабинеты онлайн-школ",
+    ROSTOV_HYPOTHESIS_TITLE,
+    ...ROSTOV_HYPOTHESIS_ALIASES,
+  ];
+  const want = [
+    ADS_HYPOTHESIS_TITLE,
+    TWINLABS_HYPOTHESIS_TITLE,
+    ...TWINLABS_HYPOTHESIS_ALIASES,
+    MEDIA_HYPOTHESIS_TITLE,
+    ...MEDIA_HYPOTHESIS_ALIASES,
+    COLD_SITES_HYPOTHESIS_TITLE,
+    ...COLD_SITES_HYPOTHESIS_ALIASES,
+  ];
+  if (must.includes(value)) {
+    const order = [
+      "Повторные точечные продажи клиентам",
+      "AI-субподряд для студий",
+      "Личные кабинеты онлайн-школ",
+      ROSTOV_HYPOTHESIS_TITLE,
+    ];
+    const idx = matchesHypothesisTitle(value, ROSTOV_HYPOTHESIS_TITLE, ROSTOV_HYPOTHESIS_ALIASES)
+      ? 3
+      : order.indexOf(value);
+    const tones: HypothesisRankTone[] = ["main", "two", "three", "four"];
+    return { label: `Обязательная · ${idx + 1}`, tone: tones[Math.max(0, idx)] ?? "main" };
   }
-  if (value === "ИИ-сервисы для блогеров") return { label: "Приоритетный тест (№4)", tone: "four" };
-  if (value === QMAGIC_HYPOTHESIS_TITLE || QMAGIC_HYPOTHESIS_ALIASES.includes(value) || value === "Холодные предложения сайтов") {
-    return { label: "Вторично", tone: "side" };
-  }
+  if (want.includes(value)) return { label: "Желательная", tone: "side" };
   return null;
 }
 
 export function hypothesisPage(title: string): HypothesisPageProfile | null {
   const value = title.trim();
-  if (value === ROSTOV_HYPOTHESIS_TITLE) {
+  if (matchesHypothesisTitle(value, ROSTOV_HYPOTHESIS_TITLE, ROSTOV_HYPOTHESIS_ALIASES)) {
     return {
       body: ROSTOV_HYPOTHESIS_BODY,
       criterion: ROSTOV_HYPOTHESIS_CRITERION,
       workspace: rostovHypothesisWorkspace,
     };
   }
-  if (value === TWINLABS_HYPOTHESIS_TITLE || TWINLABS_HYPOTHESIS_ALIASES.includes(value)) {
+  if (matchesHypothesisTitle(value, TWINLABS_HYPOTHESIS_TITLE, TWINLABS_HYPOTHESIS_ALIASES)) {
     return {
       body: TWINLABS_HYPOTHESIS_BODY,
       criterion: TWINLABS_HYPOTHESIS_CRITERION,
@@ -192,14 +224,14 @@ export function hypothesisPage(title: string): HypothesisPageProfile | null {
       workspace: twinlabsHypothesisWorkspace,
     };
   }
-  if (value === QMAGIC_HYPOTHESIS_TITLE || QMAGIC_HYPOTHESIS_ALIASES.includes(value)) {
+  if (matchesHypothesisTitle(value, QMAGIC_HYPOTHESIS_TITLE, QMAGIC_HYPOTHESIS_ALIASES)) {
     return {
       body: QMAGIC_HYPOTHESIS_BODY,
       criterion: "",
       workspace: qmagicHypothesisWorkspace,
     };
   }
-  if (value === MEDIA_HYPOTHESIS_TITLE || MEDIA_HYPOTHESIS_ALIASES.includes(value)) {
+  if (matchesHypothesisTitle(value, MEDIA_HYPOTHESIS_TITLE, MEDIA_HYPOTHESIS_ALIASES)) {
     return {
       body: MEDIA_HYPOTHESIS_BODY,
       criterion: "",

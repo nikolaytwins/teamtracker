@@ -8,6 +8,7 @@ import {
   STAGE_LABEL,
   VERDICT_META,
   PRIMARY_HYPOTHESIS_TAG,
+  NEAREST_TASK_PLAN,
   WIP_LIMIT,
   currentSprintId,
   projectColors,
@@ -298,6 +299,8 @@ export function HypothesesClient() {
           )}
         </section>
 
+        <NearestTaskPlan />
+
         <div id="board-anchor" className="flex flex-wrap items-center gap-3">
           <div className="inline-flex gap-0.5 rounded-[14px] bg-white p-1 shadow-[var(--v2-shadow-card)]">
             {(
@@ -533,6 +536,104 @@ export function HypothesesClient() {
         />
       ) : null}
     </div>
+  );
+}
+
+function NearestTaskPlan() {
+  const now = NEAREST_TASK_PLAN.filter((item) => item.wave === "now");
+  const next = NEAREST_TASK_PLAN.filter((item) => item.wave === "next");
+  return (
+    <section className="relative overflow-hidden rounded-[28px] border border-[var(--v2-ink-100)] bg-[linear-gradient(145deg,#0f172a_0%,#1e293b_48%,#0f172a_100%)] px-5 py-6 text-white shadow-[0_28px_60px_-36px_rgba(15,23,42,0.85)] sm:px-7 sm:py-8 lg:px-9">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(251,191,36,0.28),transparent_68%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-24 left-10 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.16),transparent_70%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)]"
+      />
+
+      <div className="relative mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="v2-tight text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300/90">
+            Фокус спринта
+          </p>
+          <h2 className="v2-tight mt-2 text-[26px] font-semibold tracking-[-0.04em] sm:text-[32px]">
+            Ближайший план задач
+          </h2>
+          <p className="v2-tight mt-1.5 max-w-[42rem] text-[14px] text-slate-300 sm:text-[15px]">
+            Сначала три ближайших действия, потом следующий эшелон — без распыления.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] font-semibold text-slate-200 backdrop-blur">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.8)]" />
+          {NEAREST_TASK_PLAN.length} шагов
+        </div>
+      </div>
+
+      <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-6">
+        <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4 sm:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <span className="v2-tight text-[12px] font-semibold uppercase tracking-[0.16em] text-amber-200/90">
+              Сейчас
+            </span>
+            <span className="rounded-full bg-amber-300/15 px-2.5 py-1 text-[11.5px] font-semibold text-amber-200">
+              1–3
+            </span>
+          </div>
+          <ol className="space-y-3">
+            {now.map((item, index) => (
+              <li
+                key={item.n}
+                className="group flex items-start gap-3.5 rounded-[16px] border border-white/5 bg-slate-950/35 px-3.5 py-3 transition hover:border-amber-300/25 hover:bg-slate-950/55"
+              >
+                <span className="v2-tnum inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(160deg,#fbbf24,#f59e0b)] text-[14px] font-bold text-slate-950 shadow-[0_10px_24px_-12px_rgba(245,158,11,0.9)]">
+                  {item.n}
+                </span>
+                <div className="min-w-0 pt-1">
+                  <p className="v2-tight text-[15.5px] font-semibold tracking-[-0.02em] text-white sm:text-[16.5px]">
+                    {item.title}
+                  </p>
+                  {index < now.length - 1 ? (
+                    <p className="mt-1 text-[12px] font-medium text-slate-400">дальше по цепочке</p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <span className="v2-tight text-[12px] font-semibold uppercase tracking-[0.16em] text-sky-200/90">
+              Следом
+            </span>
+            <span className="rounded-full bg-sky-300/10 px-2.5 py-1 text-[11.5px] font-semibold text-sky-200">
+              4–7
+            </span>
+          </div>
+          <ol className="space-y-2.5">
+            {next.map((item) => (
+              <li
+                key={item.n}
+                className="flex items-start gap-3.5 rounded-[16px] border border-transparent px-3 py-2.5 transition hover:border-white/10 hover:bg-white/[0.04]"
+              >
+                <span className="v2-tnum inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-[13px] font-semibold text-slate-200">
+                  {item.n}
+                </span>
+                <p className="v2-tight pt-1 text-[15px] font-medium tracking-[-0.015em] text-slate-100 sm:text-[15.5px]">
+                  {item.title}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </section>
   );
 }
 

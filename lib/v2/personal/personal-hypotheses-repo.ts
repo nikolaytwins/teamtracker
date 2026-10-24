@@ -7,6 +7,7 @@ import {
   WIP_LIMIT,
   applyStageChange,
   currentSprintId,
+  hypothesisCatalogNames,
   isHypothesisStage,
   isHypothesisVerdict,
   type Hypothesis,
@@ -211,6 +212,76 @@ async function ensureDesignBoard(userId: string) {
           .eq("user_id", userId),
       ),
     );
+    hypotheses = await listHypotheses(userId);
+  }
+
+  await syncHypothesisCatalog(userId, projects, sprints, hypotheses);
+}
+
+/** Подтягивает названия, стадии и недостающие карточки каталога гипотез. */
+async function syncHypothesisCatalog(
+  userId: string,
+  projects: HypothesisProject[],
+  sprints: HypothesisSprint[],
+  hypotheses: Hypothesis[],
+) {
+  const sb = getV2Supabase();
+  const now = nowIso();
+  const byName = new Map(projects.map((project) => [project.name, project]));
+  const sprintByName = new Map(sprints.map((sprint) => [sprint.name, sprint]));
+  const claimed = new Set<string>();
+
+  for (let index = 0; index < DESIGN_HYPOTHESES.length; index++) {
+    const seed = DESIGN_HYPOTHESES[index]!;
+    const names = hypothesisCatalogNames(seed);
+    const existing = hypotheses.find(
+      (item) => !claimed.has(item.id) && names.some((name) => name === item.title.trim()),
+    );
+    const project = byName.get(DESIGN_PROJECTS.find((item) => item.key === seed.project)?.name ?? "");
+    const sprintSeed = DESIGN_SPRINTS.find((item) => item.key === seed.sprint);
+    const sprint = sprintSeed ? sprintByName.get(sprintSeed.name) : undefined;
+    const sprintId = seed.stage === "active" || seed.stage === "done" ? sprint?.id ?? currentSprintId(sprints) : null;
+
+    if (existing) {
+      claimed.add(existing.id);
+      const patch: Record<string, unknown> = {};
+      if (existing.title !== seed.title) patch.title = seed.title;
+      if (existing.stage !== seed.stage) patch.stage = seed.stage;
+      if ((existing.sprint_id ?? null) !== (sprintId ?? null)) patch.sprint_id = sprintId;
+      if (existing.sort_order !== index) patch.sort_order = index;
+      if (project && existing.project_id !== project.id) patch.project_id = project.id;
+      if (seed.body && !existing.body.trim()) patch.body = seed.body;
+      if (seed.metric && (!existing.metric.trim() || existing.metric === "Главная гипотеза")) {
+        patch.metric = seed.metric;
+      }
+      if (!Object.keys(patch).length) continue;
+      patch.updated_at = now;
+      const { error } = await sb
+        .from("v2_personal_hypotheses")
+        .update(patch)
+        .eq("id", existing.id)
+        .eq("user_id", userId);
+      if (error) throw error;
+      continue;
+    }
+
+    const row = {
+      id: newV2Id(),
+      user_id: userId,
+      project_id: project?.id ?? null,
+      sprint_id: sprintId,
+      title: seed.title,
+      body: seed.body,
+      metric: seed.metric,
+      stage: seed.stage,
+      verdict: seed.verdict ?? null,
+      result_text: seed.result_text ?? "",
+      sort_order: index,
+      created_at: now,
+      updated_at: now,
+    };
+    const { error } = await sb.from("v2_personal_hypotheses").insert(row);
+    if (error) throw error;
   }
 }
 
