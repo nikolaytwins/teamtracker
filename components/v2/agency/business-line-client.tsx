@@ -166,67 +166,15 @@ function FinanceSelect({
   );
 }
 
-function InlineName({
-  value,
-  href,
-  onChange,
-}: {
-  value: string;
-  href: string;
-  onChange: (name: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [temp, setTemp] = useState(value);
-
-  useEffect(() => setTemp(value), [value]);
-
-  const commit = () => {
-    const next = temp.trim();
-    setEditing(false);
-    if (!next || next === value) {
-      setTemp(value);
-      return;
-    }
-    onChange(next);
-  };
-
-  if (editing) {
-    return (
-      <input
-        value={temp}
-        autoFocus
-        onBlur={commit}
-        onChange={(e) => setTemp(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-          if (e.key === "Escape") {
-            setTemp(value);
-            setEditing(false);
-          }
-        }}
-        className="v2-tight w-full min-w-0 rounded border border-[var(--v2-brand-500)] bg-white px-2 py-1 text-[14px] font-medium text-[var(--v2-ink-900)] max-lg:h-10 max-lg:rounded-lg max-lg:text-[15.5px]"
-      />
-    );
-  }
-
+function ProjectNameLink({ value, href }: { value: string; href: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-1">
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        title="Нажмите, чтобы переименовать"
-        className="v2-tight min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left text-[14px] font-medium text-[var(--v2-ink-900)] hover:bg-[var(--v2-ink-50)] max-lg:min-h-10 max-lg:py-1.5 max-lg:text-[15.5px] max-lg:font-semibold"
-      >
-        {value}
-      </button>
-      <Link
-        href={href}
-        title="Открыть проект"
-        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--v2-ink-400)] transition hover:bg-[var(--v2-ink-100)] hover:text-[var(--v2-brand-700)] max-lg:h-9 max-lg:w-9"
-      >
-        <V2Icons.arrowR className="h-3.5 w-3.5" />
-      </Link>
-    </div>
+    <Link
+      href={href}
+      title="Открыть проект"
+      className="v2-tight block min-w-0 truncate rounded px-1 py-0.5 text-[14px] font-medium text-[var(--v2-ink-900)] transition hover:bg-[var(--v2-ink-50)] hover:text-[var(--v2-brand-700)] max-lg:min-h-10 max-lg:py-1.5 max-lg:text-[15.5px] max-lg:font-semibold"
+    >
+      {value}
+    </Link>
   );
 }
 
@@ -806,10 +754,9 @@ export function BusinessLineClient({ line }: { line: V2FinanceBusinessLine }) {
                               {p.name[0]}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <InlineName
+                              <ProjectNameLink
                                 value={p.name}
                                 href={appPath(`/v2/agency/projects/${p.id}`)}
-                                onChange={(name) => void patchProject(p.id, { name })}
                               />
                               <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                                 <select
