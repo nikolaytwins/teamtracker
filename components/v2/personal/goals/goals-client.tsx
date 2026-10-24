@@ -14,6 +14,8 @@ import {
   GOAL_PHOTO_POS,
   GOAL_TIERS,
   GOALS_BOARD_LS_KEY,
+  RING_GOAL_ID,
+  RING_GOAL_URL,
   defaultGoalsBoard,
   lifeGoalProgress,
   sanitizeGoalsBoard,
@@ -188,12 +190,16 @@ function useGoalsDesk() {
         nextBalances[key] = row.amount_rub || 0;
       }
       setBalances(nextBalances);
-      setBoard(remote?.board ? sanitizeGoalsBoard(remote.board) : readLocal() ?? defaultGoalsBoard());
+      const raw = remote?.board ?? readLocal();
+      const hadRing = Boolean(raw?.goals?.some((goal) => goal.id === RING_GOAL_ID));
+      const next = sanitizeGoalsBoard(raw ?? defaultGoalsBoard());
+      setBoard(next);
+      if (!hadRing && next.goals.some((goal) => goal.id === RING_GOAL_ID)) persist(next);
     })();
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [persist]);
 
   const updateBoard = useCallback(
     (recipe: (current: GoalsBoard) => GoalsBoard) => {
@@ -553,8 +559,17 @@ function GoalsSheet({ desk }: { desk: Desk }) {
                     <div className="gc-b">
                       <div className="gc-top">
                         <h3 className="gc-n">{item.t}</h3>
-                        {item.done ? <span className="gc-tag">✓ Исполнено</span> : item.fund ? <span className="gc-src">из фонда</span> : null}
+                        {item.done ? (
+                          <span className="gc-tag">✓ Исполнено</span>
+                        ) : item.id === RING_GOAL_ID ? (
+                          <span className="gc-tag hot">прям важно</span>
+                        ) : item.fund ? (
+                          <span className="gc-src">из фонда</span>
+                        ) : null}
                       </div>
+                      {item.id === RING_GOAL_ID ? (
+                        <p className="gc-note">16,5 · красное золото 585</p>
+                      ) : null}
                       <div className="gc-v">
                         <span className="gc-cur tnum">{rub(have)}</span>
                         <span className="gc-tg tnum">из {rub(target)}</span>
@@ -820,6 +835,15 @@ function GoalDrawer({
           {wishGoal ? " · из фонда желаний" : ""}
         </span>
         <input className="m-title" value={goal.t} placeholder="Что за цель?" aria-label="Название" onChange={(event) => onChange({ t: event.target.value })} />
+        {goal.id === RING_GOAL_ID ? (
+          <div className="m-ring">
+            <span className="m-ring-badge">прям важно</span>
+            <p>Размер 16,5 · красное золото 585</p>
+            <a href={RING_GOAL_URL} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+              Открыть на 585 Золотой →
+            </a>
+          </div>
+        ) : null}
         <div className="m-nums">
           <label className="m-num">
             <span className="kick">Стоимость</span>

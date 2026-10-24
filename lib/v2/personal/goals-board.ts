@@ -58,6 +58,7 @@ export const GOALS_BOARD_LS_KEY = "tt.goals.board.v1";
 
 export const GOAL_PHOTO: Record<string, string> = {
   teeth: "/goals/teeth.jpg",
+  ring: "/goals/ring.jpg",
   iphone: "/goals/iphone.jpg",
   spb: "/goals/spb.jpg",
   party: "/goals/party.webp",
@@ -66,10 +67,22 @@ export const GOAL_PHOTO: Record<string, string> = {
 
 export const GOAL_PHOTO_POS: Record<string, string> = {
   teeth: "center 42%",
+  ring: "center 45%",
   iphone: "center 45%",
   spb: "center 85%",
   party: "center 62%",
   mac: "center 72%",
+};
+
+export const RING_GOAL_ID = "ring";
+export const RING_GOAL_URL = "https://www.585zolotoy.ru/catalog/products/9004449/";
+export const RING_GOAL: LifeGoal = {
+  id: RING_GOAL_ID,
+  c: "must",
+  t: "Кольцо SMART DIAMONDS",
+  p: 65_994,
+  v: 0,
+  note: "Прям важно.\nРазмер 16,5 · красное золото 585\nhttps://www.585zolotoy.ru/catalog/products/9004449/",
 };
 
 export function lifeGoalProgress(goal: LifeGoal, board: GoalsBoard, balances: Record<FundKey, number>) {
@@ -96,6 +109,7 @@ export function defaultGoalsBoard(): GoalsBoard {
     goals: [
       { id: "cush", c: "must", t: "Подушка безопасности", p: 0, v: 0, fund: "cush", noimg: true },
       { id: "teeth", c: "must", t: "Привести в порядок зубы", p: 100_000, v: 0 },
+      { ...RING_GOAL },
       { id: "iphone", c: "want", t: "Айфон", p: 120_000, v: 0 },
       { id: "spb", c: "want", t: "Съездить в Питер с Лерой", p: 100_000, v: 0 },
       { id: "party", c: "want", t: "Сходить в стрипуху с Лерой или на секс-вечеринку", p: 40_000, v: 0 },
@@ -122,6 +136,7 @@ export function sanitizeGoalsBoard(input: unknown): GoalsBoard {
   if (!goals.some((g) => g.id === "cush")) {
     goals.unshift(base.goals[0]!);
   }
+  ensureRingGoal(goals);
   return {
     flow: money(raw.flow),
     targets: {
@@ -130,6 +145,13 @@ export function sanitizeGoalsBoard(input: unknown): GoalsBoard {
     },
     goals,
   };
+}
+
+function ensureRingGoal(goals: LifeGoal[]) {
+  if (goals.some((g) => g.id === RING_GOAL_ID)) return;
+  const teethIdx = goals.findIndex((g) => g.id === "teeth");
+  const insertAt = teethIdx >= 0 ? teethIdx + 1 : Math.min(1, goals.length);
+  goals.splice(insertAt, 0, { ...RING_GOAL });
 }
 
 function sanitizeGoal(input: unknown): LifeGoal | null {
