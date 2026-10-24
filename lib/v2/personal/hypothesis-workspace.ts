@@ -178,7 +178,7 @@ export function hypothesisRank(title: string): HypothesisRank | null {
   const idx = Math.max(0, peers.findIndex((item) => item.title === seed.title));
   if (seed.tier === "must") {
     const tones: HypothesisRankTone[] = ["main", "two", "three", "four"];
-    return { label: `Обязательная · ${idx + 1}`, tone: tones[idx] ?? "main" };
+    return { label: `Обязательная · ${idx + 1}`, tone: tones[Math.min(idx, tones.length - 1)] ?? "main" };
   }
   return { label: `Желательная · ${idx + 1}`, tone: "side" };
 }

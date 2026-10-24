@@ -6,7 +6,7 @@ function card(id: string, stage: HypothesisStage, sprint_id: string | null = nul
   return { id, stage, sprint_id };
 }
 
-test("blocks a ninth active hypothesis in the same sprint", () => {
+test("blocks a tenth active hypothesis in the same sprint", () => {
   const items = [
     card("a", "active", "s1"),
     card("b", "active", "s1"),
@@ -16,11 +16,12 @@ test("blocks a ninth active hypothesis in the same sprint", () => {
     card("g", "active", "s1"),
     card("h", "active", "s1"),
     card("i", "active", "s1"),
+    card("j", "active", "s1"),
     card("d", "queue"),
   ];
   const result = applyStageChange(items, "d", "active", "s1");
   assert.equal(result.ok, false);
-  if (!result.ok) assert.match(result.error, /8/);
+  if (!result.ok) assert.match(result.error, /9/);
 });
 
 test("keeps an already active card inside the limit", () => {

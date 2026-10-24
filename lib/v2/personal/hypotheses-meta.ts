@@ -1,4 +1,4 @@
-export const WIP_LIMIT = 8;
+export const WIP_LIMIT = 9;
 
 export const PRIMARY_HYPOTHESIS_TAG = "Главная гипотеза";
 
@@ -120,6 +120,15 @@ export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
     aliases: ["Запуск Ростовских колбас через контент"],
     body: "Если проверить рилсы, UGC и партнерскую программу, то хотя бы один канал даст первый доход.",
     metric: "Первый доход или ≥ 1 партнёр",
+  },
+  {
+    project: "pt",
+    stage: "active",
+    sprint: "s1",
+    tier: "must",
+    title: "Найм",
+    body: "Проверить найм / part-time как канал стабильного дохода рядом с агентством и своими продуктами.",
+    metric: "",
   },
   {
     project: "tw",
