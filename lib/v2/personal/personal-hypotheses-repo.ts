@@ -4,7 +4,6 @@ import {
   DESIGN_PROJECTS,
   DESIGN_SPRINTS,
   LEGACY_EMPTY_PROJECTS,
-  WIP_LIMIT,
   applyStageChange,
   currentSprintId,
   hypothesisCatalogNames,
@@ -357,18 +356,6 @@ export async function createPersonalHypothesis(
   if (stage === "active") {
     if (!input.sprintId) throw new PersonalHypothesesValidationError("Выбери спринт");
     await requireOwnedSprint(ctx, input.sprintId);
-    const { count, error: countError } = await sb
-      .from("v2_personal_hypotheses")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("stage", "active")
-      .eq("sprint_id", input.sprintId);
-    if (countError) throw countError;
-    if ((count ?? 0) >= WIP_LIMIT) {
-      throw new PersonalHypothesesValidationError(
-        `В спринте уже ${WIP_LIMIT} гипотез. Заверши одну или верни в очередь.`,
-      );
-    }
     sprintId = input.sprintId;
   }
   const { data: existing, error: existingError } = await sb

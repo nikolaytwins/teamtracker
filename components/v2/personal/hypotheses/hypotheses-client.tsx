@@ -9,7 +9,6 @@ import {
   VERDICT_META,
   PRIMARY_HYPOTHESIS_TAG,
   NEAREST_TASK_PLAN,
-  WIP_LIMIT,
   currentSprintId,
   findHypothesisCatalogSeed,
   hypothesisCatalogOrder,
@@ -215,11 +214,11 @@ export function HypothesesClient() {
             <div>
               <h1 className="v2-tight text-[30px] font-semibold leading-[1.1] tracking-[-0.036em] sm:text-[36px] lg:text-[40px]">Гипотезы</h1>
               <p className="v2-tight mt-2 text-[14.5px] text-[var(--v2-ink-500)] sm:mt-2.5 sm:text-[15.5px]">
-                В работе, очередь и бэклог. В спринте не больше {WIP_LIMIT} гипотез одновременно.
+                В работе, очередь и бэклог. В спринте может быть сколько угодно гипотез.
               </p>
             </div>
             <div className="grid max-w-[820px] grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
-              <Stat kicker="В работе" value={String(active.length)} extra={`/ ${WIP_LIMIT}`} main />
+              <Stat kicker="В работе" value={String(active.length)} main />
               <Stat kicker="Очередь" value={String(queue.length)} />
               <Stat kicker="Бэклог" value={String(backlog.length)} />
               <Stat kicker="Проверено" value={String(done.length)} />
@@ -271,16 +270,8 @@ export function HypothesesClient() {
               В работе{sprint ? ` · ${sprint.name}` : ""}
             </h2>
             <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">{sprint?.range_label}</span>
-            <span className="ml-auto flex items-center gap-2.5 text-[13.5px] font-semibold text-[var(--v2-ink-500)]">
-              {Array.from({ length: WIP_LIMIT }, (_, index) => (
-                <i
-                  key={index}
-                  className={`block h-2 w-[26px] rounded-full ${index < active.length ? "bg-[#2d5eef]" : "bg-[var(--v2-ink-200)]"}`}
-                />
-              ))}
-              <span className="v2-tnum">
-                {active.length} / {WIP_LIMIT}
-              </span>
+            <span className="ml-auto v2-tnum text-[13.5px] font-semibold text-[var(--v2-ink-500)]">
+              {active.length}
             </span>
           </div>
           {loading ? (
@@ -354,21 +345,18 @@ export function HypothesesClient() {
                   </div>
                 </div>
               ))}
-              {WIP_LIMIT - active.length > 0 ? (
+              {queue.length ? (
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-4">
-                  {Array.from({ length: Math.max(0, WIP_LIMIT - active.length) }, (_, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={takeNext}
-                      className="flex min-h-[104px] flex-col items-center justify-center gap-1.5 rounded-[20px] bg-[var(--v2-ink-50)] px-5 py-4 text-center text-[15px] font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-brand-50)] hover:text-[#2d5eef]"
-                    >
-                      {queue.length ? "+ Взять из очереди" : "Свободный слот"}
-                      <small className="block text-[13.5px] font-medium text-[var(--v2-ink-400)]">
-                        {queue.length ? `следующая: ${queue[0]?.title}` : "очередь пуста — добавь из бэклога"}
-                      </small>
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={takeNext}
+                    className="flex min-h-[104px] flex-col items-center justify-center gap-1.5 rounded-[20px] bg-[var(--v2-ink-50)] px-5 py-4 text-center text-[15px] font-semibold text-[var(--v2-ink-500)] hover:bg-[var(--v2-brand-50)] hover:text-[#2d5eef]"
+                  >
+                    + Взять из очереди
+                    <small className="block text-[13.5px] font-medium text-[var(--v2-ink-400)]">
+                      следующая: {queue[0]?.title}
+                    </small>
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -462,7 +450,6 @@ export function HypothesesClient() {
                     </span>
                     <span className="v2-tnum text-[12.5px] font-semibold text-[var(--v2-ink-400)]">
                       {column.length}
-                      {stage === "active" ? ` / ${WIP_LIMIT}` : ""}
                     </span>
                     <span className="ml-auto text-[12px] text-[var(--v2-ink-400)]">
                       {stage === "active" || stage === "done" ? sprint?.name : STAGE_HINT[stage]}
@@ -604,7 +591,6 @@ export function HypothesesClient() {
           item={open}
           projects={projects}
           sprints={sprints}
-          activeCount={active.length}
           onClose={() => setOpenId(null)}
           onPatch={patchItem}
           onMove={move}
@@ -1035,7 +1021,6 @@ function HypothesisDrawer({
   item,
   projects,
   sprints,
-  activeCount,
   onClose,
   onPatch,
   onMove,
@@ -1044,7 +1029,6 @@ function HypothesisDrawer({
   item: Hypothesis;
   projects: HypothesisProject[];
   sprints: HypothesisSprint[];
-  activeCount: number;
   onClose: () => void;
   onPatch: (id: string, patch: Record<string, unknown>) => Promise<Hypothesis>;
   onMove: (id: string, stage: HypothesisStage) => Promise<void>;
@@ -1237,11 +1221,6 @@ function HypothesisDrawer({
                 />
               </Field>
             </>
-          ) : null}
-          {item.stage === "active" && activeCount > WIP_LIMIT ? (
-            <div className="rounded-[11px] bg-[#fef0c7] px-3 py-2.5 text-[13.5px] text-[#b54708]">
-              В спринте больше {WIP_LIMIT} гипотез.
-            </div>
           ) : null}
         </div>
         <div className="flex gap-2.5 border-t border-[var(--v2-ink-100)] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] sm:px-6 lg:py-4">

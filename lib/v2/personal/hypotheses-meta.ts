@@ -1,5 +1,3 @@
-export const WIP_LIMIT = 9;
-
 export const PRIMARY_HYPOTHESIS_TAG = "Главная гипотеза";
 
 export const HYPOTHESIS_STAGES = ["backlog", "queue", "active", "done"] as const;
@@ -285,18 +283,6 @@ export function applyStageChange<T extends Staged>(
   const current = items.find((item) => item.id === id);
   if (!current) return { ok: false, error: "Гипотеза не найдена" };
   const targetSprint = stage === "done" && current.sprint_id ? current.sprint_id : sprintId;
-  const alreadyThere = current.stage === "active" && current.sprint_id === targetSprint;
-  if (stage === "active") {
-    const taken = items.filter(
-      (item) => item.id !== id && item.stage === "active" && item.sprint_id === targetSprint,
-    ).length;
-    if (!alreadyThere && taken >= WIP_LIMIT) {
-      return {
-        ok: false,
-        error: `В спринте уже ${WIP_LIMIT} гипотезы. Заверши одну или верни в очередь.`,
-      };
-    }
-  }
   const sprint_id = stage === "active" || stage === "done" ? targetSprint : null;
   return { ok: true, item: { ...current, stage, sprint_id } };
 }
