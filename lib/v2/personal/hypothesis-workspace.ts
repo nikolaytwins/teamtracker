@@ -390,6 +390,31 @@ export function mediaHypothesisWorkspace(): HypothesisWorkspace {
         tasks: [],
       },
       {
+        id: "md-reality",
+        title: "Реалити",
+        note: "Под каждый ролик — ссылка на предзапись Neuroskills.",
+        tasks: [
+          task(
+            "md-neuroskills-page",
+            "Сделать страницу предзаписи Neuroskills",
+            null,
+            "Лендинг предзаписи школы по ИИ. Вставлять под каждый ролик, собирать интересующихся: для кого курс и анкета."
+          ),
+          task(
+            "md-reality-1",
+            "Реалити №1: ИИ отобрал работу",
+            null,
+            "Рассказать о ситуации и гипотезах. Школу по ИИ запустить (уже 600к заработал) — оставить анкету предзаписи, для кого будет. Агентство перевернуть в маркетинг. Запустить Qmagic. Колбасу. Буду пробовать тестировать и показывать."
+          ),
+          task(
+            "md-reality-2",
+            "Реалити №2: сколько заработал вместе с ИИ",
+            null,
+            "Рассказать о Soul, квартиранте, презе за 60к, сайте за 30к. Показать в целом все работы, что сделал за месяц."
+          ),
+        ],
+      },
+      {
         id: "md-youtube",
         title: "Ютуб",
         note: "",
@@ -422,6 +447,41 @@ export function mediaHypothesisWorkspace(): HypothesisWorkspace {
     copies: [],
     econ: null,
   };
+}
+
+/** Добавляет в сохранённый workspace недостающие стадии/задачи из сида (по id). */
+export function mergeHypothesisSeed(
+  current: HypothesisWorkspace,
+  seed: HypothesisWorkspace
+): HypothesisWorkspace {
+  const next: HypothesisWorkspace = {
+    stages: current.stages.map((stage) => ({
+      ...stage,
+      tasks: stage.tasks.map((item) => ({ ...item })),
+    })),
+    files: [...current.files],
+    notes: [...current.notes],
+    ideas: [...current.ideas],
+    copies: [...current.copies],
+    econ: current.econ,
+  };
+  const stageById = new Map(next.stages.map((stage) => [stage.id, stage]));
+  for (const seedStage of seed.stages) {
+    const existing = stageById.get(seedStage.id);
+    if (!existing) {
+      next.stages.push({
+        ...seedStage,
+        tasks: seedStage.tasks.map((item) => ({ ...item })),
+      });
+      continue;
+    }
+    if (!existing.note.trim() && seedStage.note.trim()) existing.note = seedStage.note;
+    const taskIds = new Set(existing.tasks.map((item) => item.id));
+    for (const seedTask of seedStage.tasks) {
+      if (!taskIds.has(seedTask.id)) existing.tasks.push({ ...seedTask });
+    }
+  }
+  return next;
 }
 
 export function adsHypothesisWorkspace(): HypothesisWorkspace {

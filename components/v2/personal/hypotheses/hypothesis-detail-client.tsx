@@ -19,6 +19,7 @@ import {
   hypothesisHero,
   hypothesisPage,
   hypothesisRank,
+  mergeHypothesisSeed,
   qmagicPageBrief,
   parseTaskDraft,
   type HypothesisIdea,
@@ -173,11 +174,18 @@ export function HypothesisDetailClient() {
         const local = readLocal(id);
         const remote = data.workspace;
         const seed = hypothesisPage(data.hypothesis.title)?.workspace() ?? emptyHypothesisWorkspace();
-        const next = remote ?? local ?? seed;
+        const base = remote ?? local ?? seed;
+        const next = mergeHypothesisSeed(base, seed);
         workspaceRef.current = next;
         setWorkspace(next);
         setPage(data);
-        if (!remote && local && data.persisted) apply(local);
+        const seedAdded = next.stages.some((stage) => {
+          const before = base.stages.find((row) => row.id === stage.id);
+          if (!before) return stage.tasks.length > 0;
+          return stage.tasks.some((task) => !before.tasks.some((row) => row.id === task.id));
+        });
+        if (seedAdded && data.persisted) apply(next);
+        else if (!remote && local && data.persisted) apply(local);
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Не удалось открыть гипотезу");
