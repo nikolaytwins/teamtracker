@@ -365,6 +365,10 @@ export function V2ShellSidebar({
                   (pathname?.startsWith(`${appPath("/v2/personal/manifest")}/`) ?? false);
               } else if (item.href.startsWith("/v2/personal/calendar")) {
                 active = pathname?.startsWith(appPath("/v2/personal/calendar")) ?? false;
+              } else if (item.href === "/v2/personal/goals") {
+                active =
+                  (pathname?.startsWith(appPath("/v2/personal/goals")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/wishes")) ?? false);
               }
               return <NavLink key={item.href} item={item} active={!!active} />;
             })}

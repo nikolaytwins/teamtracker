@@ -2,11 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireV2Personal } from "@/lib/v2/auth/require-v2-personal";
 import {
   deletePersonalWish,
+  getPersonalWish,
+  loadPersonalWishCategories,
   PersonalWishesValidationError,
   updatePersonalWish,
 } from "@/lib/v2/personal/personal-wishes-repo";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+export async function GET(_request: NextRequest, { params }: Ctx) {
+  const auth = await requireV2Personal();
+  if (!auth.ok) return auth.response;
+  try {
+    const { id } = await params;
+    const [wish, categories] = await Promise.all([
+      getPersonalWish(auth.ctx, id),
+      loadPersonalWishCategories(auth.ctx),
+    ]);
+    if (!wish) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ wish, categories });
+  } catch (e) {
+    console.error("personal wish get:", e);
+    return NextResponse.json({ error: "Failed to load wish" }, { status: 500 });
+  }
+}
 
 export async function PATCH(request: NextRequest, { params }: Ctx) {
   const auth = await requireV2Personal();

@@ -457,6 +457,33 @@ export async function loadPersonalWishesBoard(ctx: V2SessionContext): Promise<{
   return { wishes, categories };
 }
 
+export async function getPersonalWish(
+  ctx: V2SessionContext,
+  id: string
+): Promise<PersonalWish | null> {
+  const userId = uid(ctx);
+  await ensureTwinshotelWish(userId);
+  const sb = getV2Supabase();
+  const { data: row, error } = await sb
+    .from("v2_personal_wishes")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) return null;
+
+  const { data: imgRows, error: imgErr } = await sb
+    .from("v2_personal_wish_images")
+    .select("*")
+    .eq("wish_id", id)
+    .order("sort_order");
+  if (imgErr) throw imgErr;
+
+  const images = ((imgRows ?? []) as Record<string, unknown>[]).map(mapImage);
+  return mapWish(row as Record<string, unknown>, images);
+}
+
 export async function createPersonalWishCategory(
   ctx: V2SessionContext,
   nameRaw: string

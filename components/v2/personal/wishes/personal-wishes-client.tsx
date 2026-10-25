@@ -24,6 +24,7 @@ import {
   wishMediaTypeFromFile,
 } from "@/lib/v2/personal/wish-media";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -1652,6 +1653,7 @@ function DayMode() {
 }
 
 export function PersonalWishesClient() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("visual");
   const [cat, setCat] = useState<"all" | string>("all");
   const [nearOnly, setNearOnly] = useState(false);
@@ -1706,10 +1708,12 @@ export function PersonalWishesClient() {
     return list;
   }, [items, cat, nearOnly]);
 
-  const openWish = useCallback((id: string, imageIndex?: number) => {
-    setOpenImageIndex(imageIndex ?? 0);
-    setOpen(id);
-  }, []);
+  const openWish = useCallback(
+    (id: string, _imageIndex?: number) => {
+      router.push(appPath(`/v2/personal/wishes/${id}`));
+    },
+    [router]
+  );
   const step = useCallback(
     (d: number) =>
       setOpen((cur) => {
@@ -1787,19 +1791,24 @@ export function PersonalWishesClient() {
       setItems((prev) => sortWishes([optimistic, ...prev.filter((x) => x.id !== wish.id)]));
       setAdding(false);
       setSaving(false);
-      if (!payload.files.length) return;
+      if (!payload.files.length) {
+        router.push(appPath(`/v2/personal/wishes/${wish.id}`));
+        return;
+      }
       setUploading(true);
       void (async () => {
         try {
           await postWishImages(wish.id, payload.files);
-          await reload();
+          blobUrls.forEach((url) => URL.revokeObjectURL(url));
+          router.push(appPath(`/v2/personal/wishes/${wish.id}`));
         } catch (e) {
           await reload();
           setError(
             `${uploadErrorMessage(e, "Не удалось загрузить файл")} Желание сохранено — медиа можно добавить, открыв карточку.`
           );
-        } finally {
           blobUrls.forEach((url) => URL.revokeObjectURL(url));
+          router.push(appPath(`/v2/personal/wishes/${wish.id}`));
+        } finally {
           setUploading(false);
         }
       })();

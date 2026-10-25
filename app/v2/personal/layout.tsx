@@ -183,6 +183,9 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     pathname.startsWith(appPath("/v2/personal/hypotheses"));
   const inGoals =
     pathname.startsWith("/v2/personal/goals") || pathname.startsWith(appPath("/v2/personal/goals"));
+  const inWishGoal =
+    pathname.startsWith("/v2/personal/wishes/") ||
+    pathname.startsWith(appPath("/v2/personal/wishes/"));
   const inArticles =
     pathname.startsWith("/v2/personal/articles") ||
     pathname.startsWith(appPath("/v2/personal/articles")) ||
@@ -207,7 +210,8 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     inSport ||
     inIdeasTasks ||
     inHypotheses ||
-    inGoals
+    inGoals ||
+    inWishGoal
   ) {
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }
