@@ -179,6 +179,61 @@ export const SP_WEEKS_SEED: SportWeek[] = [
     avg: { w: 69.31, f: 14.5, l: 54.8 },
     note: "Неделя без правильного питания, с шашлыками и алкоголем.",
   },
+  {
+    id: "w7",
+    label: "Неделя 7",
+    dates: "",
+    kcal: null,
+    protein: null,
+    wn: null,
+    ww: null,
+    avg: { w: 68.8, f: 14.9, l: 53.9 },
+    note: "",
+  },
+  {
+    id: "w8",
+    label: "Неделя 8",
+    dates: "",
+    kcal: null,
+    protein: null,
+    wn: null,
+    ww: null,
+    avg: { w: 68.7, f: 14.55, l: 54.15 },
+    note: "",
+  },
+  {
+    id: "w9",
+    label: "Неделя 9",
+    dates: "",
+    kcal: 2750,
+    protein: null,
+    wn: null,
+    ww: null,
+    avg: { w: 69.12, f: null, l: null },
+    note: "Первая полная неделя на 2750 ккал.",
+  },
+  {
+    id: "w10",
+    label: "Неделя 10",
+    dates: "",
+    kcal: 2750,
+    protein: null,
+    wn: null,
+    ww: null,
+    avg: { w: 69.26, f: 14.68, l: 54.58 },
+    note: "",
+  },
+  {
+    id: "w11",
+    label: "Неделя 11",
+    dates: "",
+    kcal: 2750,
+    protein: null,
+    wn: null,
+    ww: null,
+    avg: { w: 69.4, f: 14.7, l: 54.7 },
+    note: "",
+  },
 ];
 
 export const SP_PROGRAM_SEED: SportProgramDay[] = [
@@ -425,21 +480,51 @@ export function seedSportDoc(): SportDoc {
   };
 }
 
+/** Подтягивает эталонные недели w0…wn в сохранённый документ (avg/note/kcal). */
+export function mergeSportWeeks(existing: SportWeek[]): SportWeek[] {
+  const byId = new Map(existing.map((week) => [week.id, week]));
+  const merged: SportWeek[] = [];
+  for (const seed of SP_WEEKS_SEED) {
+    const current = byId.get(seed.id);
+    if (!current) {
+      merged.push({ ...seed, days: seed.days ? [...seed.days] : [] });
+      continue;
+    }
+    byId.delete(seed.id);
+    merged.push({
+      ...current,
+      label: seed.label || current.label,
+      dates: seed.dates ?? current.dates,
+      kcal: seed.kcal !== undefined ? seed.kcal : current.kcal,
+      protein: seed.protein !== undefined ? seed.protein : current.protein,
+      wn: current.wn ?? seed.wn ?? null,
+      ww: current.ww ?? seed.ww ?? null,
+      avg: seed.avg ? { ...seed.avg } : current.avg,
+      note: seed.note || current.note || "",
+      days: current.days ? [...current.days] : seed.days ? [...seed.days] : [],
+    });
+  }
+  for (const week of existing) {
+    if (byId.has(week.id)) merged.push(week);
+  }
+  return merged;
+}
+
 export function normalizeSportDoc(raw: unknown): SportDoc {
   const seed = seedSportDoc();
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return seed;
   const d = raw as Partial<SportDoc>;
-  const weeks = Array.isArray(d.weeks) && d.weeks.length > 0 ? d.weeks : seed.weeks;
+  const weeks =
+    Array.isArray(d.weeks) && d.weeks.length > 0 ? mergeSportWeeks(d.weeks as SportWeek[]) : seed.weeks;
   const program = Array.isArray(d.program) && d.program.length > 0 ? d.program : seed.program;
   const strategy = Array.isArray(d.strategy) && d.strategy.length > 0 ? d.strategy : seed.strategy;
   const view =
     d.view === "weeks" || d.view === "training" || d.view === "strategy" || d.view === "metrics"
       ? d.view
       : seed.view;
+  const latestId = weeks[weeks.length - 1]?.id ?? null;
   const wid =
-    typeof d.wid === "string" && weeks.some((w) => w.id === d.wid)
-      ? d.wid
-      : weeks[weeks.length - 1]?.id ?? null;
+    typeof d.wid === "string" && weeks.some((w) => w.id === d.wid) ? d.wid : latestId;
   return {
     view,
     weeks,
