@@ -7,7 +7,7 @@ import { V2Icons } from "@/components/v2/ui/icons";
 import { ProfileModal } from "@/components/ProfileModal";
 import { canAccessAgencyRoutes, normalizeTtUserRole } from "@/lib/roles";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { CommandPalette } from "@/components/v2/shell/command-palette";
 import { NewTaskModal, type LockedProjectHint } from "@/components/v2/tasks/new-task-modal";
 import { V2ShellSidebar } from "@/components/v2/shell/v2-shell-sidebar";
@@ -92,8 +92,23 @@ const PERSONAL_NAV: NavItem[] = [
   { href: "/v2/personal/observations", label: "Дневник", icon: "eye" },
 ];
 
+function isWishGoalPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const bare = "/v2/personal/wishes/";
+  const prefixed = appPath(bare);
+  const rest =
+    pathname.startsWith(prefixed) ? pathname.slice(prefixed.length) :
+    pathname.startsWith(bare) ? pathname.slice(bare.length) :
+    null;
+  if (rest == null || !rest) return false;
+  // /v2/personal/wishes/:id — not the list root
+  return !rest.includes("/") || /^[^/]+\/?$/.test(rest);
+}
+
 export function V2AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const hideChrome = isWishGoalPath(pathname);
   const [me, setMe] = useState<Me | null>(null);
   const [workspace, setWorkspace] = useState<V2WorkspaceRow | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -247,33 +262,43 @@ export function V2AppShell({ children }: { children: React.ReactNode }) {
         openCommandPalette: () => setPaletteOpen(true),
       }}
     >
-      <div className="flex min-h-screen">
-        <V2ShellSidebar
-          nav={nav}
-          personalNav={personalNav}
-          footerNav={footerNav}
-          teamProjects={teamProjects}
-          taskCounts={taskCounts}
-          me={me}
-          roleLabel={roleLabel}
-          onOpenSearch={() => setPaletteOpen(true)}
-          onOpenProfile={() => setProfileOpen(true)}
-          onLogout={logout}
-        />
-        <V2MobileNav
-          nav={nav}
-          personalNav={personalNav}
-          footerNav={footerNav}
-          me={me}
-          roleLabel={roleLabel}
-          canCreateTask={!isClient}
-          onOpenSearch={() => setPaletteOpen(true)}
-          onNewTask={() => openNewTask()}
-          onOpenProfile={() => setProfileOpen(true)}
-          onLogout={logout}
-        />
-        <main className="flex min-w-0 flex-1 flex-col pb-[var(--v2-mobnav-h)]">
-          {bootError ? (
+      <div className={`flex min-h-screen${hideChrome ? " wg-shell-bare" : ""}`}>
+        {hideChrome ? null : (
+          <>
+            <V2ShellSidebar
+              nav={nav}
+              personalNav={personalNav}
+              footerNav={footerNav}
+              teamProjects={teamProjects}
+              taskCounts={taskCounts}
+              me={me}
+              roleLabel={roleLabel}
+              onOpenSearch={() => setPaletteOpen(true)}
+              onOpenProfile={() => setProfileOpen(true)}
+              onLogout={logout}
+            />
+            <V2MobileNav
+              nav={nav}
+              personalNav={personalNav}
+              footerNav={footerNav}
+              me={me}
+              roleLabel={roleLabel}
+              canCreateTask={!isClient}
+              onOpenSearch={() => setPaletteOpen(true)}
+              onNewTask={() => openNewTask()}
+              onOpenProfile={() => setProfileOpen(true)}
+              onLogout={logout}
+            />
+          </>
+        )}
+        <main
+          className={
+            hideChrome
+              ? "flex min-h-screen min-w-0 flex-1 flex-col"
+              : "flex min-w-0 flex-1 flex-col pb-[var(--v2-mobnav-h)]"
+          }
+        >
+          {bootError && !hideChrome ? (
             <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-[12.5px] text-amber-900">
               {bootError}.{" "}
               <button type="button" className="font-semibold underline" onClick={() => void refresh()}>

@@ -457,7 +457,7 @@ export function WishGoalPage({ wishId }: { wishId: string }) {
           <div style={{ padding: 48 }}>
             <p style={{ color: "#f4f4f5", marginBottom: 16 }}>{error}</p>
             <Link className="pill" href={appPath("/v2/personal/goals?tab=wishes")}>
-              ← К желаниям
+              ← На платформу
             </Link>
           </div>
         </div>
@@ -474,7 +474,7 @@ export function WishGoalPage({ wishId }: { wishId: string }) {
       <div className="wg-goal-scroll" ref={rootRef}>
       <header className={`top${solid ? " solid" : ""}`} id="top">
         <Link className="pill" href={appPath("/v2/personal/goals?tab=wishes")}>
-          ← Цели
+          ← На платформу
         </Link>
         <span className="top-t">{wish.title}</span>
         <span className="sp" />
