@@ -614,7 +614,7 @@ export function WishGoalPage({ wishId }: { wishId: string }) {
         </div>
       </div>
 
-      <section className="gal dim" id="gal" ref={galRef}>
+      <section className="gal" id="gal" ref={galRef}>
         {rows.map((row, ri) => (
           <div className="row" key={ri}>
             {row.cells.map((cell, ci) => {
