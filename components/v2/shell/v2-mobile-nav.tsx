@@ -25,6 +25,7 @@ const SECTION_PREFIXES: Record<string, string[]> = {
     "/v2/personal/manifestations",
     "/v2/personal/life-goals",
     "/v2/personal/game",
+    "/v2/personal/life-important",
     "/v2/personal/important",
     "/v2/personal/moscow",
     "/v2/personal/manifest",

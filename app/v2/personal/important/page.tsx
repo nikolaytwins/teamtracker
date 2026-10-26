@@ -1,5 +1,6 @@
-import { ImportantStrategyPage } from "@/components/v2/personal/important/important-strategy-page";
+import { appPath } from "@/lib/api-url";
+import { redirect } from "next/navigation";
 
 export default function PersonalImportantPage() {
-  return <ImportantStrategyPage />;
+  redirect(appPath("/v2/personal/life-important"));
 }

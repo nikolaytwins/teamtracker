@@ -359,6 +359,7 @@ export function V2ShellSidebar({
                   (pathname?.startsWith(appPath("/v2/personal/manifestations")) ?? false) ||
                   (pathname?.startsWith(appPath("/v2/personal/life-goals")) ?? false) ||
                   (pathname?.startsWith(appPath("/v2/personal/game")) ?? false) ||
+                  (pathname?.startsWith(appPath("/v2/personal/life-important")) ?? false) ||
                   (pathname?.startsWith(appPath("/v2/personal/important")) ?? false) ||
                   (pathname?.startsWith(appPath("/v2/personal/moscow")) ?? false) ||
                   pathname === appPath("/v2/personal/manifest") ||
