@@ -41,7 +41,7 @@
 .hypd .hero-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 18%;-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.5) 14%,#000 36%);mask-image:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.5) 14%,#000 36%)}
 .hypd .h-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .hypd .h1{font-size:40px;font-weight:600;letter-spacing:-.036em;line-height:1.1;max-width:760px}
-.hypd .h-d{font-size:16px;line-height:1.55;color:var(--ink-600);max-width:680px;margin-top:12px}
+.hypd .h-d{font-size:16px;line-height:1.55;color:var(--ink-600);max-width:680px;margin-top:12px;white-space:pre-wrap}
 .hypd .h-meta{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:12px;max-width:820px}
 .hypd .mbox{background:var(--ink-50);border-radius:16px;padding:16px 18px}
 .hypd .mbox b{display:block;font-size:15.5px;font-weight:600;line-height:1.4;margin-top:7px}
