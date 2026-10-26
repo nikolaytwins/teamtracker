@@ -47,21 +47,32 @@ function dur(s?: number) {
 }
 
 function probeDims(url: string, video: boolean): Promise<{ w: number; h: number; d?: number }> {
-  return new Promise((resolve) => {
+  const fallback = video ? { w: 16, h: 9 } : { w: 4, h: 3 };
+  const probe = new Promise<{ w: number; h: number; d?: number }>((resolve) => {
     if (video) {
       const v = document.createElement("video");
       v.preload = "metadata";
       v.onloadedmetadata = () =>
-        resolve({ w: v.videoWidth || 16, h: v.videoHeight || 9, d: Number.isFinite(v.duration) ? v.duration : undefined });
-      v.onerror = () => resolve({ w: 16, h: 9 });
+        resolve({
+          w: v.videoWidth || 16,
+          h: v.videoHeight || 9,
+          d: Number.isFinite(v.duration) ? v.duration : undefined,
+        });
+      v.onerror = () => resolve(fallback);
       v.src = url;
       return;
     }
     const img = new Image();
     img.onload = () => resolve({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 });
-    img.onerror = () => resolve({ w: 1, h: 1 });
+    img.onerror = () => resolve(fallback);
     img.src = url;
   });
+  return Promise.race([
+    probe,
+    new Promise<{ w: number; h: number; d?: number }>((resolve) => {
+      window.setTimeout(() => resolve(fallback), 2500);
+    }),
+  ]);
 }
 
 async function postWishImagesViaProxy(wishId: string, files: File[]) {
@@ -198,14 +209,24 @@ export function WishGoalPage({ wishId }: { wishId: string }) {
     setWish(data.wish);
     setCustomCats(data.categories);
     const sorted = [...data.wish.images].sort((a, b) => a.sort_order - b.sort_order);
-    const probed = await Promise.all(
+    // Show page immediately — don't block on image/video metadata.
+    const initial: MediaItem[] = sorted.map((img) => ({
+      ...img,
+      w: isWishVideoMedia(img) ? 16 : 4,
+      h: isWishVideoMedia(img) ? 9 : 3,
+    }));
+    setMedia(initial);
+
+    void Promise.all(
       sorted.map(async (img) => {
         const video = isWishVideoMedia(img);
         const dims = await probeDims(img.url, video);
         return { ...img, w: dims.w, h: dims.h, d: dims.d };
       })
-    );
-    setMedia(probed);
+    ).then((probed) => {
+      setMedia(probed);
+    });
+
     return data.wish;
   }, [wishId]);
 
@@ -421,20 +442,24 @@ export function WishGoalPage({ wishId }: { wishId: string }) {
 
   if (loading) {
     return (
-      <div className="wg-goal" ref={rootRef}>
-        <div style={{ padding: 48, color: "#71717a" }}>Загрузка…</div>
+      <div className="wg-goal">
+        <div className="wg-goal-scroll" ref={rootRef}>
+          <div style={{ padding: 48, color: "#71717a" }}>Загрузка…</div>
+        </div>
       </div>
     );
   }
 
   if (error && !wish) {
     return (
-      <div className="wg-goal" ref={rootRef}>
-        <div style={{ padding: 48 }}>
-          <p style={{ color: "#f4f4f5", marginBottom: 16 }}>{error}</p>
-          <Link className="pill" href={appPath("/v2/personal/goals?tab=wishes")}>
-            ← К желаниям
-          </Link>
+      <div className="wg-goal">
+        <div className="wg-goal-scroll" ref={rootRef}>
+          <div style={{ padding: 48 }}>
+            <p style={{ color: "#f4f4f5", marginBottom: 16 }}>{error}</p>
+            <Link className="pill" href={appPath("/v2/personal/goals?tab=wishes")}>
+              ← К желаниям
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -445,7 +470,8 @@ export function WishGoalPage({ wishId }: { wishId: string }) {
   const scaleLabel = WISH_SCALE_META[wish.scale]?.label ?? wish.scale;
 
   return (
-    <div className="wg-goal" ref={rootRef}>
+    <div className="wg-goal">
+      <div className="wg-goal-scroll" ref={rootRef}>
       <header className={`top${solid ? " solid" : ""}`} id="top">
         <Link className="pill" href={appPath("/v2/personal/goals?tab=wishes")}>
           ← Цели
@@ -660,48 +686,17 @@ export function WishGoalPage({ wishId }: { wishId: string }) {
           e.target.value = "";
         }}
       />
+      </div>
 
       <div className={`drop${dropOn ? " on" : ""}`}>
         <span>Отпусти — добавлю в галерею</span>
       </div>
 
       {uploading ? (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            zIndex: 100,
-            background: "rgba(20,20,23,.9)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 12,
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          Загрузка…
-        </div>
+        <div className="wg-toast wg-toast-up">Загрузка…</div>
       ) : null}
 
-      {error ? (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 24,
-            left: 24,
-            zIndex: 100,
-            background: "rgba(127,29,29,.92)",
-            color: "#fff",
-            padding: "10px 16px",
-            borderRadius: 12,
-            fontSize: 13,
-            maxWidth: 360,
-          }}
-        >
-          {error}
-        </div>
-      ) : null}
+      {error ? <div className="wg-toast wg-toast-err">{error}</div> : null}
 
       {lb && media[lb.i] ? (
         <div
@@ -714,8 +709,8 @@ export function WishGoalPage({ wishId }: { wishId: string }) {
             className="lb-st"
             onClick={(e) => {
               if (lb.show) return;
-              const x = e.clientX;
-              const go = x < window.innerWidth / 3 ? -1 : 1;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const go = e.clientX < rect.left + rect.width / 3 ? -1 : 1;
               setLb((c) => (c ? { ...c, i: (c.i + go + media.length) % media.length } : c));
             }}
           >

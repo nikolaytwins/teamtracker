@@ -462,7 +462,6 @@ export async function getPersonalWish(
   id: string
 ): Promise<PersonalWish | null> {
   const userId = uid(ctx);
-  await ensureTwinshotelWish(userId);
   const sb = getV2Supabase();
   const { data: row, error } = await sb
     .from("v2_personal_wishes")
