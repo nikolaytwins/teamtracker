@@ -42,15 +42,6 @@ const ARTICLE_TABS = [
     match: (p: string) => p.startsWith("/v2/personal/game") || p.startsWith(appPath("/v2/personal/game")),
   },
   {
-    href: "/v2/personal/life-important",
-    label: "Важное",
-    match: (p: string) =>
-      p.startsWith("/v2/personal/life-important") ||
-      p.startsWith(appPath("/v2/personal/life-important")) ||
-      p.startsWith("/v2/personal/important") ||
-      p.startsWith(appPath("/v2/personal/important")),
-  },
-  {
     href: "/v2/personal/moscow",
     label: "Москва",
     match: (p: string) => p.startsWith("/v2/personal/moscow") || p.startsWith(appPath("/v2/personal/moscow")),
@@ -200,13 +191,14 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     pathname.startsWith(appPath("/v2/personal/sexuality")) ||
     pathname.startsWith("/v2/personal/game") ||
     pathname.startsWith(appPath("/v2/personal/game")) ||
-    pathname.startsWith("/v2/personal/life-important") ||
-    pathname.startsWith(appPath("/v2/personal/life-important")) ||
-    pathname.startsWith("/v2/personal/important") ||
-    pathname.startsWith(appPath("/v2/personal/important")) ||
     pathname.startsWith("/v2/personal/moscow") ||
     pathname.startsWith(appPath("/v2/personal/moscow")) ||
     isManifestArticle(pathname);
+  const inLifeImportant =
+    pathname.startsWith("/v2/personal/life-important") ||
+    pathname.startsWith(appPath("/v2/personal/life-important")) ||
+    pathname.startsWith("/v2/personal/important") ||
+    pathname.startsWith(appPath("/v2/personal/important"));
   if (
     inTasks ||
     inCalendar ||
@@ -216,7 +208,8 @@ export default function PersonalLayout({ children }: { children: React.ReactNode
     inIdeasTasks ||
     inHypotheses ||
     inGoals ||
-    inWishGoal
+    inWishGoal ||
+    inLifeImportant
   ) {
     return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>;
   }
