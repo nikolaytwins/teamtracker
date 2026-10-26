@@ -251,6 +251,42 @@ export const NEAREST_TASK_PLAN: NearestPlanItem[] = [
   { n: 7, title: "Личные кабинеты для онлайн-школ", wave: "next" },
 ];
 
+export type ProspectiveDirection = {
+  n: number;
+  title: string;
+  hint: string;
+  /** Titles/aliases to deep-link into an existing hypothesis card when present. */
+  match: string[];
+};
+
+/** Перспективные направления и очередность их теста — от самого сильного к менее. */
+export const PROSPECTIVE_TEST_ORDER: ProspectiveDirection[] = [
+  {
+    n: 1,
+    title: "Импульс · школа креаторов",
+    hint: "Первый тест — аудитория и спрос на обучение",
+    match: ["Курс по ИИ креатору", "Импульс", "Импульс школа креаторов", "Школа креаторов"],
+  },
+  {
+    n: 2,
+    title: "ИИ-астролог",
+    hint: "Сервис с повторяемым спросом и простой упаковкой",
+    match: ["ИИ астролог", "ИИ-астролог", "Холодные ИИ-КП блогерам", "ИИ-сервисы для блогеров"],
+  },
+  {
+    n: 3,
+    title: "ИИ-репетитор",
+    hint: "Следующий продуктовый эксперимент после астролога",
+    match: ["ИИ репетитор", "ИИ-репетитор"],
+  },
+  {
+    n: 4,
+    title: "Qmagic",
+    hint: "Платформа — после коротких коммерческих тестов",
+    match: ["Qmagic", "Qmagic — проверить одну продуктовую гипотезу", "Мини-запуск Qmagic"],
+  },
+];
+
 export const LEGACY_EMPTY_PROJECTS = ["Импульс", "AI-сервисы"];
 
 export function isHypothesisStage(value: string): value is HypothesisStage {

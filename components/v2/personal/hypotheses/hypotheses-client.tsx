@@ -9,6 +9,7 @@ import {
   VERDICT_META,
   PRIMARY_HYPOTHESIS_TAG,
   NEAREST_TASK_PLAN,
+  PROSPECTIVE_TEST_ORDER,
   currentSprintId,
   findHypothesisCatalogSeed,
   hypothesisCatalogOrder,
@@ -365,6 +366,8 @@ export function HypothesesClient() {
 
         <NearestTaskPlan />
 
+        <ProspectiveTestOrder items={items} onOpen={openHypothesis} />
+
         <div id="board-anchor" className="flex flex-wrap items-center gap-3">
           <div className="inline-flex gap-0.5 rounded-[14px] bg-white p-1 shadow-[var(--v2-shadow-card)]">
             {(
@@ -598,6 +601,141 @@ export function HypothesesClient() {
         />
       ) : null}
     </div>
+  );
+}
+
+function ProspectiveTestOrder({
+  items,
+  onOpen,
+}: {
+  items: Hypothesis[];
+  onOpen: (item: Hypothesis) => void;
+}) {
+  const tones = [
+    { accent: "#2d5eef", soft: "rgba(45,94,239,0.12)", label: "Топ" },
+    { accent: "#0f766e", soft: "rgba(15,118,110,0.12)", label: "2-й" },
+    { accent: "#b45309", soft: "rgba(180,83,9,0.12)", label: "3-й" },
+    { accent: "#6b7280", soft: "rgba(107,114,128,0.12)", label: "4-й" },
+  ] as const;
+
+  const resolve = (match: string[]) => {
+    const names = new Set(match.map((value) => value.trim().toLowerCase()));
+    return (
+      items.find((item) => {
+        const title = item.title.trim().toLowerCase();
+        if (names.has(title)) return true;
+        const seed = findHypothesisCatalogSeed(item.title);
+        if (!seed) return false;
+        return [seed.title, ...(seed.aliases ?? [])].some((name) => names.has(name.trim().toLowerCase()));
+      }) ?? null
+    );
+  };
+
+  return (
+    <section className="relative overflow-hidden rounded-[28px] border border-[var(--v2-ink-100)] bg-white px-5 py-6 shadow-[var(--v2-shadow-card)] sm:px-7 sm:py-8 lg:px-9">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[linear-gradient(180deg,rgba(45,94,239,0.07),transparent)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-10 top-8 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(45,94,239,0.14),transparent_70%)]"
+      />
+
+      <div className="relative mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="v2-tight text-[11px] font-semibold uppercase tracking-[0.22em] text-[#2d5eef]">
+            Продуктовый фокус
+          </p>
+          <h2 className="v2-tight mt-2 text-[26px] font-semibold tracking-[-0.04em] text-[var(--v2-ink-900)] sm:text-[32px]">
+            Перспективные направления
+          </h2>
+          <p className="v2-tight mt-1.5 max-w-[40rem] text-[14px] text-[var(--v2-ink-500)] sm:text-[15px]">
+            Очерёдность теста — сверху вниз. Сначала короткий коммерческий эксперимент, платформу оставляем на потом.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)] px-3 py-1.5 text-[12px] font-semibold text-[var(--v2-ink-600)]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#2d5eef]" />
+          {PROSPECTIVE_TEST_ORDER.length} направления
+        </div>
+      </div>
+
+      <ol className="relative space-y-3">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-6 left-[27px] top-6 w-px bg-[linear-gradient(180deg,#2d5eef_0%,rgba(45,94,239,0.15)_55%,transparent_100%)] sm:left-[31px]"
+        />
+        {PROSPECTIVE_TEST_ORDER.map((item, index) => {
+          const tone = tones[index] ?? tones[tones.length - 1]!;
+          const linked = resolve(item.match);
+          const top = index === 0;
+          const inner = (
+            <>
+              <span
+                className={`v2-tnum relative z-[1] inline-flex shrink-0 items-center justify-center rounded-2xl font-bold text-white shadow-[0_12px_28px_-14px_rgba(15,23,42,0.55)] ${
+                  top ? "h-14 w-14 text-[20px] sm:h-16 sm:w-16 sm:text-[22px]" : "h-12 w-12 text-[16px] sm:h-14 sm:w-14 sm:text-[18px]"
+                }`}
+                style={{ background: `linear-gradient(160deg, ${tone.accent}, color-mix(in srgb, ${tone.accent} 72%, #0f172a))` }}
+              >
+                {item.n}
+              </span>
+              <div className={`min-w-0 flex-1 ${top ? "pt-0.5 sm:pt-1" : "pt-0.5"}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]"
+                    style={{ background: tone.soft, color: tone.accent }}
+                  >
+                    {tone.label}
+                  </span>
+                  {linked ? (
+                    <span className="rounded-full bg-[var(--v2-ink-50)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--v2-ink-500)]">
+                      есть в гипотезах
+                    </span>
+                  ) : null}
+                </div>
+                <h3
+                  className={`v2-tight mt-2 font-semibold tracking-[-0.03em] text-[var(--v2-ink-900)] ${
+                    top ? "text-[22px] sm:text-[26px]" : "text-[18px] sm:text-[20px]"
+                  }`}
+                >
+                  {item.title}
+                </h3>
+                <p className={`v2-tight mt-1 text-[var(--v2-ink-500)] ${top ? "text-[14.5px] sm:text-[15.5px]" : "text-[13.5px] sm:text-[14.5px]"}`}>
+                  {item.hint}
+                </p>
+              </div>
+              {linked ? (
+                <span className="hidden shrink-0 self-center text-[20px] text-[var(--v2-ink-300)] transition group-hover:text-[#2d5eef] sm:inline">
+                  →
+                </span>
+              ) : null}
+            </>
+          );
+
+          const className = `group relative flex w-full items-start gap-4 rounded-[22px] border px-4 py-4 text-left transition sm:gap-5 sm:px-5 sm:py-5 ${
+            top
+              ? "border-[rgba(45,94,239,0.22)] bg-[linear-gradient(135deg,rgba(45,94,239,0.08),rgba(255,255,255,0.95)_42%)] shadow-[0_18px_40px_-28px_rgba(45,94,239,0.55)]"
+              : "border-[var(--v2-ink-100)] bg-[var(--v2-ink-50)]/55 hover:border-[var(--v2-ink-200)] hover:bg-white"
+          } ${linked ? "cursor-pointer" : ""}`;
+
+          if (linked) {
+            return (
+              <li key={item.n}>
+                <button type="button" onClick={() => onOpen(linked)} className={className}>
+                  {inner}
+                </button>
+              </li>
+            );
+          }
+
+          return (
+            <li key={item.n} className={className}>
+              {inner}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
