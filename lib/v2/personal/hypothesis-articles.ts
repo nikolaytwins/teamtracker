@@ -4,6 +4,7 @@ import path from "path";
 const FILES = {
   "rostov-content-plan": "rostov-content-plan.md",
   "rostov-ugc": "rostov-ugc.md",
+  "impulse-nexus": "impulse-nexus.md",
 } as const;
 
 export type HypothesisArticleSlug = keyof typeof FILES;

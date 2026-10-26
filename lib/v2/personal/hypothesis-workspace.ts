@@ -8,6 +8,7 @@ export const ROSTOV_HYPOTHESIS_CRITERION = "Первый доход или ≥ 1
 
 export const ROSTOV_CONTENT_PLAN_HREF = "/v2/personal/articles/rostov-content-plan";
 export const ROSTOV_UGC_HREF = "/v2/personal/articles/rostov-ugc";
+export const IMPULSE_NEXUS_HREF = "/v2/personal/articles/impulse-nexus";
 
 export type HypothesisNoteTag = "win" | "fail" | "obs";
 
@@ -96,6 +97,16 @@ export const QMAGIC_HYPOTHESIS_BODY =
 
 const QMAGIC_HYPOTHESIS_ALIASES = ["Qmagic — проверить одну продуктовую гипотезу", "Мини-запуск Qmagic"];
 
+export const IMPULSE_HYPOTHESIS_TITLE = "Курс по ИИ креатору";
+export const IMPULSE_HYPOTHESIS_ALIASES = [
+  "Импульс",
+  "Импульс школа креаторов",
+  "Импульс · школа креаторов",
+  "Школа креаторов",
+];
+export const IMPULSE_HYPOTHESIS_BODY =
+  "«Импульс» — академия ИИ, а NEXUS — её флагманская программа: учим человека самостоятельно создавать и запускать проекты с помощью ИИ, а не зависеть от чужих навыков.\n\nПодробнее — в статье.";
+
 export function qmagicPageBrief(title: string): { title: string; text: string }[] | null {
   const value = title.trim();
   if (value !== QMAGIC_HYPOTHESIS_TITLE && !QMAGIC_HYPOTHESIS_ALIASES.includes(value)) return null;
@@ -141,10 +152,13 @@ function matchesHypothesisTitle(value: string, title: string, aliases: string[] 
   return value === title || aliases.includes(value);
 }
 
+export type HypothesisArticleLink = { name: string; href: string };
+
 export type HypothesisPageProfile = {
   body: string;
   criterion: string;
   priority?: string;
+  articles?: HypothesisArticleLink[];
   workspace: () => HypothesisWorkspace;
 };
 
@@ -205,6 +219,14 @@ export function hypothesisPage(title: string): HypothesisPageProfile | null {
       body: QMAGIC_HYPOTHESIS_BODY,
       criterion: "",
       workspace: qmagicHypothesisWorkspace,
+    };
+  }
+  if (matchesHypothesisTitle(value, IMPULSE_HYPOTHESIS_TITLE, IMPULSE_HYPOTHESIS_ALIASES)) {
+    return {
+      body: IMPULSE_HYPOTHESIS_BODY,
+      criterion: "",
+      articles: [{ name: "Концепция · Импульс / NEXUS", href: IMPULSE_NEXUS_HREF }],
+      workspace: impulseHypothesisWorkspace,
     };
   }
   if (matchesHypothesisTitle(value, MEDIA_HYPOTHESIS_TITLE, MEDIA_HYPOTHESIS_ALIASES)) {
@@ -388,6 +410,34 @@ export function qmagicHypothesisWorkspace(): HypothesisWorkspace {
   };
 }
 
+export function impulseHypothesisWorkspace(): HypothesisWorkspace {
+  return {
+    stages: [
+      {
+        id: "im-concept",
+        title: "Концепция",
+        note: "Импульс — образовательный бренд (академия ИИ). NEXUS — флагманская программа: мир новых возможностей с помощью ИИ.\n\nФакультеты: Creator, Builder, Operator, Founder.",
+        tasks: [],
+      },
+      {
+        id: "im-tasks",
+        title: "Задачи",
+        note: "",
+        tasks: [
+          task("im-audience", "Выбрать первый сегмент для теста спроса"),
+          task("im-offer", "Собрать оффер и посадочную под сегмент"),
+          task("im-test", "Запустить первый тест набора"),
+        ],
+      },
+    ],
+    files: [{ name: "Концепция · Импульс / NEXUS", href: IMPULSE_NEXUS_HREF }],
+    notes: [],
+    ideas: [],
+    copies: [],
+    econ: null,
+  };
+}
+
 export function mediaHypothesisWorkspace(): HypothesisWorkspace {
   return {
     stages: [
@@ -488,6 +538,10 @@ export function mergeHypothesisSeed(
     for (const seedTask of seedStage.tasks) {
       if (!taskIds.has(seedTask.id)) existing.tasks.push({ ...seedTask });
     }
+  }
+  const fileHrefs = new Set(next.files.map((file) => file.href));
+  for (const seedFile of seed.files) {
+    if (!fileHrefs.has(seedFile.href)) next.files.push({ ...seedFile });
   }
   return next;
 }

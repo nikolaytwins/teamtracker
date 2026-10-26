@@ -594,6 +594,13 @@ export const LIFE_ARTICLES: LifeArticleCard[] = [
     lead: "Кого проверить в Люберцах, что покупать в первом ролике и как считать заказы.",
     cover: "UGC",
   },
+  {
+    href: "/v2/personal/articles/impulse-nexus",
+    label: "Импульс",
+    title: "Концепция · Импульс / NEXUS",
+    lead: "Академия ИИ и флагманская программа NEXUS: от зависимости от чужих навыков к способности создавать самому.",
+    cover: "Концепция",
+  },
 ];
 
 export function lifeMapChapters(doc: LifeMapDoc) {

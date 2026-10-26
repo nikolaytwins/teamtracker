@@ -179,11 +179,12 @@ export function HypothesisDetailClient() {
         workspaceRef.current = next;
         setWorkspace(next);
         setPage(data);
-        const seedAdded = next.stages.some((stage) => {
-          const before = base.stages.find((row) => row.id === stage.id);
-          if (!before) return stage.tasks.length > 0;
-          return stage.tasks.some((task) => !before.tasks.some((row) => row.id === task.id));
-        });
+        const seedAdded =
+          next.stages.some((stage) => {
+            const before = base.stages.find((row) => row.id === stage.id);
+            if (!before) return stage.tasks.length > 0;
+            return stage.tasks.some((task) => !before.tasks.some((row) => row.id === task.id));
+          }) || next.files.some((file) => !base.files.some((row) => row.href === file.href));
         if (seedAdded && data.persisted) apply(next);
         else if (!remote && local && data.persisted) apply(local);
       })
@@ -270,6 +271,20 @@ export function HypothesisDetailClient() {
                 {hypothesis.title}
               </h1>
               {description ? <p className="h-d">{description}</p> : null}
+              {profile?.articles?.length ? (
+                <div className="h-arts">
+                  {profile.articles.map((article) => (
+                    <Link key={article.href} className="h-art" href={appPath(article.href)}>
+                      <span className="h-art-ic">MD</span>
+                      <span className="h-art-b">
+                        <b>{article.name}</b>
+                        <span>Открыть статью</span>
+                      </span>
+                      <span className="h-art-go">→</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <div className="h-meta">
               <div className="mbox">

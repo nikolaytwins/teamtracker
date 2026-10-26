@@ -257,7 +257,12 @@ async function syncHypothesisCatalog(
       if ((existing.sprint_id ?? null) !== (nextSprintId ?? null)) patch.sprint_id = nextSprintId;
       if (existing.sort_order !== index) patch.sort_order = index;
       if (project && existing.project_id !== project.id) patch.project_id = project.id;
-      if (seed.body && (!existing.body.trim() || existing.title === "Qmagic")) {
+      if (
+        seed.body &&
+        (!existing.body.trim() ||
+          existing.title === "Qmagic" ||
+          existing.title === "Курс по ИИ креатору")
+      ) {
         if (existing.body.trim() !== seed.body.trim()) patch.body = seed.body;
       }
       if (seed.metric && (!existing.metric.trim() || existing.metric === "Главная гипотеза")) {

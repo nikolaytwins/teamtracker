@@ -42,6 +42,15 @@
 .hypd .h-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .hypd .h1{font-size:40px;font-weight:600;letter-spacing:-.036em;line-height:1.1;max-width:760px}
 .hypd .h-d{font-size:16px;line-height:1.55;color:var(--ink-600);max-width:680px;margin-top:12px;white-space:pre-wrap}
+.hypd .h-arts{display:flex;flex-direction:column;gap:8px;margin-top:16px;max-width:420px}
+.hypd .h-art{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.72);border-radius:14px;padding:13px 14px 13px 16px;color:var(--ink-900);box-shadow:var(--shadow-card)}
+.hypd .h-art:hover{background:#fff;color:var(--ink-900)}
+.hypd .h-art-ic{width:36px;height:42px;border-radius:8px;background:#fff;box-shadow:var(--shadow-card);display:grid;place-items:end center;padding-bottom:6px;font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--blue);flex-shrink:0}
+.hypd .h-art-b{flex:1;min-width:0}
+.hypd .h-art-b b{display:block;font-size:15px;font-weight:600;letter-spacing:-.015em}
+.hypd .h-art-b span{display:block;font-size:13px;color:var(--ink-500);margin-top:2px}
+.hypd .h-art-go{font-size:18px;color:var(--ink-400)}
+.hypd .h-art:hover .h-art-go{color:var(--blue)}
 .hypd .h-meta{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:12px;max-width:820px}
 .hypd .mbox{background:var(--ink-50);border-radius:16px;padding:16px 18px}
 .hypd .mbox b{display:block;font-size:15.5px;font-weight:600;line-height:1.4;margin-top:7px}

@@ -65,6 +65,13 @@ const ARTICLE_TABS = [
       p.startsWith("/v2/personal/articles/rostov-ugc") ||
       p.startsWith(appPath("/v2/personal/articles/rostov-ugc")),
   },
+  {
+    href: "/v2/personal/articles/impulse-nexus",
+    label: "Импульс / NEXUS",
+    match: (p: string) =>
+      p.startsWith("/v2/personal/articles/impulse-nexus") ||
+      p.startsWith(appPath("/v2/personal/articles/impulse-nexus")),
+  },
 ] as const;
 
 function isManifestArticle(pathname: string) {
