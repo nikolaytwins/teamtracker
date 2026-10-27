@@ -138,6 +138,26 @@ async function ensureDesignBoard(userId: string) {
     const { error } = await sb.from("v2_personal_hypothesis_sprints").insert(rows);
     if (error) throw error;
     sprints = await listSprints(userId);
+  } else {
+    const missingSprints = DESIGN_SPRINTS.filter(
+      (seed) => !sprints.some((sprint) => sprint.name.toLowerCase() === seed.name.toLowerCase())
+    );
+    if (missingSprints.length) {
+      const baseOrder = sprints.reduce((max, sprint) => Math.max(max, sprint.sort_order), -1) + 1;
+      const rows = missingSprints.map((seed, index) => ({
+        id: newV2Id(),
+        user_id: userId,
+        name: seed.name,
+        range_label: seed.range_label,
+        is_current: false,
+        sort_order: baseOrder + index,
+        created_at: now,
+        updated_at: now,
+      }));
+      const { error } = await sb.from("v2_personal_hypothesis_sprints").insert(rows);
+      if (error) throw error;
+      sprints = await listSprints(userId);
+    }
   }
 
   let projects = await listProjects(userId);
@@ -235,7 +255,9 @@ async function syncHypothesisCatalog(
     const seed = DESIGN_HYPOTHESES[index]!;
     const names = hypothesisCatalogNames(seed);
     const existing = hypotheses.find(
-      (item) => !claimed.has(item.id) && names.some((name) => name === item.title.trim()),
+      (item) =>
+        !claimed.has(item.id) &&
+        names.some((name) => name.trim().toLowerCase() === item.title.trim().toLowerCase()),
     );
     const project = byName.get(DESIGN_PROJECTS.find((item) => item.key === seed.project)?.name ?? "");
     const sprintSeed = DESIGN_SPRINTS.find((item) => item.key === seed.sprint);

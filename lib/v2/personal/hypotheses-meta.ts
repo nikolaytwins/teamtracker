@@ -214,16 +214,38 @@ export const DESIGN_HYPOTHESES: HypothesisSeed[] = [
     body: "«Импульс» — академия ИИ, а NEXUS — её флагманская программа: учим человека самостоятельно создавать и запускать проекты с помощью ИИ, а не зависеть от чужих навыков.\n\nПодробнее — в статье.",
     metric: "",
   },
+  {
+    project: "br",
+    stage: "active",
+    sprint: "s2",
+    tier: "must",
+    title: "Медийка тест Instagram",
+    aliases: [
+      "медийка тест инстаграм",
+      "Медийка тест инстаграм",
+      "Медийка · тест Instagram",
+      "Тест Instagram",
+      "Медийка Instagram",
+    ],
+    body: "Проверить гипотезу медийки через тест в Instagram: контент, отклик аудитории и первый сигнал спроса.",
+    metric: PRIMARY_HYPOTHESIS_TAG,
+  },
 ];
 
 export function hypothesisCatalogNames(seed: HypothesisSeed): string[] {
   return [seed.title, ...(seed.aliases ?? [])];
 }
 
+function catalogNameMatch(a: string, b: string) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 export function findHypothesisCatalogSeed(title: string): HypothesisSeed | null {
   const value = title.trim();
   return (
-    DESIGN_HYPOTHESES.find((seed) => hypothesisCatalogNames(seed).some((name) => name === value)) ?? null
+    DESIGN_HYPOTHESES.find((seed) =>
+      hypothesisCatalogNames(seed).some((name) => catalogNameMatch(name, value))
+    ) ?? null
   );
 }
 

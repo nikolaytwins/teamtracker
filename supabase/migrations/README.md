@@ -120,8 +120,9 @@
 | 098 | `098_sexual_life_wish.sql` | Желание Sexual life + галерея из ЛАЙФ/сексуальность |
 | 099 | `099_qmagic_hypothesis_team_collab.sql` | Qmagic: совместная работа команды в агенте в описании |
 | 100 | `100_impulse_hypothesis_nexus_article.sql` | Импульс: описание гипотезы со ссылкой на концепцию NEXUS |
+| 101 | `101_december_sprint_media_instagram.sql` | Спринт Декабрь + главная гипотеза Медийка тест Instagram |
 
-**Следующий свободный номер:** `101`
+**Следующий свободный номер:** `102`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 

@@ -96,12 +96,25 @@ export function HypothesesClient() {
     .filter((item) => item.stage === "active" && item.sprint_id === sprint?.id)
     .slice()
     .sort(byCatalog);
-  const activeMust = active.filter((item) => findHypothesisCatalogSeed(item.title)?.tier === "must");
-  const activeWant = active.filter((item) => findHypothesisCatalogSeed(item.title)?.tier === "want");
+  const activeMust = active.filter((item) => {
+    const tier = findHypothesisCatalogSeed(item.title)?.tier;
+    return tier === "must" || item.metric === PRIMARY_HYPOTHESIS_TAG;
+  });
+  const activeWant = active.filter((item) => {
+    const tier = findHypothesisCatalogSeed(item.title)?.tier;
+    return tier === "want" && item.metric !== PRIMARY_HYPOTHESIS_TAG;
+  });
   const activeOther = active.filter((item) => {
     const tier = findHypothesisCatalogSeed(item.title)?.tier;
-    return tier !== "must" && tier !== "want";
+    return tier !== "must" && tier !== "want" && item.metric !== PRIMARY_HYPOTHESIS_TAG;
   });
+  const sprintIndex = sprints.findIndex((item) => item.id === sprint?.id);
+  const canPrevSprint = sprintIndex > 0;
+  const canNextSprint = sprintIndex >= 0 && sprintIndex < sprints.length - 1;
+  const shiftSprint = (delta: number) => {
+    const next = sprints[sprintIndex + delta];
+    if (next) setSel(next.id);
+  };
   const queue = items
     .filter((item) => item.stage === "queue")
     .slice()
@@ -266,10 +279,32 @@ export function HypothesesClient() {
         </section>
 
         <section className="v2-card px-4 py-5 sm:px-6 lg:px-[30px] lg:py-7">
-          <div className="mb-3.5 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 lg:mb-[18px]">
-            <h2 className="v2-tight text-[21px] font-semibold tracking-[-0.03em] sm:text-[26px]">
-              В работе{sprint ? ` · ${sprint.name}` : ""}
-            </h2>
+          <div className="mb-3.5 flex flex-wrap items-center gap-x-3.5 gap-y-2 lg:mb-[18px]">
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <h2 className="v2-tight text-[21px] font-semibold tracking-[-0.03em] sm:text-[26px]">
+                В работе{sprint ? ` · ${sprint.name}` : ""}
+              </h2>
+              <div className="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Предыдущий спринт"
+                  disabled={!canPrevSprint}
+                  onClick={() => shiftSprint(-1)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-50)] text-[18px] font-semibold text-[var(--v2-ink-700)] transition enabled:hover:bg-[var(--v2-ink-100)] disabled:cursor-default disabled:opacity-35"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  aria-label="Следующий спринт"
+                  disabled={!canNextSprint}
+                  onClick={() => shiftSprint(1)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[var(--v2-ink-50)] text-[18px] font-semibold text-[var(--v2-ink-700)] transition enabled:hover:bg-[var(--v2-ink-100)] disabled:cursor-default disabled:opacity-35"
+                >
+                  →
+                </button>
+              </div>
+            </div>
             <span className="v2-tight text-[14.5px] text-[var(--v2-ink-500)]">{sprint?.range_label}</span>
             <span className="ml-auto v2-tnum text-[13.5px] font-semibold text-[var(--v2-ink-500)]">
               {active.length}
