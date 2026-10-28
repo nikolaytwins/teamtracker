@@ -606,7 +606,7 @@ export const LIFE_ARTICLES: LifeArticleCard[] = [
     label: "Внутренний критик",
     title: "Внутренний критик",
     lead: "Критик и Император — одна схема презрения. Ангел даёт выбор: ценность = я есть, свобода = шаг за шагом.",
-    cover: "Наблюдатель",
+    hero: "/articles/inner-critic-hero.jpg",
   },
 ];
 

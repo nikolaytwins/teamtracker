@@ -3,5 +3,11 @@ import { loadHypothesisArticle } from "@/lib/v2/personal/hypothesis-articles";
 
 export default function InnerCriticPage() {
   const article = loadHypothesisArticle("inner-critic");
-  return <HypothesisArticle title={article.title} body={article.body} />;
+  return (
+    <HypothesisArticle
+      title={article.title}
+      body={article.body}
+      hero="/articles/inner-critic-hero.jpg"
+    />
+  );
 }

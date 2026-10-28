@@ -14,13 +14,27 @@ const unbounded = Unbounded({
   variable: "--font-unbounded",
 });
 
-export function HypothesisArticle({ title, body }: { title: string; body: string }) {
+export function HypothesisArticle({
+  title,
+  body,
+  hero,
+}: {
+  title: string;
+  body: string;
+  hero?: string;
+}) {
   return (
     <div className={`hy-art ${unbounded.variable}`}>
       <div className="hy-art-wrap">
         <Link href={appPath("/v2/personal/articles")} className="hy-art-back">
           ← Все статьи
         </Link>
+        {hero ? (
+          <div className="hy-art-banner">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={appPath(hero)} alt="" />
+          </div>
+        ) : null}
         <article className="hy-art-doc">
           <h1>{title}</h1>
           <div className="hy-art-prose">
