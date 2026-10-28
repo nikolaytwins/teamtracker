@@ -72,6 +72,13 @@ const ARTICLE_TABS = [
       p.startsWith("/v2/personal/articles/impulse-nexus") ||
       p.startsWith(appPath("/v2/personal/articles/impulse-nexus")),
   },
+  {
+    href: "/v2/personal/articles/inner-critic",
+    label: "Внутренний критик",
+    match: (p: string) =>
+      p.startsWith("/v2/personal/articles/inner-critic") ||
+      p.startsWith(appPath("/v2/personal/articles/inner-critic")),
+  },
 ] as const;
 
 function isManifestArticle(pathname: string) {

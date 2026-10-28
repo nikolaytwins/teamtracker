@@ -5,6 +5,7 @@ const FILES = {
   "rostov-content-plan": "rostov-content-plan.md",
   "rostov-ugc": "rostov-ugc.md",
   "impulse-nexus": "impulse-nexus.md",
+  "inner-critic": "inner-critic.md",
 } as const;
 
 export type HypothesisArticleSlug = keyof typeof FILES;

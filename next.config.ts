@@ -30,6 +30,7 @@ const nextConfig: NextConfig = {
     "/v2/personal/articles/rostov-content-plan": ["./content/personal/**/*"],
     "/v2/personal/articles/rostov-ugc": ["./content/personal/**/*"],
     "/v2/personal/articles/impulse-nexus": ["./content/personal/**/*"],
+    "/v2/personal/articles/inner-critic": ["./content/personal/**/*"],
   },
 };
 

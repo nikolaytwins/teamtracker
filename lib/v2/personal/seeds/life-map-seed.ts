@@ -601,6 +601,13 @@ export const LIFE_ARTICLES: LifeArticleCard[] = [
     lead: "Академия ИИ и флагманская программа NEXUS: от зависимости от чужих навыков к способности создавать самому.",
     cover: "Концепция",
   },
+  {
+    href: "/v2/personal/articles/inner-critic",
+    label: "Внутренний критик",
+    title: "Внутренний критик",
+    lead: "Критик и Император — одна схема презрения. Ангел даёт выбор: ценность = я есть, свобода = шаг за шагом.",
+    cover: "Наблюдатель",
+  },
 ];
 
 export function lifeMapChapters(doc: LifeMapDoc) {
