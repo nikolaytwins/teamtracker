@@ -6,6 +6,10 @@ const FILES = {
   "rostov-ugc": "rostov-ugc.md",
   "impulse-nexus": "impulse-nexus.md",
   "inner-critic": "inner-critic.md",
+  "ai-courses": "ai-courses.md",
+  copernicus: "copernicus.md",
+  clips: "clips.md",
+  "ege-tutor": "ege-tutor.md",
 } as const;
 
 export type HypothesisArticleSlug = keyof typeof FILES;

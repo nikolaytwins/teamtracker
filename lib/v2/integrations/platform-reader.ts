@@ -78,6 +78,10 @@ const ARTICLE_SLUGS = new Set<HypothesisArticleSlug>([
   "rostov-ugc",
   "impulse-nexus",
   "inner-critic",
+  "ai-courses",
+  "copernicus",
+  "clips",
+  "ege-tutor",
 ]);
 
 function money(n: number) {
@@ -570,7 +574,7 @@ export async function readPlatformSection(
             `• ${a.label}: ${a.title}\n  ${a.lead}\n  ${a.href}${a.href.includes("/articles/") ? ` · slug=${a.href.split("/").pop()}` : ""}`,
         ),
         "",
-        "Чтобы прочитать markdown-статью: section=articles&slug=impulse-nexus|rostov-content-plan|rostov-ugc|inner-critic",
+        "Чтобы прочитать markdown-статью: section=articles&slug=impulse-nexus|rostov-content-plan|rostov-ugc|inner-critic|ai-courses|copernicus|clips|ege-tutor",
         "Длинные страницы: important, life_goals, manifestations, sexuality, moscow",
       ].join("\n");
       break;
@@ -578,7 +582,7 @@ export async function readPlatformSection(
     case "article": {
       if (!params.slug || !ARTICLE_SLUGS.has(params.slug as HypothesisArticleSlug)) {
         throw new PlatformReaderError(
-          "Нужен slug: rostov-content-plan | rostov-ugc | impulse-nexus | inner-critic",
+          "Нужен slug: rostov-content-plan | rostov-ugc | impulse-nexus | inner-critic | ai-courses | copernicus | clips | ege-tutor",
         );
       }
       const article = loadHypothesisArticle(params.slug as HypothesisArticleSlug);

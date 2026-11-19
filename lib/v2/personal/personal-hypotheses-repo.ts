@@ -306,8 +306,17 @@ async function syncHypothesisCatalog(
     if (
       seed.body &&
       (!existing.body.trim() ||
-        existing.title === "Qmagic" ||
-        existing.title === "Курс по ИИ креатору")
+        [
+          "Qmagic",
+          "Курс по ИИ креатору",
+          "Продажа ИИ-курсов",
+          "Коперник",
+          "Клипс",
+          "ИИ-репетитор",
+          "Ростовские колбасы",
+          "ИИ субподряд",
+          "Холодные сайты",
+        ].includes(seed.title))
     ) {
       if (existing.body.trim() !== seed.body.trim()) patch.body = seed.body;
     }

@@ -1,7 +1,11 @@
 import { DESIGN_HYPOTHESES, findHypothesisCatalogSeed } from "@/lib/v2/personal/hypotheses-meta";
 
-export const ROSTOV_HYPOTHESIS_TITLE = "Колбаса через контент";
-export const ROSTOV_HYPOTHESIS_ALIASES = ["Запуск Ростовских колбас через контент"];
+export const ROSTOV_HYPOTHESIS_TITLE = "Ростовские колбасы";
+export const ROSTOV_HYPOTHESIS_ALIASES = [
+  "Колбаса через контент",
+  "Запуск Ростовских колбас через контент",
+  "Ростовские колбасы через контент",
+];
 export const ROSTOV_HYPOTHESIS_BODY =
   "Если проверить рилсы, UGC и партнерскую программу, то хотя бы один канал даст первый доход.";
 export const ROSTOV_HYPOTHESIS_CRITERION = "Первый доход или ≥ 1 партнёр";
@@ -9,6 +13,10 @@ export const ROSTOV_HYPOTHESIS_CRITERION = "Первый доход или ≥ 1
 export const ROSTOV_CONTENT_PLAN_HREF = "/v2/personal/articles/rostov-content-plan";
 export const ROSTOV_UGC_HREF = "/v2/personal/articles/rostov-ugc";
 export const IMPULSE_NEXUS_HREF = "/v2/personal/articles/impulse-nexus";
+export const AI_COURSES_HREF = "/v2/personal/articles/ai-courses";
+export const COPERNICUS_HREF = "/v2/personal/articles/copernicus";
+export const CLIPS_HREF = "/v2/personal/articles/clips";
+export const EGE_TUTOR_HREF = "/v2/personal/articles/ege-tutor";
 
 export type HypothesisNoteTag = "win" | "fail" | "obs";
 
@@ -97,6 +105,27 @@ export const QMAGIC_HYPOTHESIS_BODY =
 
 const QMAGIC_HYPOTHESIS_ALIASES = ["Qmagic — проверить одну продуктовую гипотезу", "Мини-запуск Qmagic"];
 
+export const AI_COURSES_HYPOTHESIS_TITLE = "Продажа ИИ-курсов";
+export const AI_COURSES_HYPOTHESIS_ALIASES = ["Продажа AI-курсов", "ИИ курсы", "AI courses"];
+export const AI_COURSES_HYPOTHESIS_BODY =
+  "Научиться самостоятельно создавать сайты, рабочие сервисы и ИИ-сотрудников для бизнеса — и продавать это как курс / внедрение.";
+export const AI_COURSES_HYPOTHESIS_CRITERION = "Первые продажи тарифа 49 990 ₽ или 149 000 ₽";
+
+export const COPERNICUS_HYPOTHESIS_TITLE = "Коперник";
+export const COPERNICUS_HYPOTHESIS_ALIASES = ["ИИ-астролог", "ИИ астролог", "Коперник астрология"];
+export const COPERNICUS_HYPOTHESIS_BODY =
+  "Астрологический сервис с ИИ-расшифровками: контент-ферма, рилсы, YouTube-прогнозы и инструмент, который астрологи заводят клиентам.";
+
+export const CLIPS_HYPOTHESIS_TITLE = "Клипс";
+export const CLIPS_HYPOTHESIS_ALIASES = ["Clips", "Клипс сериалы", "Клипс драмы"];
+export const CLIPS_HYPOTHESIS_BODY =
+  "Платформа коротких драм / сериалов с рилс-лентой, spicy-подпиской и инструментами для креаторов.";
+
+export const EGE_TUTOR_HYPOTHESIS_TITLE = "ИИ-репетитор";
+export const EGE_TUTOR_HYPOTHESIS_ALIASES = ["ИИ репетитор", "ЕГЭ репетитор", "ЕГЭ РЕПЕТИТОР"];
+export const EGE_TUTOR_HYPOTHESIS_BODY =
+  "ИИ-репетитор для ЕГЭ: статьи, личные зумы, персональная программа и решатор домашек. Рост через UGC школьников.";
+
 export const IMPULSE_HYPOTHESIS_TITLE = "Курс по ИИ креатору";
 export const IMPULSE_HYPOTHESIS_ALIASES = [
   "Импульс",
@@ -149,7 +178,8 @@ export const ADS_HYPOTHESIS_BODY =
 export const ADS_HYPOTHESIS_CRITERION = "Директолог-партнёр и сообщения старым клиентам";
 
 function matchesHypothesisTitle(value: string, title: string, aliases: string[] = []) {
-  return value === title || aliases.includes(value);
+  const left = value.trim().toLowerCase();
+  return left === title.trim().toLowerCase() || aliases.some((alias) => alias.trim().toLowerCase() === left);
 }
 
 export type HypothesisArticleLink = { name: string; href: string };
@@ -191,7 +221,7 @@ export function hypothesisRank(title: string): HypothesisRank | null {
   const peers = DESIGN_HYPOTHESES.filter((item) => item.tier === seed.tier);
   const idx = Math.max(0, peers.findIndex((item) => item.title === seed.title));
   if (seed.tier === "must") {
-    const tones: HypothesisRankTone[] = ["main", "two", "three", "four"];
+    const tones: HypothesisRankTone[] = ["main", "two", "three", "four", "four", "four"];
     return { label: `Обязательная · ${idx + 1}`, tone: tones[Math.min(idx, tones.length - 1)] ?? "main" };
   }
   return { label: `Желательная · ${idx + 1}`, tone: "side" };
@@ -203,7 +233,43 @@ export function hypothesisPage(title: string): HypothesisPageProfile | null {
     return {
       body: ROSTOV_HYPOTHESIS_BODY,
       criterion: ROSTOV_HYPOTHESIS_CRITERION,
+      articles: [
+        { name: "Контент-план", href: ROSTOV_CONTENT_PLAN_HREF },
+        { name: "UGC-креаторы", href: ROSTOV_UGC_HREF },
+      ],
       workspace: rostovHypothesisWorkspace,
+    };
+  }
+  if (matchesHypothesisTitle(value, AI_COURSES_HYPOTHESIS_TITLE, AI_COURSES_HYPOTHESIS_ALIASES)) {
+    return {
+      body: AI_COURSES_HYPOTHESIS_BODY,
+      criterion: AI_COURSES_HYPOTHESIS_CRITERION,
+      articles: [{ name: "План продажи ИИ-курсов", href: AI_COURSES_HREF }],
+      workspace: emptyHypothesisWorkspace,
+    };
+  }
+  if (matchesHypothesisTitle(value, COPERNICUS_HYPOTHESIS_TITLE, COPERNICUS_HYPOTHESIS_ALIASES)) {
+    return {
+      body: COPERNICUS_HYPOTHESIS_BODY,
+      criterion: "",
+      articles: [{ name: "Коперник · план", href: COPERNICUS_HREF }],
+      workspace: emptyHypothesisWorkspace,
+    };
+  }
+  if (matchesHypothesisTitle(value, CLIPS_HYPOTHESIS_TITLE, CLIPS_HYPOTHESIS_ALIASES)) {
+    return {
+      body: CLIPS_HYPOTHESIS_BODY,
+      criterion: "",
+      articles: [{ name: "Клипс · план", href: CLIPS_HREF }],
+      workspace: emptyHypothesisWorkspace,
+    };
+  }
+  if (matchesHypothesisTitle(value, EGE_TUTOR_HYPOTHESIS_TITLE, EGE_TUTOR_HYPOTHESIS_ALIASES)) {
+    return {
+      body: EGE_TUTOR_HYPOTHESIS_BODY,
+      criterion: "",
+      articles: [{ name: "ЕГЭ репетитор · план", href: EGE_TUTOR_HREF }],
+      workspace: emptyHypothesisWorkspace,
     };
   }
   if (matchesHypothesisTitle(value, TWINLABS_HYPOTHESIS_TITLE, TWINLABS_HYPOTHESIS_ALIASES)) {

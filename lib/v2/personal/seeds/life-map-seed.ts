@@ -608,6 +608,34 @@ export const LIFE_ARTICLES: LifeArticleCard[] = [
     lead: "Критик и Император — одна схема презрения. Ангел даёт выбор: ценность = я есть, свобода = шаг за шагом.",
     hero: "/articles/inner-critic-hero.jpg",
   },
+  {
+    href: "/v2/personal/articles/ai-courses",
+    label: "ИИ-курсы",
+    title: "Продажа ИИ-курсов",
+    lead: "Оффер 49 990 / 149 000, анкета предзаписи, YouTube-каналы и упаковка конкурентов.",
+    cover: "Курс",
+  },
+  {
+    href: "/v2/personal/articles/copernicus",
+    label: "Коперник",
+    title: "Коперник",
+    lead: "Касдев у астрологов, контент-ферма, рилсы и ИИ-инструмент для клиентов.",
+    cover: "Астрология",
+  },
+  {
+    href: "/v2/personal/articles/clips",
+    label: "Клипс",
+    title: "Клипс",
+    lead: "Короткие драмы, рилс-лента, spicy-подписка и заработок креаторов.",
+    cover: "Сериалы",
+  },
+  {
+    href: "/v2/personal/articles/ege-tutor",
+    label: "ЕГЭ",
+    title: "ЕГЭ репетитор",
+    lead: "UGC школьников, решатор домашек и MVP-команда: блогер, репетитор, я.",
+    cover: "Репетитор",
+  },
 ];
 
 export function lifeMapChapters(doc: LifeMapDoc) {

@@ -57,7 +57,9 @@ export function createDiaryMcpServer() {
       slug: z
         .string()
         .optional()
-        .describe("slug статьи: impulse-nexus | rostov-content-plan | rostov-ugc | inner-critic"),
+        .describe(
+          "slug статьи: impulse-nexus | rostov-content-plan | rostov-ugc | inner-critic | ai-courses | copernicus | clips | ege-tutor",
+        ),
       type: z.string().optional().describe("Для diary: тип записи"),
       from: z.string().optional().describe("YYYY-MM-DD"),
       to: z.string().optional().describe("YYYY-MM-DD"),
