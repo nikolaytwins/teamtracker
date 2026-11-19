@@ -1,6 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { formatEntry, getEntry, listEntries } from "./client.js";
+import {
+  formatEntry,
+  getEntry,
+  listEntries,
+  listPlatformSections,
+  readPlatformSection,
+} from "./client.js";
 
 function monthPeriod(month: string): { from: string; to: string } | null {
   const m = month.trim().match(/^(\d{4})-(\d{2})$/);
@@ -17,9 +23,54 @@ function monthPeriod(month: string): { from: string; to: string } | null {
 
 export function createDiaryMcpServer() {
   const server = new McpServer({
-    name: "team-tracker-diary",
-    version: "0.1.0",
+    name: "team-tracker-platform",
+    version: "0.2.0",
   });
+
+  server.tool(
+    "list_sections",
+    "Каталог вкладок Team Tracker, которые можно прочитать через read_section (главная, финансы, гипотезы, цели, важное, статьи, спорт, дневник и др.).",
+    {},
+    async () => {
+      const sections = await listPlatformSections();
+      const text =
+        sections.length === 0
+          ? "Разделы не найдены."
+          : sections
+              .map((s) => `• ${s.id} — ${s.title}\n  ${s.description}\n  ${s.href}`)
+              .join("\n\n");
+      return { content: [{ type: "text", text }] };
+    },
+  );
+
+  server.tool(
+    "read_section",
+    "Прочитать содержимое вкладки / раздела Team Tracker только на чтение. Сначала вызови list_sections. Для статьи markdown передай slug. Для одной гипотезы — section=hypothesis и id.",
+    {
+      section: z
+        .string()
+        .describe(
+          "id раздела: home, revenue, plan, finance, hypotheses, goals, important, articles, sport, diary, wishes, wishlist, ideas, life_goals, manifestations, sexuality, moscow, mycode, brand, time, hypothesis, article, life_strategy",
+        ),
+      q: z.string().optional().describe("Фильтр по тексту внутри раздела"),
+      id: z.string().optional().describe("id гипотезы для section=hypothesis"),
+      slug: z
+        .string()
+        .optional()
+        .describe("slug статьи: impulse-nexus | rostov-content-plan | rostov-ugc | inner-critic"),
+      type: z.string().optional().describe("Для diary: тип записи"),
+      from: z.string().optional().describe("YYYY-MM-DD"),
+      to: z.string().optional().describe("YYYY-MM-DD"),
+      year: z.number().int().optional(),
+      month: z.number().int().min(1).max(12).optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+    },
+    async (args) => {
+      const data = await readPlatformSection(args);
+      const text = `# ${data.title}\n\n${data.text}`.trim();
+      return { content: [{ type: "text", text }] };
+    },
+  );
 
   server.tool(
     "search_entries",

@@ -1,4 +1,5 @@
 const DEFAULT_API = "https://tt.twinlabs.ru/api/integrations/sophia/diary";
+const DEFAULT_PLATFORM_API = "https://tt.twinlabs.ru/api/integrations/sophia/platform";
 
 export type DiaryObservation = {
   id: string;
@@ -19,27 +20,40 @@ export type DiaryList = {
   counts: Record<string, number>;
 };
 
+export type PlatformSection = {
+  id: string;
+  title: string;
+  href: string;
+  description: string;
+};
+
 function apiUrl() {
   return (process.env.TT_DIARY_API_URL || DEFAULT_API).trim();
+}
+
+function platformApiUrl() {
+  return (process.env.TT_PLATFORM_API_URL || DEFAULT_PLATFORM_API).trim();
 }
 
 function secret() {
   return (process.env.TT_INTEGRATION_SECRET || "").trim();
 }
 
-async function diaryFetch(pathQuery: string): Promise<Response> {
+async function authFetch(url: string): Promise<Response> {
   const token = secret();
   if (token.length < 16) {
     throw new Error("TT_INTEGRATION_SECRET не задан");
   }
-  const url = `${apiUrl()}${pathQuery}`;
-  const res = await fetch(url, {
+  return fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
       "x-tt-integration-secret": token,
     },
   });
-  return res;
+}
+
+async function diaryFetch(pathQuery: string): Promise<Response> {
+  return authFetch(`${apiUrl()}${pathQuery}`);
 }
 
 export async function listEntries(params: {
@@ -87,4 +101,49 @@ export function formatEntry(o: DiaryObservation, { full = false } = {}): string 
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+export async function listPlatformSections(): Promise<PlatformSection[]> {
+  const res = await authFetch(`${platformApiUrl()}?list=1`);
+  const data = (await res.json()) as { sections?: PlatformSection[]; error?: string };
+  if (!res.ok) throw new Error(data.error || `API ${res.status}`);
+  return data.sections ?? [];
+}
+
+export async function readPlatformSection(params: {
+  section: string;
+  q?: string;
+  id?: string;
+  slug?: string;
+  type?: string;
+  from?: string;
+  to?: string;
+  year?: number;
+  month?: number;
+  limit?: number;
+}): Promise<{ section: string; title: string; text: string }> {
+  const sp = new URLSearchParams();
+  sp.set("section", params.section);
+  if (params.q) sp.set("q", params.q);
+  if (params.id) sp.set("id", params.id);
+  if (params.slug) sp.set("slug", params.slug);
+  if (params.type) sp.set("type", params.type);
+  if (params.from) sp.set("from", params.from);
+  if (params.to) sp.set("to", params.to);
+  if (params.year != null) sp.set("year", String(params.year));
+  if (params.month != null) sp.set("month", String(params.month));
+  if (params.limit != null) sp.set("limit", String(params.limit));
+  const res = await authFetch(`${platformApiUrl()}?${sp}`);
+  const data = (await res.json()) as {
+    section?: string;
+    title?: string;
+    text?: string;
+    error?: string;
+  };
+  if (!res.ok) throw new Error(data.error || `API ${res.status}`);
+  return {
+    section: data.section || params.section,
+    title: data.title || params.section,
+    text: data.text || "",
+  };
 }

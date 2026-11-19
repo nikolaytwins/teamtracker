@@ -170,11 +170,11 @@ const server = createServer(async (req, res) => {
 
     sendJson(res, 404, { error: "not found" });
   } catch (error) {
-    console.error("tt-diary-mcp:", error);
+    console.error("tt-platform-mcp:", error);
     if (!res.headersSent) sendJson(res, 500, { error: "internal error" });
   }
 });
 
 server.listen(PORT, "127.0.0.1", () => {
-  console.log(`tt-diary-mcp on 127.0.0.1:${PORT} resource=${resourceUrl()}`);
+  console.log(`tt-platform-mcp on 127.0.0.1:${PORT} resource=${resourceUrl()}`);
 });

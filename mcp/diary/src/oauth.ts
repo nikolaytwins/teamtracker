@@ -59,7 +59,7 @@ export function authorizationServerMetadata() {
     grant_types_supported: ["authorization_code"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
-    scopes_supported: ["diary.read"],
+    scopes_supported: ["platform.read", "diary.read"],
   };
 }
 
@@ -69,7 +69,7 @@ export function protectedResourceMetadata() {
     resource: resourceUrl(),
     authorization_servers: [origin],
     bearer_methods_supported: ["header"],
-    scopes_supported: ["diary.read"],
+    scopes_supported: ["platform.read", "diary.read"],
   };
 }
 
@@ -108,15 +108,15 @@ export function authorizePage(query: URLSearchParams): string {
   const code_challenge = query.get("code_challenge") || "";
   const error = query.get("error") || "";
   return `<!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><title>Дневник Team Tracker</title>
+<html lang="ru"><head><meta charset="utf-8"><title>Team Tracker MCP</title>
 <style>
   body{font-family:ui-sans-serif,system-ui;max-width:28rem;margin:12vh auto;padding:0 1rem;color:#111}
   input,button{font:inherit;padding:.6rem .8rem;width:100%;box-sizing:border-box}
   button{margin-top:.8rem;background:#111;color:#fff;border:0;border-radius:8px;cursor:pointer}
   .err{color:#b91c1c;margin-bottom:1rem}
 </style></head><body>
-<h1>Дневник Team Tracker</h1>
-<p>MCP только на чтение. Введи интеграционный секрет Team Tracker.</p>
+<h1>Team Tracker</h1>
+<p>MCP только на чтение: все вкладки платформы и дневник. Введи интеграционный секрет.</p>
 ${error ? `<p class="err">${escapeHtml(error)}</p>` : ""}
 <form method="post" action="/oauth/authorize">
   <input type="hidden" name="client_id" value="${escapeHtml(client_id)}">
@@ -176,7 +176,7 @@ export function exchangeToken(body: URLSearchParams) {
     access_token: token,
     token_type: "Bearer",
     expires_in: 30 * 24 * 60 * 60,
-    scope: "diary.read",
+    scope: "platform.read diary.read",
   };
 }
 

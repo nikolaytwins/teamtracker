@@ -121,8 +121,11 @@
 | 099 | `099_qmagic_hypothesis_team_collab.sql` | Qmagic: совместная работа команды в агенте в описании |
 | 100 | `100_impulse_hypothesis_nexus_article.sql` | Импульс: описание гипотезы со ссылкой на концепцию NEXUS |
 | 101 | `101_december_sprint_media_instagram.sql` | Спринт Декабрь + главная гипотеза Медийка тест Instagram |
+| 102 | `102_niktwins_pages.sql` | niktwins: тексты, картинки и локальное состояние страниц |
+| 103 | `103_niktwins_insights.sql` | niktwins: факты-инсайты и разборы стратегии |
+| 104 | `104_site_audit_reel_hypothesis.sql` | Очередь: гипотеза «Аудит сайта через рилс» |
 
-**Следующий свободный номер:** `102`
+**Следующий свободный номер:** `105`
 
 Очистка проектов v2 (без v1): `npm run v2-clear-projects` (опционально `DRY_RUN=1`). Таблицы `agency_*` и `pm_*` не затрагиваются.
 
