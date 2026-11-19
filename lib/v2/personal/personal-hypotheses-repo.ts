@@ -120,6 +120,26 @@ async function listHypotheses(userId: string): Promise<Hypothesis[]> {
   return ((data ?? []) as Record<string, unknown>[]).map(mapHypothesis);
 }
 
+async function hasBoardSeeded(userId: string): Promise<boolean> {
+  const sb = getV2Supabase();
+  const { data, error } = await sb
+    .from("v2_personal_hypothesis_settings")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
+async function markBoardSeeded(userId: string) {
+  const sb = getV2Supabase();
+  const { error } = await sb.from("v2_personal_hypothesis_settings").upsert(
+    { user_id: userId, seeded_at: nowIso() },
+    { onConflict: "user_id" },
+  );
+  if (error) throw error;
+}
+
 async function ensureDesignBoard(userId: string) {
   const sb = getV2Supabase();
   const now = nowIso();
@@ -192,7 +212,9 @@ async function ensureDesignBoard(userId: string) {
   }
 
   let hypotheses = await listHypotheses(userId);
-  if (!hypotheses.length) {
+  const alreadySeeded = await hasBoardSeeded(userId);
+  // Первый заход: засеять каталог один раз. Удалённые карточки больше не возвращаем.
+  if (!hypotheses.length && !alreadySeeded) {
     const byName = new Map(projects.map((project) => [project.name, project]));
     const sprintByName = new Map(sprints.map((sprint) => [sprint.name, sprint]));
     const rows = DESIGN_HYPOTHESES.map((seed, index) => {
@@ -219,6 +241,7 @@ async function ensureDesignBoard(userId: string) {
     if (error) throw error;
     hypotheses = await listHypotheses(userId);
   }
+  if (!alreadySeeded) await markBoardSeeded(userId);
 
   const current = currentSprintId(sprints);
   const loose = hypotheses.filter((item) => (item.stage === "active" || item.stage === "done") && !item.sprint_id);
@@ -238,7 +261,7 @@ async function ensureDesignBoard(userId: string) {
   await syncHypothesisCatalog(userId, projects, sprints, hypotheses);
 }
 
-/** Подтягивает названия, стадии и недостающие карточки каталога гипотез. */
+/** Обновляет уже существующие карточки каталога. Не создаёт заново удалённые. */
 async function syncHypothesisCatalog(
   userId: string,
   projects: HypothesisProject[],
@@ -259,64 +282,45 @@ async function syncHypothesisCatalog(
         !claimed.has(item.id) &&
         names.some((name) => name.trim().toLowerCase() === item.title.trim().toLowerCase()),
     );
+    if (!existing) continue;
+
+    claimed.add(existing.id);
     const project = byName.get(DESIGN_PROJECTS.find((item) => item.key === seed.project)?.name ?? "");
     const sprintSeed = DESIGN_SPRINTS.find((item) => item.key === seed.sprint);
     const sprint = sprintSeed ? sprintByName.get(sprintSeed.name) : undefined;
     const sprintId = seed.stage === "active" || seed.stage === "done" ? sprint?.id ?? currentSprintId(sprints) : null;
 
-    if (existing) {
-      claimed.add(existing.id);
-      const patch: Record<string, unknown> = {};
-      if (existing.title !== seed.title) patch.title = seed.title;
-      // Не возвращаем проверенные гипотезы обратно в каталог-стадию.
-      if (existing.stage !== "done" && existing.stage !== seed.stage) patch.stage = seed.stage;
-      const nextSprintId =
-        existing.stage === "done"
-          ? existing.sprint_id
-          : seed.stage === "active" || seed.stage === "done"
-            ? sprintId
-            : null;
-      if ((existing.sprint_id ?? null) !== (nextSprintId ?? null)) patch.sprint_id = nextSprintId;
-      if (existing.sort_order !== index) patch.sort_order = index;
-      if (project && existing.project_id !== project.id) patch.project_id = project.id;
-      if (
-        seed.body &&
-        (!existing.body.trim() ||
-          existing.title === "Qmagic" ||
-          existing.title === "Курс по ИИ креатору")
-      ) {
-        if (existing.body.trim() !== seed.body.trim()) patch.body = seed.body;
-      }
-      if (seed.metric && (!existing.metric.trim() || existing.metric === "Главная гипотеза")) {
-        patch.metric = seed.metric;
-      }
-      if (!Object.keys(patch).length) continue;
-      patch.updated_at = now;
-      const { error } = await sb
-        .from("v2_personal_hypotheses")
-        .update(patch)
-        .eq("id", existing.id)
-        .eq("user_id", userId);
-      if (error) throw error;
-      continue;
+    const patch: Record<string, unknown> = {};
+    if (existing.title !== seed.title) patch.title = seed.title;
+    // Не возвращаем проверенные гипотезы обратно в каталог-стадию.
+    if (existing.stage !== "done" && existing.stage !== seed.stage) patch.stage = seed.stage;
+    const nextSprintId =
+      existing.stage === "done"
+        ? existing.sprint_id
+        : seed.stage === "active" || seed.stage === "done"
+          ? sprintId
+          : null;
+    if ((existing.sprint_id ?? null) !== (nextSprintId ?? null)) patch.sprint_id = nextSprintId;
+    if (existing.sort_order !== index) patch.sort_order = index;
+    if (project && existing.project_id !== project.id) patch.project_id = project.id;
+    if (
+      seed.body &&
+      (!existing.body.trim() ||
+        existing.title === "Qmagic" ||
+        existing.title === "Курс по ИИ креатору")
+    ) {
+      if (existing.body.trim() !== seed.body.trim()) patch.body = seed.body;
     }
-
-    const row = {
-      id: newV2Id(),
-      user_id: userId,
-      project_id: project?.id ?? null,
-      sprint_id: sprintId,
-      title: seed.title,
-      body: seed.body,
-      metric: seed.metric,
-      stage: seed.stage,
-      verdict: seed.verdict ?? null,
-      result_text: seed.result_text ?? "",
-      sort_order: index,
-      created_at: now,
-      updated_at: now,
-    };
-    const { error } = await sb.from("v2_personal_hypotheses").insert(row);
+    if (seed.metric && (!existing.metric.trim() || existing.metric === "Главная гипотеза")) {
+      patch.metric = seed.metric;
+    }
+    if (!Object.keys(patch).length) continue;
+    patch.updated_at = now;
+    const { error } = await sb
+      .from("v2_personal_hypotheses")
+      .update(patch)
+      .eq("id", existing.id)
+      .eq("user_id", userId);
     if (error) throw error;
   }
 }
